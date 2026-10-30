@@ -1351,11 +1351,15 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
             @"RF_ROWS" : @(p->rowsPerTG),
             @"CC_COLS" : @(p->colsPerTG),
         };
-        // mathMode is declared from the macOS 15 SDK on. Against an older SDK,
-        // conda-forge's 11.0 among them, only fastMathEnabled is compiled.
+        // mathMode and mathFloatingPointFunctions are declared from the macOS 15 SDK
+        // on. Against an older SDK, conda-forge's 11.0 among them, only
+        // fastMathEnabled is compiled. fastMathEnabled = NO sets both safe arithmetic
+        // and precise functions. From macOS 15 they are two settings, and the
+        // functions default to fast, so both are set.
 #if defined(__MAC_15_0) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_15_0
         if (@available(macOS 15.0, *)) {
             copt.mathMode = MTLMathModeSafe;
+            copt.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsPrecise;
         } else
 #endif
         {

@@ -9,6 +9,14 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Fixed: on macOS 15 and later the Metal backend compiled its kernels with fast
+  single-precision math functions. `fastMathEnabled = NO` had set safe arithmetic and precise functions
+  together, and its replacement, `mathMode = MTLMathModeSafe`, sets the arithmetic alone and leaves
+  `mathFloatingPointFunctions` at its fast default. The backend sets both, so the kernels run precise
+  sine and cosine on every macOS, as a build against an older SDK already did. Every device row of
+  `docs/generated/validation-measured.md` moved inside its tolerance and no CPU row moved. The device's
+  steady-state exit power against the CPU went from 6.09e-4 to 5.99e-4. The walk is 0.3 to 2.3 percent
+  longer, measured in `docs/performance.md`.
 - 2026-10-29 Fixed: `docs/validation.md` named the particle-path timing program
   `tests/lucifer_advance_bench.f90`. It is `programs/lucifer_advance_bench.f90`, where it has been since
   the sources moved to the repository root.

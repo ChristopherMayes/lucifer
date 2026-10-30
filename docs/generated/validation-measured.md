@@ -269,15 +269,15 @@ where the two builds agree to every printed digit.
 | device lockstep steady worst_theta | 6.5786e-06 | same | <= 1.5000e-04 |
 | device lockstep steady worst_phasor | 7.5288e-08 | same | <= 2.2000e-05 |
 | device lockstep steady worst_source | 1.4673e-05 | same | <= 2.2000e-04 |
-| device lockstep steady worst_field | 1.4664e-05 | same | <= 2.2000e-04 |
+| device lockstep steady worst_field | 1.4663e-05 | same | <= 2.2000e-04 |
 | device lockstep steady guard [ticks] | 8.8069e+06 | same | >= 1.0000e+06 |
 | bucket wraps asserted exact on device |  | same | holds |
 | FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | mutation moves worst_theta | 4.6860e-03 | same | >= 6.5786e-05 |
 | mutation moves worst_source | 7.7557e-04 | same | >= 7.3365e-05 |
-| device freerun compounds past lockstep (phasor) | 9.9176e-07 | same | >= 7.5288e-08 |
-| device freerun end-to-end power | 6.0927e-04 | same | 0 to 1.6000e-03 |
-| device production exit power vs CPU | 6.0927e-04 | same | 0 to 1.6000e-03 |
+| device freerun compounds past lockstep (phasor) | 9.8435e-07 | same | >= 7.5288e-08 |
+| device freerun end-to-end power | 5.9853e-04 | same | 0 to 1.6000e-03 |
+| device production exit power vs CPU | 5.9853e-04 | same | 0 to 1.6000e-03 |
 | device lockstep TD worst_x | 2.7499e-07 | same | <= 1.0000e-06 |
 | device lockstep TD worst_px | 2.6433e-07 | same | <= 1.0000e-06 |
 | device lockstep TD worst_y | 2.4626e-07 | same | <= 1.0000e-06 |
@@ -289,7 +289,7 @@ where the two builds agree to every printed digit.
 | device lockstep TD worst_field | 6.3706e-06 | same | <= 2.2000e-04 |
 | device lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| device production TD window power vs CPU | 1.4941e-05 | same | <= 1.6000e-03 |
+| device production TD window power vs CPU | 1.3783e-05 | same | <= 1.6000e-03 |
 | refused: does not cover wakes |  | same | holds |
 | refused: does not cover spontaneous radiation |  | same | holds |
 | refused: unrecognized device |  | same | holds |
@@ -304,19 +304,19 @@ where the two builds agree to every printed digit.
 | harmonic lockstep worst_pz | 2.0099e-07 | same | <= 1.3000e-06 |
 | harmonic lockstep worst_theta | 6.8653e-06 | same | <= 1.5000e-04 |
 | harmonic lockstep worst_phasor | 1.2861e-07 | same | <= 2.2000e-05 |
-| harmonic lockstep worst_source | 1.2395e-08 | same | <= 2.2000e-04 |
+| harmonic lockstep worst_source | 1.2388e-08 | same | <= 2.2000e-04 |
 | harmonic lockstep worst_field | 2.0428e-07 | same | <= 2.2000e-04 |
 | harmonic lockstep worst_phasor_h3 (per-member footer) | 9.1287e-08 | 9.1288e-08 | <= 6.0000e-07 |
-| harmonic lockstep worst_source_h3 (per-member footer) | 3.4443e-09 | same | <= 8.0000e-06 |
-| harmonic lockstep worst_field_h3 (per-member footer) | 3.4449e-09 | same | <= 8.0000e-06 |
+| harmonic lockstep worst_source_h3 (per-member footer) | 3.4444e-09 | same | <= 8.0000e-06 |
+| harmonic lockstep worst_field_h3 (per-member footer) | 3.4450e-09 | same | <= 8.0000e-06 |
 | harmonic footer carries the fundamental too |  | same | holds |
 | harmonic FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | harmonic mutation moves worst_theta | 4.7036e-03 | same | >= 6.8653e-05 |
-| harmonic mutation moves worst_source_h3 | 6.4875e-07 | same | >= 1.7221e-08 |
-| harmonic freerun compounds past lockstep (phasor) | 3.1721e-06 | same | >= 1.2861e-07 |
-| harmonic production P1 vs CPU (bunched beam) | 1.9268e-06 | same | <= 1.6000e-03 |
-| harmonic production P3 vs CPU (bunched beam) | 6.7882e-04 | same | <= 1.8000e-03 |
-| device one-step deposit P3/P1 vs the Bessel closed form | 1.7212e-06 | same | <= 1.3000e-05 |
+| harmonic mutation moves worst_source_h3 | 6.4875e-07 | same | >= 1.7222e-08 |
+| harmonic freerun compounds past lockstep (phasor) | 3.1728e-06 | same | >= 1.2861e-07 |
+| harmonic production P1 vs CPU (bunched beam) | 1.8407e-06 | same | <= 1.6000e-03 |
+| harmonic production P3 vs CPU (bunched beam) | 6.7994e-04 | same | <= 1.8000e-03 |
+| device one-step deposit P3/P1 vs the Bessel closed form | 1.7244e-06 | same | <= 1.3000e-05 |
 | harmonic lockstep TD worst_x | 1.5143e-07 | same | <= 1.0000e-06 |
 | harmonic lockstep TD worst_px | 4.3578e-08 | same | <= 1.0000e-06 |
 | harmonic lockstep TD worst_y | 2.3809e-07 | same | <= 1.0000e-06 |
@@ -324,21 +324,21 @@ where the two builds agree to every printed digit.
 | harmonic lockstep TD worst_pz | 1.5467e-07 | same | <= 1.3000e-06 |
 | harmonic lockstep TD worst_theta | 7.1737e-06 | same | <= 1.5000e-04 |
 | harmonic lockstep TD worst_phasor | 1.9747e-07 | same | <= 2.2000e-05 |
-| harmonic lockstep TD worst_source | 4.6666e-06 | same | <= 2.2000e-04 |
-| harmonic lockstep TD worst_field | 4.6666e-06 | same | <= 2.2000e-04 |
+| harmonic lockstep TD worst_source | 4.6670e-06 | same | <= 2.2000e-04 |
+| harmonic lockstep TD worst_field | 4.6670e-06 | same | <= 2.2000e-04 |
 | harmonic lockstep TD worst_phasor_h3 | 1.9747e-07 | same | <= 6.0000e-07 |
-| harmonic lockstep TD worst_source_h3 | 2.6430e-06 | same | <= 8.0000e-06 |
-| harmonic lockstep TD worst_field_h3 | 2.6430e-06 | same | <= 8.0000e-06 |
+| harmonic lockstep TD worst_source_h3 | 2.6483e-06 | same | <= 8.0000e-06 |
+| harmonic lockstep TD worst_field_h3 | 2.6483e-06 | same | <= 8.0000e-06 |
 | harmonic TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | harmonic TD footer states the escaped energy (CPU) |  | same | holds |
 | harmonic TD footer states the escaped energy (device) |  | same | holds |
-| harmonic production TD escaped energy h1 vs CPU | 6.1561e-07 | same | <= 1.6000e-03 |
-| harmonic production TD escaped energy h3 vs CPU | 1.1741e-05 | same | <= 1.8000e-03 |
-| harmonic production TD window P1 vs CPU | 3.3325e-06 | same | <= 1.6000e-03 |
-| harmonic production TD window P3 vs CPU (shot-noise b3) | 3.4493e-06 | same | <= 1.8000e-03 |
-| device vs Genesis, TD planar with shot noise, P1 | 6.3104e-05 | same | <= 1.6000e-03 |
-| device vs Genesis, TD planar with shot noise, P3 | 2.1637e-05 | same | <= 1.8000e-03 |
-| quiet-start dark harmonic: fundamental P1 vs CPU | 3.3908e-04 | same | <= 1.6000e-03 |
+| harmonic production TD escaped energy h1 vs CPU | 6.4135e-07 | same | <= 1.6000e-03 |
+| harmonic production TD escaped energy h3 vs CPU | 1.1700e-05 | same | <= 1.8000e-03 |
+| harmonic production TD window P1 vs CPU | 3.1338e-06 | same | <= 1.6000e-03 |
+| harmonic production TD window P3 vs CPU (shot-noise b3) | 3.3016e-06 | same | <= 1.8000e-03 |
+| device vs Genesis, TD planar with shot noise, P1 | 6.3096e-05 | same | <= 1.6000e-03 |
+| device vs Genesis, TD planar with shot noise, P3 | 2.1616e-05 | same | <= 1.8000e-03 |
+| quiet-start dark harmonic: fundamental P1 vs CPU | 3.3915e-04 | same | <= 1.6000e-03 |
 | two-plane lockstep worst_x | 1.4621e-07 | same | <= 1.0000e-06 |
 | two-plane lockstep worst_px | 1.5119e-07 | same | <= 1.0000e-06 |
 | two-plane lockstep worst_y | 1.4834e-07 | same | <= 1.0000e-06 |
@@ -346,14 +346,14 @@ where the two builds agree to every printed digit.
 | two-plane lockstep worst_pz | 1.3408e-07 | same | <= 1.3000e-06 |
 | two-plane lockstep worst_theta | 2.3838e-06 | same | <= 1.5000e-04 |
 | two-plane lockstep worst_phasor | 1.8669e-08 | same | <= 2.2000e-05 |
-| two-plane lockstep worst_source | 6.3348e-06 | same | <= 2.2000e-04 |
-| two-plane lockstep worst_field | 6.3374e-06 | same | <= 2.2000e-04 |
+| two-plane lockstep worst_source | 6.3349e-06 | same | <= 2.2000e-04 |
+| two-plane lockstep worst_field | 6.3375e-06 | same | <= 2.2000e-04 |
 | two-plane FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | two-plane mutation moves worst_theta | 1.6319e-03 | same | >= 2.3838e-05 |
-| two-plane mutation moves worst_source | 1.1296e-03 | same | >= 3.1674e-05 |
-| crossed production Px vs CPU | 1.4030e-04 | same | <= 1.6000e-03 |
-| crossed production Py vs CPU | 3.7773e-03 | same | <= 1.3000e-02 |
-| crossed device: x-field isolation through the y set, \|ln(Px/P_drift)\| | 5.2314e-06 | same | <= 1.3000e-05 |
+| two-plane mutation moves worst_source | 1.1296e-03 | same | >= 3.1675e-05 |
+| crossed production Px vs CPU | 1.4005e-04 | same | <= 1.6000e-03 |
+| crossed production Py vs CPU | 3.7774e-03 | same | <= 1.3000e-02 |
+| crossed device: x-field isolation through the y set, \|ln(Px/P_drift)\| | 5.0775e-06 | same | <= 1.3000e-05 |
 | crossed device: afterburner floor, Py/Px | 8.8241e-03 | same | >= 5.0000e-03 |
 | two-plane lockstep TD worst_x | 1.7052e-07 | same | <= 1.0000e-06 |
 | two-plane lockstep TD worst_px | 1.9057e-07 | same | <= 1.0000e-06 |
@@ -362,16 +362,16 @@ where the two builds agree to every printed digit.
 | two-plane lockstep TD worst_pz | 1.5312e-07 | same | <= 1.3000e-06 |
 | two-plane lockstep TD worst_theta | 2.5420e-06 | same | <= 1.5000e-04 |
 | two-plane lockstep TD worst_phasor | 3.6813e-08 | same | <= 2.2000e-05 |
-| two-plane lockstep TD worst_source | 3.7775e-06 | same | <= 2.2000e-04 |
-| two-plane lockstep TD worst_field | 3.7775e-06 | same | <= 2.2000e-04 |
+| two-plane lockstep TD worst_source | 3.7773e-06 | same | <= 2.2000e-04 |
+| two-plane lockstep TD worst_field | 3.7773e-06 | same | <= 2.2000e-04 |
 | two-plane TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| crossed TD production Px vs CPU (slippage live) | 4.1762e-06 | same | <= 1.6000e-03 |
-| crossed TD production Py vs CPU (slippage live) | 4.1020e-06 | same | <= 1.6000e-03 |
+| crossed TD production Px vs CPU (slippage live) | 4.1859e-06 | same | <= 1.6000e-03 |
+| crossed TD production Py vs CPU (slippage live) | 4.1009e-06 | same | <= 1.6000e-03 |
 | migration on the device bites | 73877 | same | >= 10000 |
 | migration conservation on the device, worst violation | 1.6029e-14 | same | <= 1.0000e-10 |
-| migration phase continuity on the device, worst deviation | 5.3707e-15 | 4.7235e-15 | <= 1.0000e-10 |
+| migration phase continuity on the device, worst deviation | 1.2027e-14 | 3.9359e-15 | <= 1.0000e-10 |
 | migration window residency on the device | 0 | same | <= 0 |
-| heavy-migration window power, device vs CPU | 3.7107e-04 | same | <= 3.0000e-03 |
+| heavy-migration window power, device vs CPU | 3.6892e-04 | 3.6902e-04 | <= 3.0000e-03 |
 | a migrated slice outgrew the rectangle and the seam grew it |  | same | holds |
 | migrating lockstep worst_x | 2.8856e-07 | same | <= 1.0000e-06 |
 | migrating lockstep worst_px | 2.6824e-07 | same | <= 1.0000e-06 |
@@ -394,14 +394,14 @@ where the two builds agree to every printed digit.
 | deposit quantum below the FP32 spacing of its bound, unequal weights | 37 | same | >= 24 |
 | deposit accuracy, charge in few cells | 7.1097e-06 | same | <= 7.2335e-06 |
 | deposit quantum below the FP32 spacing of its bound, charge in few cells | 37 | same | >= 24 |
-| deposit accuracy, the largest load | 2.4533e-06 | same | <= 2.6323e-06 |
+| deposit accuracy, the largest load | 2.4450e-06 | same | <= 2.6323e-06 |
 | deposit quantum below the FP32 spacing of its bound, the largest load | 37 | same | >= 24 |
-| deposit accuracy, the performance load | 1.3280e-06 | same | <= 2.2000e-04 |
+| deposit accuracy, the performance load | 1.3271e-06 | same | <= 2.2000e-04 |
 | deposit quantum below the FP32 spacing of its bound, the performance load | 37 | same | >= 24 |
-| the source row with the quantum 24 bits coarser | 1.4673e-05 | same | <= 1.4688e-05 |
+| the source row with the quantum 24 bits coarser | 1.4672e-05 | same | <= 1.4688e-05 |
 | refused: a quantum 30 bits coarser, one past the floor |  | same | holds |
 | refused: harmonics together with two live polarizations |  | same | holds |
-| source filter, device vs CPU window power | 1.2393e-05 | same | <= 1.0000e-03 |
+| source filter, device vs CPU window power | 1.3921e-05 | same | <= 1.0000e-03 |
 | source filter on the device removes wide-angle power | 1.0083e+02 | same | >= 1.5000e+00 |
 | refused: source_filter_mutate on the device |  | same | holds |
 | unaveraged lockstep steady worst_x | 1.1317e-06 | same | <= 3.5000e-06 |
@@ -409,17 +409,17 @@ where the two builds agree to every printed digit.
 | unaveraged lockstep steady worst_y | 9.6089e-07 | same | <= 3.0000e-06 |
 | unaveraged lockstep steady worst_py | 6.3779e-06 | same | <= 2.1000e-05 |
 | unaveraged lockstep steady worst_pz | 2.1513e-06 | same | <= 6.5000e-06 |
-| unaveraged lockstep steady worst_theta | 3.3663e-06 | 3.3645e-06 | <= 1.1000e-05 |
-| unaveraged lockstep steady worst_phasor | 6.5601e-08 | 6.5927e-08 | <= 2.5000e-07 |
-| unaveraged lockstep steady worst_source | 6.6128e-05 | 6.2477e-05 | <= 5.0000e-03 |
-| unaveraged lockstep steady worst_field | 6.3381e-06 | 6.4110e-06 | <= 2.0000e-05 |
+| unaveraged lockstep steady worst_theta | 2.7855e-06 | 2.7795e-06 | <= 1.1000e-05 |
+| unaveraged lockstep steady worst_phasor | 6.5338e-08 | 6.5645e-08 | <= 2.5000e-07 |
+| unaveraged lockstep steady worst_source | 6.6029e-05 | 6.2477e-05 | <= 5.0000e-03 |
+| unaveraged lockstep steady worst_field | 6.2929e-06 | 6.3214e-06 | <= 2.0000e-05 |
 | unaveraged lockstep steady guard [ticks] | 3.1319e+09 | same | >= 1.0000e+09 |
 | unaveraged FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | unaveraged FP64 ledger byte-identical, device twin on vs off |  | same | holds |
-| unaveraged mutation moves worst_theta | 9.8122e-05 | 9.8236e-05 | >= 3.3663e-05 (debug), >= 3.3645e-05 (production) |
-| unaveraged mutation moves worst_phasor | 3.2597e-05 | same | >= 3.2801e-06 (debug), >= 3.2964e-06 (production) |
-| unaveraged mutation moves worst_field | 7.7092e-04 | 7.7091e-04 | >= 1.2676e-04 (debug), >= 1.2822e-04 (production) |
-| unaveraged production power vs CPU | 1.7235e-03 | 1.7260e-03 | <= 5.0000e-03 |
+| unaveraged mutation moves worst_theta | 9.8122e-05 | 9.8236e-05 | >= 2.7855e-05 (debug), >= 2.7795e-05 (production) |
+| unaveraged mutation moves worst_phasor | 3.2598e-05 | same | >= 3.2669e-06 (debug), >= 3.2823e-06 (production) |
+| unaveraged mutation moves worst_field | 7.7095e-04 | 7.7100e-04 | >= 1.2586e-04 (debug), >= 1.2643e-04 (production) |
+| unaveraged production power vs CPU | 1.5435e-03 | 1.5463e-03 | <= 5.0000e-03 |
 | unaveraged frames on the device, count against the CPU | 9 | same | = 9 |
 | unaveraged field frames on the device, count against the CPU | 9 | same | = 9 |
 | unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
@@ -427,18 +427,18 @@ where the two builds agree to every printed digit.
 | unaveraged frames on the device land at the CPU's own s | 0.0000e+00 | same | <= 1.0000e-09 |
 | unaveraged frames on the device name the chart they hold |  | same | holds |
 | unaveraged frames on the device carry the quiver in px | 4.2044e+05 | same | >= 1.0000e+04 |
-| unaveraged frame px mean, device against CPU | 1.8923e-07 | same | <= 1.0000e-05 |
+| unaveraged frame px mean, device against CPU | 1.8951e-07 | same | <= 1.0000e-05 |
 | unaveraged lockstep TD worst_x | 1.1342e-06 | same | <= 3.5000e-06 |
 | unaveraged lockstep TD worst_px | 8.2940e-06 | same | <= 2.5000e-05 |
 | unaveraged lockstep TD worst_y | 9.6623e-07 | same | <= 3.0000e-06 |
 | unaveraged lockstep TD worst_py | 6.8603e-06 | same | <= 2.1000e-05 |
 | unaveraged lockstep TD worst_pz | 1.9040e-06 | same | <= 6.5000e-06 |
-| unaveraged lockstep TD worst_theta | 3.6626e-06 | 3.6625e-06 | <= 1.1000e-05 |
-| unaveraged lockstep TD worst_phasor | 8.2369e-08 | 8.2371e-08 | <= 2.5000e-07 |
+| unaveraged lockstep TD worst_theta | 3.1218e-06 | 3.1300e-06 | <= 1.1000e-05 |
+| unaveraged lockstep TD worst_phasor | 8.0086e-08 | 8.0088e-08 | <= 2.5000e-07 |
 | unaveraged lockstep TD worst_source | 1.7073e-03 | same | <= 5.0000e-03 |
-| unaveraged lockstep TD worst_field | 5.9242e-06 | 5.9659e-06 | <= 2.0000e-05 |
+| unaveraged lockstep TD worst_field | 5.9466e-06 | 5.9562e-06 | <= 2.0000e-05 |
 | unaveraged TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| unaveraged production TD window power vs CPU | 1.6997e-06 | 1.6361e-06 | <= 5.0000e-03 |
+| unaveraged production TD window power vs CPU | 8.3720e-06 | 8.3084e-06 | <= 5.0000e-03 |
 | two unaveraged device runs, diag and ledger identical |  | same | holds |
 | FP32 transform pair energy loss, unaveraged input file | 1.2829e-07 | 1.2854e-07 | 5.0000e-08 to 4.0000e-07 |
 | header counts the transform pairs, unaveraged input file | [5340, 5340] | same | = [5340, 5340] |
@@ -447,25 +447,25 @@ where the two builds agree to every printed digit.
 | header counts the transform pairs, averaged input file | [89, 0] | same | = [89, 0] |
 | header projection over measured loss, averaged input file | 9.5814e-01 | same | 5.0000e-01 to 2.0000e+00 |
 | two-plane unaveraged lockstep worst_x | 1.9377e-06 | same | <= 3.5000e-06 |
-| two-plane unaveraged lockstep worst_px | 2.4567e-06 | same | <= 2.5000e-05 |
+| two-plane unaveraged lockstep worst_px | 2.9026e-06 | same | <= 2.5000e-05 |
 | two-plane unaveraged lockstep worst_y | 2.2475e-06 | same | <= 3.0000e-06 |
-| two-plane unaveraged lockstep worst_py | 2.9852e-06 | same | <= 2.1000e-05 |
+| two-plane unaveraged lockstep worst_py | 4.6603e-06 | same | <= 2.1000e-05 |
 | two-plane unaveraged lockstep worst_pz | 4.9553e-07 | same | <= 6.5000e-06 |
-| two-plane unaveraged lockstep worst_theta | 1.9855e-06 | same | <= 1.1000e-05 |
-| two-plane unaveraged lockstep worst_phasor | 1.6516e-08 | same | <= 2.5000e-07 |
-| two-plane unaveraged lockstep worst_source | 2.1786e-04 | same | <= 5.0000e-03 |
-| two-plane unaveraged lockstep worst_field | 2.0194e-06 | 1.9969e-06 | <= 2.0000e-05 |
+| two-plane unaveraged lockstep worst_theta | 2.3221e-06 | same | <= 1.1000e-05 |
+| two-plane unaveraged lockstep worst_phasor | 1.6918e-08 | same | <= 2.5000e-07 |
+| two-plane unaveraged lockstep worst_source | 2.1770e-04 | same | <= 5.0000e-03 |
+| two-plane unaveraged lockstep worst_field | 1.9826e-06 | 2.0031e-06 | <= 2.0000e-05 |
 | two-plane unaveraged lockstep guard [ticks] | 1.1170e+08 | same | >= 1.0000e+07 |
 | two-plane unaveraged FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | two-plane unaveraged FP64 ledger byte-identical, device twin on vs off |  | same | holds |
-| two-plane unaveraged mutation moves worst_theta | 9.7376e-05 | same | >= 1.9855e-05 |
-| two-plane unaveraged mutation moves worst_phasor | 3.1506e-05 | same | >= 8.2580e-07 |
-| two-plane unaveraged mutation moves worst_field | 2.1729e-04 | same | >= 4.0388e-05 (debug), >= 3.9938e-05 (production) |
-| two-plane unaveraged production power x vs CPU | 2.0188e-04 | 2.0313e-04 | <= 5.0000e-03 |
-| two-plane unaveraged production power y vs CPU | 2.9801e-02 | same | <= 1.0000e-01 |
+| two-plane unaveraged mutation moves worst_theta | 9.7414e-05 | same | >= 2.3221e-05 |
+| two-plane unaveraged mutation moves worst_phasor | 3.1507e-05 | same | >= 8.4590e-07 |
+| two-plane unaveraged mutation moves worst_field | 2.1731e-04 | same | >= 3.9652e-05 (debug), >= 4.0062e-05 (production) |
+| two-plane unaveraged production power x vs CPU | 2.0167e-04 | 2.0137e-04 | <= 5.0000e-03 |
+| two-plane unaveraged production power y vs CPU | 3.4956e-02 | 3.5013e-02 | <= 1.0000e-01 |
 | two-plane unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
 | FP32 transform pair energy loss, two-plane input file | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
-| handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7298e-07 | same | <= 1.0000e-05 |
+| handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7341e-07 | same | <= 1.0000e-05 |
 | handedness on the device: (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
 
 (val-levels-unaveraged)=

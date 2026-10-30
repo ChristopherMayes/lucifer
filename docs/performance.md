@@ -506,6 +506,24 @@ The wall-clock price is six to seven percent where the host's dispatch dominates
 
 What the price buys is in [](validation.md#val-device): two runs of one input file identical on every array of the statistics file, where 54 of 127 differed before.
 
+(perf-device-precise)=
+### Precise math functions on the device
+
+The kernels compile with safe arithmetic and precise single-precision math functions. Before macOS 15 one option, `fastMathEnabled = NO`, set both. From macOS 15 Metal sets them apart, as `mathMode` and `mathFloatingPointFunctions`, and the functions default to fast. Until 2026-10-29 the backend set `mathMode` alone, so on macOS 15 and later its sine and cosine were the fast ones, while a build against an older SDK compiled the precise ones. The backend now sets both, and two device runs of one input file still agree on every array ([](validation.md#val-device)).
+
+The cost is measured on the input file of the per-pass table: the full Aramis line, one slice, `ngrid` 256, `comb_ds_save = -1`, five runs of each build in alternation. The walk is the best of five and the busy time the median, both with the timing off. The per-pass seconds are medians with `run.device_timing` on.
+
+*Measured 2026-10-29: Apple M3 Max, production build, gfortran 15.3 and clang 21.1 from conda-forge, with Spotlight indexing on the host throughout.*
+
+| particles a slice | functions | walk | busy | transverse | push |
+|---|---|---|---|---|---|
+| 8192 | fast | 0.789 s | 0.138 s | 0.0165 s | 0.0165 s |
+| 8192 | precise | 0.807 s | 0.145 s | 0.0195 s | 0.0198 s |
+| 131072 | fast | 1.910 s | 0.321 s | 0.0415 s | 0.0404 s |
+| 131072 | precise | 1.915 s | 0.331 s | 0.0476 s | 0.0457 s |
+
+The transverse map and the push are the two passes that evaluate sine and cosine, and they take 13 to 20 percent longer. The deposit, the filter and the solve are unchanged. The walk is 2.3 percent longer at 8192 particles a slice and 0.3 percent longer at 131072, where the deposit and the field dominate. The device-busy time is 3 to 5 percent longer.
+
 (perf-device-unaveraged)=
 ## The unaveraged mode on the device
 
