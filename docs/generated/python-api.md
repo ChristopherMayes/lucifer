@@ -1292,7 +1292,24 @@ a value that disagrees with the file is an error rather than a silent preference
 *Module*
 
 ```
-Read the escaped light a run writes beside its final dump.
+Read a field dump, and the escaped light a run writes beside its final dump.
+
+``read_field`` reads one polarization of a field dump into per-slice complex arrays, in
+V/m, from either format: the openPMD EXT_Wavefront file the program writes
+(``.wf.h5``) or the ``.fld.h5`` of Genesis 1.3 Version 4. Both are read with h5py alone.
+Units are the one real difference between the two. openPMD carries the electric field in
+V/m, the SI quantity, while Genesis carries a dimensionless amplitude dfl in sqrt(W) with
+
+    E = dfl * sqrt(2 * Z0) / dx,      Z0 = mu_0 * c
+
+which scales with the grid spacing, so it is not a change of units alone. The Genesis
+side is converted, leaving every comparison in V/m. Any common factor cancels in a
+relative difference, so the choice of which side to convert cannot move a result. The
+choice of Z0 can, at the 1e-9 level of the two codes' impedances, and Bmad's is used
+here. One openPMD file holds both transverse components as components x and y of the
+electricField record, where Genesis holds one component per file. Callers say which they
+want, and asking for a component the file does not carry is an error rather than a
+silent zero.
 
 ``<out_root>-pulse.wf.h5`` is the whole pulse at the exit, the window's slices and the
 light slippage carried out of the window propagated to the exit plane. A run keeps it
@@ -1313,6 +1330,42 @@ where the run carried one.
 No one beamline position holds the escaped planes, so the escaped file's
 ``zCoordinate``, and the Wavefront's ``s_position``, is NaN. Each plane's own is
 ``zTransmit``. The pulse file's is the exit plane.
+```
+
+(pyapi-lucifer-field-read-field)=
+### `read_field`
+
+*Function* `read_field(path, component='x', nslice=None)`
+
+```
+A field dump as a dict: u (nslice, ny, nx) complex V/m, dx, dy, dz [m], wavelength [m],
+zmin [m], s_position [m] or None, and components, the polarizations the file carries.
+Slices are in time-window order, as both codes write them. zmin is the coordinate of
+the first slice within the pulse, Genesis's refposition or openPMD's gridGlobalOffset
+along z, and s_position the plane's position along the lattice, openPMD's zCoordinate,
+which the Genesis format has no record of, so it comes back None there.
+
+nslice, when given, is required to match the file's slice count. A caller that knows
+what it asked the tracker for gets the mismatch named here rather than a silently
+truncated comparison.
+```
+
+(pyapi-lucifer-field-is-openpmd)=
+### `is_openpmd`
+
+*Function* `is_openpmd(path)`
+
+```
+True for an openPMD file, by the root attribute the standard requires.
+```
+
+(pyapi-lucifer-field-components)=
+### `components`
+
+*Function* `components(path)`
+
+```
+The polarizations a field dump carries, ('x',) or ('x', 'y').
 ```
 
 (pyapi-lucifer-field-escaped)=

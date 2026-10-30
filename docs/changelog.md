@@ -9,6 +9,12 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Changed: the field reader of the check scripts, `read_field` with `is_openpmd` and
+  `components`, moved from `tests/scripts/fieldio.py` into `lucifer.field`, which reads one
+  polarization of an openPMD EXT_Wavefront file or a Genesis4 `.fld.h5` into per-slice complex arrays
+  in V/m with the grid spacings, the wavelength and the plane's position. `fieldio.py` imports them
+  and keeps `write_genesis` and `field_power`, so every check script reads as before and the package
+  reads a Genesis4 field with the same conversion the checks use.
 - 2026-10-29 Changed: `.github/workflows/lucifer-linux.yml` validates the release build beside the
   debug build, as one job definition over a matrix of the two, each on its own runner, with
   `fail-fast` off so neither cancels the other. Each job builds its configuration against the

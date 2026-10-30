@@ -1,5 +1,22 @@
 """
-Read the escaped light a run writes beside its final dump.
+Read a field dump, and the escaped light a run writes beside its final dump.
+
+``read_field`` reads one polarization of a field dump into per-slice complex arrays, in
+V/m, from either format: the openPMD EXT_Wavefront file the program writes
+(``.wf.h5``) or the ``.fld.h5`` of Genesis 1.3 Version 4. Both are read with h5py alone.
+Units are the one real difference between the two. openPMD carries the electric field in
+V/m, the SI quantity, while Genesis carries a dimensionless amplitude dfl in sqrt(W) with
+
+    E = dfl * sqrt(2 * Z0) / dx,      Z0 = mu_0 * c
+
+which scales with the grid spacing, so it is not a change of units alone. The Genesis
+side is converted, leaving every comparison in V/m. Any common factor cancels in a
+relative difference, so the choice of which side to convert cannot move a result. The
+choice of Z0 can, at the 1e-9 level of the two codes' impedances, and Bmad's is used
+here. One openPMD file holds both transverse components as components x and y of the
+electricField record, where Genesis holds one component per file. Callers say which they
+want, and asking for a component the file does not carry is an error rather than a
+silent zero.
 
 ``<out_root>-pulse.wf.h5`` is the whole pulse at the exit, the window's slices and the
 light slippage carried out of the window propagated to the exit plane. A run keeps it
@@ -30,7 +47,14 @@ import pathlib
 import h5py
 import numpy as np
 
-__all__ = ["Escaped", "Pulse", "read_escaped", "read_pulse"]
+__all__ = ["read_field", "is_openpmd", "components", "Escaped", "Pulse", "read_escaped", "read_pulse"]
+
+C_LIGHT = 2.99792458e8
+MU0_C = 1.25663706127e-6 * C_LIGHT       # Bmad's mu_0_vac (2018 CODATA), not 4 pi e-7.
+H_PLANCK_EVS = 4.135667696e-15           # Bmad's h_planck [eV s].
+E_CHARGE = 1.602176634e-19
+
+MESH_PATH = "data/1/meshes/electricField"
 
 ESCAPED_GROUP = "lucifer/escaped"
 PULSE_GROUP = "lucifer/pulse"
@@ -46,6 +70,81 @@ PARAM_NAMES = (
     "sigma_13", "sigma_23", "sigma_33", "sigma_43", "sigma_14", "sigma_24", "sigma_34", "sigma_44",
     "energy", "power", "on_axis_intensity", "emit_x", "emit_y",
 )
+
+
+def is_openpmd(path):
+    """True for an openPMD file, by the root attribute the standard requires."""
+    with h5py.File(path) as h5:
+        return "openPMD" in h5.attrs
+
+
+def components(path):
+    """The polarizations a field dump carries, ('x',) or ('x', 'y')."""
+    with h5py.File(path) as h5:
+        if "openPMD" not in h5.attrs:
+            return ("x",)
+        m = h5[MESH_PATH]
+        return tuple(name for name in ("x", "y") if name in m)
+
+
+def read_field(path, component="x", nslice=None):
+    """
+    A field dump as a dict: u (nslice, ny, nx) complex V/m, dx, dy, dz [m], wavelength [m],
+    zmin [m], s_position [m] or None, and components, the polarizations the file carries.
+    Slices are in time-window order, as both codes write them. zmin is the coordinate of
+    the first slice within the pulse, Genesis's refposition or openPMD's gridGlobalOffset
+    along z, and s_position the plane's position along the lattice, openPMD's zCoordinate,
+    which the Genesis format has no record of, so it comes back None there.
+
+    nslice, when given, is required to match the file's slice count. A caller that knows
+    what it asked the tracker for gets the mismatch named here rather than a silently
+    truncated comparison.
+    """
+    path = pathlib.Path(path)
+    out = _read_openpmd(path, component) if is_openpmd(path) else _read_genesis(path, component)
+
+    if nslice is not None and out["u"].shape[0] != nslice:
+        raise ValueError(f"{path.name} holds {out['u'].shape[0]} slices, caller expected "
+                         f"{nslice}")
+    return out
+
+
+def _read_genesis(path, component):
+    if component != "x":
+        raise ValueError(f"{path.name} is a Genesis field dump, which carries one "
+                         f"polarization; component {component!r} was asked for")
+    with h5py.File(path) as h5:
+        n = int(h5["gridpoints"][0])
+        dx = float(h5["gridsize"][0])
+        nslice = int(h5["slicecount"][0])
+        u = np.empty((nslice, n, n), dtype=complex)
+        for i in range(nslice):
+            g = h5[f"slice{i + 1:06d}"]
+            u[i] = (g["field-real"][:].reshape(n, n)
+                    + 1j * g["field-imag"][:].reshape(n, n))
+        return dict(u=u * np.sqrt(2 * MU0_C) / dx, dx=dx, dy=dx,
+                    dz=float(h5["slicespacing"][0]),
+                    wavelength=float(h5["wavelength"][0]),
+                    zmin=float(h5["refposition"][0]), s_position=None, components=("x",))
+
+
+def _read_openpmd(path, component):
+    with h5py.File(path) as h5:
+        m = h5[MESH_PATH]
+        components = tuple(name for name in ("x", "y") if name in m)
+        if component not in components:
+            raise ValueError(f"{path.name} carries polarization {components} and does not "
+                             f"carry {component!r}")
+        # Stored (z, y, x), which is what a caller wants slice by slice, so no transpose.
+        u = np.asarray(m[component][...], dtype=complex)
+        spacing = np.atleast_1d(m.attrs["gridSpacing"]).astype(float)
+        offset = np.atleast_1d(m.attrs["gridGlobalOffset"]).astype(float)
+        e_photon = float(np.atleast_1d(m.attrs["photonEnergy"])[0])
+        return dict(u=u, dx=spacing[2], dy=spacing[1], dz=spacing[0],
+                    wavelength=H_PLANCK_EVS * C_LIGHT * E_CHARGE / e_photon,
+                    zmin=offset[0],
+                    s_position=float(np.atleast_1d(m.attrs["zCoordinate"])[0]),
+                    components=components)
 
 
 @dataclasses.dataclass
