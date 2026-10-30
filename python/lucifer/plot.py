@@ -840,7 +840,24 @@ def _compare(plt, cmp, run, ref, fields, tex):
         else:
             ax[0].tick_params(labelbottom=True)
             ax[0].set_xlabel(xs)
+    _freeze_layout(fig)
     return fig
+
+
+def _freeze_layout(fig):
+    """Place the blocks and their axes once with constrained layout, round each box to
+    1e-5 of its parent and turn the layout engine off. The solver's result varies in its
+    last bits from one process to the next, and an SVG names each clip rectangle by a hash
+    of its full-precision bounds, so without this the same arrays drew a different file on
+    every run."""
+    fig.draw_without_rendering()
+    fig.set_layout_engine("none")
+    for sub in fig.subfigs:
+        sub.bbox_relative.set_points(np.round(sub.bbox_relative.get_points(), 5))
+    for sub in [fig, *fig.subfigs]:
+        for a in sub.axes:
+            x0, y0, w, h = a.get_position(original=False).bounds
+            a.set_position([round(x0, 5), round(y0, 5), round(w, 5), round(h, 5)])
 
 
 def main(argv=None) -> int:

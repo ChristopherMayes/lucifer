@@ -9,6 +9,16 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Changed: the tier figures on `docs/validation.md` are SVG, where they were PNG at
+  110 dpi, which read soft on a high-density display. An SVG is 167 to 219 kB against 143 to 183 kB
+  for the PNGs, and stays sharp under the reader's zoom. Each takes the class
+  `col-body-outset-right`, which widens it 3rem past the text column. `col-page` had spread it under
+  the site's left navigation, and `col-page-right` runs under the sticky outline at the right.
+  `lucifer.plot.compare` fixes its layout once drawn, each block and axes rounded to 1e-5 of its
+  parent with the layout engine then off: the constrained-layout solver's result varied in its last
+  bits between processes, and matplotlib names each SVG clip rectangle by a hash of its bounds, so
+  the same arrays drew a different file on every run. `report_tier_figures.py` salts the SVG ids and
+  writes no date, and three runs now write the same bytes.
 - 2026-10-30 Changed: `examples/migration`'s figure is the run with migration on drawn over the run
   with it off, through `python -m lucifer.plot compare`, in place of the summary figure of the one run.
   An example directory names its own figure in `figure.args`, one line of arguments to

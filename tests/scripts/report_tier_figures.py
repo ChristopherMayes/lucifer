@@ -5,7 +5,7 @@ write the page of figures and captions that docs/validation.md includes.
 
   report_tier_figures.py --work-dir <kept work directory> --results <fel-production.txt>
                          --out docs/generated/validation --page docs/generated/validation-figures.md
-                         [--included-by docs/validation.md] [--dpi 110]
+                         [--included-by docs/validation.md]
 
 The page is written to be included by another, docs/validation.md, and MyST resolves an
 included page's relative paths against the page that includes it, so the figure paths are
@@ -22,10 +22,19 @@ bunching, the complex field over the whole exit grid, or the final particles'
 coordinates, which the figure does not draw. The numbers come from lucifer.compare, the
 same arrays the figure draws, so a caption cannot disagree with its figure.
 
+The figures are SVG, so they stay sharp on a high-density display and under the reader's
+zoom, at 167 to 219 kB each, near the 143 to 183 kB of a 110 dpi PNG of the same figure.
+matplotlib writes a date and random element ids into an SVG unless told otherwise, so
+the date is left out and the ids are salted with a fixed string: the same arrays give
+the same bytes, and a keystone that redraws the figures leaves the tree as it found it.
+Each figure takes the site's col-body-outset-right class, which widens it 3rem past the
+text column to the right. The wider col-page and col-page-right reach under the left
+navigation and under the sticky outline at the right of the book theme.
+
 The keystone's regeneration runs this from the production pass's kept work directory and
 diffs the page with the other generated pages, so a tier whose curves move fails the
-keystone through its caption. The PNGs stay out of the diff, as the example figures do,
-since a plotting library upgrade rewrites every one of them with no physics moving.
+keystone through its caption. The figures stay out of the diff, as the example figures
+do, since a plotting library upgrade rewrites every one of them with no physics moving.
 """
 import argparse
 import sys
@@ -95,7 +104,7 @@ def read_levels(path):
     return out
 
 
-def caption(key, what, run, ref, diffs, level, tolerance, flevel, has_particles, png):
+def caption(key, what, run, ref, diffs, level, tolerance, flevel, has_particles, image):
     td = run.n_slice > 1
     s_exit = f"{run.s[-1]:.0f} m"
     parts = [f"{key}: {what}. {ref.name} is the solid line and {run.name} the dashed line over it, "
@@ -132,7 +141,7 @@ def caption(key, what, run, ref, diffs, level, tolerance, flevel, has_particles,
         setter = "the final particles' coordinates, which the figure does not draw"
     parts.append(f"The tier's level is {sci(level, 3)} against a tolerance of {sci(tolerance, 1)}, set by "
                  f"{setter}.")
-    parts.append(f"[Full size]({png}).")
+    parts.append(f"[Full size]({image}).")
     return " ".join(parts)
 
 
@@ -140,15 +149,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0].strip())
     ap.add_argument("--work-dir", required=True, help="a kept work directory of run_fel_validation.sh")
     ap.add_argument("--results", required=True, help="the pass's results file, for each tier's level")
-    ap.add_argument("--out", required=True, help="where the figures are written, <out>/<tier>.png")
+    ap.add_argument("--out", required=True, help="where the figures are written, <out>/<tier>.svg")
     ap.add_argument("--page", required=True, help="the Markdown page of figures and captions to write")
     ap.add_argument("--included-by", default="docs/validation.md",
                     help="the page that includes --page, whose directory the figure paths are relative to")
-    ap.add_argument("--dpi", type=int, default=110, help="the figures' resolution (default: 110)")
     args = ap.parse_args()
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    # The SVG's element ids from a fixed salt, so a figure is the same bytes on every run.
+    matplotlib.rcParams["svg.hashsalt"] = "lucifer-tier-figures"
     from lucifer import compare as cmp
     from lucifer.plot import compare
 
@@ -180,15 +190,15 @@ def main():
         diffs = cmp.differences(run, ref, fields=fields if run.n_slice == 1 else None)
         flevel = cmp.field_level(fields, run.n_slice)
         fig = compare(run, ref, fields=fields, labels=(run.name, ref.name), return_figure=True)
-        png = out / f"{key}.png"
-        fig.savefig(png, dpi=args.dpi)
+        image = out / f"{key}.svg"
+        fig.savefig(image, metadata={"Date": None})
         plt.close(fig)
-        rel = png.resolve().relative_to(link_dir).as_posix()
+        rel = image.resolve().relative_to(link_dir).as_posix()
         text = caption(key, what, run, ref, diffs, levels[key], TOLERANCE[key], flevel,
                        key not in NO_PARTICLES, rel)
-        lines += [f":::{{figure}} {rel}", f":label: fig-{key.replace('_', '-')}", ":class: col-page", "",
+        lines += [f":::{{figure}} {rel}", f":label: fig-{key.replace('_', '-')}", ":class: col-body-outset-right", "",
                   text, ":::", ""]
-        print(f"{key}: {png.name}, level {sci(levels[key], 3)}")
+        print(f"{key}: {image.name}, level {sci(levels[key], 3)}")
     Path(args.page).write_text("\n".join(lines))
     print(f"wrote {args.page}: {len(TIERS)} figures")
     return 0
