@@ -8,6 +8,7 @@ project:
     - file: user-guide.md
     - file: input-reference.md
     - file: reading-output.md
+    - file: glossary.md
     - file: python.md
     - title: Notebooks
       children:

@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Added: `docs/glossary.md`, the words the pages use for the pieces of a run, each with the
+  page that defines it: the slice, the window and its head and tail, the beamlet, the grid, the plane,
+  the field set and its members, the field record and its rotation seam, the slippage and the bank,
+  the segment, the interlude and the seam, the step and the substep, the walk and the comb, the
+  statistics record, the dump, the frame and the slab, the checkpoint and the ledger. The two words
+  with two meanings, `record` and `plane`, carry both. The index's table of the two FEL methods named
+  its column `tracking_method` where the attribute is `fel_method`.
 - 2026-10-30 Changed: a frame of a slice range costs the slices it writes. `fel_dump_frame` cut the
   field frame of a range, and every field frame inside an unaveraged segment, from a scratch copy of
   the whole window. The window was copied and every slice carried back half a substep through

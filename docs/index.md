@@ -31,7 +31,7 @@ Lucifer has:
 
 The method is Bmad's own `fel_method` attribute, set on the element as any attribute is.
 
-| `tracking_method` | what it is for |
+| `fel_method` | what it is for |
 |---|---|
 | `averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production method. |
 | `unaveraged` | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. Its cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also an independent check on the averaged method, since the two share no approximation. |
@@ -45,6 +45,7 @@ The averaged method's transverse maps have a third option behind them, the trans
 | build it, describe a run, and run it | [](user-guide.md) |
 | know what an input key does | [](input-reference.md) |
 | read an output file you were handed | [](reading-output.md) |
+| know what a slice, a record, a frame or a slab is | [](glossary.md) |
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what level | [](validation.md) |
 | know where a run spends its time | [](performance.md) |
