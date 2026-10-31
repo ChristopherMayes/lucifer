@@ -16,6 +16,11 @@ of that history. The entries before that date describe that branch.
   statistics record, the dump, the frame and the slab, the checkpoint and the ledger. The two words
   with two meanings, `record` and `plane`, carry both. The index's table of the two FEL methods named
   its column `tracking_method` where the attribute is `fel_method`.
+- 2026-10-30 Added: the glossary opens its beam section with a figure of the window,
+  `docs/figures/window.svg`: the slices in window order with the tail and the head, the bunch low in
+  the window and the slippage headroom ahead of it, light slipping toward the head and leaving into
+  the bank, a slab, and one slice enlarged to its wavelengths, its beamlets and its transverse grid.
+  `docs/figures/window_figure.py` draws it and is run by hand, since the figure holds no data.
 - 2026-10-30 Changed: a frame of a slice range costs the slices it writes. `fel_dump_frame` cut the
   field frame of a range, and every field frame inside an unaveraged segment, from a scratch copy of
   the whole window. The window was copied and every slice carried back half a substep through

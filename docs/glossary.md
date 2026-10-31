@@ -7,6 +7,12 @@ The words this documentation uses for the pieces of a run, each with the page th
 
 ## The beam and the time window
 
+:::{figure} figures/window.svg
+:name: fig-window
+:alt: A row of sixteen slice boxes in window order, the bunch over the low-index slices, the slippage headroom at the head, a slab of four slices, and one slice enlarged to show its wavelengths, its beamlets and its transverse grid.
+The window, in window order. Slice 1 is the tail and the highest index the head, which arrives first. The bunch sits low in the window and the slippage headroom sits ahead of it. Light slips toward the head and leaves there into the bank, and vacuum enters at the tail. A slab is the slices a frame writes. One slice, enlarged, is `n_wavelength` wavelengths long and holds its macroparticles in beamlets and one transverse grid of the field. The counts drawn are for the picture: `docs/figures/window_figure.py` draws it.
+:::
+
 **wavelength.** The radiation wavelength $\lambda_s$, `field.lambda0`. Every longitudinal length below is a whole number of it.
 
 **slice.** One longitudinal sample of the run. The beam's particles are partitioned into slices, and the field holds one transverse grid per slice. Slices are spaced by $\Delta = $ `window.n_wavelength` $\cdot\lambda_s$, so a slice is `n_wavelength` wavelengths long ([](fel-physics.md#sec-window)). A steady-state run is one slice.
