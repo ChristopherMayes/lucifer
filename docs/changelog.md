@@ -9,6 +9,25 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Changed: a frame of a slice range costs the slices it writes. `fel_dump_frame` cut the
+  field frame of a range, and every field frame inside an unaveraged segment, from a scratch copy of
+  the whole window. The window was copied and every slice carried back half a substep through
+  `fel_field_diffract_by` on one thread. The copy was then rotated into time order with `cshift`
+  and the range cut last. On FLASH1
+  at one wavelength a slice, 4212 slices at `ngrid` 128 with a frame of 12 slices at every FEL step,
+  a frame cost 2.26 s. The 5185 frames of the line took 11282 s of a 13116 s walk, against a header
+  estimate of 1412 s. The frame is now a copy of the slices it writes, each taken from its record
+  through `fel_field_index`. So a range across the record's rotation seam comes out in order. The
+  carry is a transform pair a slice, the slices in parallel. `unavg_field_to_midpoint`, the carry at
+  a segment's entry and exit, runs the same parallel loop. The first segment's 826 frames take
+  11.2 s where they took 1869.5 s, 0.014 s a frame. Every frame's field and beam file, the final
+  dumps and the statistics file are the same bytes dataset by dataset. That holds for the 12-slice
+  range, for a range of 61 slices across the seam, and for the whole window. `fel_field_diffract_by` is unchanged and forms its
+  phase table for each slice. Forming it once per loop was built and measured: every form of the
+  routine that took the table from its caller compiled its multiply with other roundings at -O3,
+  and on a grid of 255 points the production build's `tier1_unavg` level moved from 6.984652e-02
+  to 6.984636e-02. `docs/performance.md` carries the table, measured on
+  `tests/perf/flash1_frames.toml`. Every recorded digit held.
 - 2026-10-30 Changed: the example pages' figures and the Python page's are SVG, where they were PNG
   at 110 and 90 dpi, which read soft on a high-density display. `lucifer.plot.save(fig, path, dpi=150)`
   writes a figure in the format its suffix names, and for an SVG fixes the layout, salts the element

@@ -3380,10 +3380,16 @@ record is the stats row this frame sits on. So a frame and its row share one ind
 The beam frame holds the coordinates the selected tracking method produced there,
 inside an averaged undulator as anywhere else, with nothing reconstructed.
 
-The field's records are rotated to time order to be written and rotated back, so the
-run continues from the state it had. fel_dump_field_set leaves them unrotated. That is
-right at the end of a run and wrong in the middle of one. A diagnostic that changes
-the state it observes is the failure the FP32 twin's read-only proof exists to catch.
+The field's records are written in time order. The whole window of an averaged element
+is rotated in place, written and rotated back, so the run continues from the state it
+had. fel_dump_field_set leaves the records unrotated. That is right at the end of a run
+and wrong in the middle of one. A diagnostic that changes the state it observes is the
+failure the FP32 twin's read-only proof exists to catch. Every other field frame is
+written from a scratch copy of the slices it writes and no others. Each slice is taken
+from its record through fel_field_index. Inside an unaveraged segment the copy is
+carried back half a substep onto the frame's plane, one transform pair a slice with the
+slices in parallel. So a slice-range frame costs the slices it writes. The live record
+is not touched on either path.
 ```
 
 ```

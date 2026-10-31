@@ -1,0 +1,13 @@
+! FLASH1 as examples/flash1/flash1.bmad states it, with the undulators integrated rather
+! than period-averaged, for the frame-series measurement of docs/performance.md. The
+! machine is that file's and unchanged. fel_method is Bmad's own element attribute, so
+! it is set here and every other Bmad program still loads the lattice.
+!
+! ds_step is a fifth of an undulator period. It does not set the integration, which is
+! run.unaveraged_steps_per_period at twenty substeps a period whatever this says. It sets
+! how often the field and the slippage are advanced, and the comb cannot be finer than it.
+
+call, file = ../../examples/flash1/flash1.bmad
+
+wiggler::*[fel_method] = unaveraged
+wiggler::*[ds_step] = 0.00546

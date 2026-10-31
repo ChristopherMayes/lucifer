@@ -367,10 +367,16 @@ end subroutine fel_write_slippage_residual
 ! The beam frame holds the coordinates the selected tracking method produced there,
 ! inside an averaged undulator as anywhere else, with nothing reconstructed.
 !
-! The field's records are rotated to time order to be written and rotated back, so the
-! run continues from the state it had. fel_dump_field_set leaves them unrotated. That is
-! right at the end of a run and wrong in the middle of one. A diagnostic that changes
-! the state it observes is the failure the FP32 twin's read-only proof exists to catch.
+! The field's records are written in time order. The whole window of an averaged element
+! is rotated in place, written and rotated back, so the run continues from the state it
+! had. fel_dump_field_set leaves the records unrotated. That is right at the end of a run
+! and wrong in the middle of one. A diagnostic that changes the state it observes is the
+! failure the FP32 twin's read-only proof exists to catch. Every other field frame is
+! written from a scratch copy of the slices it writes and no others. Each slice is taken
+! from its record through fel_field_index. Inside an unaveraged segment the copy is
+! carried back half a substep onto the frame's plane, one transform pair a slice with the
+! slices in parallel. So a slice-range frame costs the slices it writes. The live record
+! is not touched on either path.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state.
@@ -389,11 +395,11 @@ subroutine fel_dump_frame (run, ie, at_end, err_flag)
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
+type (wavefront_struct), pointer :: wf
 type (wavefront_struct) wf_sub
-complex(wf_rp), allocatable :: eslab(:,:,:)
 real(rp) s_frame
-integer ie, ihh, first_was, ifr
-logical at_end, err_flag, eerr, whole, ckpt
+integer ie, ihh, first_was, nsub, nslice, j, ifld
+logical at_end, err_flag, eerr, any_err, whole, ckpt
 character(200) prefix
 character(8) hsuf
 
@@ -443,42 +449,64 @@ do ihh = 1, run%n_harm
 
   if (run%ustate%active .or. .not. whole) then
 
-    ! A scratch copy. Inside an unaveraged segment the record is the substep's midpoint
-    ! field, half a substep past the plane this frame is named for (fel_unaveraged_mod).
-    ! The frame carries the plane's own field. So the copy is carried back and written,
-    ! and the live record is not touched. A run with frames on and one with them off then
-    ! hold the same field to the bit. Carrying the live record back and forward again
-    ! would leave two transform pairs of rounding in it, 5e-15 of the field on the mixed
-    ! line (docs/validation.md). A slice range takes its slab from the same copy. The copy
-    ! is in time order for the write, as the whole-window path below rotates the live
-    ! record to be.
+    ! A scratch copy of the slices this frame writes, run%dump_is1 to run%dump_is2 of the
+    ! window in time order. Each slice is taken from its record through fel_field_index.
+    ! The copy is the slab and not the window. So a slice-range frame costs the slices it
+    ! writes, and a slab across the record's rotation seam comes out in order. For a
+    ! whole-window frame the copy is the window in time order, as the averaged path below
+    ! rotates the live record to be.
+    !
+    ! Inside an unaveraged segment the record is the substep's midpoint field, half a
+    ! substep past the plane this frame is named for (fel_unaveraged_mod). The frame
+    ! carries the plane's own field. So the copy is carried back and written, and the live
+    ! record is not touched. A run with frames on and one with them off then hold the same
+    ! field to the bit. Carrying the live record back and forward again would leave two
+    ! transform pairs of rounding in it, 5e-15 of the field on the mixed line
+    ! (docs/validation.md). The carry is a transform pair a slice, with the phase table
+    ! formed for each slice as fel_field_diffract_by forms it. The slices run in parallel as
+    ! the step runs them, on the plans fel_field_kernel_init warmed at the segment's entry.
+    ! Until 2026-10-30 the copy was the whole window, carried on one thread and then cut.
+    ! That cost 2.5 s a frame for 12 slices of a 4212-slice window at 128 by 128
+    ! (docs/performance.md).
 
-    wf_sub = ffield(ihh)%wf
+    wf => ffield(ihh)%wf
+    nslice = size(wf%Ex, 3)
+    nsub = run%dump_is2 - run%dump_is1 + 1
+    if (allocated(wf_sub%Ex)) deallocate (wf_sub%Ex)
+    if (allocated(wf_sub%Ey)) deallocate (wf_sub%Ey)
+    allocate (wf_sub%Ex(size(wf%Ex, 1), size(wf%Ex, 2), nsub))
+    if (allocated(wf%Ey)) allocate (wf_sub%Ey(size(wf%Ey, 1), size(wf%Ey, 2), nsub))
+    wf_sub%dx = wf%dx
+    wf_sub%dy = wf%dy
+    wf_sub%dz = wf%dz
+    wf_sub%wavelength = wf%wavelength
+    wf_sub%s_position = wf%s_position
+
+    !$OMP parallel do private(ifld)
+    do j = 1, nsub
+      ifld = fel_field_index(ffield(ihh)%slip, run%dump_is1 + j - 1, nslice)
+      wf_sub%Ex(:,:,j) = wf%Ex(:,:,ifld)
+      if (allocated(wf%Ey)) wf_sub%Ey(:,:,j) = wf%Ey(:,:,ifld)
+    enddo
+    !$OMP end parallel do
+
     if (run%ustate%active) then
-      do ifr = 1, size(wf_sub%Ex, 3)
-        call fel_field_diffract_by (wf_sub, ifr, -0.5_rp * run%ustate%dsub, eerr)
-        if (eerr) return
+      any_err = .false.
+      !$OMP parallel do private(eerr) reduction(.or.: any_err)
+      do j = 1, nsub
+        call fel_field_diffract_by (wf_sub, j, -0.5_rp * run%ustate%dsub, eerr)
+        any_err = any_err .or. eerr
       enddo
+      !$OMP end parallel do
+      if (any_err) return
     endif
-    if (first_was /= 0) then
-      wf_sub%Ex = cshift(wf_sub%Ex, shift = first_was, dim = 3)
-      if (allocated(wf_sub%Ey)) wf_sub%Ey = cshift(wf_sub%Ey, shift = first_was, dim = 3)
-    endif
-    if (.not. whole) then
 
-      ! The slab keeps its place. The mesh's z origin is the first slice's. So a reader
-      ! that walks the standard attributes puts the cut field where the whole window's
-      ! would sit. It sits beside the cut beam, whose timeOffset places each slice.
+    ! The slab keeps its place. The mesh's z origin is the first slice's. So a reader
+    ! that walks the standard attributes puts the cut field where the whole window's
+    ! would sit. It sits beside the cut beam, whose timeOffset places each slice.
 
-      eslab = wf_sub%Ex(:, :, run%dump_is1:run%dump_is2)
-      call move_alloc (eslab, wf_sub%Ex)
-      if (allocated(wf_sub%Ey)) then
-        eslab = wf_sub%Ey(:, :, run%dump_is1:run%dump_is2)
-        call move_alloc (eslab, wf_sub%Ey)
-      endif
-    endif
     call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', eerr, &
-                                  z_offset = (run%dump_is1 - 1) * ffield(ihh)%wf%dz)
+                                  z_offset = (run%dump_is1 - 1) * wf%dz)
     if (eerr) return
   else
 

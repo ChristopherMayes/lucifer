@@ -45,6 +45,14 @@ sample $(pgrep -n lucifer) 15 1 -file prof.txt -mayDie
 
 The averaged input file is the 96-slice one the phases mode writes, and the unaveraged one is `tests/perf/unavg_sample.toml`, run at one thread and sampled for 20 s.
 
+The frame-series table ([](#perf-frames-slab)) runs from `tests/perf/` as:
+
+```
+OMP_NUM_THREADS=12 ../../build-release/bin/lucifer flash1_frames.toml 'run.track_end="UND##1"' run.out_root=<scratch>/f
+```
+
+Its dumps line is the frames' cost, and the whole line is the same command without `run.track_end`. The frames of two builds are compared dataset by dataset with `h5py`, every dataset's bytes and every attribute but the beam file's `date`.
+
 Read the `Sort by top of stack` section, which is exclusive cost per symbol. The call graph is per thread and fragments the same information across dozens of stacks.
 
 The vectorization audit runs as:
@@ -391,6 +399,32 @@ Writing frames dominates a run at a movie-grade comb, and the device readback do
 | device step | 0.001 s | 0.002 s |
 
 The readback is about 0.10 s either way, since it happens at every comb row whether or not a frame is written. It is the unaccounted remainder in both columns. With frames on it is a sixth of the walk and the file writing is two thirds. Moving the per-slice reductions onto the device would save readback the run is not spending its time in. A series that costs too much is answered by writing fewer slices, which `run.dump_slice_first` and `dump_slice_last` do, or fewer records, which the comb does.
+
+(perf-frames-slab)=
+### A slice-range frame costs its slices
+
+Writing fewer slices did not cost less until 2026-10-30. A field frame of a slice range was cut from a scratch copy of the whole window, and so was every field frame inside an unaveraged segment. `fel_dump_frame` copied the window and carried every slice back half a substep through `fel_field_diffract_by` on one thread. The copy was then rotated into time order and the range cut last. On a window of 4212 slices at `ngrid` 128 that is 1.1 GB copied and rotated, and 4212 transform pairs on the main thread while the other eleven waited, for a frame of 12 slices. The frame is now a copy of the slices it writes, each taken from its record through `fel_field_index`. The carry runs in parallel over those slices. The whole-window frame of an unaveraged segment takes the same path. The frames are the same bytes, dataset by dataset, for a range of 12 slices, for a range of 61 across the record's rotation seam, and for the whole window. So are the final dumps and the statistics file.
+
+The input file is `tests/perf/flash1_frames.toml`: FLASH1 at one wavelength a slice, 4212 slices of 4096 macroparticles at `ngrid` 128, the undulators unaveraged at 20 substeps a period, on the Metal backend. `comb_ds_save = 0.00546` puts a frame of 12 slices at every FEL step. The run is `run.track_end = "UND##1"`, the first segment, 826 frames:
+
+*Measured 2026-10-30: Apple M3 Max, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
+
+| phase | whole-window copy and carry | slab alone |
+|---|---|---|
+| unaveraged step | 173.1 s | 139.7 s |
+| stats and diag | 77.3 s | 90.4 s |
+| dumps, 826 frames | 1869.5 s, 87.4% | 11.2 s, 4.3% |
+| unaccounted | 19.7 s | 18.6 s |
+| walk | 2140.0 s | 260.2 s |
+| estimate | 235.4 s | 235.4 s |
+
+A frame cost 2.26 s and costs 0.014 s. The other two phases moved against each other and changed no code. The stats phase grew from 77 to 90 s and the unaveraged step fell from 173 to 140 s. The frames go to disk at 170 times the rate, 5.7 GB in 260 s against 2140 s. Why the two phases moved is not known. Everything but the dumps is 270 s on the old path and 249 s on the new, against the header's 235 s.
+
+The whole line, 5185 frames, walked 13115.5 s on 2026-10-30 on the old path, with 11282.1 s in dumps, against the header's estimate of 1412.4 s. On the new path it walks 1607.3 s with 58.4 s in dumps, 3.6 percent. The walk less the dumps was 1833 s and is 1549 s, 1.10 of the estimate. A whole-window frame of the same window, 1.1 GB of field and 1.2 GB of beam, costs 4.8 s on the new path against 8.4 s on the old, at `comb_ds_save = 0.5` and 10 frames. The copy in time order replaces a copy and a rotation, and the carry runs on twelve threads. What remains is the write.
+
+The half-substep carries at an unaveraged segment's entry and exit, `unavg_field_to_midpoint`, run the same loop over the whole window, in parallel as well, 74 carries on this line against 5185 frames.
+
+`fel_field_diffract_by` forms its phase table exp(K2 dz) for every slice, about a third of a slice's carry: 0.13 ms for the 128 by 128 table against 0.23 ms for the transform pair. Forming it once per loop was built and measured and is not taken. Every form of the routine that took the table from its caller recompiled the multiply of the record by the table with other roundings at -O3, fused complex multiply instructions where the build before used separate ones, and on a grid of 255 points the production build's `tier1_unavg` level moved from 6.984652e-02 to 6.984636e-02 with three more unaveraged rows, while a grid of 128 points gave the same bytes. The debug build held every digit. The routine is therefore unchanged, and a recorded digit stays where it was recorded.
 
 (perf-interlude-steps)=
 ## The interlude's pieces, measured

@@ -1,0 +1,36 @@
+# The frame-series measurement of docs/performance.md: FLASH1 at one wavelength a slice,
+# 4212 slices of 4096 macroparticles, the undulators unaveraged, with a frame of 12 slices
+# at every FEL step. The field frame of the whole window is 1.1 GB, so the frames are
+# cut to the slices a view of the core wants, and what the run pays for them is what the
+# page measures. Run from this directory with run.track_end = "UND##1" for the first
+# segment alone, 826 frames, or whole for all six, 5185 frames.
+
+lattice = "flash1_unaveraged.bmad"
+
+[run]
+out_root = "flash1_frames"
+comb_ds_save = 0.00546
+interlude_ds_step = 0.02
+dump_at_comb = true
+dump_slice_first = 2076
+dump_slice_last = 2087
+dump_reduced = false
+migrate = true
+device = "metal"
+
+[window]
+n_wavelength = 1
+n_slice = 4212
+
+[beam]
+n_particle = 4096
+bunch_charge = 7.983503e-11
+sig_z = 3.819304e-6
+sig_pz = 6e-4
+a_norm_emit = 1.5e-6
+b_norm_emit = 1.5e-6
+shot_noise = true
+
+[field]
+lambda0 = 1.37e-8
+seed_power = 0

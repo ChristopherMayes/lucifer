@@ -829,19 +829,28 @@ end subroutine unavg_dev_encode
 ! The half-substep carry between the plane the record is named for and the midpoint
 ! field the step advances: +0.5 into the segment, -0.5 out of it. Every record of the
 ! member, both planes, through the uncached diffraction, since the cache holds the
-! substep and this is half of it.
+! substep and this is half of it. The records run in parallel as the step runs them, on
+! the plans fel_field_kernel_init warmed above. fel_field_diffract_by forms its phase
+! table for each record. Forming it once for the member was measured and not taken: any
+! change to that routine's body recompiled its multiply with other roundings at -O3,
+! and the unaveraged tier's production digits moved (docs/performance.md).
 
 subroutine unavg_field_to_midpoint (half, uerr)
 
 real(rp) half
 logical uerr
 integer jf
+logical cerr, any_cerr
 
 uerr = .true.
+any_cerr = .false.
+!$OMP parallel do private(cerr) reduction(.or.: any_cerr)
 do jf = 1, size(wf%Ex, 3)
-  call fel_field_diffract_by (wf, jf, half * dsub, err)
-  if (err) return
+  call fel_field_diffract_by (wf, jf, half * dsub, cerr)
+  any_cerr = any_cerr .or. cerr
 enddo
+!$OMP end parallel do
+if (any_cerr) return
 uerr = .false.
 
 end subroutine unavg_field_to_midpoint
