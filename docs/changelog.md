@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-02 Changed: a change is merged into `main` as one pull request, by rebase, with the
+  changelog entry as its description and `added`, `changed` or `fixed` as its label, and GitHub
+  generates a release's notes from the pull requests merged since the last tag, grouped by those
+  labels as `.github/release.yml` says. The Linux job runs on pull requests against `main` as well
+  as on pushes to it, so the second platform is checked before the merge. The keystone precedes
+  the push as before, and the changelog stays the detailed record a release's notes link to.
+  `docs/user-guide.md` states the practice.
 - 2026-11-02 Changed: `liblucifer` is a shared library, linked against Bmad's shared
   libraries, and `cmake --install` places it. `CMakeLists.txt` honors `BUILD_SHARED_LIBS`, on by
   default, and gives the library the numeric part of the version and the major part as its

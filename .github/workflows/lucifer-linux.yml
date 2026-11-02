@@ -65,10 +65,11 @@
 # main, rather than from the ref they name, which is GitHub's rule for both. `push` is the
 # trigger that reads the pushed ref.
 #
-# On every push to the branch, and weekly besides. Every commit here is validated before
-# it lands, and the keystone that does it runs on one macOS machine, so a per-push run is
-# what extends that rule to a second platform. The wall clock recorded below is the
-# price, and the concurrency group below bounds it: a second push cancels the first run
+# On every pull request against main, on every push to it, and weekly besides. Every
+# commit here is validated before it is merged, and the keystone that does it runs on
+# one macOS machine, so a run on the pull request is what extends that rule to a second
+# platform before the merge. The wall clock recorded below is the price, and the
+# concurrency group below bounds it: a second push to the same ref cancels the first run
 # rather than queueing behind it, so a day of six pushes costs one run and not six. A
 # path filter would be no substitute, since the defects this reaches come from the
 # platform rather than from which file moved.
@@ -83,6 +84,8 @@ permissions:
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
   schedule:

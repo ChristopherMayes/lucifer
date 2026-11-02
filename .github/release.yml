@@ -1,0 +1,19 @@
+# How GitHub writes a release's notes, from the pull requests merged since the last tag.
+#
+# A change is merged into main as one pull request, by rebase, so each commit is merged as
+# it was validated and its message stays the record. The pull request's title is the change's
+# subject, its description is the entry docs/changelog.md carries for it, and its label is
+# the category below. The notes GitHub generates are therefore the changelog's section
+# for the release, one line a change, each linking to its pull request. A release's notes
+# open with a link to that section.
+
+changelog:
+  categories:
+    - title: Added
+      labels: [added]
+    - title: Changed
+      labels: [changed]
+    - title: Fixed
+      labels: [fixed]
+    - title: Other
+      labels: ["*"]
