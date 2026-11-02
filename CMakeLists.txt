@@ -6,8 +6,12 @@
 # LUCIFER_BMAD_ROOT names the Bmad tree to build against, a distribution build's production/ or
 # debug/ root or a prefix of the same shape (cmake/FindBmad.cmake). The binaries land in
 # the build directory's bin/, the Fortran modules in its modules/ and the library in its
-# lib/. util/conda_compile runs these lines for both configurations. cmake --install with
-# --prefix <dir> then places the tracker in <dir>/bin.
+# lib/. The library is shared, liblucifer.so or .dylib, linked against Bmad's shared
+# libraries, and -DBUILD_SHARED_LIBS=OFF builds the archive liblucifer.a against Bmad's
+# archives instead. util/conda_compile runs these lines for both configurations.
+# cmake --install with --prefix <dir> then places the tracker in <dir>/bin, the library in
+# <dir>/lib, its modules in <dir>/include/lucifer and LuciferConfig.cmake in
+# <dir>/lib/cmake/lucifer, so another program builds against it with find_package (Lucifer).
 #
 # The flags are the ones Bmad's distribution build gave this program as a user program,
 # since the recorded levels of docs/validation.md were measured under them: gfortran at
@@ -26,6 +30,10 @@ if (NOT CMAKE_BUILD_TYPE MATCHES "^(Release|Debug)$")
            "records levels for are Release and Debug.")
 endif ()
 
+# The library's kind. Shared is the default, and what the conda-forge package carries.
+# FindBmad reads the same switch to take Bmad's shared libraries or its archives.
+option (BUILD_SHARED_LIBS "Build liblucifer as a shared library, else as an archive" ON)
+
 # The compiler flags. The common set is what every Fortran file of the distribution's
 # user programs is compiled with. Release holds the level the production levels were
 # recorded at, and Debug the bounds-checked tree the regression suite and the debug pass
@@ -42,6 +50,7 @@ set (CMAKE_OBJCXX_FLAGS_DEBUG "-g")
 
 set (CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/modules")
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 # The conda environment the build runs in holds toml-f's CMake configuration and HDF5's,
@@ -50,6 +59,7 @@ if (DEFINED ENV{CONDA_PREFIX})
   list (APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}")
 endif ()
 
+include (GNUInstallDirs)
 find_package (Bmad REQUIRED)
 find_package (OpenMP REQUIRED COMPONENTS Fortran)
 find_package (HDF5 REQUIRED COMPONENTS Fortran HL)
@@ -105,13 +115,23 @@ add_custom_target (lucifer_version
           "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}" -P "${CMAKE_SOURCE_DIR}/cmake/LuciferVersion.cmake"
   BYPRODUCTS "${LUCIFER_VERSION_FILE}")
 
-# The library, liblucifer.a: every module under src/, the version module, the
+# The library, liblucifer: every module under src/, the version module, the
 # paired-sincos shim, and the device seam. The target is lucifer_lib since the tracker's
-# executable takes the name.
+# executable takes the name. A shared library carries the numeric part of the version,
+# 0.1.0 from v0.1.0-3-g<hash>, as its version and the major part as its soversion, and
+# 0.0.0 when the version has no numeric part.
 
 file (GLOB LUCIFER_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.f90")
-add_library (lucifer_lib STATIC ${LUCIFER_SOURCES} "${LUCIFER_VERSION_FILE}" src/fel_sincos.c)
-set_target_properties (lucifer_lib PROPERTIES OUTPUT_NAME lucifer)
+add_library (lucifer_lib ${LUCIFER_SOURCES} "${LUCIFER_VERSION_FILE}" src/fel_sincos.c)
+if (LUCIFER_VERSION_STRING MATCHES "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+  set (LUCIFER_VERSION_NUMERIC "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+  set (LUCIFER_VERSION_MAJOR "${CMAKE_MATCH_1}")
+else ()
+  set (LUCIFER_VERSION_NUMERIC "0.0.0")
+  set (LUCIFER_VERSION_MAJOR "0")
+endif ()
+set_target_properties (lucifer_lib PROPERTIES OUTPUT_NAME lucifer
+                       VERSION "${LUCIFER_VERSION_NUMERIC}" SOVERSION "${LUCIFER_VERSION_MAJOR}")
 add_dependencies (lucifer_lib lucifer_version)
 
 # -O3 with the paired-sincos shim takes the FEL step's particle path from 152 to about
@@ -137,7 +157,12 @@ else ()
   message (STATUS "Device backend: none, so run.device is refused")
 endif ()
 
-target_include_directories (lucifer_lib PUBLIC "${Bmad_MODULE_DIR}" "${CMAKE_SOURCE_DIR}/src/device")
+# The device header is the library's own. Bmad's module directory is public, since a
+# program that uses Lucifer's modules uses Bmad's, and it is carried by its path into the
+# installed configuration. The installed modules are under include/lucifer.
+target_include_directories (lucifer_lib PRIVATE "${CMAKE_SOURCE_DIR}/src/device")
+target_include_directories (lucifer_lib PUBLIC "${Bmad_MODULE_DIR}"
+                            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/lucifer>")
 if (Bmad_INCLUDE_DIR)
   target_include_directories (lucifer_lib PUBLIC "${Bmad_INCLUDE_DIR}")
 endif ()
@@ -146,9 +171,21 @@ endif ()
 # that configuration's targets, which carry the Fortran stub libraries hdf5_hl_f90cstub
 # and hdf5_f90cstub that bmad's hdf5_interface calls into. The hdf5:: targets name the
 # two front libraries alone and the link of a static libbmad.a then fails.
-target_link_libraries (lucifer_lib PUBLIC ${Bmad_LIBRARIES}
-                       ${HDF5_Fortran_HL_LIBRARIES} ${HDF5_Fortran_LIBRARIES}
-                       toml-f::toml-f OpenMP::OpenMP_Fortran ${CMAKE_DL_LIBS})
+#
+# Bmad's libraries and OpenMP are public, since a program that uses Lucifer's modules
+# uses Bmad's and the modules carry threadprivate variables. HDF5 and toml-f are the
+# shared library's own, and public only for the archive, whose user links them itself.
+if (BUILD_SHARED_LIBS)
+  set (LUCIFER_OWN_SCOPE PRIVATE)
+else ()
+  set (LUCIFER_OWN_SCOPE PUBLIC)
+endif ()
+target_link_libraries (lucifer_lib PUBLIC ${Bmad_LIBRARIES} OpenMP::OpenMP_Fortran ${CMAKE_DL_LIBS})
+# Bmad's names carry a dollar sign, lucifer_version$ among Lucifer's own, so a program
+# that uses the modules compiles with the extension, as every Bmad program does.
+target_compile_options (lucifer_lib PUBLIC "$<$<COMPILE_LANGUAGE:Fortran>:-fdollar-ok>")
+target_link_libraries (lucifer_lib ${LUCIFER_OWN_SCOPE}
+                       ${HDF5_Fortran_HL_LIBRARIES} ${HDF5_Fortran_LIBRARIES} toml-f::toml-f)
 if (APPLE)
   # The distribution linked its binaries with this, and the recorded levels carry it.
   target_link_options (lucifer_lib PUBLIC "-Wl,-no_compact_unwind")
@@ -162,12 +199,38 @@ foreach (exe lucifer lucifer_smoke_test lucifer_advance_bench wavefront_drift_te
   target_link_libraries (${exe} PRIVATE lucifer_lib)
 endforeach ()
 
-# What cmake --install places: the tracker in the prefix's bin/, and nothing else. The
-# library, its modules and the three test programs stay in the build directory. The
-# installed tracker keeps the directories of the libraries it was linked against in its
-# rpath, the conda environment's lib/ among them, so it runs from the prefix as it runs
-# from the build directory.
+# What cmake --install places: the tracker in the prefix's bin/, the library in its
+# lib/, every module in its include/lucifer/, and LuciferConfig.cmake with its version
+# file and the exported target in lib/cmake/lucifer. The three test programs stay in the
+# build directory. The installed tracker finds the library beside its own bin/ through
+# its rpath, and both keep the directories of the libraries they were linked against,
+# the conda environment's lib/ among them, so they run from the prefix as they run from
+# the build directory. The configuration finds OpenMP again for the program that uses
+# it, HDF5 and toml-f too for the archive, and carries Bmad's libraries and module
+# directory by path.
 
-include (GNUInstallDirs)
-set_target_properties (lucifer PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+if (APPLE)
+  set (LUCIFER_ORIGIN "@loader_path")
+else ()
+  set (LUCIFER_ORIGIN "$ORIGIN")
+endif ()
+set_target_properties (lucifer PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE
+                       INSTALL_RPATH "${LUCIFER_ORIGIN}/../${CMAKE_INSTALL_LIBDIR}")
+set_target_properties (lucifer_lib PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 install (TARGETS lucifer RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install (TARGETS lucifer_lib EXPORT LuciferTargets
+         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install (DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}/"
+         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/lucifer" FILES_MATCHING PATTERN "*.mod")
+set (LUCIFER_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/lucifer")
+install (EXPORT LuciferTargets NAMESPACE Lucifer:: DESTINATION "${LUCIFER_CMAKE_DIR}")
+include (CMakePackageConfigHelpers)
+configure_package_config_file (cmake/LuciferConfig.cmake.in
+                               "${CMAKE_BINARY_DIR}/generated/LuciferConfig.cmake"
+                               INSTALL_DESTINATION "${LUCIFER_CMAKE_DIR}")
+write_basic_package_version_file ("${CMAKE_BINARY_DIR}/generated/LuciferConfigVersion.cmake"
+                                  VERSION "${LUCIFER_VERSION_NUMERIC}" COMPATIBILITY SameMajorVersion)
+install (FILES "${CMAKE_BINARY_DIR}/generated/LuciferConfig.cmake"
+               "${CMAKE_BINARY_DIR}/generated/LuciferConfigVersion.cmake"
+         DESTINATION "${LUCIFER_CMAKE_DIR}")

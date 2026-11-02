@@ -181,10 +181,12 @@ jobs:
                 ${{ matrix.dir }}/bin/wavefront_drift_test "$CONDA_PREFIX/bin/tao"
           echo "LUCIFER_BMAD_ROOT=$CONDA_PREFIX" >> "$GITHUB_ENV"
 
-      # The install rule. cmake --install places the tracker alone in the prefix's bin/,
-      # and the installed tracker prints its version and runs the steady-state example
-      # from a directory outside the tree, in an empty environment, so the libraries come
-      # from its rpath and nothing else.
+      # The install rule. cmake --install places the tracker in the prefix's bin/, the
+      # shared library in its lib/, the modules in its include/lucifer/ and the CMake
+      # configuration in lib/cmake/lucifer. The installed tracker loads liblucifer and
+      # Bmad's shared libbmad, which ldd shows, prints its version and runs the
+      # steady-state example from a directory outside the tree, in an empty environment,
+      # so the libraries come from its rpath and nothing else.
       - name: Install the ${{ matrix.build }} tracker and run steady_state from the prefix
         shell: bash -o pipefail {0}
         run: |
@@ -192,7 +194,9 @@ jobs:
           conda activate lucifer-build
           set -e
           cmake --install ${{ matrix.dir }} --prefix "$RUNNER_TEMP/prefix"
-          find "$RUNNER_TEMP/prefix" -type f
+          find "$RUNNER_TEMP/prefix" -type f -o -type l
+          test -f "$RUNNER_TEMP/prefix/lib/cmake/lucifer/LuciferConfig.cmake"
+          ldd "$RUNNER_TEMP/prefix/bin/lucifer" | grep -e liblucifer -e libbmad
           mkdir -p "$RUNNER_TEMP/installed/steady_state"
           cp examples/steady_state/lucifer.toml "$RUNNER_TEMP/installed/steady_state/"
           cp examples/aramis.bmad "$RUNNER_TEMP/installed/"

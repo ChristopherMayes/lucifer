@@ -1,0 +1,30 @@
+# The configuration cmake --install places in lib/cmake/lucifer, so a program builds
+# against the installed Lucifer with find_package (Lucifer) and links Lucifer::lucifer_lib.
+#
+# The target carries Lucifer's modules under include/lucifer, Bmad's module directory
+# and libraries by the paths the build found them at, and the libraries they call.
+# OpenMP is found again here, so the program's own configure holds it. HDF5 and toml-f
+# are the shared library's own, and found again only for an archive liblucifer, whose
+# user links them itself.
+#
+# Sets:
+#   Lucifer_FOUND
+#   Lucifer_VERSION          The version the library was built as, @LUCIFER_VERSION_STRING@.
+#   Lucifer_SHARED           Whether the library is shared.
+#   Lucifer_BMAD_MODULE_DIR  The Bmad module directory the library was built against.
+
+@PACKAGE_INIT@
+
+include (CMakeFindDependencyMacro)
+find_dependency (OpenMP COMPONENTS Fortran)
+set (Lucifer_SHARED @BUILD_SHARED_LIBS@)
+if (NOT Lucifer_SHARED)
+  find_dependency (toml-f)
+  find_dependency (HDF5 COMPONENTS Fortran HL)
+endif ()
+
+set (Lucifer_VERSION "@LUCIFER_VERSION_STRING@")
+set (Lucifer_BMAD_MODULE_DIR "@Bmad_MODULE_DIR@")
+
+include ("${CMAKE_CURRENT_LIST_DIR}/LuciferTargets.cmake")
+check_required_components (Lucifer)

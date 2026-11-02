@@ -14,16 +14,20 @@
 # revision counter compared as numbers, and a tree below the minimum is refused with both
 # values in the message.
 #
+# Reads:
+#   BUILD_SHARED_LIBS    Whether Lucifer's library is shared, which decides whether Bmad's
+#                        shared libraries or its archives are taken.
+#
 # Sets:
 #   Bmad_FOUND
 #   Bmad_MODULE_DIR      The directory holding bmad.mod and sim_utils.mod.
 #   Bmad_INCLUDE_DIR     Bmad's include/ when the tree has one.
-#   Bmad_LIBRARIES       The archives and libraries to link, in link order.
+#   Bmad_LIBRARIES       The Bmad libraries and the libraries they call, in link order.
 #   Bmad_RELEASE         The release the tree carries, YYYYMMDD-N.
 #
 # The link list is the one Bmad's own build hands a user program through its
 # ACC_BMAD_LINK_LIBS variable, read from the production build of 2026-10-23, with the three
-# Bmad archives first. Each entry carries the reason it is there, so a library that Bmad
+# Bmad libraries first. Each entry carries the reason it is there, so a library that Bmad
 # stops needing can be dropped with its line.
 
 include(FindPackageHandleStandardArgs)
@@ -43,14 +47,23 @@ find_path (Bmad_MODULE_DIR bmad.mod
 find_path (Bmad_INCLUDE_DIR NAMES bmad_std_typedefs.h sim_utils.h
   PATHS "${LUCIFER_BMAD_ROOT}/include" NO_DEFAULT_PATH)
 
-# The three archives Lucifer calls into: the Bmad library, its utilities and PTC's
-# forest, which bmad's element tracking reaches. The archive is taken ahead of the shared
-# library of the same name, as the distribution's link line did, so the binary carries
-# Bmad and runs without the tree it was built against.
+# The three Bmad libraries Lucifer calls into: the Bmad library, its utilities and PTC's
+# forest, which bmad's element tracking reaches. A shared liblucifer takes their shared
+# form ahead of the archive of the same name: a shared library that folded the archives
+# into itself would give a program that also loads libbmad two copies of Bmad's module
+# variables. An archive liblucifer takes the archive ahead of the shared library, as the
+# distribution's link line did, so the binary carries Bmad and runs without the tree it
+# was built against. The found path is cached, so a build directory configured one way
+# is not reconfigured the other.
 set (_bmad_own bmad sim_utils forest)
 set (Bmad_LIBRARIES)
 foreach (_lib ${_bmad_own})
-  find_library (Bmad_${_lib}_LIBRARY NAMES lib${_lib}.a ${_lib} PATHS "${LUCIFER_BMAD_ROOT}/lib" NO_DEFAULT_PATH)
+  if (BUILD_SHARED_LIBS)
+    set (_names ${_lib} lib${_lib}.a)
+  else ()
+    set (_names lib${_lib}.a ${_lib})
+  endif ()
+  find_library (Bmad_${_lib}_LIBRARY NAMES ${_names} PATHS "${LUCIFER_BMAD_ROOT}/lib" NO_DEFAULT_PATH)
   list (APPEND Bmad_LIBRARIES "${Bmad_${_lib}_LIBRARY}")
 endforeach ()
 

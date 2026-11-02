@@ -9,6 +9,27 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-02 Changed: `liblucifer` is a shared library, linked against Bmad's shared
+  libraries, and `cmake --install` places it. `CMakeLists.txt` honors `BUILD_SHARED_LIBS`, on by
+  default, and gives the library the numeric part of the version and the major part as its
+  soversion.
+  `cmake/FindBmad.cmake` takes `libbmad`, `libsim_utils` and `libforest` in their shared form under
+  a shared build and their archives under `-DBUILD_SHARED_LIBS=OFF`, which keeps the archive
+  `liblucifer.a` with the reason it had: a shared library that folded Bmad's archives into itself
+  would give a program that also loads `libbmad` two copies of Bmad's module variables. The
+  install places the tracker in `bin/`, the library in `lib/`, the modules in `include/lucifer/` and
+  `LuciferConfig.cmake` with its version file and the exported target `Lucifer::lucifer_lib` in
+  `lib/cmake/lucifer` (`cmake/LuciferConfig.cmake.in`), where it placed the tracker alone. The
+  target carries Bmad's module directory and libraries by path, OpenMP, and `-fdollar-ok`, which
+  Bmad's names need. HDF5 and toml-f are the shared library's own and public only for the archive.
+  The installed tracker finds the library beside its own `bin` through its rpath. A build against
+  the conda-forge package, installed into a prefix and run from outside the tree, gave the
+  steady-state example's recorded exit power, 801.994 MW, and a two-line program that uses
+  `fel_version_mod` configured with `find_package (Lucifer)` against that prefix, linked and ran.
+  Every recorded digit held on both configurations. The conda-forge recipe can now drop its two
+  lines that copied the archive and the modules into the prefix, and its test for the archive.
+  The Linux job lists the installed files and shows the installed tracker loading `liblucifer`
+  and `libbmad`.
 - 2026-10-30 Added: `docs/glossary.md`, the words the pages use for the pieces of a run, each with the
   page that defines it: the slice, the window and its head and tail, the beamlet, the grid, the plane,
   the field set and its members, the field record and its rotation seam, the slippage and the bank,
