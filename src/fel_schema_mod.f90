@@ -324,8 +324,8 @@ call add ('space_charge', 'longrange', key_logical$, '', 'long range', 'The whol
 
 ! [bmad]: the Bmad switches the tracker honors, bmad_com and space_charge_com.
 
-call add ('bmad', 'radiation_damping_on', key_logical$, '', 'radiation damping', 'Bmad''s radiation damping in the interludes.')
-call add ('bmad', 'radiation_fluctuations_on', key_logical$, '', 'radiation fluctuations', 'Bmad''s radiation fluctuations in the interludes.')
+call add ('bmad', 'radiation_damping_on', key_logical$, '', 'radiation damping', 'Bmad''s radiation damping, honored everywhere a particle is tracked, the FEL step included.')
+call add ('bmad', 'radiation_fluctuations_on', key_logical$, '', 'radiation fluctuations', 'Bmad''s radiation fluctuations, honored everywhere a particle is tracked, the FEL step included.')
 call add ('bmad', 'csr_and_space_charge_on', key_logical$, '', 'csr and space charge', 'Bmad''s master switch for CSR and space charge.')
 call add ('bmad', 'sr_wakes_on', key_logical$, '', 'short-range wakes', 'Bmad''s short-range element wakes.')
 call add ('bmad', 'lr_wakes_on', key_logical$, '', 'long-range wakes', 'Bmad''s long-range element wakes.')

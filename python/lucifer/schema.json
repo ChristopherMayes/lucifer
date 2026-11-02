@@ -150,8 +150,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "radiation_damping_on": {"type": "boolean", "default": false, "description": "Bmad's radiation damping in the interludes."},
-        "radiation_fluctuations_on": {"type": "boolean", "default": false, "description": "Bmad's radiation fluctuations in the interludes."},
+        "radiation_damping_on": {"type": "boolean", "default": false, "description": "Bmad's radiation damping, honored everywhere a particle is tracked, the FEL step included."},
+        "radiation_fluctuations_on": {"type": "boolean", "default": false, "description": "Bmad's radiation fluctuations, honored everywhere a particle is tracked, the FEL step included."},
         "csr_and_space_charge_on": {"type": "boolean", "default": false, "description": "Bmad's master switch for CSR and space charge."},
         "sr_wakes_on": {"type": "boolean", "default": true, "description": "Bmad's short-range element wakes."},
         "lr_wakes_on": {"type": "boolean", "default": true, "description": "Bmad's long-range element wakes."},

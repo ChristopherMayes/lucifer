@@ -136,7 +136,7 @@ $$
   \end{cases}
 $$ (eq-fc)
 
-with $\xi = (h/2)\,a_w^2/(1+a_w^2)$. Only $h=1$ is used (harmonics beyond the coupling formula are out of scope). The transverse roll-off of the undulator field about its offset $(a_x, a_y)$ is
+with $\xi = (h/2)\,a_w^2/(1+a_w^2)$. It is evaluated at each member of the field set, the odd harmonics of a planar device and the fundamental alone of a helical one ([](#sec-field-set)). The transverse roll-off of the undulator field about its offset $(a_x, a_y)$ is
 
 $$
   \begin{aligned}

@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-02 Fixed: three statements written before the features they describe landed said
+  otherwise. The coupling section of `docs/fel-physics.md` said only the fundamental was used,
+  where the field set carries each harmonic member with the Bessel coupling at the odd harmonics
+  of a planar device, as its own field-set section says. The descriptions of
+  `bmad.radiation_damping_on` and `bmad.radiation_fluctuations_on` said the switches act in the
+  interludes, where both FEL modes honor them inside the FEL step as well, as the physics page's
+  spontaneous-emission paragraph says. `docs/genesis4.md` listed one-to-one tracking and its
+  sorting among what Lucifer lacks, where `load_mode = "keep"` with migration keeps every real
+  particle at its own weight and moves it between slices, and listed the taper among the models it
+  lacks, where a taper is a per-element attribute of the lattice. The field-error model of
+  Genesis4's `&lattice` namelist stays listed as absent.
 - 2026-11-02 Changed: a change is merged into `main` as one pull request, by rebase, with the
   changelog entry as its description and `added`, `changed` or `fixed` as its label, and GitHub
   generates a release's notes from the pull requests merged since the last tag, grouped by those

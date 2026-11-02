@@ -29,15 +29,14 @@ Lucifer has, and Genesis4 does not:
 - **Per-particle weights** throughout, including weighted shot noise and weighted diagnostics. No Genesis4 dump format carries a weight.
 - **The unaveraged mode**, integrating the real undulator field with no period averaging and no resonance approximation.
 - **Bmad element wakes** applied across the whole time window, and every non-FEL element tracked by Bmad itself: real quadrupoles, chicanes, patches, apertures and collimators.
-- **Slice migration**, moving particles between slices when their ponderomotive phase leaves the slice window.
+- **Slice migration**, moving particles between slices when their ponderomotive phase leaves the slice window. With `load_mode = "keep"`, which keeps every real particle at its own weight, migration is what Genesis4's one-to-one tracking and its sorting do ([](fel-physics.md#sec-loading), [](fel-physics.md#sec-migration)).
 - **A lattice**, in Bmad's sense. FEL parameters are element attributes, so one lattice serves tracking, optics and layout.
 - **A self-describing statistics file**, described by [](BMAD-STATS-SPEC.md).
 
 Genesis4 has, and Lucifer does not:
 
 - **MPI**, where Lucifer is shared-memory OpenMP over slices.
-- **One-to-one tracking** (`one4one`) and the particle sorting it implies.
-- **Undulator field errors**, and taper and error models Lucifer has not transcribed.
+- **Undulator field errors**, the field-error model of its `&lattice` namelist. A taper is a per-element attribute of the Bmad lattice and needs no model.
 - **The ADI field solver**. Lucifer transcribes the FFT solver only, so a comparison run sets `fft_fieldsolver = true`.
 - **Its own semianalytic and scan machinery**, none of which is in scope here.
 
