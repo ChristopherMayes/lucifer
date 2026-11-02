@@ -168,8 +168,8 @@
 <!-- begin keys-bmad -->
 | key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
-| `radiation_damping_on` | true/false | false |  |  | Bmad's radiation damping in the interludes. |
-| `radiation_fluctuations_on` | true/false | false |  |  | Bmad's radiation fluctuations in the interludes. |
+| `radiation_damping_on` | true/false | false |  |  | Bmad's radiation damping, honored everywhere a particle is tracked, the FEL step included. |
+| `radiation_fluctuations_on` | true/false | false |  |  | Bmad's radiation fluctuations, honored everywhere a particle is tracked, the FEL step included. |
 | `csr_and_space_charge_on` | true/false | false |  |  | Bmad's master switch for CSR and space charge. |
 | `sr_wakes_on` | true/false | true |  |  | Bmad's short-range element wakes. |
 | `lr_wakes_on` | true/false | true |  |  | Bmad's long-range element wakes. |

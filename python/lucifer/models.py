@@ -249,9 +249,9 @@ class SpaceCharge:
 class Bmad:
     """The [bmad] table of the input file."""
     radiation_damping_on: bool = False
-    """Bmad's radiation damping in the interludes."""
+    """Bmad's radiation damping, honored everywhere a particle is tracked, the FEL step included."""
     radiation_fluctuations_on: bool = False
-    """Bmad's radiation fluctuations in the interludes."""
+    """Bmad's radiation fluctuations, honored everywhere a particle is tracked, the FEL step included."""
     csr_and_space_charge_on: bool = False
     """Bmad's master switch for CSR and space charge."""
     sr_wakes_on: bool = True
