@@ -396,6 +396,8 @@ The slippage is `Control::applySlippage` reduced to one shared-memory node (the 
 :::
 The measured levels and how they are checked are in [](validation.md#val-validation-from-one-command).
 
+A research prototype, `field.propagator = "spectral"`, transforms the whole window along the slice axis as well, so each frequency diffracts at its own wavenumber and the slippage is a continuous phase ramp. It is outside the keystone and measured on its own page, [](spectral-field.md).
+
 (sec-loading)=
 ## Loading
 

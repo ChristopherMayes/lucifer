@@ -76,6 +76,8 @@ integer(8) prog_count0, prog_count_last, prog_rate
 real(rp) prog_power, prog_energy, prog_bunch
 logical prog_header_done
 logical write_diag, keep_escaped_field, migrate, migrate_check, any_unavg, two_pol, err
+logical spectral, ramp_slip      ! The spectral propagator, and its slippage as the ramp.
+real(rp) slip_step
 character(400) out_root
 character(16) interlude_model
 type (ele_struct), target :: slice_ele          ! One interlude piece, element_slice_iterator's.
@@ -134,6 +136,13 @@ out_root = run%global%out_root
 interlude_model = run%global%interlude_model
 comb = run%global%comb_ds_save
 run%z_last_rec = -1e30_rp
+
+! The spectral propagator (fel_spectral_mod) takes the field half of every step and
+! interlude when it is on, and under its ramp the slippage rides inside it, so the
+! record is never rotated and the bank stays empty.
+
+spectral = run%spectral%on
+ramp_slip = spectral .and. run%spectral%ramp
 
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
@@ -239,6 +248,7 @@ do ie = run%i_start, run%i_end
     ! end-of-lattice fixup lands on the last step.
 
     und = und_of(ie)
+    und%spectral = spectral
     ! Transverse transport in an averaged element uses Bmad's own kernel by default.
     ! transport_model = 'genesis' selects Genesis4's maps, for comparison runs. The
     ! unaveraged mode integrates the field and has no map to choose.
@@ -307,6 +317,20 @@ do ie = run%i_start, run%i_end
       if (err) then
         err_flag = .true.;  return
       endif
+
+      ! The step's slippage, which the spectral propagator takes with the step and the
+      ! slice propagator applies by rotation below.
+
+      slip_step = und%dz * und_slip_step
+      if (istep == und%nstep) slip_step = slip_step + ele_slip(ie)
+      if (spectral) then
+        call fel_tic (fel_t_solve$)
+        call fel_spectral_step (run%spectral, und, fbeam, ffield, und%dz, slip_step, err)
+        call fel_toc (fel_t_solve$)
+        if (err) then
+          err_flag = .true.;  return
+        endif
+      endif
       call apply_radiation ()
 
       ! Element sr wake, once per passage as in Bmad. One kick at the step nearest
@@ -321,11 +345,8 @@ do ie = run%i_start, run%i_end
 
       z_now = z_now + und%dz
       call set_field_position ()
-      if (istep == und%nstep) then
-        call apply_slippage_banked (und%dz * und_slip_step + ele_slip(ie))
-        if (err_flag) return
-      else
-        call apply_slippage_banked (und%dz * und_slip_step)
+      if (.not. ramp_slip) then
+        call apply_slippage_banked (slip_step)
         if (err_flag) return
       endif
       ! The offset is given back before the migration re-slices the beam. Migration
@@ -488,12 +509,17 @@ do ie = run%i_start, run%i_end
                       fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
 
       call fel_tic (fel_t_drift$)
-      do ih = 1, n_harm      ! Each field diffracts at its own wavelength. Through a
+      if (spectral) then
+        call fel_spectral_drift (run%spectral, ffield, l_piece - light_corr(ie) * f_piece, &
+                                 ele_slip(ie) / n_piece, err)
+      else
+        do ih = 1, n_harm    ! Each field diffracts at its own wavelength. Through a
                              ! geometry break the light takes the chord and not the arc.
                              ! The correction lands on the break's last element.
-        call wavefront_drift (ffield(ih)%wf, l_piece - light_corr(ie) * f_piece, err)
-        if (err) exit
-      enddo
+          call wavefront_drift (ffield(ih)%wf, l_piece - light_corr(ie) * f_piece, err)
+          if (err) exit
+        enddo
+      endif
       call fel_toc (fel_t_drift$)
 
       ! Absolute-time phasing (fel-physics.md sec-phasing), set by bmad_com's global switch
@@ -527,8 +553,10 @@ do ie = run%i_start, run%i_end
         z_now = z_ele0 + i_piece * (ele%value(l$) / n_piece)
       endif
       call set_field_position ()
-      call apply_slippage_banked (ele_slip(ie) / n_piece)
-      if (err_flag) return
+      if (.not. ramp_slip) then
+        call apply_slippage_banked (ele_slip(ie) / n_piece)
+        if (err_flag) return
+      endif
 
       if (i_piece == n_piece) then
         call do_migrate ()
@@ -560,7 +588,8 @@ do ie = run%i_start, run%i_end
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
     call fel_tic (fel_t_gen_int$)
-    call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err)
+    call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err, field = .not. spectral)
+    if (spectral .and. .not. err) call fel_spectral_drift (run%spectral, ffield, ele%value(l$), ele_slip(ie), err)
     call fel_toc (fel_t_gen_int$)
     if (absolute_time_tracking(ele)) then      ! Absolute-time phasing (sec-phasing).
       fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$)
@@ -574,8 +603,10 @@ do ie = run%i_start, run%i_end
     endif
     z_now = z_now + ele%value(l$)
     call set_field_position ()
-    call apply_slippage_banked (ele_slip(ie))
-    if (err_flag) return
+    if (.not. ramp_slip) then
+      call apply_slippage_banked (ele_slip(ie))
+      if (err_flag) return
+    endif
 
     call do_migrate ()
     if (err_flag) return

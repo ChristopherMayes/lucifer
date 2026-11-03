@@ -720,6 +720,26 @@ block
 end block
 call out_io (s_blank$, r_name, trim(line))
 
+! The spectral propagator, when the input file selects it (fel_spectral_mod).
+
+if (run%spectral%on) then
+  line = ' Propagator  spectral, a research prototype: slippage as the '
+  if (run%spectral%ramp) then
+    line = trim(line) // ' phase ramp, boundary '
+  else
+    line = trim(line) // ' whole-slice rotation, boundary '
+  endif
+  select case (run%spectral%boundary)
+  case (fel_spectral_sponge$)
+    write (line, '(2a, i0, a)') trim(line), ' cos^2 sponge over ', run%spectral%n_sponge, ' slices'
+  case (fel_spectral_pad$)
+    write (line, '(2a, i0, a)') trim(line), ' zero padding of ', run%spectral%n_pad, ' slices'
+  case default
+    write (line, '(2a, es9.2)') trim(line), ' headroom, head tolerance', run%spectral%head_tolerance
+  end select
+  call out_io (s_blank$, r_name, trim(line))
+endif
+
 ! What the run will do and how long it will take. The count is exact. The estimate is
 ! one machine's, which the line says (fel_cost_mod). load_only stops after this block,
 ! so an input file's cost can be seen without tracking it (docs/user-guide.md).
@@ -1130,7 +1150,20 @@ if (run%ffield(1)%slip%timerun) then
           run%ffield(ih)%slip%u_escaped, ' J'
     if (ih < run%n_harm) line = trim(line) // ','
   enddo
-  call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
+  if (run%spectral%on .and. run%spectral%boundary /= fel_spectral_headroom$) then
+    call out_io (s_blank$, r_name, trim(line) // ' removed at the window head by the spectral boundary')
+  else
+    call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
+  endif
+endif
+
+! What the spectral propagator's headroom check saw (fel_spectral_mod).
+
+if (run%spectral%on .and. run%spectral%ramp .and. run%spectral%boundary == fel_spectral_headroom$ .and. &
+    run%ffield(1)%slip%timerun) then
+  write (line, '(a, es10.3, a, f0.3, a)') ' Spectral    head slice held at most ', run%spectral%head_max, &
+        ' of the window energy, at s = ', run%spectral%z_head_max, ' m'
+  call out_io (s_blank$, r_name, trim(line))
 endif
 
 ! The dumps, each listed when the switch that writes it was on in this run and the file is

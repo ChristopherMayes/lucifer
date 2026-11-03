@@ -1414,6 +1414,33 @@ if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
   err_flag = .true.;  return
 endif
 
+! The spectral propagator (fel_spectral_mod, docs/spectral-field.md) is a research
+! prototype of the averaged mode's field half on the CPU in double precision. The
+! unaveraged step, the device, the FP32 twin and the coherent source each carry a
+! propagator of their own, which the prototype does not reach, so each is refused.
+
+call fel_spectral_setup (run%spectral, run%winit%propagator, run%winit%spectral_slippage, &
+                         run%winit%spectral_boundary, run%winit%spectral_sponge_slices, &
+                         run%winit%spectral_head_tolerance)
+if (run%spectral%on) then
+  if (run%any_unavg) then
+    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE UNAVERAGED MODE.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%device /= 'off') then
+    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE DEVICE.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%fp32_check /= 'off') then
+    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE FP32 CHECK.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%source_model == 'coherent') then
+    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE COHERENT SOURCE MODEL.')
+    err_flag = .true.;  return
+  endif
+endif
+
 
 ! The rest of the schedule: the rotations the walk applies at each element's last step,
 ! from the one sum a derived window's headroom also takes (fel_setup_slippage), and the
@@ -1428,6 +1455,29 @@ run%phase_rate = phase_rate
 call fel_setup_slippage (run, gamma0_ref, wf%wavelength, ele_slip, light_corr, &
                          run%slip_und, run%slip_int, run%slip_chic, err_flag, run%und_slip)
 if (err_flag) return
+
+! The spectral propagator's sponge and zero padding are sized against the largest shift
+! one pass applies, an element's end slippage with its last step's, or a shift would
+! carry light past them (fel_spectral_size).
+
+if (run%spectral%on) then
+  block
+    real(rp) shift_max
+    integer ie_s
+    shift_max = 0
+    do ie_s = 1, branch%n_ele_track
+      if (is_fel(ie_s)) then
+        shift_max = max(shift_max, ele_slip(ie_s) + run%und_slip(ie_s) / max(1, nint(branch%ele(ie_s)%value(num_steps$))))
+      else
+        shift_max = max(shift_max, ele_slip(ie_s))
+      endif
+    enddo
+    call fel_spectral_size (run%spectral, shift_max / fbeam%n_wavelength, nslice, err)
+    if (err) then
+      err_flag = .true.;  return
+    endif
+  end block
+endif
 Lz = 0
 prev_ie = 0
 
