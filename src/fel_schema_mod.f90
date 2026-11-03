@@ -283,6 +283,26 @@ call add ('field', 'seed_polarization', key_string$, '', 'seed polarization', &
       'The seed''s polarization, x or y.', allowed = [character(16) :: 'x', 'y'])
 call add ('field', 'harmonics', key_int_list$, '', 'harmonics', &
       'The field set: 1 first, then further harmonic numbers in increasing order.')
+call add ('field', 'propagator', key_string$, '', 'propagator', &
+      'The field propagator: slices, one transverse transform per slice at the reference wavenumber, ' // &
+      'or spectral, a research prototype that transforms the whole window in (x, y, tau) with the ' // &
+      'frequency-dependent kernel (docs/spectral-field.md).', allowed = [character(16) :: 'slices', 'spectral'])
+call add ('field', 'spectral_slippage', key_string$, '', 'spectral slippage', &
+      'Under the spectral propagator, the slippage as the continuous phase ramp, or as the whole-slice ' // &
+      'rotation of the slice propagator.', allowed = [character(16) :: 'ramp', 'slices'])
+call add ('field', 'spectral_boundary', key_string$, '', 'spectral boundary', &
+      'Under the spectral propagator, what meets light the ramp moves to the window''s head: the headroom ' // &
+      'alone, the run refused when the head slice holds more than spectral_head_tolerance of the window''s ' // &
+      'energy; a cos^2 ' // &
+      'sponge over spectral_sponge_slices, whose removed energy joins the escaped energy; or zero padding ' // &
+      'along tau beyond the schedule''s largest shift, with what crosses into the padding removed and its ' // &
+      'energy joined the same way.', &
+      allowed = [character(16) :: 'headroom', 'sponge', 'pad'])
+call add ('field', 'spectral_sponge_slices', key_int$, '', 'sponge slices', &
+      'Slices of the cos^2 sponge at the window''s head. 0 derives an eighth of the window, at least 4.', lo = 0.0_rp)
+call add ('field', 'spectral_head_tolerance', key_real$, '', 'head tolerance', &
+      'The head slice''s share of the window''s energy above which a run under the headroom boundary is refused.', &
+      lo = 0.0_rp)
 
 ! [wake]: fel_chamber_wake_init_struct.
 
@@ -586,6 +606,11 @@ case ('field.grid_half_width');            run%winit%grid_half_width = rv
 case ('field.seed_power');                 run%winit%seed_power = rv
 case ('field.seed_waist_size');            run%winit%seed_waist_size = rv
 case ('field.seed_polarization');          call put (run%winit%seed_polarization)
+case ('field.propagator');                 call put (run%winit%propagator)
+case ('field.spectral_slippage');          call put (run%winit%spectral_slippage)
+case ('field.spectral_boundary');          call put (run%winit%spectral_boundary)
+case ('field.spectral_sponge_slices');     run%winit%spectral_sponge_slices = iv
+case ('field.spectral_head_tolerance');    run%winit%spectral_head_tolerance = rv
 case ('field.harmonics')
   if (.not. fits(size(run%winit%harmonics))) return
   run%winit%harmonics = 0
@@ -948,6 +973,11 @@ case ('field.grid_half_width');            rv = run%winit%grid_half_width
 case ('field.seed_power');                 rv = run%winit%seed_power
 case ('field.seed_waist_size');            rv = run%winit%seed_waist_size
 case ('field.seed_polarization');          sv = run%winit%seed_polarization
+case ('field.propagator');                 sv = run%winit%propagator
+case ('field.spectral_slippage');          sv = run%winit%spectral_slippage
+case ('field.spectral_boundary');          sv = run%winit%spectral_boundary
+case ('field.spectral_sponge_slices');     iv = run%winit%spectral_sponge_slices
+case ('field.spectral_head_tolerance');    rv = run%winit%spectral_head_tolerance
 case ('field.harmonics')
   n = count(run%winit%harmonics > 0)
   ilist = run%winit%harmonics(1:n)

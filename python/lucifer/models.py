@@ -195,6 +195,16 @@ class Field:
     """The seed's polarization, x or y."""
     harmonics: list[int] = _field(default_factory=lambda: [1])
     """The field set: 1 first, then further harmonic numbers in increasing order."""
+    propagator: Literal['slices', 'spectral'] = 'slices'
+    """The field propagator: slices, one transverse transform per slice at the reference wavenumber, or spectral, a research prototype that transforms the whole window in (x, y, tau) with the frequency-dependent kernel (docs/spectral-field.md)."""
+    spectral_slippage: Literal['ramp', 'slices'] = 'ramp'
+    """Under the spectral propagator, the slippage as the continuous phase ramp, or as the whole-slice rotation of the slice propagator."""
+    spectral_boundary: Literal['headroom', 'sponge', 'pad'] = 'headroom'
+    """Under the spectral propagator, what meets light the ramp moves to the window's head: the headroom alone, the run refused when the head slice holds more than spectral_head_tolerance of the window's energy; a cos^2 sponge over spectral_sponge"""
+    spectral_sponge_slices: int = 0
+    """Slices of the cos^2 sponge at the window's head. 0 derives an eighth of the window, at least 4. Bounds: from 0."""
+    spectral_head_tolerance: float = 0.001
+    """The head slice's share of the window's energy above which a run under the headroom boundary is refused. Bounds: from 0.0."""
 
 
 @dataclass

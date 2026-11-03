@@ -37,6 +37,7 @@ module fel_struct
 
 use fel_track_mod
 use fel_unaveraged_mod
+use fel_spectral_mod
 use fel_import_mod
 use fel_stats_mod
 
@@ -253,6 +254,12 @@ type wavefront_init_struct
   ! The field set: harmonics(1) must be 1 (the fundamental). Further entries are
   ! harmonic numbers in increasing order, 0 = unused.
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
+  ! The spectral propagator, a research prototype (fel_spectral_mod, docs/spectral-field.md).
+  character(16) :: propagator = 'slices'            ! slices or spectral.
+  character(16) :: spectral_slippage = 'ramp'       ! ramp or slices.
+  character(16) :: spectral_boundary = 'headroom'   ! headroom, sponge or pad.
+  integer :: spectral_sponge_slices = 0             ! 0 derives it.
+  real(rp) :: spectral_head_tolerance = 1e-3_rp
 end type
 
 ! The transverse grid derived from the beam when the input file sets none
@@ -365,6 +372,7 @@ type fel_run_struct
   type (fel_device_struct) :: dev
   type (fel_stats_struct) :: stats
   type (fel_unavg_struct) :: ustate
+  type (fel_spectral_struct) :: spectral
   ! The schedule (fel_setup): per tracked element.
   type (fel_und_struct), allocatable :: und_of(:)
   ! The angle at which the stats split the field power, whether or not the filter is on.

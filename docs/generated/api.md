@@ -4599,6 +4599,377 @@ Output:
   is_known   -- logical: True if the name is one this tree knows.
 ```
 
+## `fel_spectral_mod.f90`
+
+(api-fel-spectral-mod)=
+### `fel_spectral_mod`
+
+*Module*
+
+```
+The spectral field propagator, a research prototype (docs/spectral-field.md). The
+slice propagator (fel_field_step, fel_field_diffract) advances every slice of the
+window by the paraxial kernel exp(-i dz k_perp^2 / 2 k0) at the one reference
+wavenumber k0, and the slippage moves the record by whole slices once 0.8 of a slice
+has accumulated (fel_apply_slippage). This module transforms a member's whole window
+in (x, y, tau) instead. Two things change and the rest does not. The kernel becomes
+exp(-i dz k_perp^2 / 2 k(kappa)) with k(kappa) = k0 + kappa, where kappa is the
+wavenumber conjugate to the window coordinate tau and c kappa is the frequency offset
+from the carrier. That is the term a chirped or short pulse gets wrong at relative
+order dOmega/omega under one k0. And the slippage becomes the phase ramp
+exp(-i kappa delta), delta the step's slippage as a length, exact and continuous, or
+stays the whole-slice rotation under field.spectral_slippage = "slices". The push, the
+deposit and the averaged equations are untouched.
+
+The window coordinate. Window slice i (fel-physics.md sec-window) sits at
+tau = (i - 1) * slice_spacing, so tau grows toward the head, the end light slips
+toward. The envelope rides the carrier exp(i (k0 z - omega0 t)), the convention the
+kernel's sign fixes, so a mode exp(i kappa tau) of the envelope has the carrier's
+frequency plus c kappa and the wavenumber k0 + kappa. The discrete transform of the
+window carries kappa_m = 2 pi m / (n_t slice_spacing) for m up to half of n_t and
+negative beyond, as the transverse table does (fel_field_kernel_init).
+
+The transform along tau is periodic, so light the ramp moves past the head would
+reappear at the tail. A derived window holds the line's slippage ahead of the bunch
+and nothing reaches the tail. Three forms meet the head on a shorter window
+(field.spectral_boundary): the headroom alone, with the run refused once the head
+slice holds more than field.spectral_head_tolerance of the window's energy; a cos^2
+sponge over the last field.spectral_sponge_slices slices, applied before each shift
+of at most a slice, the slippage taken in such chunks, whose removed energy joins the
+member's escaped energy; and zero padding of the transform along tau, eight slices
+beyond the largest shift one pass applies, with what crosses into the padding removed
+and its energy joined the same way. Under "slices"
+slippage the rotation zero-fills the slice it transmits and the slice propagator's
+bank (fel_apply_slippage) keeps the light itself, so nothing wraps and the headroom
+form checks nothing, while the padding then meets the kernel's own spread alone,
+which is below one wavelength a step.
+
+The kernel factors. exp(-i dz (m_x^2 + m_y^2) dk^2 / 2 k(kappa)) is the product of a
+table in (m_x, kappa) and one in (m_y, kappa), each n_grid by n_t, so the whole kernel
+costs one complex multiply a point and the tables are rebuilt at every call.
+
+The transverse transforms are wavefront_fft2's, per slice and parallel over slices.
+The transform along tau runs on each line of the transverse spectrum, parallel over
+the second index, through a plan cache of this module's own in wavefront_fft2's form:
+one plan pair and one buffer per thread, planned serially before the parallel loop
+and executed inside it.
+```
+
+(api-fel-spectral-struct)=
+### `fel_spectral_struct`
+
+*Struct*
+
+```
+The spectral propagator's switches, resolved at setup from the [field] keys, and what
+it measured on the way: the largest share of the window's energy the head slice held,
+and where.
+```
+
+(api-fel-spectral-setup)=
+### `fel_spectral_setup`
+
+*Subroutine* `(sp, propagator, slippage, boundary, n_sponge, head_tolerance)`
+
+```
+Routine to resolve the [field] keys of the spectral propagator into its switches. The
+key table has already refused a name outside each key's set. fel_spectral_size then
+sizes the sponge and the padding from the window and the schedule.
+```
+
+```
+Input:
+  propagator     -- character(*): field.propagator, "slices" or "spectral".
+  slippage       -- character(*): field.spectral_slippage, "ramp" or "slices".
+  boundary       -- character(*): field.spectral_boundary, "headroom", "sponge" or "pad".
+  n_sponge       -- integer: field.spectral_sponge_slices, 0 derived.
+  head_tolerance -- real(rp): field.spectral_head_tolerance.
+
+Output:
+  sp             -- fel_spectral_struct: The resolved switches.
+```
+
+(api-fel-spectral-size)=
+### `fel_spectral_size`
+
+*Subroutine* `(sp, shift_max, nslice, err_flag)`
+
+```
+Routine to size the sponge and the padding. The padding is eight slices beyond the
+largest shift one pass applies, an element's end slippage with its last step's, in
+slices, since the ramp takes it in one pass. The sponge takes the slippage in chunks
+of a slice (fel_spectral_shift), so its width is the window's alone: a count of 0
+derives an eighth of the window, at least 4 slices, and a count not below the window
+is refused. A window of one slice, the steady state, takes no boundary, since
+nothing slips.
+```
+
+```
+Input:
+  shift_max -- real(rp): The largest shift one pass applies [slices].
+  nslice    -- integer: The window's slices.
+
+Output:
+  sp        -- fel_spectral_struct: n_sponge and n_pad set.
+  err_flag  -- logical: Set True on a sponge not below the window.
+```
+
+(api-fel-spectral-step)=
+### `fel_spectral_step`
+
+*Subroutine* `(sp, und, beam, ff, dz, slippage, err_flag)`
+
+```
+Routine to do the field half of one undulator step under the spectral propagator,
+in the slice propagator's order (fel_field_step, then fel_apply_slippage): each
+member's window is propagated over the step by the kernel, the source is deposited
+slice by slice from the just-advanced particles (fel_spectral_deposit), and the
+slippage then moves the field and the fresh source together, as the phase ramp with
+the boundary (fel_spectral_shift), or by the caller's rotation under "slices"
+slippage. fel_track_und_step has pushed the particles and skipped its own field solve.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switches.
+  und      -- fel_und_struct: The segment.
+  beam     -- fel_beam_struct: The beam, pushed over the step.
+  ff(:)    -- fel_field_struct: The field set.
+  dz       -- real(rp): Step length [m].
+  slippage -- real(rp): The step's slippage [fundamental wavelengths].
+
+Output:
+  ff(:)    -- fel_field_struct: Every member advanced.
+  err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-fel-spectral-drift)=
+### `fel_spectral_drift`
+
+*Subroutine* `(sp, ff, dz, slippage, err_flag)`
+
+```
+Routine to propagate every member of the field set through an interlude under the
+spectral propagator: the kernel over the interlude's length with no source, then
+the slippage the schedule charges it with the boundary (fel_spectral_shift). This is
+what wavefront_drift does for the slice propagator, with the kernel at k(kappa) and
+the slippage as the ramp.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switches.
+  ff(:)    -- fel_field_struct: The field set.
+  dz       -- real(rp): The light's path [m].
+  slippage -- real(rp): The interlude's slippage [fundamental wavelengths].
+
+Output:
+  ff(:)    -- fel_field_struct: Every member advanced.
+  err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-fel-spectral-shift)=
+### `fel_spectral_shift`
+
+*Subroutine* `(sp, fs, slippage, err_flag)`
+
+```
+Routine to slip one member by the ramp with the boundary form in force, in passes
+along tau alone. Under the sponge the slippage is taken in chunks of at most one
+slice with the sponge applied before each, so what a chunk carries past the head is
+the sponge's zero on the head slice and nothing else; an interlude's whole slippage,
+tens of slices on a line like Aramis, would otherwise carry its unsponged slices
+round to the tail. The other forms take the slippage in one pass, the padding sized
+to hold it, and the headroom check follows. Under "slices" slippage the sponge alone
+runs, before the caller's rotation, and nothing else.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switches.
+  fs       -- fel_field_struct: The member.
+  slippage -- real(rp): The slippage to apply [fundamental wavelengths].
+
+Output:
+  fs       -- fel_field_struct: The window slipped, u_escaped grown by what the
+                boundary removed.
+  err_flag -- logical: Set True on a transform failure or the headroom refusal.
+```
+
+(api-fel-spectral-apply)=
+### `fel_spectral_apply`
+
+*Subroutine* `(sp, fs, dz, slippage, transverse, err_flag)`
+
+```
+Routine to apply the kernel over dz and the ramp for the slippage to one member's
+whole window, under sp%ramp, or the ramp alone when transverse is False, which is the
+step's pass after the deposit (fel_spectral_step). The record is read and written
+in window order through fel_field_index, so a rotated record is handled as the slice
+propagator handles it, and under "slices" slippage the caller rotates it afterwards
+(fel_apply_slippage) as before.
+
+The passes, per polarization: the forward transverse transform of every slice; on
+every line of the transverse spectrum the forward transform along tau, the kernel
+and ramp factors, and the inverse; the inverse transverse transform of every slice.
+The transforms are unnormalized, so the result is scaled by n_t and by n_grid^2. The
+ramp alone is diagonal in tau's conjugate and needs no transverse pass, so it runs
+on the lines of the field itself.
+```
+
+```
+Input:
+  sp         -- fel_spectral_struct: The propagator's switches.
+  fs         -- fel_field_struct: The member: its wavefront, slippage state and harmonic.
+  dz         -- real(rp): Step length [m].
+  slippage   -- real(rp): The slippage to apply [fundamental wavelengths].
+  transverse -- logical: Apply the kernel, with the transverse passes. False applies
+                  the ramp alone.
+
+Output:
+  fs         -- fel_field_struct: The window advanced, u_escaped grown by what the
+                  padding removed.
+  err_flag   -- logical: Set True on a transform failure. False otherwise.
+```
+
+(api-apply-component)=
+### `apply_component`
+
+*Subroutine* `(e, err)`
+
+```
+Routine to put one polarization's planes through the passes of the header. The
+padding's energy is summed into e_pad over the lines, in the units of the pass.
+```
+
+(api-fel-spectral-sponge)=
+### `fel_spectral_sponge`
+
+*Subroutine* `(sp, fs)`
+
+```
+Routine to apply the cos^2 sponge at the window's head when it is the boundary
+(module header), before each shift of at most a slice, so what the shift carries
+past the head is the sponge's zero. The weight falls from just under 1 on the sponge's
+first slice to 0 on the head slice, in window order, and the field is multiplied by
+it, so a slice keeps w^2 of its energy and the rest joins u_escaped. A window of one
+slice takes no sponge.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switches.
+  fs       -- fel_field_struct: The member.
+
+Output:
+  fs       -- fel_field_struct: The sponge applied, u_escaped grown by what it removed.
+```
+
+(api-fel-spectral-head-check)=
+### `fel_spectral_head_check`
+
+*Subroutine* `(sp, fs, err_flag)`
+
+```
+Routine to hold the window's head after a pass under the headroom form (module
+header): the run is refused once the head slice holds more than sp%head_tolerance of
+the window's energy, and the largest share seen is recorded with its position. The
+check is the ramp's alone, since the whole-slice rotation banks and zero-fills what
+reaches the head, and a window of one slice takes none.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switches.
+  fs       -- fel_field_struct: The member.
+
+Output:
+  sp       -- fel_spectral_struct: head_max and z_head_max updated.
+  err_flag -- logical: Set True on the refusal. False otherwise.
+```
+
+(api-plane-energy)=
+### `plane_energy`
+
+*Function* `(wf, ifld) result (e_sum)`
+
+```
+Routine to sum |E|^2 over one record plane, both polarizations, in grid units.
+```
+
+(api-fel-spectral-deposit)=
+### `fel_spectral_deposit`
+
+*Subroutine* `(und, beam, sl, wf, ifld, delz, harm, xks1, err_flag)`
+
+```
+Routine to deposit one slice's source into its field record with no propagation.
+This is fel_field_step's deposit, the per-particle scatter with the source filter when
+it is on, kept apart from that routine so the slice propagator stays as it was. The
+source scale, the phase, the bilinear weights and the filter's transform pair are
+fel_field_step's (fel-physics.md sec-field, sec-source-filter), and so is the add of
+2*crsource, through the element's polarization pair when both planes are live. The
+coherent source model is not carried here, and setup refuses it under the spectral
+propagator.
+```
+
+```
+Input:
+  und      -- fel_und_struct: Undulator parameters.
+  beam     -- fel_beam_struct: The beam.
+  sl       -- fel_slice_struct: One slice's packed particles.
+  wf       -- wavefront_struct: One field of the set.
+  ifld     -- integer: Field-record index of the slice.
+  delz     -- real(rp): Step length [m].
+  harm     -- integer: This field's harmonic number.
+  xks1     -- real(rp): Fundamental radiation wavenumber [1/m].
+
+Output:
+  wf       -- wavefront_struct: Source added to the slice's field record.
+  err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-spectral-fft1)=
+### `spectral_fft1`
+
+*Subroutine* `(direction, err_flag)`
+
+```
+Routine to transform the calling thread's line buffer sp_buf in place, unnormalized,
+by its cached plan. The buffer was filled by the caller and the plans made by
+spectral_fft1_plan_threads before the parallel loop (see wavefront_fft2 for the
+alignment and planner rules this follows).
+```
+
+```
+Input:
+  direction -- integer: wf_fft_forward$ or wf_fft_backward$.
+
+Output:
+  err_flag  -- logical: Set True when the thread holds no plan. False otherwise.
+```
+
+(api-spectral-fft1-plan)=
+### `spectral_fft1_plan`
+
+*Subroutine* `(n, cache_ok)`
+
+```
+Routine to hold the calling thread's plan pair and buffer for a transform of length
+n, remaking them when the length changes. FFTW_ESTIMATE, so the plan is a pure
+function of the length and a run reproduces (wavefront_fft2_plan).
+```
+
+(api-spectral-fft1-plan-threads)=
+### `spectral_fft1_plan_threads`
+
+*Subroutine* `(n, err_flag)`
+
+```
+Routine to fill every thread's plan cache for a transform of length n, serially,
+before a parallel loop executes them (wavefront_fft2_plan_threads).
+```
+
 ## `fel_stats_mod.f90`
 
 (api-fel-stats-mod)=
@@ -6215,6 +6586,9 @@ Input:
   beam     -- fel_beam_struct: The beam.
   ff(:)    -- fel_field_struct: The field set (phi0 advances with the drift).
   coll     -- fel_collective_struct: Collective terms (space charge acts here).
+  field    -- logical, optional: Diffract the field over the interlude? Default is
+                True. False leaves the field to the caller, as the spectral
+                propagator's walk does (fel_spectral_drift).
 
 Output:
   beam     -- fel_beam_struct: Advanced through the interlude.
@@ -6672,6 +7046,17 @@ scaled by kappa. It is normalized so the deposited sum equals the particle depos
 Routine to point at the cached step propagator for this wavelength. A caller outside
 this module can then round it into another precision. The result is null when no
 entry has been built, that is, when the caller did not run fel_field_kernel_init first.
+```
+
+(api-fel-field-kernel-sigmoid)=
+### `fel_field_kernel_sigmoid`
+
+*Function* `(ks) result (p)`
+
+```
+Routine to point at the cached source-filter sigmoid for this wavelength, as
+fel_field_kernel_exp_k2 points at the propagator. The result is null when no entry
+carries one, that is, when fel_field_kernel_init was not run with the filter on.
 ```
 
 (api-fel-field-kernel-init)=

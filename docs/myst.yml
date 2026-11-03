@@ -19,6 +19,7 @@ project:
     - file: validation.md
     - file: performance.md
     - file: startup-noise.md
+    - file: spectral-field.md
     - title: The statistics file format
       children:
         - file: BMAD-STATS-SPEC.md

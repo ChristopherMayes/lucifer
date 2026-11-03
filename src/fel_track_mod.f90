@@ -136,6 +136,8 @@ type fel_und_struct
   real(rp) :: dz = 0          ! Step length [m].
   integer :: source_model = 0 ! fel_source_deposit$ (default) or fel_source_coherent$.
   type (fel_source_filter_struct) :: filter   ! The source-term angular filter, off by default.
+  logical :: spectral = .false.  ! The spectral propagator (fel_spectral_mod) does the field
+                                 !   half of the step, so fel_track_und_step skips its solve.
 end type
 
 !+
@@ -1129,6 +1131,7 @@ endif
 
 call fel_tic (fel_t_solve$)
 do io = 1, size(ff)
+  if (und%spectral) exit     ! The walk deposits and propagates (fel_spectral_step).
   nslice_f = size(ff(io)%wf%Ex, 3)
   any_err = .false.
   if (und%source_model == fel_source_coherent$) then
@@ -1353,6 +1356,9 @@ end subroutine fel_track_und_step
 !   beam     -- fel_beam_struct: The beam.
 !   ff(:)    -- fel_field_struct: The field set (phi0 advances with the drift).
 !   coll     -- fel_collective_struct: Collective terms (space charge acts here).
+!   field    -- logical, optional: Diffract the field over the interlude? Default is
+!                 True. False leaves the field to the caller, as the spectral
+!                 propagator's walk does (fel_spectral_drift).
 !
 ! Output:
 !   beam     -- fel_beam_struct: Advanced through the interlude.
@@ -1360,7 +1366,7 @@ end subroutine fel_track_und_step
 !   err_flag -- logical: Set True if there is an error. False otherwise.
 !-
 
-subroutine fel_track_interlude_genesis (qf, length, beam, ff, coll, err_flag)
+subroutine fel_track_interlude_genesis (qf, length, beam, ff, coll, err_flag, field)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
@@ -1369,6 +1375,7 @@ type (wavefront_struct), pointer :: wf
 type (fel_collective_struct) coll
 real(rp) qf, length
 logical err_flag
+logical, optional :: field
 
 type (fel_und_struct) und0
 real(rp) xks, xku, qquad, phi0_new, gamma0, p0_mc
@@ -1451,6 +1458,11 @@ beam%phi0 = phi0_new
 ! slice once. The kernels are built serially first. A lattice can open with an
 ! interlude, so no undulator step may have built them yet. Harmonic loop outermost,
 ! each field diffracting at its own wavelength.
+
+if (.not. logic_option(.true., field)) then
+  err_flag = .false.
+  return
+endif
 
 do io = 1, size(ff)
   ngrid_arr = wavefront_shape(ff(io)%wf)
@@ -2789,6 +2801,36 @@ do ik = 1, size(fel_kernels)
 enddo
 
 end function fel_field_kernel_exp_k2
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_field_kernel_sigmoid (ks) result (p)
+!
+! Routine to point at the cached source-filter sigmoid for this wavelength, as
+! fel_field_kernel_exp_k2 points at the propagator. The result is null when no entry
+! carries one, that is, when fel_field_kernel_init was not run with the filter on.
+!-
+
+function fel_field_kernel_sigmoid (ks) result (p)
+
+real(rp), pointer :: p(:,:)
+real(rp) ks
+integer ik
+
+!
+
+p => null()
+if (.not. allocated(fel_kernels)) return
+do ik = 1, size(fel_kernels)
+  if (fel_kernels(ik)%ks == ks .and. allocated(fel_kernels(ik)%sigmoid)) then
+    p => fel_kernels(ik)%sigmoid
+    return
+  endif
+enddo
+
+end function fel_field_kernel_sigmoid
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

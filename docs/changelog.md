@@ -9,6 +9,27 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-03 Added: a research prototype of a spectral field propagator, `field.propagator =
+  "spectral"`, outside the keystone and recorded on `docs/spectral-field.md`. `fel_spectral_mod`
+  transforms a member's whole window in (x, y, tau), diffracts each mode at its own wavenumber
+  `k0 + kappa` in place of the one `k0` of the slice propagator, and carries the slippage as a
+  continuous phase ramp or, under `field.spectral_slippage = "slices"`, as the whole-slice
+  rotation of before. The push and the deposit are untouched, and a step runs in the slice
+  propagator's order: the kernel, the deposit, then the slippage on both. Three forms meet light
+  the ramp moves to the window's head, `field.spectral_boundary`: the headroom alone, with the
+  run refused above `field.spectral_head_tolerance`; a cos^2 sponge over
+  `field.spectral_sponge_slices`; and zero padding along tau sized from the schedule's largest
+  shift, the removed energy joining the escaped energy under both. The unaveraged mode, the
+  device, the FP32 check and the coherent source are refused with the key, and every run of the
+  keystone takes the default. `tests/scripts/spectral_field.py` makes the four measurements the
+  page records. A chirped Gaussian in vacuum against the exact paraxial solution: the slice
+  propagator errs at 0.77 of the relative bandwidth and the spectral one at 1e-9. The steady-state
+  tier: the two agree to 5e-15. The SASE tier with the source filter off, as the tiers run: the
+  spectral propagator differs from the slice run by 13 percent of the exit power, which a
+  kernel at `k0` reduces to 7e-10 and the source filter to 1.6e-3, so the difference is the group
+  delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
+  within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
+  page. No recorded digit moved.
 - 2026-11-03 Added: an FEL element's `x_offset`, `y_offset`, `kx`, `hkick` and `vkick` are
   honored, where the offsets and the kicks were read by nothing and a nonzero `kx` was refused.
   `setup_fel_elements` reads the girder-composed offsets into the roll-off's axis, and both

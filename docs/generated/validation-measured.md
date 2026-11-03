@@ -760,7 +760,10 @@ where the two builds agree to every printed digit.
 | every key with a set of names has a refusal check here |  | same | holds |
 | a name outside the set is refused with the set, beam.load_mode = "all" |  | same | holds |
 | a name outside the set is refused with the set, beam.z_distribution = "gauss" |  | same | holds |
+| a name outside the set is refused with the set, field.propagator = "spectra" |  | same | holds |
 | a name outside the set is refused with the set, field.seed_polarization = "z" |  | same | holds |
+| a name outside the set is refused with the set, field.spectral_boundary = "wall" |  | same | holds |
+| a name outside the set is refused with the set, field.spectral_slippage = "rotation" |  | same | holds |
 | a name outside the set is refused with the set, run.device = "metl" |  | same | holds |
 | a name outside the set is refused with the set, run.fp32_check = "on" |  | same | holds |
 | a name outside the set is refused with the set, run.interlude_model = "bamd" |  | same | holds |
