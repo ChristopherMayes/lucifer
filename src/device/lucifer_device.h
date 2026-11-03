@@ -99,6 +99,9 @@ typedef struct {
   double g0inv2;         /* 1/gamma0^2, the slippage identity's second half */
   double cos_t, sin_t;   /* wiggle-plane tilt */
   double gridmax, dgrid; /* grid half width and spacing [m] */
+  double ax, ay;         /* the element's offset [m] */
+  double kxb, kyb;       /* Bmad's kx and the planar field's ky [1/m] */
+  double kick_bx, kick_by; /* the kicks as a uniform normalized field [1/m] */
   double scl_u;          /* the unaveraged source scale, fel_unavg_step's scl_u */
   double m_electron;     /* electron rest energy [eV], the kick's divisor */
   double dep_scale;      /* the deposit's fixed-point scale [ticks per V/m] */
@@ -114,6 +117,7 @@ typedef struct {
   int32_t helical;       /* the undulator's helicity */
   int32_t mutate;        /* falsifiability hook: coarsen the lag's residual angle */
   int32_t pad;
+  int32_t field_general; /* an offset, a kx or a kick: the field's general form */
 } luc_dev_unavg_par;
 
 /* Backend presence and the device it would run on. Returns 1 when a backend is

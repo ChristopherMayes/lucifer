@@ -2517,6 +2517,17 @@ cancellation. ku*y reaches 4e-3 on the checked input files, so cosh and sinh are
 where they are well conditioned.
 ```
 
+(api-fel-fp32-unavg-bfield-general)=
+### `fel_fp32_unavg_bfield_general`
+
+*Subroutine* `(u, x, y, g, gp, c_u, s_u, bx, by, bz)`
+
+```
+Routine to evaluate fel_unavg_bfield_general in single precision, term for term: the
+offset, Bmad's kx with its ky, and the kick field. Its arguments are of order one as
+the plain form's are.
+```
+
 (api-fel-fp32-unavg-ode)=
 ### `fel_fp32_unavg_ode`
 
@@ -4321,9 +4332,9 @@ Output:
 
 ```
 Routine to recognize FEL segments and derive their FEL parameters from lattice
-attributes. Bmad's kx roll-off attribute is not yet mapped and must be zero. An FEL
-segment is a wiggler or undulator tracked by an FEL method, which is Bmad's own
-meaning for program-supplied tracking.
+attributes, the offsets, Bmad's kx and the kicks among them. An FEL segment is a
+wiggler or undulator tracked by an FEL method, which is Bmad's own meaning for
+program-supplied tracking.
 
 The wiggler sanity assertions are enforced. A wiggler with zero b_max or l_period
 would silently get factor = 0 in Bmad's own kernel (no resonance, no error). A
@@ -5681,6 +5692,17 @@ with_angles fills the field theta moments (element ends). An error sets the host
 err_flag.
 ```
 
+(api-apply-face-kick)=
+### `apply_face_kick`
+
+*Subroutine* `()`
+
+```
+Routine to apply half of the element's hkick and vkick, as px/p0 and py/p0, to every
+particle. The entry face and the exit face each take one half, as offset_particle
+applies them for track_a_wiggler. An element without a kick is untouched.
+```
+
 (api-end-of-element)=
 ### `end_of_element`
 
@@ -6289,6 +6311,13 @@ Genesis does not have.
 
 g_max follows from aw: c*b_max = K*ku*m_e with K = aw (helical) or aw*sqrt(2)
 (planar), so g_max = K*ku/p0_mc.
+
+A planar element with Bmad's kx takes track_a_wiggler's own strengths, k1x = factor
+(kx/kz)^2 and k1y = -factor (kz^2 + kx^2)/kz^2 with factor = g_max^2/2, the x plane
+defocused and the y plane focused the more. An offset element (x_offset, y_offset)
+focuses about its own axis: the coordinates are shifted onto it before the maps and
+back after, outside the tilt rotation as offset_particle orders them. Both are taken
+only on an element that has them, so every other element runs the lines as they were.
 ```
 
 ```
@@ -7015,6 +7044,41 @@ Input:
 Output:
   bx, by, bz -- real(rp): The normalized undulator field b = curl(a) [1/m], with the
                   envelope's g' terms so the ramps stay divergence-free.
+```
+
+(api-fel-unavg-bfield-general)=
+### `fel_unavg_bfield_general`
+
+*Subroutine* `(und, x, y, g, gp, c_u, s_u, bx, by, bz)`
+
+```
+Routine to evaluate the field of fel_unavg_bfield for an element with an offset, a
+roll-off wavenumber or a kick, the three the plain form leaves out. The position is
+taken from the element's axis, (x - ax, y - ay), before the tilt rotation, as the
+averaged roll-off takes it. A planar element with Bmad's kx carries the vector
+potential of Bmad's planar model,
+
+  a_x = a0 g(s) cos(ku s) cos(kx x) cosh(ky y)
+  a_y = a0 g(s) cos(ku s) (kx/ky) sin(kx x) sinh(ky y),    ky^2 = kx^2 + ku^2,
+
+whose curl is the planar field of the Bmad manual and is the plain form at kx = 0.
+The kicks are a uniform normalized field over the element, b_y = p0_mc hkick / L and
+b_x = -p0_mc vkick / L, so that du_x/ds = b_y and du_y/ds = -b_x give the element's
+hkick and vkick in px/p0 and py/p0, as Bmad's integrators apply them. The kick field
+is in the lab frame and takes no tilt, as offset_particle's kicks take none. A helical
+element reaches this routine with an offset or a kick alone.
+```
+
+```
+Input:
+  und        -- fel_und_struct: Undulator parameters, with ax, ay, kxb, kyb and the
+                  kick field kick_bx, kick_by.
+  x, y       -- real(rp): Transverse position [m].
+  g, gp      -- real(rp): The ramp envelope and its slope at this s.
+  c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
+
+Output:
+  bx, by, bz -- real(rp): The normalized field b = curl(a) plus the kick field [1/m].
 ```
 
 (api-fel-unavg-step)=

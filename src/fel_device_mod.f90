@@ -156,12 +156,16 @@ type, bind(c) :: fel_device_unavg_par_struct
   real(c_double) :: dsub, ks, ku, aw
   real(c_double) :: gam0, beta0, g0inv2
   real(c_double) :: cos_t, sin_t, gridmax, dgrid
+  real(c_double) :: ax, ay                      ! The element's offset [m].
+  real(c_double) :: kxb, kyb                    ! Bmad's kx and the field's ky [1/m].
+  real(c_double) :: kick_bx, kick_by            ! The kicks as a uniform field [1/m].
   real(c_double) :: scl_u                       ! fel_unavg_step's own source scale.
   real(c_double) :: m_electron                  ! The kick's divisor [eV].
   real(c_double) :: dep_scale
   real(c_double) :: dep_u_bound                 ! The largest |j|/u_s the bound assumes.
   real(c_double) :: spont_fac                   ! Joules per unit sum|src|^2.
   integer(c_int) :: nsub, first, helical, mutate, pad
+  integer(c_int) :: field_general               ! An offset, a kx or a kick: the general field.
 end type
 
 !+

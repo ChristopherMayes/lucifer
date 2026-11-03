@@ -141,6 +141,9 @@ TD_EXTRA = """  beam.bunch_charge = 1.601107656951e-14
 """
 
 DEV = '  run.device = "metal"\n'
+# The exit orbit of the offset probe on the device against the CPU, in single
+# precision over 40 periods. Measured first (validation.md, val-element-offsets).
+OFFSET_CEIL = 5e-5
 
 # The recorded ceilings. pz through field are three times the CPU twin's recorded
 # levels (validation.md, val-fp32-lockstep), absorbing that the device's sincos is not
@@ -948,6 +951,9 @@ def field_set(args, wd, exe):
     # device alike. The CPU's level is the anchor the device's is read against.
     genesis_harmonics(args, wd, exe)
 
+    # 7d'. The element attributes on the device, against the CPU.
+    element_offsets(args, wd, exe)
+
     # 7e. The quiet-start floor, printed: the planar steady-state tier input file at grid 64,
     # dark third harmonic, no shot noise. The fundamental holds its band. The harmonic's
     # true bunching is ~1e-8 of the charge, below the device's FP32 phase floor, so its
@@ -1355,6 +1361,28 @@ def harm_powers(wd, root, window=False):
     if window:
         return float(np.sum(p1)), float(np.sum(p3))
     return float(p1[0]), float(p3[0])
+
+
+def element_offsets(args, wd, exe):
+    """The offset probe of check_element_offsets.py with every attribute set, an
+    x_offset and y_offset, a kx and a kick, run on the device and on the CPU, averaged
+    mode, radiation off: the exit orbits agree at the device's single precision."""
+    import check_element_offsets as eo
+    (wd / "offset_probe.bmad").write_bytes((pathlib.Path(args.latdir) / "offset_probe.bmad").read_bytes())
+    (wd / "dev_offset_all.bmad").write_text("call, file = offset_probe.bmad\n" + eo.CASES["all"])
+    orbit = {}
+    for tag, extra in (("cpu", ""), ("dev", DEV)):
+        name = f"devoff_{tag}"
+        run(exe, wd, name + ".toml", eo.NML.replace("grid_n_pts = 33", "grid_n_pts = 64")
+            .format(lat="dev_offset_all.bmad", root=name, extra=extra))
+        orbit[tag] = eo.exit_orbit(wd, name)
+    diff = 0.0
+    for rows in ((0, 1), (2, 3)):
+        num = np.abs(orbit["dev"][rows, :] - orbit["cpu"][rows, :]).max()
+        den = np.abs(orbit["cpu"][rows, :]).max()
+        diff = max(diff, num / den)
+    ok("device vs CPU, exit orbit with an x_offset, y_offset, kx and kick (all)", f"{diff:.3e}",
+       f"<= {OFFSET_CEIL:.1e}", diff <= OFFSET_CEIL, num=diff, bound=OFFSET_CEIL, kind="max")
 
 
 def genesis_harmonics(args, wd, exe):

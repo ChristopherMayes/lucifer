@@ -64,6 +64,9 @@ Genesis4 is driven by namelists over its own lattice format. Lucifer is driven b
 | `&write beam`, `&write field` | `beam.file`, `field.file` on the input side; openPMD dumps on the output side | See file exchange below |
 | `&track beamdumpstep`, `fielddumpstep` | `run.dump_at_comb` with `run.comb_ds_save` | Genesis4 strides in integration steps and separately for the beam and the field. Here one comb sets the cadence in metres and both files are written on it, so a frame and its statistics row share an index. A field that is wanted less often is read less often rather than written less often |
 | `&importbeam`, `&importfield` | `beam.file`, `field.file` | Lucifer reads openPMD only, so convert first |
+| `&lattice`'s `ax`, `ay` on an undulator | the element's `x_offset`, `y_offset` | The undulator's transverse offset, Bmad's own misalignment attributes |
+| `&lattice`'s `kx`, `ky` on an undulator | the element's `kx` | Bmad's planar roll-off wavenumber: Genesis4's pair is `-kx^2` and `kx^2 + k_u^2` in units of `k_u^2`, and the helicity defaults otherwise |
+| `corrector` | the element's `hkick`, `vkick`, or a `kicker` element | A kick on the FEL element is carried as Bmad's tracking carries it. A `kicker` between elements is an interlude |
 | (no equivalent) | `run.migrate` | Slice migration. Off by default, since the comparison tiers run against a code that never migrates |
 | (no equivalent) | `fel_method = averaged` or `unaveraged` | Selects the method per element, and `run.transport_model` selects the averaged method's maps |
 

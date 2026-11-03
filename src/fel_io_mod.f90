@@ -641,7 +641,7 @@ character(200) line
 character(*), parameter :: r_name = 'lucifer'
 character(*), parameter :: rule = &
       '================================================================================'
-integer nfel, n_omp
+integer nfel, n_omp, ie
 
 !
 
@@ -663,6 +663,18 @@ call out_io (s_blank$, r_name, trim(line))
 write (line, '(a, i0, a, f0.3, a, i0, a)') '             ', branch%n_ele_track, ' elements, ', &
       branch%ele(branch%n_ele_track)%s, ' m, ', nfel, ' FEL segments'
 call out_io (s_blank$, r_name, trim(line))
+
+! An FEL segment with an offset, a roll-off wavenumber or a kick says so, since each is
+! read from the lattice and changes the tracking (fel-physics.md sec-element).
+
+do ie = 1, branch%n_ele_track
+  if (.not. run%is_fel(ie)) cycle
+  if (.not. run%und_of(ie)%field_general) cycle
+  write (line, '(3a, 2(es10.3, a), f0.3, a, 2(es10.3, a))') '             ', trim(branch%ele(ie)%name), &
+        ': x_offset ', run%und_of(ie)%ax, ' m, y_offset ', run%und_of(ie)%ay, ' m, kx ', run%und_of(ie)%kxb, &
+        ' /m, hkick ', run%und_of(ie)%hkick, ' rad, vkick ', run%und_of(ie)%vkick, ' rad'
+  call out_io (s_blank$, r_name, trim(line))
+enddo
 
 if (run%nslice == 1) then
   write (line, '(a, i0, a, f0.2)') ' Beam        1 slice x ', run%fbeam%slice(1)%n, &

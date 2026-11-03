@@ -159,6 +159,10 @@ end type
 
 type fel_fp32_unavg_struct
   real(sp) :: aw = 0, ku = 0, cos_t = 1, sin_t = 0
+  real(sp) :: ax = 0, ay = 0                 ! The element's offset [m].
+  real(sp) :: kxb = 0, kyb = 0               ! Bmad's kx and the field's ky [1/m].
+  real(sp) :: kick_bx = 0, kick_by = 0       ! The kicks as a uniform field [1/m].
+  logical :: field_general = .false.         ! Any of the three: the general field.
   real(sp) :: gam0 = 0                       ! The reference goff hangs off.
   real(sp) :: beta0 = 0                      ! p0_mc / gamma0, the slippage identity's rb.
   real(sp) :: g0inv2 = 0                     ! 1 / gamma0^2, its b.
@@ -1372,6 +1376,59 @@ end subroutine fel_fp32_unavg_bfield
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_fp32_unavg_bfield_general (u, x, y, g, gp, c_u, s_u, bx, by, bz)
+!
+! Routine to evaluate fel_unavg_bfield_general in single precision, term for term: the
+! offset, Bmad's kx with its ky, and the kick field. Its arguments are of order one as
+! the plain form's are.
+!-
+
+subroutine fel_fp32_unavg_bfield_general (u, x, y, g, gp, c_u, s_u, bx, by, bz)
+
+type (fel_fp32_unavg_struct) u
+real(sp) x, y, g, gp, c_u, s_u, bx, by, bz
+real(sp) a0, fperp, xl, yl, bt, ds_fac, ckx, skx, chy, shy
+
+!
+
+xl = x - u%ax;  yl = y - u%ay
+if (u%sin_t /= 0) then
+  bt =  u%cos_t * xl + u%sin_t * yl
+  yl = -u%sin_t * xl + u%cos_t * yl
+  xl = bt
+endif
+
+if (u%helical) then
+  a0 = u%aw
+  fperp = 1 + (u%ku**2 / 4) * (xl*xl + yl*yl)
+  bx = -a0 * (gp * s_u + g * u%ku * c_u) * fperp
+  by =  a0 * (gp * c_u - g * u%ku * s_u) * fperp
+  bz =  a0 * g * (u%ku**2 / 2) * (s_u * xl - c_u * yl)
+else
+  a0 = sqrt(2.0_sp) * u%aw
+  ds_fac = gp * c_u - g * u%ku * s_u
+  ckx = cos(u%kxb * xl);  skx = sin(u%kxb * xl)
+  chy = cosh(u%kyb * yl);  shy = sinh(u%kyb * yl)
+  bx = -a0 * ds_fac * (u%kxb / u%kyb) * skx * shy
+  by =  a0 * ds_fac * ckx * chy
+  bz = -a0 * g * c_u * (u%ku**2 / u%kyb) * ckx * shy
+endif
+
+if (u%sin_t /= 0) then
+  bt = u%cos_t * bx - u%sin_t * by
+  by = u%sin_t * bx + u%cos_t * by
+  bx = bt
+endif
+
+bx = bx + u%kick_bx
+by = by + u%kick_by
+
+end subroutine fel_fp32_unavg_bfield_general
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_fp32_unavg_ode (y, fq, goff, u, dyds)
 !
 ! Routine to evaluate unavg_ode in single precision. The four transverse lines
@@ -1400,8 +1457,12 @@ real(sp) bx, by, bz, gam, us, ra, aa
 !
 
 gam = u%gam0 + goff
-call fel_fp32_unavg_bfield (u%aw, u%ku, u%helical, u%cos_t, u%sin_t, &
-                            y(1), y(2), fq(1), fq(2), fq(3), fq(4), bx, by, bz)
+if (u%field_general) then
+  call fel_fp32_unavg_bfield_general (u, y(1), y(2), fq(1), fq(2), fq(3), fq(4), bx, by, bz)
+else
+  call fel_fp32_unavg_bfield (u%aw, u%ku, u%helical, u%cos_t, u%sin_t, &
+                              y(1), y(2), fq(1), fq(2), fq(3), fq(4), bx, by, bz)
+endif
 us = sqrt(gam*gam - 1.0_sp - y(3)*y(3) - y(4)*y(4))
 
 dyds(1) = y(3) / us
