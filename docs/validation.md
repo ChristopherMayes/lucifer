@@ -7,7 +7,7 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 (val-what-is-tested)=
 ## What is tested, and where
 
-The keystone is the run every commit passes before it lands. It runs five jobs at once: the validation suite on the debug build and again on the release build, Bmad's own regression suite, the wavefront validation and the examples. Each job must pass its tolerances. The keystone then regenerates the generated pages and requires them to equal the committed ones, so a recorded digit that moves fails it. A commit that means to change a generated page, with a new check row or a changed file layout, reviews and commits the page, and the next keystone must reproduce it exactly. `tests/test_keystone.py` runs it, and [](#val-the-keystone-rule) gives the commands.
+The keystone is the run every commit passes before it is merged. It runs five jobs at once: the validation suite on the debug build and again on the release build, Bmad's own regression suite, the wavefront validation and the examples. Each job must pass its tolerances. The keystone then regenerates the generated pages and requires them to equal the committed ones, so a recorded digit that moves fails it. A commit that means to change a generated page, with a new check row or a changed file layout, reviews and commits the page, and the next keystone must reproduce it exactly. `tests/test_keystone.py` runs it, and [](#val-the-keystone-rule) gives the commands.
 
 The validation suite is `tests/run_fel_validation.sh` with its check scripts. It holds the Genesis4 tiers and the check sections below. The Linux CI job runs it too, on both builds at its tolerances, and is not a keystone.
 
@@ -28,7 +28,7 @@ The Linux CI job builds both configurations, each in a job of its own on its own
 (val-the-keystone-rule)=
 ## The keystone rule
 
-Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug and not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule. A moved line there is a change to the files this program writes, to explain, review, regenerate and stage. It is neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. The keystone runs from the root of the Lucifer repository, with `BMAD_DIR` naming a Bmad checkout and the interpreter of the `bmad-fel-validate` environment:
+Every commit is validated before it is merged, and the tiers hold their recorded digits. A moved digit is a bug and not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule. A moved line there is a change to the files this program writes, to explain, review, regenerate and stage. It is neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. The keystone runs from the root of the Lucifer repository, with `BMAD_DIR` naming a Bmad checkout and the interpreter of the `bmad-fel-validate` environment:
 
 ```
 BUILD_PRODUCTION=N util/conda_compile      # debug: Bmad, then Lucifer
