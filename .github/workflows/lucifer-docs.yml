@@ -8,7 +8,7 @@
 # the input reference agrees with the Fortran declarations, the examples agree with the
 # feature list, and the generated example pages are current.
 #
-# On main, the branch every Lucifer commit lands on, and on pull requests against it.
+# On main, the branch every Lucifer commit is merged into, and on pull requests against it.
 
 name: Lucifer - Docs & Conformance
 
