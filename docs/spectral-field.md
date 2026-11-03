@@ -53,7 +53,7 @@ python tests/scripts/spectral_field.py --exe build-release/bin/lucifer \
         --work-dir <dir> --validation-dir <a completed validation pass's work directory>
 ```
 
-The script runs the four measurements below and prints them. The vacuum test needs the tracker alone. The other three take the tier inputs, the imported dumps and the Genesis4 references from a validation pass's work directory, which they read and never write. Every number on this page was measured on 2026-11-03 on the release build, gfortran 15.3 from conda-forge, on an Apple M3 Max with 12 cores, and the thread count of each table is stated with it.
+The script runs the first four measurements below by default and prints them, and `seeded` and `chirped` name the two FEL cases, which take hours at 12 threads. The vacuum test needs the tracker alone. The others take the tier inputs, the imported dumps and the Genesis4 references from a validation pass's work directory, which they read and never write. Every number on this page was measured on 2026-11-03 on the release build, gfortran 15.3 from conda-forge, on an Apple M3 Max with 12 cores, and the thread count of each table is stated with it.
 
 (spectral-vacuum)=
 ### The vacuum test
@@ -124,7 +124,49 @@ The field phase of the SASE tier's walk, the `field solve` row of the footer's t
 
 The spectral propagator costs 1.8 times the slice propagator's field phase at one thread and 1.9 at eight. The transverse transform pair is the same count, and the rest is the two passes along $\tau$, each a gather of every line of the window across the stack's stride, a transform pair of 50 and a scatter, and the second pass only under the ramp.
 
+(spectral-seeded)=
+### A chirped seed through Aramis
+
+The vacuum test's pulse with gain. The seed is the chirped Gaussian at 1 Å, rms length 15 wavelengths, waist 30 µm, 1 MW at its peak, ten times the start-up noise light a slice holds at the segment's exit, on the tier's grid, 30 slices from the tail of a window of 1280 slices of 3 wavelengths, which holds the line's slippage of 1184 slices so the seed stays with the beam to the exit. The beam is the tier's, 3000 A flat over the window at 1024 particles a slice, dumped by a run that tracks a marker alone and loaded with the seed. Relative rms bandwidths 0.5, 1, 2 and 5 percent, where 0.53 percent is the unchirped pulse's own, through the first segment and through the full line, under both propagators with the source filter on, at 12 threads. The segment also runs on the same bunch loaded without its shot noise, so the seed is the only light.
+
+The slice propagator leaves its field a fraction of a slice behind the ramp's: the segment slips 88.67 slices, of which it rotates 88 and records the rest as the residual its field file carries, 2.0003 wavelengths, and the line slips 1184.00. The comparison moves the slice run's field by that residual along $	au$ through the transform before it differences, since a chirped field two thirds of a slice out of step differs by its phase slope times the offset and by nothing physical. The field difference is the largest over the lit slices and four on each side, over the spectral run's peak, and the raw column is the whole window as the runs left it. Each slice's wavelength comes from the phase advance to its neighbor on the slices above a quarter of the peak power, the seed's core.
+
+| Bandwidth | Light | Offset [slices] | Field, raw | Field, aligned | Wavelength | Peak power, slices / spectral |
+|---|---|---|---|---|---|---|
+| 0.53 % | seed alone, segment | 0.667 | 5.7e-2 | 2.9e-3 | 1.9e-5 | 0.994 / 0.994 MW |
+| 1 % | seed alone, segment | 0.667 | 1.1e-1 | 2.3e-3 | 2.0e-5 | 0.979 / 0.979 MW |
+| 2 % | seed alone, segment | 0.667 | 2.1e-1 | 3.0e-3 | 2.1e-5 | 0.987 / 0.987 MW |
+| 5 % | seed alone, segment | 0.667 | 5.2e-1 | 6.5e-3 | 8.5e-5 | 0.992 / 0.993 MW |
+| 0.53 % | seed and noise, segment | 0.667 | 1.2e-1 | 8.1e-2 | 1.6e-3 | 1.010 / 1.012 MW |
+| 1 % | seed and noise, segment | 0.667 | 1.7e-1 | 8.2e-2 | 1.5e-3 | 0.996 / 0.999 MW |
+| 2 % | seed and noise, segment | 0.667 | 2.8e-1 | 8.3e-2 | 2.1e-3 | 1.003 / 1.006 MW |
+| 5 % | seed and noise, segment | 0.667 | 5.1e-1 | 6.5e-2 | 2.7e-3 | 1.006 / 1.008 MW |
+| 0.53 % | seed and noise, line | 0.001 | 1.9e-2 | 1.9e-2 | 4.7e-4 | 9.58 / 9.54 GW |
+| 1 % | seed and noise, line | 0.001 | 2.0e-2 | 2.0e-2 | 3.9e-4 | 9.70 / 9.67 GW |
+| 2 % | seed and noise, line | 0.001 | 2.1e-2 | 1.8e-2 | 4.0e-4 | 9.32 / 9.26 GW |
+| 5 % | seed and noise, line | 0.001 | 1.7e-2 | 1.6e-2 | 4.1e-4 | 8.91 / 8.84 GW |
+
+With the seed alone, the propagators differ by 2.3e-3 to 3.0e-3 of the peak field at the three lower bandwidths and 6.5e-3 at 5 percent, and the peak powers agree to 1e-3. The floor is the slippage's form and not the kernel's: the spectral kernel with the whole-slice rotation differs from the slice propagator by 6.5e-4 at 0.53 percent and from the ramp by 2.6e-3, so what the beam sees over the segment is the field's position against it, up to a slice behind the ramp's between rotations. The part that grows with the bandwidth, 3.9e-3 above that floor at 5 percent, is the vacuum test's error scaled to this pulse, $0.77 \times 0.05 \times L / 2 z_R$ with the waist's Rayleigh range 28.3 m and the segment 3.99 m, 2.7e-3. With the beam's shot noise on, every segment row sits at 6.5e-2 to 8.3e-2 and the seed's own error is under it: the noise-only slices of the same runs differ by 8e-2 of the seed's peak and by 13 percent of their own rms, since the two kernels diffract the start-up light's wide angles differently before the filter and the gain narrow it. Through the line, where the seed has swept the window and the light is at saturation, the propagators differ by 1.6e-2 to 2.0e-2 of the peak field, 4e-4 in wavelength and 0.4 to 0.7 percent in peak power, with no trend in the bandwidth.
+
+The reference's convergence: the 2 percent seed with the undulator step cut from three periods to one. Through the segment, the spectral run moves by 3.4e-2 of the peak field in the seed's slices, 5.1e-4 in wavelength and 1.9 percent in peak power, and its noise-only slices by 6 percent of their rms. Through the line it moves by 9.5e-2 in the lit slices, 7.9e-4 in wavelength and 2.4 percent in peak power, and by 0.80 of the peak in the tail slices, which hold 0.3 percent of the energy and are past saturation from 35 m on. The step therefore moves a seeded Aramis run more than the propagator does at every bandwidth, by 5 times through the line, and the 1e-3 the vacuum test's reference holds to is not available with a beam in the window.
+
+A 2 percent seed through the full line is not wrong under the slice propagator at a level a measurement could see: the two propagators' exit fields differ by 1.8e-2 of the peak, their peak powers by 0.6 percent and their wavelengths by 4e-4, with no trend in the bandwidth from 0.53 to 5 percent, and halving the step moves the spectral run itself by 9.5e-2 and 2.4 percent. The gain guiding holds the mode at the beam's size through the line, so the vacuum test's growth over the Rayleigh range does not accumulate, and the bandwidth error the vacuum test isolates is below the floor the whole-slice slippage sets against the beam, 2.6e-3 over a segment.
+
+(spectral-chirped)=
+### An energy-chirped beam from noise
+
+The same beam with a linear energy chirp along the window, 0.25, 0.5 and 1 percent head to tail, the head above the tail, and the unchirped bunch beside them, from noise through the full line under both propagators with the source filter on, at 12 threads. The bunch is the dump's with every momentum component and the momentum deviation record scaled by the same factor, so the angles stay, loaded as the dump is, one patch a slice. A chirp $\epsilon$ in energy chirps the resonant wavelength by $-2\epsilon$, the head shorter, and the slope of a line fitted to the exit wavelengths over the slices above a thousandth of the peak power, as a fraction of the mean over the window, is placed against it. The window is 1.28 fs, so 1 percent across it moves the resonance by 1.5 $\rho$ over a cooperation length of 53 slices.
+
+| Chirp | Field | Wavelength | Lit slices | Peak power, slices / spectral | Exit energy | Slope, slices / spectral | $-2\epsilon$ |
+|---|---|---|---|---|---|---|---|
+| 0 | 2.1e-2 | 4.5e-4 | 514 | 8.22 / 8.13 GW | 2.77 µJ | +0.0020 / +0.0020 | 0 |
+| 0.25 % | 2.5e-2 | 1.9e-4 | 274 | 43.2 / 43.3 GW | 7.98 µJ | -0.0011 / -0.0011 | -0.0050 |
+| 0.5 % | 3.9e-2 | 7.5e-4 | 528 | 2.34 / 2.32 GW | 0.77 µJ | -0.0068 / -0.0067 | -0.0100 |
+| 1 % | 6.7e-2 | 1.6e-3 | 368 | 0.103 / 0.101 GW | 0.028 µJ | -0.0147 / -0.0147 | -0.0200 |
+
+The chirp decides the output and the propagator does not. At 0.25 percent the light slipping forward meets electrons of rising energy, which is what a taper does after saturation, and the exit energy is 2.9 times the unchirped run's with a single spike of 43 GW. At 0.5 and 1 percent the resonance moves across a cooperation length by more than the gain bandwidth and the exit energy falls to 0.28 and 0.010 of the unchirped. The exit wavelengths slope at 0.2, 0.7 and 0.7 of the resonance's, above the +0.002 the unchirped SASE carries. The two propagators agree on every one of those numbers: the peak powers to 0.3 to 2 percent, the slopes to 1e-4 and the slice wavelengths to 2e-4 to 1.6e-3. The field difference grows with the chirp, from 2.1e-2 to 6.7e-2 of the peak, which is the saturated light's own sensitivity: the unchirped run's 2.1e-2 is the null test's filter-on level, and halving the step moves a seeded run by 9.5e-2.
+
 (spectral-next)=
 ## What is next
 
-The vacuum test says where the prototype pays: a chirped or short pulse, where the slice propagator errs at the relative bandwidth. A chirped FEL case is the next measurement. The prototype keeps the envelope and its carrier, so the SVEA stands and the bandwidth the window carries is bounded by the slice spacing at $\lambda_s / 2\Delta$. A field without an envelope, Puffin's model, is the step after that one and is not this prototype.
+The vacuum test says where the prototype pays: a chirped or short pulse, where the slice propagator errs at the relative bandwidth. The two FEL cases say that error does not reach the output of an Aramis run through the gain: the seed's bandwidth error is under the floor the whole-slice slippage sets, that floor is under the start-up noise light's difference, and both are under what the step moves. Where the prototype differs from the slice propagator in a way the beam can see is the slippage, continuous under the ramp and a whole slice at a time under the rotation, which is what lets the field be sampled coarser than the beam's slices along $\tau$. The prototype keeps the envelope and its carrier, so the SVEA stands and the bandwidth the window carries is bounded by the slice spacing at $\lambda_s / 2\Delta$. A field without an envelope, Puffin's model, is the step after that one and is not this prototype.
