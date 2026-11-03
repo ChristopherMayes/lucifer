@@ -379,9 +379,9 @@ contains
 ! Subroutine setup_fel_elements ()
 !
 ! Routine to recognize FEL segments and derive their FEL parameters from lattice
-! attributes. Bmad's kx roll-off attribute is not yet mapped and must be zero. An FEL
-! segment is a wiggler or undulator tracked by an FEL method, which is Bmad's own
-! meaning for program-supplied tracking.
+! attributes, the offsets, Bmad's kx and the kicks among them. An FEL segment is a
+! wiggler or undulator tracked by an FEL method, which is Bmad's own meaning for
+! program-supplied tracking.
 !
 ! The wiggler sanity assertions are enforced. A wiggler with zero b_max or l_period
 ! would silently get factor = 0 in Bmad's own kernel (no resonance, no error). A
@@ -449,6 +449,29 @@ do je = 1, branch%n_ele_track
     und_of(je)%kx = 0
     und_of(je)%ky = kw**2
   endif
+
+  ! The element's offsets, roll-off wavenumber and kicks (fel-physics.md sec-element).
+  ! The offsets are the girder-composed totals, as offset_particle reads them. Bmad's
+  ! planar kx gives the field cos(kx x) cosh(ky y) with ky^2 = kx^2 + ku^2, so the
+  ! roll-off pair is -kx^2 and kx^2 + ku^2 in Genesis4's form. A helical kx is refused
+  ! in fel_assert_wiggler_sane. The kicks are px/p0 and py/p0 over the element: half at
+  ! each face in the averaged mode, as track_a_wiggler applies them, and a uniform
+  ! field in the unaveraged mode, formed in the walk where the beam's p0 is known.
+
+  und_of(je)%ax = w%value(x_offset_tot$)
+  und_of(je)%ay = w%value(y_offset_tot$)
+  und_of(je)%offset = (und_of(je)%ax /= 0 .or. und_of(je)%ay /= 0)
+  und_of(je)%kyb = kw
+  if (w%value(kx$) /= 0) then
+    und_of(je)%kxb = w%value(kx$)
+    und_of(je)%kyb = sqrt(kw**2 + w%value(kx$)**2)
+    und_of(je)%kx = -w%value(kx$)**2
+    und_of(je)%ky = kw**2 + w%value(kx$)**2
+  endif
+  und_of(je)%hkick = w%value(hkick$)
+  und_of(je)%vkick = w%value(vkick$)
+  und_of(je)%field_general = und_of(je)%offset .or. und_of(je)%kxb /= 0 .or. &
+                             und_of(je)%hkick /= 0 .or. und_of(je)%vkick /= 0
 
   ! Tilt is the wiggle-plane rotation, planar only. A tilted helical element is a no-op
   ! that reads as a mistake, so it is refused. The transcribed-Genesis maps know no tilt,

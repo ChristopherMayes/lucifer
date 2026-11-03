@@ -247,6 +247,17 @@ do ie = run%i_start, run%i_end
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
+    ! The element's kicks (fel-physics.md sec-element). The averaged mode applies half
+    ! of each at the entry face and half at the exit face, as offset_particle does for
+    ! track_a_wiggler, on the host before the device takes the beam and after it gives
+    ! it back. The unaveraged mode integrates them as a uniform field over the element,
+    ! as Bmad's integrators do: du_x/ds = b_y gives b_y = p0_mc hkick / L, and
+    ! du_y/ds = -b_x gives b_x = -p0_mc vkick / L (fel_unavg_bfield_general).
+
+    und%kick_by =  fel_p0_mc(fbeam) * und%hkick / ele%value(l$)
+    und%kick_bx = -fel_p0_mc(fbeam) * und%vkick / ele%value(l$)
+    if (fel_mode(ie) /= unaveraged$) call apply_face_kick ()
+
     if (fel_mode(ie) == unaveraged$) then
       ! The concatenated wake kick would meet the quiver-carrying chart mid-segment.
       ! Nothing in this mode needs element wakes, so the run is refused.
@@ -343,6 +354,7 @@ do ie = run%i_start, run%i_end
       if (istep /= und%nstep) call progress_line (.false., istep, und%nstep)
     enddo
     call fel_device_element_end (run%dev, fbeam, ffield)   ! The residency boundary: z re-forms in FP64.
+    if (fel_mode(ie) /= unaveraged$) call apply_face_kick ()
 
     ! A deposit met a particle below the gamma its bound assumes and dropped it. So this
     ! element's field is wrong, and nothing downstream may read it. The run stops here,
@@ -1038,6 +1050,31 @@ if (run%global%dump_at_comb) then
   endif
 endif
 end subroutine take_stats_record
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine apply_face_kick ()
+!
+! Routine to apply half of the element's hkick and vkick, as px/p0 and py/p0, to every
+! particle. The entry face and the exit face each take one half, as offset_particle
+! applies them for track_a_wiggler. An element without a kick is untouched.
+!-
+
+subroutine apply_face_kick ()
+
+integer is, n
+
+!
+
+if (und%hkick == 0 .and. und%vkick == 0) return
+do is = 1, size(fbeam%slice)
+  n = fbeam%slice(is)%n
+  fbeam%slice(is)%px(1:n) = fbeam%slice(is)%px(1:n) + 0.5_rp * und%hkick
+  fbeam%slice(is)%py(1:n) = fbeam%slice(is)%py(1:n) + 0.5_rp * und%vkick
+enddo
+
+end subroutine apply_face_kick
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

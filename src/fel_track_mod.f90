@@ -109,7 +109,16 @@ type fel_und_struct
   real(rp) :: ku = 0          ! Undulator wavenumber twopi/lambdau [1/m].
   real(rp) :: kx = 0          ! Natural focusing, Genesis4's kx * ku^2 [1/m^2].
   real(rp) :: ky = 0          ! Natural focusing, Genesis4's ky * ku^2 [1/m^2].
-  real(rp) :: ax = 0, ay = 0  ! Transverse offset of the undulator field [m].
+  real(rp) :: ax = 0, ay = 0  ! Transverse offset of the undulator field [m], the
+                              !   element's x_offset_tot and y_offset_tot.
+  logical :: offset = .false. ! ax or ay is nonzero, so the maps focus about (ax, ay).
+  real(rp) :: kxb = 0         ! Bmad's kx, the planar roll-off wavenumber [1/m], 0 unset.
+  real(rp) :: kyb = 0         ! The planar field's y wavenumber sqrt(kxb^2 + ku^2) [1/m].
+  real(rp) :: hkick = 0, vkick = 0   ! The element's hkick and vkick [rad].
+  real(rp) :: kick_bx = 0, kick_by = 0  ! The kicks as a uniform normalized field over the
+                                        !   element [1/m], the unaveraged mode's form.
+  logical :: field_general = .false.    ! An offset, a kxb or a kick: the unaveraged field
+                                        !   takes its general form.
   real(rp) :: tilt = 0        ! Wiggle-plane tilt [rad]: planar wiggles along
   real(rp) :: cos_t = 1, sin_t = 0   !   e = (cos_t, sin_t). Cached for the maps.
   complex(rp) :: pol(2) = [(1.0_rp, 0.0_rp), (0.0_rp, 0.0_rp)]
@@ -319,9 +328,14 @@ if (ele%value(l_period$) <= 0) then
                                  'SILENTLY ZERO): ' // trim(ele%name))
   stop 1
 endif
-if (ele%value(kx$) /= 0) then
-  call out_io (s_fatal$, r_name, 'THE BMAD KX ROLL-OFF ATTRIBUTE IS NOT YET MAPPED TO THE FEL FOCUSING SPLIT.', &
-                                 'POSSIBLE SOLUTION: SET KX = 0 ON: ' // trim(ele%name))
+if (ele%value(kx$) /= 0 .and. ele%field_calc == helical_model$) then
+  call out_io (s_fatal$, r_name, 'KX ON A HELICAL FEL ELEMENT HAS NO MEANING: THE HELICAL MODEL HAS NO ROLL-OFF', &
+                                 'WAVENUMBER. POSSIBLE SOLUTION: SET KX = 0 ON: ' // trim(ele%name))
+  stop 1
+endif
+if (ele%value(x_pitch$) /= 0 .or. ele%value(y_pitch$) /= 0) then
+  call out_io (s_fatal$, r_name, 'A PITCHED FEL ELEMENT IS NOT CARRIED: X_PITCH AND Y_PITCH MUST BE ZERO ON: ' // &
+                                 trim(ele%name), 'POSSIBLE SOLUTION: OFFSET THE ELEMENT WITH X_OFFSET AND Y_OFFSET.')
   stop 1
 endif
 if (ele%value(tilt$) /= 0 .and. ele%field_calc == helical_model$) then
@@ -1213,8 +1227,13 @@ if (und%helical) then
   par%k1y = par%k1x
 else
   g_max = und%aw * sqrt(2.0_rp) * und%ku / p0_mc_l
-  par%k1x = 0
-  par%k1y = -0.5_rp * g_max**2
+  if (und%kxb /= 0) then       ! track_a_wiggler's strengths, as fel_transverse_track_bmad.
+    par%k1x = 0.5_rp * g_max**2 * (und%kxb / und%ku)**2
+    par%k1y = -0.5_rp * g_max**2 * (und%ku**2 + und%kxb**2) / und%ku**2
+  else
+    par%k1x = 0
+    par%k1y = -0.5_rp * g_max**2
+  endif
 endif
 
 ngrid_l = wavefront_shape(ff(1)%wf)
@@ -1583,6 +1602,22 @@ qx_hat = und%kx * aw2 / gamma0 / betpar0 / p0_mc
 qy_hat = und%ky * aw2 / gamma0 / betpar0 / p0_mc
 aw_p0_sq = (und%aw / p0_mc)**2
 
+! An offset element focuses about its own axis (ax, ay), as Genesis4's TrackBeam does
+! through its xoff and yoff and as Bmad's offset_particle does. The shift and its return
+! are taken only when there is an offset, so an element without one runs the lines
+! below as they were.
+
+if (und%offset) then
+  do ip = 1, sl%n
+    gz_hat = sqrt((1 + sl%pz(ip))**2 - sl%px(ip)**2 - sl%py(ip)**2 - aw_p0_sq)
+    sl%x(ip) = sl%x(ip) - und%ax;  sl%y(ip) = sl%y(ip) - und%ay
+    call fel_apply_focus (delz, qx_hat, sl%x(ip), sl%px(ip), gz_hat)
+    call fel_apply_focus (delz, qy_hat, sl%y(ip), sl%py(ip), gz_hat)
+    sl%x(ip) = sl%x(ip) + und%ax;  sl%y(ip) = sl%y(ip) + und%ay
+  enddo
+  return
+endif
+
 do ip = 1, sl%n
   gz_hat = sqrt((1 + sl%pz(ip))**2 - sl%px(ip)**2 - sl%py(ip)**2 - aw_p0_sq)
   call fel_apply_focus (delz, qx_hat, sl%x(ip), sl%px(ip), gz_hat)
@@ -1619,6 +1654,13 @@ end subroutine fel_transverse_track
 ! g_max follows from aw: c*b_max = K*ku*m_e with K = aw (helical) or aw*sqrt(2)
 ! (planar), so g_max = K*ku/p0_mc.
 !
+! A planar element with Bmad's kx takes track_a_wiggler's own strengths, k1x = factor
+! (kx/kz)^2 and k1y = -factor (kz^2 + kx^2)/kz^2 with factor = g_max^2/2, the x plane
+! defocused and the y plane focused the more. An offset element (x_offset, y_offset)
+! focuses about its own axis: the coordinates are shifted onto it before the maps and
+! back after, outside the tilt rotation as offset_particle orders them. Both are taken
+! only on an element that has them, so every other element runs the lines as they were.
+!
 ! Input:
 !   und     -- fel_und_struct: Undulator parameters.
 !   beam    -- fel_beam_struct: The beam (reference energy).
@@ -1653,8 +1695,13 @@ if (und%helical) then
   k1y_loc = k1x_loc
 else
   g_max = und%aw * sqrt(2.0_rp) * und%ku / p0_mc
-  k1x_loc = 0                              ! kx attribute is asserted zero at setup.
-  k1y_loc = -0.5_rp * g_max**2
+  if (und%kxb /= 0) then
+    k1x_loc = 0.5_rp * g_max**2 * (und%kxb / kz)**2
+    k1y_loc = -0.5_rp * g_max**2 * (kz**2 + und%kxb**2) / kz**2
+  else
+    k1x_loc = 0
+    k1y_loc = -0.5_rp * g_max**2
+  endif
 endif
 
 do ip = 1, sl%n
@@ -1662,6 +1709,10 @@ do ip = 1, sl%n
   k1yy = k1y_loc / rel_p**2
   k1xx = k1x_loc / rel_p**2
   k3l = 2 * delz * k1yy                    ! Half of Bmad's per-step kick. See header.
+
+  if (und%offset) then
+    sl%x(ip) = sl%x(ip) - und%ax;  sl%y(ip) = sl%y(ip) - und%ay
+  endif
 
   ! A tilted planar element focuses in its own wiggle frame: rotate in, apply the
   ! untilted map, rotate out. This is Bmad's tilt_coords composition. sin_t = 0 (every
@@ -1679,6 +1730,10 @@ do ip = 1, sl%n
   if (.not. leading) call octupole_kick ()
 
   if (und%sin_t /= 0) call rot_xy (sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), und%cos_t, -und%sin_t)
+
+  if (und%offset) then
+    sl%x(ip) = sl%x(ip) + und%ax;  sl%y(ip) = sl%y(ip) + und%ay
+  endif
 enddo
 
 !------------------------------------------------------------------------------

@@ -24,7 +24,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 28 in all.
+Every section below ran and passed on both builds, 29 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -44,6 +44,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `device`
 - `unaveraged`
 - `spontaneous`
+- `element-offsets`
 - `two-polarization`
 - `beam-format`
 - `harmonics`
@@ -339,6 +340,7 @@ where the two builds agree to every printed digit.
 | harmonic production TD window P3 vs CPU (shot-noise b3) | 3.3016e-06 | same | <= 1.8000e-03 |
 | device vs Genesis, TD planar with shot noise, P1 | 6.3096e-05 | same | <= 1.6000e-03 |
 | device vs Genesis, TD planar with shot noise, P3 | 2.1616e-05 | same | <= 1.8000e-03 |
+| device vs CPU, exit orbit with an x_offset, y_offset, kx and kick (all) | 1.0752e-05 | same | <= 5.0000e-05 |
 | quiet-start dark harmonic: fundamental P1 vs CPU | 3.3915e-04 | same | <= 1.6000e-03 |
 | two-plane lockstep worst_x | 1.4621e-07 | same | <= 1.0000e-06 |
 | two-plane lockstep worst_px | 1.5119e-07 | same | <= 1.0000e-06 |
@@ -526,6 +528,31 @@ where the two builds agree to every printed digit.
 | fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.3485e-01 | same | 0.0000e+00 to 2.5000e-01 |
 | fluctuations: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
 | ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.9122e-12 | 5.0416e-12 | 0.0000e+00 to 1.0000e-03 |
+
+(val-levels-element-offsets)=
+### `element-offsets`
+
+| Check | Debug | Production | Bound |
+|---|---|---|---|
+| offset: averaged against bmad_standard, max \|d_avg - d_bs\| / max \|d_bs\| | 2.8475e-05 | same | <= 1.0000e-04 |
+| offset: averaged against runge_kutta, max \|d_avg - d_rk\| / max \|d_rk\| | 1.0400e-03 | same | <= 3.0000e-03 |
+| offset: unaveraged against runge_kutta with the ramp factor, max \|d_uv - f d_rk\| / max \|d_rk\| | 9.7230e-04 | same | <= 3.0000e-03 |
+| kx: averaged against bmad_standard, max \|d_avg - d_bs\| / max \|d_bs\| | 6.7208e-06 | same | <= 2.0000e-05 |
+| kx: averaged against runge_kutta, max \|d_avg - d_rk\| / max \|d_rk\| | 5.7794e-03 | same | <= 2.0000e-02 |
+| kx: unaveraged against runge_kutta with the ramp factor, max \|d_uv - f d_rk\| / max \|d_rk\| | 5.9705e-03 | same | <= 2.0000e-02 |
+| kick: avg \|d_px / hkick - 1\| | 2.2204e-16 | same | <= 1.0000e-12 |
+| kick: avg \|d_x / (L hkick / 2) - 1\| | 1.7009e-13 | same | <= 1.0000e-10 |
+| kick: avg \|d_py / vkick - 1\| | 8.8144e-05 | same | <= 2.0000e-04 |
+| kick: avg \|d_y / (L vkick / 2) - 1\| | 5.8764e-05 | same | <= 2.0000e-04 |
+| kick: uv \|d_px / hkick - 1\| | 1.9118e-12 | 1.8937e-12 | <= 1.0000e-09 |
+| kick: uv \|d_x / (L hkick / 2) - 1\| | 7.5829e-09 | same | <= 1.0000e-07 |
+| kick: uv \|d_py / vkick - 1\| | 5.3436e-05 | same | <= 2.0000e-04 |
+| kick: uv \|d_y / (L vkick / 2) - 1\| | 2.9198e-05 | same | <= 2.0000e-04 |
+| all: avg max \|d_all - (d_offset + d_kx + d_kick)\| / max \|d_all\| | 2.2338e-02 | same | <= 5.0000e-02 |
+| all: uv max \|d_all - (d_offset + d_kx + d_kick)\| / max \|d_all\| | 2.1065e-02 | same | <= 5.0000e-02 |
+| header: the element's line names x_offset, kx and hkick |  | same | holds |
+| refusal: kx on a helical element |  | same | holds |
+| refusal: a pitched element |  | same | holds |
 
 (val-levels-two-polarization)=
 ### `two-polarization`

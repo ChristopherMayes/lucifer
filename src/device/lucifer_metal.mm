@@ -143,6 +143,7 @@ inline float2 dec_fixed (const device uint* SI, ulong ie, float sinv){
 
 struct TrkPar {
     float delz, inv_e0, k1x, k1y, kz, cos_t, sin_t;
+    float ax, ay;
     uint  npart, helical, leading;
 };
 
@@ -178,6 +179,10 @@ kernel void trk_half (device float* X [[buffer(0)]], device float* PX [[buffer(1
     float k1xx = P.k1x / (rel_p * rel_p);
     float k1yy = P.k1y / (rel_p * rel_p);
     float k3l = 2.0f * P.delz * k1yy;
+    // An offset element focuses about its own axis, as fel_transverse_track_bmad.
+    // The shift is taken only with an offset, so the zero case touches nothing.
+    const bool offset = (P.ax != 0.0f || P.ay != 0.0f);
+    if (offset) { x -= P.ax; y -= P.ay; }
 
     if (P.sin_t != 0.0f) {
         float t;
@@ -199,6 +204,7 @@ kernel void trk_half (device float* X [[buffer(0)]], device float* PX [[buffer(1
         t = P.cos_t * x  - P.sin_t * y;   y  =  P.sin_t * x  + P.cos_t * y;   x  = t;
         t = P.cos_t * px - P.sin_t * py;  py =  P.sin_t * px + P.cos_t * py;  px = t;
     }
+    if (offset) { x += P.ax; y += P.ay; }
     X[gid] = x; PX[gid] = px;
     Y[gid] = y; PY[gid] = py;
 }
@@ -478,9 +484,10 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
 
 struct UnavgPar {
     float h, dsub, ks, ku, aw, cos_t, sin_t;
+    float ax, ay, kxb, kyb, kick_bx, kick_by;
     float gam0, beta0, g0inv2, me;
     float gridmax, dgrid, scl_u, dscale, u_bound;
-    uint  ngrid, npart, nslice, first, helical, mutate, npol;
+    uint  ngrid, npart, nslice, first, helical, mutate, npol, field_general;
 };
 
 struct U5 { float x, y, ux, uy, tau; };
@@ -492,9 +499,46 @@ inline U5 u5axpy (U5 a, float s, U5 b){
     return r;
 }
 
+// fel_unavg_bfield_general, term for term: the offset, Bmad's kx with its ky, and
+// the kick field, for an element that has any of the three.
+inline void ubfield_general (constant UnavgPar& P, float x, float y, float4 fq,
+                             thread float& bx, thread float& by, thread float& bz){
+    float xl = x - P.ax, yl = y - P.ay;
+    if (P.sin_t != 0.0f) {
+        float t =  P.cos_t * xl + P.sin_t * yl;
+        yl = -P.sin_t * xl + P.cos_t * yl;
+        xl = t;
+    }
+    float g = fq.x, gp = fq.y, c_u = fq.z, s_u = fq.w;
+    float a0;
+    if (P.helical != 0u) {
+        a0 = P.aw;
+        float fperp = 1.0f + (P.ku*P.ku / 4.0f) * (xl*xl + yl*yl);
+        bx = -a0 * (gp * s_u + g * P.ku * c_u) * fperp;
+        by =  a0 * (gp * c_u - g * P.ku * s_u) * fperp;
+        bz =  a0 * g * (P.ku*P.ku / 2.0f) * (s_u * xl - c_u * yl);
+    } else {
+        a0 = sqrt(2.0f) * P.aw;
+        float ds_fac = gp * c_u - g * P.ku * s_u;
+        float ckx = cos(P.kxb * xl), skx = sin(P.kxb * xl);
+        float chy = cosh(P.kyb * yl), shy = sinh(P.kyb * yl);
+        bx = -a0 * ds_fac * (P.kxb / P.kyb) * skx * shy;
+        by =  a0 * ds_fac * ckx * chy;
+        bz = -a0 * g * c_u * (P.ku*P.ku / P.kyb) * ckx * shy;
+    }
+    if (P.sin_t != 0.0f) {
+        float bt = P.cos_t * bx - P.sin_t * by;
+        by = P.sin_t * bx + P.cos_t * by;
+        bx = bt;
+    }
+    bx += P.kick_bx;
+    by += P.kick_by;
+}
+
 // fel_unavg_bfield, term for term, with the four s-dependent factors arriving in fq.
 inline void ubfield (constant UnavgPar& P, float x, float y, float4 fq,
                      thread float& bx, thread float& by, thread float& bz){
+    if (P.field_general != 0u) { ubfield_general(P, x, y, fq, bx, by, bz); return; }
     float xl = x, yl = y;
     if (P.sin_t != 0.0f) {
         xl =  P.cos_t * x + P.sin_t * y;
@@ -1030,6 +1074,7 @@ kernel void wrap_phase (const device long* u [[buffer(0)]], device float* ph [[b
 
 struct TrkPar {
     float delz, inv_e0, k1x, k1y, kz, cos_t, sin_t;
+    float ax, ay;
     uint32_t npart, helical, leading;
 };
 
@@ -1058,9 +1103,10 @@ struct AddPar {
 
 struct UnavgPar {
     float h, dsub, ks, ku, aw, cos_t, sin_t;
+    float ax, ay, kxb, kyb, kick_bx, kick_by;
     float gam0, beta0, g0inv2, me;
     float gridmax, dgrid, scl_u, dscale, u_bound;
-    uint32_t ngrid, npart, nslice, first, helical, mutate, npol;
+    uint32_t ngrid, npart, nslice, first, helical, mutate, npol, field_general;
 };
 
 // The spontaneous reduction's shape, mirroring SPONT_T in the shader. One
@@ -1591,6 +1637,8 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         T.kz = (float) par->ku;
         T.cos_t = (float) par->cos_t;
         T.sin_t = (float) par->sin_t;
+        T.ax = (float) par->ax;
+        T.ay = (float) par->ay;
         T.npart = (uint32_t) p->npart;
         T.helical = (uint32_t) par->helical;
         T.leading = 1;
@@ -1904,6 +1952,12 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
         P.aw = (float) par->aw;
         P.cos_t = (float) par->cos_t;
         P.sin_t = (float) par->sin_t;
+        P.ax = (float) par->ax;
+        P.ay = (float) par->ay;
+        P.kxb = (float) par->kxb;
+        P.kyb = (float) par->kyb;
+        P.kick_bx = (float) par->kick_bx;
+        P.kick_by = (float) par->kick_by;
         P.gam0 = (float) par->gam0;
         P.beta0 = (float) par->beta0;
         P.g0inv2 = (float) par->g0inv2;
@@ -1920,6 +1974,7 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
         P.helical = (uint32_t) par->helical;
         P.mutate = (uint32_t) par->mutate;
         P.npol = (uint32_t) p->npol;
+        P.field_general = (uint32_t) par->field_general;
 
         // The planes each member carries, which is what the propagator pass maps a plane
         // to its member with. The source needs no map here: the unaveraged first pass

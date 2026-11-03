@@ -1,0 +1,24 @@
+! Element-attribute probe (check_element_offsets.py): ONE short planar wiggler at the
+! Benchmark1-SASE energy and rms aw, 40 periods, tracked with the field off by Bmad's
+! own bmad_standard and runge_kutta, by the averaged FEL mode and by the unaveraged
+! FEL mode, with and without an x_offset and y_offset, a kx, and an hkick and vkick on
+! the element. The check compares what each attribute does to the exit orbit, tracker
+! against tracker. Planar, since kx is the planar model's.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+
+UNDS: wiggler, l = 0.60, l_period = 0.015, field_calc = planar_model, &
+      b_max = 0.84853 * sqrt(2) * (twopi / 0.015) * m_electron / c_light, &
+      fel_method = averaged, ds_step = 0.015
+
+SEG: line = (UNDS)
+
+use, SEG

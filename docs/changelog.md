@@ -9,6 +9,25 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-03 Added: an FEL element's `x_offset`, `y_offset`, `kx`, `hkick` and `vkick` are
+  honored, where the offsets and the kicks were read by nothing and a nonzero `kx` was refused.
+  `setup_fel_elements` reads the girder-composed offsets into the roll-off's axis, and both
+  transverse maps, `fel_transverse_track` and `fel_transverse_track_bmad`, focus about it, as
+  Genesis4's `TrackBeam` and Bmad's `offset_particle` do. A planar `kx` is Bmad's roll-off
+  wavenumber, the field `cos(kx x) cosh(ky y)` with `ky^2 = kx^2 + ku^2`: the roll-off pair becomes
+  `-kx^2` and `kx^2 + ku^2`, the Bmad maps take `track_a_wiggler`'s `k1x` and `k1y`, and the
+  unaveraged mode integrates the vector potential of that field (`fel_unavg_bfield_general`,
+  with its FP32 and Metal twins). A `kx` on a helical element is refused, as is a pitched element.
+  The kicks are `px/p0` and `py/p0` over the element, half at each face in the averaged mode as
+  `offset_particle` applies them and a uniform field in the unaveraged mode as Bmad's integrators
+  apply them. The header prints the three for an element that has any. The validation suite gains
+  the `element-offsets` section, `check_element_offsets.py` on `tests/bmad/offset_probe.bmad`: the
+  averaged mode against `bmad_standard` at 1e-4, both modes against `runge_kutta` at 2e-2 with the
+  ramp factor, the kicks against the attribute at 1e-9, the composition of all three at 5e-2, and
+  the device against the CPU at 5e-5. Two things about Bmad came out of the measurement and are
+  printed for the record: at release 20261023-0 `bmad_standard` applies a wiggler's kick twice,
+  through `offset_particle` and again through the kick folded into its multipoles, and
+  `runge_kutta`'s planar field carries no kick. Every recorded digit held.
 - 2026-11-02 Fixed: three statements written before the features they describe landed said
   otherwise. The coupling section of `docs/fel-physics.md` said only the fundamental was used,
   where the field set carries each harmonic member with the Bessel coupling at the odd harmonics

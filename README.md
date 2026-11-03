@@ -80,7 +80,7 @@ See [`docs/user-guide.md`](docs/user-guide.md) for the input file's tables, the 
 
 ## Where it stands
 
-Validated against Genesis4 on eleven tiers plus twenty-eight check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
+Validated against Genesis4 on eleven tiers plus twenty-nine check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
 The keystone is the run every commit passes before it is merged: five jobs at their tolerances, then the generated pages regenerated and required to equal the committed ones. The validation suite, `tests/run_fel_validation.sh`, compares against Genesis4 and runs the check sections, and the Linux CI job runs it on the debug and the release build at its tolerances. Neither judges a wall clock. Performance is measured separately, on an idle machine, in [`docs/performance.md`](docs/performance.md). The table of every test, what it compares against, which build it uses and where it runs opens [`docs/validation.md`](docs/validation.md).
 

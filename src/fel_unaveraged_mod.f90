@@ -217,6 +217,14 @@ real(rp) a0, fperp, xl, yl, bt
 
 !
 
+! An element with an offset, a roll-off wavenumber or a kick takes the general form.
+! Every other element runs the lines below as they were.
+
+if (und%field_general) then
+  call fel_unavg_bfield_general (und, x, y, g, gp, c_u, s_u, bx, by, bz)
+  return
+endif
+
 ! A tilted planar element: evaluate the untilted potential in the wiggle frame
 ! (coordinates rotated in), rotate b back out. sin_t = 0 skips both rotations.
 
@@ -247,6 +255,81 @@ if (und%sin_t /= 0) then        ! Rotate the transverse field components back ou
 endif
 
 end subroutine fel_unavg_bfield
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_unavg_bfield_general (und, x, y, g, gp, c_u, s_u, bx, by, bz)
+!
+! Routine to evaluate the field of fel_unavg_bfield for an element with an offset, a
+! roll-off wavenumber or a kick, the three the plain form leaves out. The position is
+! taken from the element's axis, (x - ax, y - ay), before the tilt rotation, as the
+! averaged roll-off takes it. A planar element with Bmad's kx carries the vector
+! potential of Bmad's planar model,
+!
+!   a_x = a0 g(s) cos(ku s) cos(kx x) cosh(ky y)
+!   a_y = a0 g(s) cos(ku s) (kx/ky) sin(kx x) sinh(ky y),    ky^2 = kx^2 + ku^2,
+!
+! whose curl is the planar field of the Bmad manual and is the plain form at kx = 0.
+! The kicks are a uniform normalized field over the element, b_y = p0_mc hkick / L and
+! b_x = -p0_mc vkick / L, so that du_x/ds = b_y and du_y/ds = -b_x give the element's
+! hkick and vkick in px/p0 and py/p0, as Bmad's integrators apply them. The kick field
+! is in the lab frame and takes no tilt, as offset_particle's kicks take none. A helical
+! element reaches this routine with an offset or a kick alone.
+!
+! Input:
+!   und        -- fel_und_struct: Undulator parameters, with ax, ay, kxb, kyb and the
+!                   kick field kick_bx, kick_by.
+!   x, y       -- real(rp): Transverse position [m].
+!   g, gp      -- real(rp): The ramp envelope and its slope at this s.
+!   c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
+!
+! Output:
+!   bx, by, bz -- real(rp): The normalized field b = curl(a) plus the kick field [1/m].
+!-
+
+subroutine fel_unavg_bfield_general (und, x, y, g, gp, c_u, s_u, bx, by, bz)
+
+type (fel_und_struct) und
+real(rp) x, y, g, gp, c_u, s_u, bx, by, bz
+real(rp) a0, fperp, xl, yl, bt, ds_fac, ckx, skx, chy, shy
+
+!
+
+xl = x - und%ax;  yl = y - und%ay
+if (und%sin_t /= 0) then
+  bt =  und%cos_t * xl + und%sin_t * yl
+  yl = -und%sin_t * xl + und%cos_t * yl
+  xl = bt
+endif
+
+if (und%helical) then
+  a0 = und%aw
+  fperp = 1 + (und%ku**2 / 4) * (xl*xl + yl*yl)
+  bx = -a0 * (gp * s_u + g * und%ku * c_u) * fperp
+  by =  a0 * (gp * c_u - g * und%ku * s_u) * fperp
+  bz =  a0 * g * (und%ku**2 / 2) * (s_u * xl - c_u * yl)
+else
+  a0 = sqrt(2.0_rp) * und%aw
+  ds_fac = gp * c_u - g * und%ku * s_u                   ! d/ds of g(s) cos(ku s)
+  ckx = cos(und%kxb * xl);  skx = sin(und%kxb * xl)
+  chy = cosh(und%kyb * yl);  shy = sinh(und%kyb * yl)
+  bx = -a0 * ds_fac * (und%kxb / und%kyb) * skx * shy     ! -d(a_y)/ds
+  by =  a0 * ds_fac * ckx * chy                           !  d(a_x)/ds
+  bz = -a0 * g * c_u * (und%ku**2 / und%kyb) * ckx * shy  !  d(a_y)/dx - d(a_x)/dy
+endif
+
+if (und%sin_t /= 0) then
+  bt = und%cos_t * bx - und%sin_t * by
+  by = und%sin_t * bx + und%cos_t * by
+  bx = bt
+endif
+
+bx = bx + und%kick_bx
+by = by + und%kick_by
+
+end subroutine fel_unavg_bfield_general
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -790,6 +873,10 @@ upar%beta0 = p0_mc / gamma0b
 upar%g0inv2 = 1 / gamma0b**2
 upar%cos_t = und%cos_t
 upar%sin_t = und%sin_t
+upar%ax = und%ax;  upar%ay = und%ay
+upar%kxb = und%kxb;  upar%kyb = und%kyb
+upar%kick_bx = und%kick_bx;  upar%kick_by = und%kick_by
+upar%field_general = merge(1, 0, und%field_general)
 upar%gridmax = (ngrid - 1) * dgrid / 2
 upar%dgrid = dgrid
 upar%scl_u = scl_u
@@ -1088,6 +1175,10 @@ endif
 
 uc%aw = real(und%aw, sp);        uc%ku = real(und%ku, sp)
 uc%cos_t = real(und%cos_t, sp);  uc%sin_t = real(und%sin_t, sp)
+uc%ax = real(und%ax, sp);        uc%ay = real(und%ay, sp)
+uc%kxb = real(und%kxb, sp);      uc%kyb = real(und%kyb, sp)
+uc%kick_bx = real(und%kick_bx, sp);  uc%kick_by = real(und%kick_by, sp)
+uc%field_general = und%field_general
 uc%gam0 = real(gamma0b, sp)
 uc%beta0 = real(p0_mc / gamma0b, sp)
 uc%g0inv2 = real(1 / gamma0b**2, sp)
