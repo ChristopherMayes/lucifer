@@ -30,6 +30,20 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-03 Added: the two FEL cases on `docs/spectral-field.md`, `seeded` and `chirped` in
+  `tests/scripts/spectral_field.py`. A chirped Gaussian seed at 1 Å, 0.53 to 5 percent relative
+  bandwidth, through the first Aramis segment and the full line under both propagators with the
+  source filter on, and the segment again on the bunch without its shot noise. With the seed the
+  only light the two differ by 2.3e-3 to 6.5e-3 of the peak field over the segment, which is the
+  whole-slice slippage's position against the beam, 2.6e-3, with the vacuum test's bandwidth
+  error above it at 5 percent. With the noise on, the start-up light's difference of 8e-2 covers
+  it, and through the line the two differ by 2e-2, 4e-4 in wavelength and 0.6 percent in peak
+  power, with no trend in the bandwidth, while the step cut from three periods to one moves the
+  spectral run by 9.5e-2 and 2.4 percent. An energy chirp of 0.25, 0.5 and 1 percent across the
+  window from noise through the line: the chirp moves the exit energy by 2.9, 0.28 and 0.010 of
+  the unchirped run's and the propagators agree on it to 2 percent. The comparison moves the
+  slice run's field by the slippage residual its file records before it differences, since the
+  segment leaves two thirds of a slice unapplied. No recorded digit moved.
 - 2026-11-03 Added: an FEL element's `x_offset`, `y_offset`, `kx`, `hkick` and `vkick` are
   honored, where the offsets and the kicks were read by nothing and a nonzero `kx` was refused.
   `setup_fel_elements` reads the girder-composed offsets into the roll-off's axis, and both

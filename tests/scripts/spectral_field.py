@@ -5,9 +5,12 @@ propagator, as docs/spectral-field.md records. Nothing here runs in the keystone
 prototype is outside it, and the page is hand written from this script's report.
 
     spectral_field.py --exe <lucifer> --work-dir <dir> [--validation-dir <dir>]
-                      [--threads N] [vacuum] [null] [boundary] [cost]
+                      [--threads N] [--reuse] [vacuum] [null] [boundary] [cost]
+                      [seeded] [chirped]
 
-The four measurements, each a subcommand and all four when none is named:
+The six measurements, each a subcommand and the first four when none is named. With
+--reuse a run whose log and final field exist in the work directory is not run again,
+so a set that takes hours is re-analyzed from its files.
 
   vacuum    A chirped Gaussian pulse with no beam, drifted through a pipe under both
             propagators, against the exact paraxial solution with its spatio-temporal
@@ -21,7 +24,7 @@ The four measurements, each a subcommand and all four when none is named:
             with the difference from the slice run placed against rho. Needs the work
             directory of a completed validation pass (--validation-dir), which holds
             the tier inputs, the imported dumps and the Genesis4 references.
-  boundary  The SASE tier's window, 32 slices under a line that slips about 600, under
+  boundary  The SASE tier's window, 32 slices under a line that slips 1184, under
             each boundary form: the headroom alone, which refuses the run where the head
             fills; the headroom with the refusal disabled, to see what wraps; the cos^2
             sponge; and the hybrid of whole-slice rotation with zero padding. For each,
@@ -30,6 +33,20 @@ The four measurements, each a subcommand and all four when none is named:
   cost      The field phase of the SASE tier's walk per step, from the footer's timing
             table, under both propagators, at the thread count given. Needs
             --validation-dir.
+  seeded    A chirped Gaussian seed, the vacuum test's pulse at the tier's wavelength on
+            the tier's grid, through the first Aramis segment and through the full line
+            with the tier's beam continued over a 1280-slice window that holds the line's
+            slippage, under both propagators with the source filter on, at four relative
+            bandwidths, and the segment again on the bunch loaded without its shot noise,
+            the seed the only light. The exit field differenced after the slice run's
+            field is moved by the slippage residual it carries, the exit power and the
+            per-slice wavelength of each. The spectral run is the reference, and its step
+            cut from three periods to one says how far it moves. Needs --validation-dir
+            for the lattice.
+  chirped   The same beam with a linear energy chirp along the window, from noise
+            through the full line under both propagators, unchirped and at three chirps.
+            The same three numbers and the slope the exit wavelengths carry against minus
+            twice the energy chirp. Needs --validation-dir for the lattice.
 
 The tracker is run from the work directory, into which the validation directory's
 inputs are linked, so the validation directory is read and never written.
@@ -55,6 +72,11 @@ sys.path.insert(0, str(HERE))
 def run(exe, toml, overrides, out_root, cwd, threads, log=None):
     """Run the tracker on toml with overrides, out_root set, and return the log's text.
     A failed run returns the text too, and the caller reads the refusal from it."""
+    log_path = pathlib.Path(cwd) / (log or f"{out_root}.log")
+    if REUSE and log_path.exists() and (pathlib.Path(cwd) / f"{out_root}-final.wf.h5").exists():
+        text = log_path.read_text()
+        if re.search(r"\n Exit\s+power", text):
+            return 0, text
     env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     cmd = [str(exe), str(toml), f"run.out_root={out_root}"] + list(overrides)
     p = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True)
@@ -434,6 +456,298 @@ def cost(args, wdir):
 
 
 # --------------------------------------------------------------------------------------
+# The chirped cases: a long flat beam at the SASE tier's parameters, a seed with a chirp
+# or a beam with one, through the line under both propagators.
+
+CHIRP_LATTICE = """! The chirped cases' line (spectral_field.py): the Aramis line of the SASE tier behind a
+! marker, so a run tracking the marker alone dumps the beam and the dark field the seeded
+! runs start from, on the window and grid every run shares.
+call, file = aramis.bmad
+MARK: marker
+CHIRP: line = (MARK, ARAMIS)
+use, CHIRP
+"""
+
+CHIRP_LATTICE_FINE = """! The chirped cases' line with the undulator step halved to one period, for the
+! convergence of the spectral run (spectral_field.py).
+call, file = aramis.bmad
+wiggler::*[ds_step] = 0.015
+MARK: marker
+CHIRP: line = (MARK, ARAMIS)
+use, CHIRP
+"""
+
+# The SASE tier's beam (Aramis-td-sase.in: 3000 A, delgam 1, 4e-7 m emittances), flat
+# over a window of 1280 slices of 3 wavelengths, which holds the seed and the line's
+# slippage of 1184 slices: the seed sits 30 slices from the tail and reaches slice 1214 at
+# the exit. 1024 particles a slice in place of the tier's 2048, since the seeded runs
+# stand well above the shot noise.
+PREP_INPUT = """lattice = "chirp-line.bmad"
+track_start = "MARK"
+track_end = "MARK"
+keep_escaped_field = F
+n_wavelength = 3
+window_length = 3.84e-7
+window.current = 3000
+n_particle = 1024
+beamlet_size = 8
+sig_pz = 8.8045e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+quiet_start = T
+shot_noise = T
+lambda0 = 1e-10
+grid_n_pts = 255
+grid_half_width = 2e-4
+seed_power = 0
+"""
+
+CHIRP_RUN_INPUT = """lattice = "{lattice}"
+keep_escaped_field = F
+n_wavelength = 3
+beam.file = "{beam}"
+field.file = "{field}"
+lambda0 = 1e-10
+"""
+
+SEED_SIGMA_WAVELENGTHS = 15      # The seed's rms length. Its unchirped rms bandwidth is 0.53 percent.
+SEED_SLICE = 30                  # Where the seed's center sits, from the tail.
+SEED_WAIST = 30e-6               # Its 1/e^2 intensity radius [m], near the mode's.
+SEED_POWER = 1e6                 # Its peak power [W], a thousand times the tier's startup noise.
+BANDWIDTHS = (0.005, 0.01, 0.02, 0.05)
+ENERGY_CHIRPS = (0.0, 0.0025, 0.005, 0.01)   # the first is the unchirped reference
+REUSE = False          # --reuse: a run whose log and final field exist is not run again
+
+
+def chirp_prepare(args, wdir):
+    """The line, the beam file and the dark field the chirped cases start from, made once."""
+    from lucifer.flat import to_toml
+    tier_inputs(args, wdir)
+    (wdir / "chirp-line.bmad").write_text(CHIRP_LATTICE)
+    (wdir / "chirp-line-fine.bmad").write_text(CHIRP_LATTICE_FINE)
+    if not (wdir / "prep-final.beam.h5").exists():
+        (wdir / "prep.toml").write_text(to_toml(PREP_INPUT))
+        rc, text = run(args.exe, "prep.toml", [], "prep", wdir, args.threads)
+        if rc != 0:
+            print(text[-2000:])
+            raise SystemExit("chirp: the preparatory run failed")
+    return wdir / "prep-final.beam.h5", wdir / "prep-final.wf.h5"
+
+
+def quiet_beam(args, wdir):
+    """The same bunch loaded without its shot noise, so a seed is the only light and the
+    propagators' difference on the seed is not under the start-up noise light's."""
+    if not (wdir / "prep-quiet-final.beam.h5").exists():
+        rc, text = run(args.exe, "prep.toml", ["beam.shot_noise=false"], "prep-quiet", wdir, args.threads)
+        if rc != 0:
+            print(text[-2000:])
+            raise SystemExit("chirp: the quiet preparatory run failed")
+    return wdir / "prep-quiet-final.beam.h5"
+
+
+def chirp_seed(wdir, dark, tag, bandwidth):
+    """The chirped Gaussian seed on the dark field's grid and window, at the relative rms
+    bandwidth asked, scaled to SEED_POWER at its peak."""
+    from beamphysics.wavefront import Wavefront
+    from lucifer.field import read_field
+    f = read_field(dark)
+    nz, ny, nx = f["u"].shape
+    dx, dtau, lam = f["dx"], f["dz"], f["wavelength"]
+    k0 = 2 * np.pi / lam
+    sigma = SEED_SIGMA_WAVELENGTHS * lam
+    x = (np.arange(nx) - (nx - 1) / 2) * dx
+    r2 = x[:, None]**2 + x[None, :]**2
+    tau = np.arange(nz) * dtau
+    tau_c = SEED_SLICE * dtau
+    b_unchirped = 1 / (2 * sigma * k0)
+    b = 0.0 if bandwidth <= b_unchirped else np.sqrt((2 * sigma * k0 * bandwidth)**2 - 1) / (4 * sigma**2)
+    a = 1 / (4 * sigma**2) - 1j * b
+    g = np.exp(-r2 / SEED_WAIST**2)
+    z0 = 376.730313668
+    e0 = np.sqrt(2 * z0 * SEED_POWER / ((g**2).sum() * dx * dx))
+    ex = (e0 * g)[:, :, None] * np.exp(-a * (tau - tau_c)**2)[None, None, :]
+    path = wdir / f"{tag}-initial.wf.h5"
+    Wavefront(Ex=ex.astype(np.complex128), dx=dx, dy=dx, dz=dtau, wavelength=lam).write_openpmd(str(path))
+    return path, b, max(bandwidth, b_unchirped)
+
+
+def chirp_beam(src, dst, chirp):
+    """A copy of the beam file with a linear energy chirp along the window, chirp head to
+    tail, the head at the high slices and above the tail in energy: every momentum
+    component scaled by the same factor, so the angles stay. Bmad's reader takes the
+    energy from totalMomentum, the momentum deviation from the reference p0c, when the
+    file carries it, so that record is scaled as the whole momentum and not the
+    deviation."""
+    import h5py
+    shutil.copyfile(src, dst)
+    with h5py.File(dst, "r+") as h:
+        g = h["data/00001/particles/electron"]
+        n = np.asarray(g["particlePatches/numParticles"])
+        off = np.asarray(g["particlePatches/numParticlesOffset"])
+        nz = n.size
+        slice_of = np.empty(int(n.sum()), dtype=int)
+        for k in range(nz):
+            slice_of[off[k]:off[k] + n[k]] = k
+        factor = 1 + chirp * (slice_of - (nz - 1) / 2) / (nz - 1)
+        for c in ("x", "y", "z"):
+            d = g[f"momentum/{c}"]
+            d[...] = np.asarray(d) * factor
+        p0c = float(np.asarray(g["totalMomentumOffset"].attrs["value"]).ravel()[0])
+        d = g["totalMomentum"]
+        d[...] = (np.asarray(d) + p0c) * factor - p0c
+
+
+def slice_wavelengths(u, dtau, lam, floor=1e-3):
+    """Each slice's wavelength from the phase advance to its neighbor, 2 pi / (k0 + kappa)
+    with kappa from arg(sum u_i conj u_{i+1}), on the slices above floor of the peak
+    power; NaN elsewhere."""
+    k0 = 2 * np.pi / lam
+    power = (np.abs(u)**2).sum(axis=(1, 2))
+    lit = power > floor * power.max()
+    c = (u[:-1] * np.conj(u[1:])).sum(axis=(1, 2))
+    kappa = -np.angle(c) / dtau
+    out = np.full(u.shape[0], np.nan)
+    ok = lit[:-1] & lit[1:]
+    out[:-1][ok] = 2 * np.pi / (k0 + kappa[ok])
+    return out, power
+
+
+def slippage_residual(path):
+    """The slippage a run's final field has not yet applied [wavelengths], from the
+    file's lucifer/field group; zero under the phase ramp, which leaves none."""
+    import h5py
+    with h5py.File(path) as h:
+        return float(np.asarray(h["lucifer/field"].attrs["slippageResidual"]).ravel()[0])
+
+
+def shift_slices(u, d):
+    """u moved d slices toward the head along tau, by the transform's phase: the slice
+    propagator's field carries its residual as a lag, and the comparison removes it."""
+    nz = u.shape[0]
+    m = np.fft.fftfreq(nz) * nz
+    return np.fft.ifft(np.fft.fft(u, axis=0) * np.exp(-2j * np.pi * m * d / nz)[:, None, None], axis=0)
+
+
+def chirp_compare(wdir, root_a, root_b, floor=0.25):
+    """The exit of run a against run b: the field difference over b's peak, over the whole
+    window as the runs left it and over the lit slices after a is moved by the slippage
+    residual the two runs differ by, each exit power,
+    and the largest relative wavelength difference over the slices above floor of the
+    peak power. The wavelengths at 1e-3 of the peak are returned for the chirp fit."""
+    from lucifer.field import read_field
+    fa, fb = read_field(wdir / f"{root_a}-final.wf.h5"), read_field(wdir / f"{root_b}-final.wf.h5")
+    ua, ub = fa["u"], fb["u"]
+    dtau, lam = fb["dz"], fb["wavelength"]
+    n_wavelength = int(round(dtau / lam))
+    offset = (slippage_residual(wdir / f"{root_a}-final.wf.h5")
+              - slippage_residual(wdir / f"{root_b}-final.wf.h5")) / n_wavelength
+    peak = np.abs(ub).max()
+    field_raw = float(np.abs(ua - ub).max() / peak)
+    if offset != 0:
+        ua = shift_slices(ua, offset)
+    la, pa = slice_wavelengths(ua, dtau, lam, floor)
+    lb, pb = slice_wavelengths(ub, dtau, lam, floor)
+    # The aligned difference is taken over the lit slices and four on each side, since the
+    # shift's band-limited form rings where the start-up noise light meets the window's ends.
+    lit = np.where(pb > floor * pb.max())[0]
+    lo, hi = max(lit.min() - 4, 0), min(lit.max() + 5, ub.shape[0])
+    z0 = 376.730313668
+    ok = np.isfinite(la) & np.isfinite(lb)
+    return dict(field=float(np.abs(ua - ub)[lo:hi].max() / peak), field_raw=field_raw, offset=float(offset),
+                power_a=float(pa.max() * fb["dx"]**2 / (2 * z0)), power_b=float(pb.max() * fb["dx"]**2 / (2 * z0)),
+                wavelength=float(np.abs(la[ok] / lb[ok] - 1).max()) if ok.any() else float("nan"),
+                lit=int(ok.sum()), lam_a=slice_wavelengths(ua, dtau, lam, 1e-3)[0],
+                lam_b=slice_wavelengths(ub, dtau, lam, 1e-3)[0])
+
+
+def seeded(args, wdir):
+    from lucifer.flat import to_toml
+    beam, dark = chirp_prepare(args, wdir)
+    quiet = quiet_beam(args, wdir)
+    print("--- seeded: a chirped seed through Aramis under both propagators, source filter on")
+    print(f"  seed sigma {SEED_SIGMA_WAVELENGTHS} wavelengths at slice {SEED_SLICE}, waist {SEED_WAIST*1e6:.0f} um, "
+          f"peak {SEED_POWER:.0e} W; 1280 slices of 3 wavelengths, 1024 particles a slice, {args.threads} threads")
+    print()
+    print("  bandwidth  extent   offset   field diff raw / aligned   wavelength diff   lit    peak power slices / spectral")
+    rows = []
+    for i, bw in enumerate(BANDWIDTHS):
+        tag = f"seed{i}"
+        seed, b, bw_eff = chirp_seed(wdir, dark, tag, bw)
+        (wdir / f"{tag}.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line.bmad", beam=beam.name, field=seed.name)))
+        (wdir / f"{tag}_quiet.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line.bmad", beam=quiet.name, field=seed.name)))
+        # quiet: the segment with the beam's shot noise off, the seed the only light.
+        for extent, over in (("quiet", ["run.track_end=UND##1"]), ("segment", ["run.track_end=UND##1"]), ("line", [])):
+            toml = f"{tag}_quiet.toml" if extent == "quiet" else f"{tag}.toml"
+            roots = {}
+            # The flat beam fills the window, so its noise sits in the head slice and the
+            # headroom check would refuse the ramp: the padding meets the head, as in null.
+            for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral", "field.spectral_boundary=pad"])):
+                root = f"{tag}_{extent}_{prop}"
+                rc, text = run(args.exe, toml, over + more, root, wdir, args.threads)
+                if rc != 0:
+                    print(text[-2000:])
+                    raise SystemExit(f"seeded: {root} failed")
+                roots[prop] = root
+            r = chirp_compare(wdir, roots["slices"], roots["spectral"])
+            rows.append((bw_eff, extent, r))
+            print(f"  {bw_eff:8.3f}   {extent:7s}  {r['offset']:6.3f}   {r['field_raw']:.3e} / {r['field']:.3e}    "
+                  f"{r['wavelength']:.3e}       {r['lit']:4d}   {r['power_a']:.3e} / {r['power_b']:.3e} W")
+    # Convergence of the reference: the 2 percent seed with the undulator step cut from
+    # three periods to one, through the segment and through the line.
+    tag = "seed2"
+    (wdir / f"{tag}_fine.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line-fine.bmad", beam=beam.name,
+                                                                           field=f"{tag}-initial.wf.h5")))
+    for extent, over in (("segment", ["run.track_end=UND##1"]), ("line", [])):
+        rc, text = run(args.exe, f"{tag}_fine.toml", over + ["field.propagator=spectral", "field.spectral_boundary=pad"],
+                       f"{tag}_{extent}_spectral_fine", wdir, args.threads)
+        if rc != 0:
+            print(text[-2000:])
+            raise SystemExit(f"seeded: the fine-step {extent} run failed")
+        r = chirp_compare(wdir, f"{tag}_{extent}_spectral_fine", f"{tag}_{extent}_spectral")
+        print(f"  convergence, {extent}: the 2 percent seed, spectral at ds_step 0.015 against 0.045: "
+              f"field {r['field']:.3e}, wavelength {r['wavelength']:.3e}, peak power {r['power_a']:.3e} / {r['power_b']:.3e} W")
+        r = chirp_compare(wdir, f"{tag}_{extent}_slices", f"{tag}_{extent}_spectral_fine")
+        print(f"               and the slice run against that fine spectral run: field {r['field']:.3e} aligned by {r['offset']:.3f} slice")
+    print()
+    return rows
+
+
+def chirped(args, wdir):
+    from lucifer.flat import to_toml
+    beam, dark = chirp_prepare(args, wdir)
+    print("--- chirped: an energy-chirped beam from noise through Aramis under both propagators, source filter on")
+    print(f"  1280 slices of 3 wavelengths, 1024 particles a slice, {args.threads} threads")
+    print()
+    print("  chirp    field diff   wavelength diff   lit   exit peak power slices / spectral   fitted slope of the wavelengths slices / spectral")
+    rows = []
+    for i, chirp in enumerate(ENERGY_CHIRPS):
+        tag = f"chirp{i}"
+        chirp_beam(beam, wdir / f"{tag}-initial.beam.h5", chirp)
+        (wdir / f"{tag}.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line.bmad",
+                                                                          beam=f"{tag}-initial.beam.h5", field=dark.name)))
+        roots = {}
+        for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral", "field.spectral_boundary=pad"])):
+            root = f"{tag}_line_{prop}"
+            rc, text = run(args.exe, f"{tag}.toml", more, root, wdir, args.threads)
+            if rc != 0:
+                print(text[-2000:])
+                raise SystemExit(f"chirped: {root} failed")
+            roots[prop] = root
+        r = chirp_compare(wdir, roots["slices"], roots["spectral"])
+        fits = []
+        for lam_i in (r["lam_a"], r["lam_b"]):
+            ok = np.isfinite(lam_i)
+            idx = np.arange(lam_i.size)[ok]
+            slope = np.polyfit(idx, lam_i[ok] / np.nanmean(lam_i), 1)[0] * (lam_i.size - 1)
+            fits.append(slope)
+        rows.append((chirp, r, fits))
+        print(f"  {chirp:6.4f}   {r['field']:.3e}    {r['wavelength']:.3e}       {r['lit']:4d}  "
+              f"{r['power_a']:.3e} / {r['power_b']:.3e} W   {fits[0]:+.4f} / {fits[1]:+.4f} (-2 x chirp {-2*chirp:+.4f})")
+    print()
+    return rows
+
+
+# --------------------------------------------------------------------------------------
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -441,9 +755,12 @@ def main():
     p.add_argument("--work-dir", required=True, help="where to run; made if absent")
     p.add_argument("--validation-dir", help="a completed validation pass's work directory")
     p.add_argument("--threads", type=int, default=1, help="OMP_NUM_THREADS for every run")
-    p.add_argument("what", nargs="*", choices=["vacuum", "null", "boundary", "cost"],
-                   help="which measurements; all four by default")
+    p.add_argument("--reuse", action="store_true", help="keep a run whose log and final field exist")
+    p.add_argument("what", nargs="*", choices=["vacuum", "null", "boundary", "cost", "seeded", "chirped"],
+                   help="which measurements; the first four by default")
     args = p.parse_args()
+    global REUSE
+    REUSE = args.reuse
     args.exe = pathlib.Path(args.exe).resolve()
     wdir = pathlib.Path(args.work_dir).resolve()
     wdir.mkdir(parents=True, exist_ok=True)
