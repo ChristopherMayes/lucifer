@@ -223,15 +223,16 @@ The header's cost estimate counts what the mode runs ([](performance.md)): the p
 ## What it does not cover
 
 - The unaveraged mode, which advances its field by its own substep propagator (`fel_unavg_step`).
-- The device, which carries the slice propagator alone (`fel_device_mod`).
-- The FP32 check, whose twin steps the slice propagator in single precision.
+- The FP32 check without the device, whose CPU twin steps the slice propagator in single precision. With `run.device = "metal"` the device takes the twin's role ([](validation.md#val-device-spectral)).
 - The coherent source model, whose deposit is `fel_field_step`'s own.
 - Harmonic fields and `run.dump_reduced` with a field coarser than the slices. The coarse field is carried for the fundamental alone, and the field reductions are taken plane by plane of the record and not on a slice's interpolated plane.
 - Backward slippage, since the pad that feeds the bank is at the window's head.
 
 Each is refused at setup with the reason in the message. The spectral propagator keeps the envelope and its carrier, so the SVEA stands and the bandwidth the window carries is bounded by the slice spacing at $\lambda_s / 2\Delta$. A field without an envelope, Puffin's model, is a different propagator and is not this one.
 
+The device carries the propagator ([](validation.md#val-device-spectral)). Its step's command buffer runs the kernel pass along $\tau$ over the window and its pad on the resident record, the slip passes follow it with the plane at the pad's first slot read at each crossing and downloaded for the bank, and the coarse field's push and deposit read and write the two planes about a slice by the weights above. Harmonic members and two polarization planes ride under it at one plane a slice. The device's own limits are two. The window and its pad are transformed along $\tau$ as one length in the threadgroup memory, 2048 planes on an M3 Max, and a longer one is refused with both counts. The resident record is counted against the device's working set before anything is allocated, and one that does not fit is refused with the bytes it needs and the bytes the device offers. The header's `Device` line states the resident bytes beside the bank's. What the pass along $\tau$ costs on the device is in [](performance.md#perf-device).
+
 (spectral-next)=
 ## What is next
 
-The device: the pass along $\tau$, the ramp, the bank's plane and the coarse deposit on the resident record, so a long window's device memory is the coarse field's. And the unaveraged mode under the ramp, which is measured on the sandwich probe before it is wired, since that mode resolves structure the averaged mode does not.
+The unaveraged mode under the ramp, which is measured on the sandwich probe before it is wired, since that mode resolves structure the averaged mode does not. And the pass along $\tau$ on the device at one plane a slice on a long window, whose threadgroup carries one line at a time there and reads each plane's cells apart, which [](performance.md#perf-device) prices.

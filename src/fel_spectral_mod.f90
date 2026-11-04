@@ -63,6 +63,7 @@
 module fel_spectral_mod
 
 use fel_track_mod
+use fel_device_mod
 use, intrinsic :: iso_c_binding
 
 implicit none
@@ -184,7 +185,9 @@ end subroutine fel_spectral_size
 ! slippage then moves the field and the fresh source together as the ramp, with the
 ! planes that cross a slice banked (fel_spectral_slip). fel_track_und_step has pushed
 ! the particles and skipped its own field solve. The caller drains each member's bank
-! afterwards (fel_drain_bank).
+! afterwards (fel_drain_bank). The two halves are fel_spectral_step_field and
+! fel_spectral_step_slip, which the walk calls apart when the instrument's rows are
+! read between them (fel_track_und_twin_close).
 !
 ! Input:
 !   sp       -- fel_spectral_struct: The propagator's switch and pad.
@@ -207,6 +210,46 @@ type (fel_und_struct) und
 type (fel_beam_struct), target :: beam
 type (fel_field_struct), target :: ff(:)
 real(rp) dz, slippage
+logical keep, err_flag
+
+!
+
+call fel_spectral_step_field (sp, und, beam, ff, dz, keep, err_flag)
+if (err_flag) return
+call fel_spectral_step_slip (sp, ff, slippage, keep, err_flag)
+
+end subroutine fel_spectral_step
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_step_field (sp, und, beam, ff, dz, keep, err_flag)
+!
+! Routine to do the first half of fel_spectral_step, each member's kernel pass over
+! the step and its deposit from the just-advanced particles, without the slippage.
+!
+! Input:
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
+!   und      -- fel_und_struct: The segment.
+!   beam     -- fel_beam_struct: The beam, pushed over the step.
+!   ff(:)    -- fel_field_struct: The field set.
+!   dz       -- real(rp): Step length [m].
+!   keep     -- logical: Bank the planes that cross? Passed to the kernel pass, which
+!                 crosses nothing.
+!
+! Output:
+!   ff(:)    -- fel_field_struct: Every member propagated with its source added.
+!   err_flag -- logical: Set True if there is an error. False otherwise.
+!-
+
+subroutine fel_spectral_step_field (sp, und, beam, ff, dz, keep, err_flag)
+
+type (fel_spectral_struct) sp
+type (fel_und_struct) und
+type (fel_beam_struct), target :: beam
+type (fel_field_struct), target :: ff(:)
+real(rp) dz
 logical keep, err_flag
 
 real(rp) ks
@@ -236,13 +279,50 @@ do io = 1, size(ff)
     !$OMP end parallel do
     if (any_err) return
   endif
-  call fel_spectral_slip (sp, ff(io), slippage, keep, err)
-  if (err) return
 enddo
 
 err_flag = .false.
 
-end subroutine fel_spectral_step
+end subroutine fel_spectral_step_field
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_step_slip (sp, ff, slippage, keep, err_flag)
+!
+! Routine to do the second half of fel_spectral_step, each member's slippage as the
+! ramp with the planes that cross a slice banked (fel_spectral_slip).
+!
+! Input:
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
+!   ff(:)    -- fel_field_struct: The field set.
+!   slippage -- real(rp): The step's slippage [fundamental wavelengths].
+!   keep     -- logical: Bank the planes that cross? False adds their energy alone.
+!
+! Output:
+!   ff(:)    -- fel_field_struct: Every member slipped, its bank holding the planes.
+!   err_flag -- logical: Set True if there is an error. False otherwise.
+!-
+
+subroutine fel_spectral_step_slip (sp, ff, slippage, keep, err_flag)
+
+type (fel_spectral_struct) sp
+type (fel_field_struct), target :: ff(:)
+real(rp) slippage
+logical keep, err_flag
+integer io
+
+!
+
+err_flag = .true.
+do io = 1, size(ff)
+  call fel_spectral_slip (sp, ff(io), slippage, keep, err_flag)
+  if (err_flag) return
+enddo
+err_flag = .false.
+
+end subroutine fel_spectral_step_slip
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -628,6 +708,166 @@ err = .false.
 end subroutine apply_component
 
 end subroutine fel_spectral_apply
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_device_slip (sp, dev, ff, slippage, keep, twin, err_flag)
+!
+! Routine to slip every member of the resident field set by the ramp on the device, as
+! fel_spectral_slip slips it on the CPU: passes along tau of at most one slice each, the
+! plane that crosses a slice read at the pad's first slot into a bank slot by the pass
+! that crosses it (lucifer_device.h, luc_dev_tau_slip). The crossings are
+! fel_spectral_apply's arithmetic on the fundamental's slippage state, which the host
+! keeps in FP64 for the device as for the CPU, and every member slips together, as the
+! members share the window. The kernel pass and the deposit ran in the device's own
+! step (fel_track_und_step).
+!
+! When the device is the run (twin False) the crossed planes are downloaded after the
+! passes, in transmission order, their energy added to u_escaped as fel_spectral_apply
+! adds it, and, when kept, the planes appended to each member's bank for the caller to
+! drain (fel_drain_bank). In the twin's role (twin True) the passes are encoded alone,
+! so the twin's record slips as the CPU's does, and the state is left for the CPU's own
+! step to advance.
+!
+! Input:
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
+!   dev      -- fel_device_struct: The device, the field set resident on it.
+!   ff(:)    -- fel_field_struct: The field set.
+!   slippage -- real(rp): The slippage to apply [fundamental wavelengths].
+!   keep     -- logical: Bank the planes that cross? False adds their energy alone.
+!   twin     -- logical: The device is the instrument's twin, and the state stays.
+!
+! Output:
+!   ff(:)    -- fel_field_struct: Each member's bank holding its planes, u_escaped and
+!                 slip%ramp_slip advanced, unless twin.
+!   err_flag -- logical: Set True on a refusal or backward slippage. False otherwise.
+!-
+
+subroutine fel_spectral_device_slip (sp, dev, ff, slippage, keep, twin, err_flag)
+
+type (fel_spectral_struct) sp
+type (fel_device_struct) dev
+type (fel_field_struct), target :: ff(:)
+real(rp) slippage
+logical keep, twin, err_flag
+
+type (fel_device_slip_par_struct) spar
+complex(wf_rp), allocatable :: plane(:,:), plane_y(:,:)
+real(rp) chunk, left, ramp_slip, sample, shift(2)
+integer n_chunk, ic, n_cross, io, ngrid_arr(3), slot
+character(*), parameter :: r_name = 'fel_spectral_device_slip'
+
+!
+
+err_flag = .false.
+do io = 1, size(ff)
+  ff(io)%bank%n = 0
+enddo
+if (.not. ff(1)%slip%timerun) return
+if (slippage == 0) return
+
+if (slippage < 0) then
+  call out_io (s_error$, r_name, 'BACKWARD SLIPPAGE UNDER FIELD.PROPAGATOR = "spectral".', &
+                                 'THE PAD THAT FEEDS THE ESCAPED-FIELD BANK IS AT THE WINDOW''S HEAD,', &
+                                 'AND A PLANE THAT LEAVES AT THE TAIL HAS NO PLACE IN THE PULSE FILE.', &
+                                 'POSSIBLE SOLUTION: FIELD.PROPAGATOR = "slices" WITH KEEP_ESCAPED_FIELD = F.')
+  err_flag = .true.
+  return
+endif
+
+ngrid_arr = wavefront_shape(ff(1)%wf)
+allocate (plane(ngrid_arr(1), ngrid_arr(2)))
+if (allocated(ff(1)%wf%Ey)) allocate (plane_y(ngrid_arr(1), ngrid_arr(2)))
+
+! The passes, fel_spectral_slip's chunks of at most one slice, and in each the
+! crossing and the shifts of fel_spectral_apply, at most one crossing a pass. A shift in
+! fundamental wavelengths becomes a shift in planes over the plane's wavelengths.
+
+sample = ff(1)%slip%sample
+ramp_slip = ff(1)%slip%ramp_slip
+n_chunk = max(1, ceiling(slippage / sample - 1e-9_rp))
+left = slippage
+slot = 0
+do ic = 1, n_chunk
+  chunk = slippage / n_chunk
+  if (ic == n_chunk) chunk = left
+  left = left - chunk
+
+  n_cross = floor((ramp_slip + chunk) / sample + 1e-9_rp)
+  if (n_cross > 0) then
+    shift(1) = sample - ramp_slip
+    shift(2) = chunk - (n_cross * sample - ramp_slip)
+  else
+    shift(1) = chunk
+    shift(2) = 0
+  endif
+  ramp_slip = max(0.0_rp, ramp_slip + chunk - n_cross * sample)
+
+  spar%s_a = shift(1) / ff(1)%n_wavelength
+  spar%s_b = shift(2) / ff(1)%n_wavelength
+  spar%n_cross = n_cross
+  spar%slot = slot
+  call fel_device_slip_pass (dev, spar, err_flag)
+  if (err_flag) return
+
+  if (n_cross > 0) slot = slot + 1
+  if (slot > 0 .and. (slot == fel_dev_bank_slots$ .or. ic == n_chunk)) then
+    if (.not. twin) call drain_slots (slot)
+    slot = 0
+  endif
+enddo
+
+if (.not. twin) then
+  do io = 1, size(ff)
+    ff(io)%slip%ramp_slip = ramp_slip
+  enddo
+endif
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine drain_slots (n_slot)
+!
+! Routine to download the crossed planes in the first n_slot bank slots of every
+! member, in transmission order, add each one's energy to the member's ledger as
+! fel_spectral_apply adds it, and append it to the member's bank when kept.
+!-
+
+subroutine drain_slots (n_slot)
+
+integer n_slot, k, io_l
+real(rp) e_scale, t_slice
+
+!
+
+do io_l = 1, size(ff)
+  e_scale = ff(io_l)%wf%dx**2 / (2 * (mu_0_vac * c_light))
+  t_slice = ff(io_l)%slip%sample * ff(io_l)%wf%wavelength * ff(io_l)%harm / c_light
+  do k = 0, n_slot - 1
+    call fel_device_bank_plane (dev, io_l, 1, k, plane)
+    ff(io_l)%slip%u_escaped = ff(io_l)%slip%u_escaped + &
+                  sum(real(plane, rp)**2 + aimag(plane)**2) * e_scale * t_slice
+    if (allocated(plane_y)) then
+      call fel_device_bank_plane (dev, io_l, 2, k, plane_y)
+      ff(io_l)%slip%u_escaped = ff(io_l)%slip%u_escaped + &
+                  sum(real(plane_y, rp)**2 + aimag(plane_y)**2) * e_scale * t_slice
+    endif
+    if (keep) then
+      if (allocated(plane_y)) then
+        call bank_append (ff(io_l)%bank, plane, plane_y)
+      else
+        call bank_append (ff(io_l)%bank, plane)
+      endif
+    endif
+  enddo
+enddo
+
+end subroutine drain_slots
+
+end subroutine fel_spectral_device_slip
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

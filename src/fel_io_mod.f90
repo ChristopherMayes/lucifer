@@ -850,6 +850,7 @@ block
   end block
 
   call write_bank_bytes ()
+  call write_device_bytes ()
 
   ! The load against the floor of the filter's convergence: 1024 macroparticles per
   ! slice in 128 beamlets. Below it, the mode power in the exponential regime rises on
@@ -996,6 +997,43 @@ do ihh = 1, run%n_harm
 enddo
 
 end subroutine write_bank_bytes
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine write_device_bytes ()
+!
+! Routine to state the device's resident bytes beside the bank's, with the record's
+! planes along tau, when the device is on. Under the spectral propagator the record
+! carries the pad's planes beside the window's, and a window that would not fit was
+! refused at setup, before any upload (fel_device_setup).
+!-
+
+subroutine write_device_bytes ()
+
+use fel_device_mod, only: fel_device_resident_bytes
+
+real(rp) b_dev
+integer n_grid(3)
+character(200) line
+
+!
+
+if (.not. run%dev%on) return
+b_dev = fel_device_resident_bytes(run%dev)
+n_grid = wavefront_shape(run%ffield(1)%wf)
+if (run%dev%spectral) then
+  write (line, '(a, es10.4, a, i0, a, i0, a, i0, a, i0, a)') ' Device      ', b_dev, &
+        ' bytes resident on ' // trim(run%dev%name) // ': ', run%dev%nplane, ' window planes and ', &
+        run%dev%nfree + run%dev%nsponge, ' pad planes of ', n_grid(1), ' x ', n_grid(2), &
+        ' under the spectral propagator'
+else
+  write (line, '(a, es10.4, a, i0, a, i0, a, i0, a)') ' Device      ', b_dev, &
+        ' bytes resident on ' // trim(run%dev%name) // ': ', run%dev%nplane, ' planes of ', &
+        n_grid(1), ' x ', n_grid(2)
+endif
+call out_io (s_blank$, r_name, trim(line))
+
+end subroutine write_device_bytes
 
 end subroutine fel_write_header
 

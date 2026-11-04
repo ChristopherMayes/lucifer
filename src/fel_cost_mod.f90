@@ -92,6 +92,18 @@ real(rp), parameter :: fel_cost_device$ = 9.1_rp
 real(rp), parameter :: fel_cost_dispatch$ = 5.1e-4_rp  ! s per step, host side.
 integer, parameter :: fel_cost_device_threads$ = 12    ! The CPU thread count that ratio is against.
 
+! The device's own rate for the passes along tau under the spectral propagator, seconds
+! of device time per point per log2 of the transform's length per pass, in place of the
+! CPU model's fel_cost_tau$ divided by the ratio above, since the pass is a different
+! kernel there (tau_pass in lucifer_metal.mm). Fitted on 2026-11-04 from the spectral
+! rows of the device table of docs/performance.md: the device busy seconds of the
+! 24-slice and the 96-slice SASE windows under the spectral propagator at one plane a
+! slice, less the same windows' under the slice propagator, over the count
+! fel_cost_estimate takes, 6.2e-11 and 6.4e-11. The pulse file's writing is outside the
+! estimate on either backend.
+
+real(rp), parameter :: fel_cost_tau_device$ = 6.3e-11_rp
+
 contains
 
 !------------------------------------------------------------------------------
@@ -251,7 +263,7 @@ end subroutine fel_cost_passes
 subroutine fel_cost_estimate (run, secs, backend)
 
 type (fel_run_struct), target :: run
-real(rp) secs, n_pstep, n_gpt, t_one, speedup, pts_plane
+real(rp) secs, n_pstep, n_gpt, t_one, speedup, pts_plane, n_tau, t_tau
 integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff, n_t, n_pad, n_int_kernel, n_int_slip
 character(*) backend
 
@@ -270,6 +282,8 @@ if (ngrid > 1) t_one = t_one + fel_cost_solve$ * n_gpt * log(real(ngrid, rp)) / 
 ! interlude kernel pass, at the solve's rate, and the passes along tau, two a step and the
 ! interludes' own, each a transform pair over every line of the window and the pad.
 
+n_tau = 0
+t_tau = 0
 if (run%spectral%on .and. run%nfield > 1) then
   call fel_cost_passes (run, n_int_kernel, n_int_slip)
   n_pad = run%spectral%n_pad
@@ -277,8 +291,9 @@ if (run%spectral%on .and. run%nfield > 1) then
   pts_plane = n_gpt / run%nfield
   t_one = t_one + fel_cost_solve$ * pts_plane * log(real(ngrid, rp)) / log(2.0_rp) * &
                   (real(n_pad, rp) * nstep + real(n_t, rp) * n_int_kernel)
-  t_one = t_one + fel_cost_tau$ * pts_plane * n_t * log(real(n_t, rp)) / log(2.0_rp) * &
-                  (2.0_rp * nstep + n_int_kernel + n_int_slip)
+  n_tau = pts_plane * n_t * log(real(n_t, rp)) / log(2.0_rp) * (2.0_rp * nstep + n_int_kernel + n_int_slip)
+  t_tau = fel_cost_tau$ * n_tau
+  t_one = t_one + t_tau
 endif
 
 n_omp = 1
@@ -286,10 +301,14 @@ n_omp = 1
 n_eff = max(1, min(n_omp, run%nslice))
 speedup = 1 / (fel_cost_serial$ + (1 - fel_cost_serial$) / n_eff)
 
+! The device: the CPU model over the ratio, with the passes along tau at the device's
+! own rate in place of the CPU's, plus the dispatch floor.
+
 if (run%dev%on) then
   backend = trim(run%global%device)
   speedup = 1 / (fel_cost_serial$ + (1 - fel_cost_serial$) / fel_cost_device_threads$)
-  secs = t_one / speedup / fel_cost_device$ / fel_cost_walk_share$ + fel_cost_dispatch$ * nstep
+  secs = ((t_one - t_tau) / speedup / fel_cost_device$ + fel_cost_tau_device$ * n_tau) / fel_cost_walk_share$ + &
+         fel_cost_dispatch$ * nstep
 else
   backend = 'CPU'
   secs = t_one / speedup / fel_cost_walk_share$

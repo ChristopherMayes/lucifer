@@ -1516,6 +1516,18 @@ lucifer_device.h field for field (all doubles, then the 32-bit ints).
 Note: Editing either mirror alone skews the layout silently. Edit both together.
 ```
 
+(api-fel-device-slip-par-struct)=
+### `fel_device_slip_par_struct`
+
+*Struct*
+
+```
+One slip pass of the spectral propagator for luc_dev_tau_slip, mirroring
+luc_dev_slip_par of lucifer_device.h field for field: the ramp's two shifts in field
+planes, the crossing count, 0 or 1, and the bank slot the crossed plane goes to.
+Editing either mirror alone skews the layout silently.
+```
+
 (api-fel-device-unavg-par-struct)=
 ### `fel_device_unavg_par_struct`
 
@@ -1591,10 +1603,10 @@ Output:
 (api-fel-device-setup)=
 ### `fel_device_setup`
 
-*Subroutine* `(dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu,`
+*Subroutine* `(dev, device_req, beam, ngrid, sample, harm, npol, nplane, nfree,`
 
 ```
-                                                               timing, dep_mutate, err_flag)
+                                         nsponge, spectral, fp32_iu, timing, dep_mutate, err_flag)
 
 Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal' asks
 for the one backend this tree knows. A build without it (the stub) refuses with the
@@ -1605,7 +1617,9 @@ fel_device_known checks before this is called.
 The routine allocates the resident buffers for this run shape, runs the exact-wrap
 assertion on the device, and writes the device header lines into the instrument's stream
 when one is open. The backend refuses an unsupported grid and names the nearest
-supported size.
+supported size, a resident record larger than the device's working set with the bytes
+it needs and the bytes the device offers, and under the spectral propagator a window
+and pad longer along tau than its threadgroup memory transforms, with both counts.
 ```
 
 ```
@@ -1617,6 +1631,10 @@ Input:
   harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the
                   member count.
   npol       -- integer: Planes per member, 1 or 2.
+  nplane     -- integer: The record's planes over the window, each member's.
+  nfree      -- integer: The spectral propagator's free pad planes after the window.
+  nsponge    -- integer: Its sponge planes after those.
+  spectral   -- logical: The spectral propagator does the field half of the step.
   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
   timing     -- logical: Time each pass of a step separately, one encoder a pass?
                   A device that samples no counters at an encoder boundary refuses.
@@ -1658,7 +1676,8 @@ Output:
 ```
 Routine to round every plane of every member of the set to FP32 and upload it in
 ring order: plane 1 is Ex and plane 2 is Ey, present only when the run carries two
-polarizations, in which case every member carries both.
+polarizations, in which case every member carries both. Under the spectral
+propagator the pad's planes follow the window's in each member's set.
 ```
 
 (api-fel-device-set-kernel)=
@@ -1758,6 +1777,71 @@ structural points hold that. The device drains once, serially, before the parall
 regions. After that every transfer is a disjoint copy from the shared-storage buffers
 (the post-drain contract of lucifer_device.h). And the staging is block-local per
 slice. The module-level staging arrays are sized for one slice and are not thread-safe.
+```
+
+(api-fel-device-set-tau-kernel)=
+### `fel_device_set_tau_kernel`
+
+*Subroutine* `(dev, im, wf, dz)`
+
+```
+Routine to upload member im's kernel factors along tau for a step of dz,
+ax(ix, m) = exp(-i dz (m_x dk)^2 / 2 k(kappa_m)) with k(kappa) = k0 + kappa over the
+n_t modes of the window and its pad, as fel_spectral_apply builds them for the CPU,
+in FP64 and rounded once, keyed on the step, the length and the member's wavenumbers
+as fel_device_set_kernel keys the slice propagator's, so an unchanged table costs no
+transfer. The same table serves the y factor, the grid being square.
+```
+
+```
+Input:
+  im -- integer: The member, 1-based in set order.
+  wf -- wavefront_struct: The member's record, for its wavelength, spacing and grid.
+  dz -- real(rp): Step length [m].
+```
+
+(api-fel-device-slip-pass)=
+### `fel_device_slip_pass`
+
+*Subroutine* `(dev, spar, err_flag)`
+
+```
+Routine to encode one slip pass of the spectral propagator on the resident record,
+the crossings and shifts the caller formed (fel_spectral_device_slip).
+```
+
+```
+Input:
+  spar     -- fel_device_slip_par_struct: The pass's shifts, crossing and bank slot.
+
+Output:
+  err_flag -- logical: Set True if the backend refuses. False otherwise.
+```
+
+(api-fel-device-bank-plane)=
+### `fel_device_bank_plane`
+
+*Subroutine* `(dev, im, ip, slot, plane)`
+
+```
+Routine to download one plane the spectral propagator's slip pass read at the pad's
+first slot, from bank slot slot of member im and polarization ip, into FP64. Drains
+first, like every transfer.
+```
+
+```
+Output:
+  plane(:,:) -- complex(wf_rp): The plane, the grid's shape.
+```
+
+(api-fel-device-resident-bytes)=
+### `fel_device_resident_bytes`
+
+*Function* `(dev) result (bytes)`
+
+```
+Routine to report the resident footprint in bytes, as the backend counts it, for the
+run header.
 ```
 
 (api-fel-device-release)=
@@ -1881,6 +1965,18 @@ With one member this is the single-field normalization.
 Input:
   ff(:) -- fel_field_struct: The field set, in set order, post-solve. The ring
              offset is ff(1)%slip%first, one for the set.
+```
+
+(api-coarse-source64)=
+### `coarse_source64`
+
+*Subroutine* `(jp, h, scl, s64)`
+
+```
+Routine to form the FP64 reference source of window plane jp (0-based) under a field
+coarser than the slices, as fel_spectral_deposit_coarse forms it: the slices on or
+above the plane with the weight 1 - w, those below it with the weight w, each over
+the slices a plane, at the member's phase h theta.
 ```
 
 (api-fel-device-close-run)=
@@ -3534,6 +3630,18 @@ params a component and the transmission position per banked slice. The pulse hol
 window's slices too.
 ```
 
+(api-write-device-bytes)=
+### `write_device_bytes`
+
+*Subroutine* `()`
+
+```
+Routine to state the device's resident bytes beside the bank's, with the record's
+planes along tau, when the device is on. Under the spectral propagator the record
+carries the pad's planes beside the window's, and a window that would not fit was
+refused at setup, before any upload (fel_device_setup).
+```
+
 (api-fel-write-footer)=
 ### `fel_write_footer`
 
@@ -4794,7 +4902,9 @@ slice by slice from the just-advanced particles (fel_spectral_deposit), and the
 slippage then moves the field and the fresh source together as the ramp, with the
 planes that cross a slice banked (fel_spectral_slip). fel_track_und_step has pushed
 the particles and skipped its own field solve. The caller drains each member's bank
-afterwards (fel_drain_bank).
+afterwards (fel_drain_bank). The two halves are fel_spectral_step_field and
+fel_spectral_step_slip, which the walk calls apart when the instrument's rows are
+read between them (fel_track_und_twin_close).
 ```
 
 ```
@@ -4809,6 +4919,53 @@ Input:
 
 Output:
   ff(:)    -- fel_field_struct: Every member advanced, its bank holding the planes.
+  err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-fel-spectral-step-field)=
+### `fel_spectral_step_field`
+
+*Subroutine* `(sp, und, beam, ff, dz, keep, err_flag)`
+
+```
+Routine to do the first half of fel_spectral_step, each member's kernel pass over
+the step and its deposit from the just-advanced particles, without the slippage.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
+  und      -- fel_und_struct: The segment.
+  beam     -- fel_beam_struct: The beam, pushed over the step.
+  ff(:)    -- fel_field_struct: The field set.
+  dz       -- real(rp): Step length [m].
+  keep     -- logical: Bank the planes that cross? Passed to the kernel pass, which
+                crosses nothing.
+
+Output:
+  ff(:)    -- fel_field_struct: Every member propagated with its source added.
+  err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-fel-spectral-step-slip)=
+### `fel_spectral_step_slip`
+
+*Subroutine* `(sp, ff, slippage, keep, err_flag)`
+
+```
+Routine to do the second half of fel_spectral_step, each member's slippage as the
+ramp with the planes that cross a slice banked (fel_spectral_slip).
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
+  ff(:)    -- fel_field_struct: The field set.
+  slippage -- real(rp): The step's slippage [fundamental wavelengths].
+  keep     -- logical: Bank the planes that cross? False adds their energy alone.
+
+Output:
+  ff(:)    -- fel_field_struct: Every member slipped, its bank holding the planes.
   err_flag -- logical: Set True if there is an error. False otherwise.
 ```
 
@@ -4917,6 +5074,55 @@ Output:
 ```
 Routine to put one polarization's planes, the window's and the pad's, through the
 passes of the header, reading the plane at each crossing into pl.
+```
+
+(api-fel-spectral-device-slip)=
+### `fel_spectral_device_slip`
+
+*Subroutine* `(sp, dev, ff, slippage, keep, twin, err_flag)`
+
+```
+Routine to slip every member of the resident field set by the ramp on the device, as
+fel_spectral_slip slips it on the CPU: passes along tau of at most one slice each, the
+plane that crosses a slice read at the pad's first slot into a bank slot by the pass
+that crosses it (lucifer_device.h, luc_dev_tau_slip). The crossings are
+fel_spectral_apply's arithmetic on the fundamental's slippage state, which the host
+keeps in FP64 for the device as for the CPU, and every member slips together, as the
+members share the window. The kernel pass and the deposit ran in the device's own
+step (fel_track_und_step).
+
+When the device is the run (twin False) the crossed planes are downloaded after the
+passes, in transmission order, their energy added to u_escaped as fel_spectral_apply
+adds it, and, when kept, the planes appended to each member's bank for the caller to
+drain (fel_drain_bank). In the twin's role (twin True) the passes are encoded alone,
+so the twin's record slips as the CPU's does, and the state is left for the CPU's own
+step to advance.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
+  dev      -- fel_device_struct: The device, the field set resident on it.
+  ff(:)    -- fel_field_struct: The field set.
+  slippage -- real(rp): The slippage to apply [fundamental wavelengths].
+  keep     -- logical: Bank the planes that cross? False adds their energy alone.
+  twin     -- logical: The device is the instrument's twin, and the state stays.
+
+Output:
+  ff(:)    -- fel_field_struct: Each member's bank holding its planes, u_escaped and
+                slip%ramp_slip advanced, unless twin.
+  err_flag -- logical: Set True on a refusal or backward slippage. False otherwise.
+```
+
+(api-drain-slots)=
+### `drain_slots`
+
+*Subroutine* `(n_slot)`
+
+```
+Routine to download the crossed planes in the first n_slot bank slots of every
+member, in transmission order, add each one's energy to the member's ledger as
+fel_spectral_apply adds it, and append it to the member's bank when kept.
 ```
 
 (api-bank-append)=
@@ -6717,8 +6923,34 @@ the deposit bound cannot be set.
 
 ```
 Routine to hand the device every member's propagator for this step, each at its own
-wavelength, from the cache fel_field_step reads. fel_device_set_kernel keys the
-upload, so an unchanged kernel is not uploaded again.
+wavelength, from the cache fel_field_step reads, or under the spectral propagator its
+kernel factors along tau (fel_device_set_tau_kernel). Both key the upload, so an
+unchanged kernel is not uploaded again.
+```
+
+(api-fel-track-und-twin-close)=
+### `fel_track_und_twin_close`
+
+*Subroutine* `(beam, ff, fp32, dev, err_flag)`
+
+```
+Routine to close one step of the instrument with the device in the twin's role under
+the spectral propagator. fel_track_und_step encoded the twin's step and kept its
+constants, and the walk has since slipped the twin's record (fel_spectral_device_slip)
+and run the CPU's own field half (fel_spectral_step), so the rows can now be read
+against the FP64 record as fel_track_und_step reads them for the slice propagator.
+```
+
+```
+Input:
+  beam     -- fel_beam_struct: The beam, after the step.
+  ff(:)    -- fel_field_struct: The field set, after the CPU's spectral step.
+  fp32     -- fel_fp32_struct: The instrument.
+  dev      -- fel_device_struct: The device, holding the step's constants.
+
+Output:
+  fp32     -- fel_fp32_struct: This step's rows recorded and the stream advanced.
+  err_flag -- logical: Set True if the stream's close fails. False otherwise.
 ```
 
 (api-fel-track-interlude-genesis)=

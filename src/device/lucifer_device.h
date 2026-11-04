@@ -87,7 +87,31 @@ typedef struct {
   int32_t nfield;        /* members in use, 1 to LUC_DEV_MAX_FIELD */
   int32_t npol;          /* planes per member, 1 or 2 */
   int32_t pad;
+  /* The spectral propagator (fel_spectral_mod): 1 runs the field half of the step as
+   * fel_spectral_apply's kernel pass, the transform along tau over the window and its
+   * pad with the kernel at k0 + kappa, in place of the propagator exp(K2 dz), and the
+   * slippage then comes as slip passes through luc_dev_tau_slip. n_per is the beam
+   * slices a field plane spans (fel_field_sample): the push gathers the two planes
+   * about a slice by the linear weights and the deposit scatters onto them by the
+   * same weights divided by n_per. 1 is one plane a slice. */
+  int32_t spectral;
+  int32_t n_per;
+  int32_t pad2;
 } luc_dev_step_par;
+
+/* One slip pass of the spectral propagator (fel_spectral_apply's slip pass), mirrored by
+ * fel_device_slip_par_struct in fel_device_mod.f90: the ramp's shifts in field planes,
+ * s_a to the whole-slice crossing when n_cross is 1 and s_b the rest, or s_a the whole
+ * pass when it is 0, and the bank slot the crossed plane goes to. */
+typedef struct {
+  double s_a, s_b;
+  int32_t n_cross;
+  int32_t slot;
+} luc_dev_slip_par;
+
+/* The bank slots of the spectral propagator: planes read at the pad's first slot wait
+ * here for luc_dev_download_bank. Mirrored by fel_dev_bank_slots$. */
+#define LUC_DEV_BANK_SLOTS 8
 
 /* One unaveraged record step's constants, mirrored field for field by
  * fel_device_unavg_par_struct in fel_device_mod.f90 (all doubles, then the 32-bit
@@ -127,11 +151,18 @@ int luc_dev_available (char *name, int name_len, char *reason, int reason_len);
 
 /* Allocate the resident buffers and compile the kernels for this run shape: nslice
  * slices of npart particles, and a field set of nfield members with npol planes
- * each on one ngrid grid. Refuses (nonzero return, reason filled): no device, a grid
+ * each on one ngrid grid, each plane set nplane planes of the window along tau and,
+ * under the spectral propagator (spectral = 1), nfree free and nsponge sponge planes
+ * of the pad after them. Refuses (nonzero return, reason filled): no device, a grid
  * the transform does not handle (powers of two 64 to 1024, the message names the
  * nearest supported size), a set outside 1..LUC_DEV_MAX_FIELD members or 1..2
- * planes, or a failed allocation with the wanted bytes as the device reports them. */
+ * planes, a resident record larger than the device's recommended working set, with
+ * the bytes it needs and the bytes the device offers, a window and pad longer along
+ * tau than the threadgroup memory transforms, with both counts, or a failed
+ * allocation. Under the spectral propagator the transform along tau is planned here
+ * for the one length nplane + nfree + nsponge. */
 int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
+                  int nplane, int nfree, int nsponge, int spectral,
                   char *reason, int reason_len);
 
 void luc_dev_close (void);
@@ -176,6 +207,24 @@ void luc_dev_download_source_slice (int im, int is, float *s);
  * each member diffracts at its own wavelength. The caller keys rebuilds
  * (fel_device_mod mirrors fp32_kernel_cache's key, per member). */
 void luc_dev_set_kernel (int im, const float *expk);
+
+/* The spectral propagator's kernel factors of member im, ax(ix, m) for ix over the grid
+ * and m over the nplane + npad modes along tau, ngrid*(nplane+npad) interleaved complex
+ * floats in that order, ix outer: exp(-i dz (m_x dk)^2 / 2 k(kappa_m)) as
+ * fel_spectral_apply builds it, FP64 on the host and rounded once. The same table
+ * serves the y factor. The caller keys the upload as it keys luc_dev_set_kernel. */
+void luc_dev_set_tau_kernel (int im, const float *ax);
+
+/* Encode one slip pass of the spectral propagator over every (member, plane) block:
+ * the transform along tau, the ramp by sp->s_a, at a crossing the plane at the pad's
+ * first slot read by the direct sum into bank slot sp->slot and the ramp by sp->s_b
+ * after it, the inverse transform and the sponge on the pad. Refuses a run not
+ * initialized for the spectral propagator or a slot outside LUC_DEV_BANK_SLOTS. */
+int luc_dev_tau_slip (const luc_dev_slip_par *sp, char *reason, int reason_len);
+
+/* One banked plane, 2*ngrid*ngrid floats, of member im and plane ip from bank slot
+ * slot. Drains first, and obeys the post-drain concurrency contract above. */
+void luc_dev_download_bank (int im, int ip, int slot, float *e);
 
 /* The source filter's sigmoid for member 'im', ngrid*ngrid interleaved complex floats in
  * the same FFT order as the propagator. Real-valued, carried as complex so the same
@@ -287,7 +336,8 @@ int64_t luc_dev_bytes (void);
 #define LUC_DEV_PASS_UPUSH  6   /* unaveraged: the half magnetic push, twice a substep */
 #define LUC_DEV_PASS_UKICK  7   /* unaveraged: the radiation kick and its deposit */
 #define LUC_DEV_PASS_USPONT 8   /* unaveraged: the ledger's spontaneous reduction */
-#define LUC_DEV_PASS_N      9
+#define LUC_DEV_PASS_TAU    9   /* spectral: the passes along tau, the kernel's and the slips' */
+#define LUC_DEV_PASS_N      10
 
 /* Turn per-pass timing on or off. Legal only with nothing encoded, which the caller
  * arranges by calling it before the first step. Returns 0, or nonzero with 'reason'
