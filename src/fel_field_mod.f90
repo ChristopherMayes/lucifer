@@ -76,6 +76,10 @@ end type
 
 type fel_field_struct
   integer :: harm = 1               ! Harmonic number h (Field::harm).
+  integer :: n_wavelength = 1       ! Wavelengths per plane of the record: the window's slice under
+                                    !   the slice propagator, a whole multiple of it under the
+                                    !   spectral one (fel_field_sample, field.n_wavelength).
+  integer :: n_per = 1              ! Beam slices per plane, n_wavelength over the beam's.
   type (wavefront_struct) :: wf
   type (fel_slip_struct) :: slip
   type (fel_bank_struct) :: bank

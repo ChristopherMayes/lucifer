@@ -197,6 +197,8 @@ class Field:
     """The field set: 1 first, then further harmonic numbers in increasing order."""
     propagator: Literal['slices', 'spectral'] = 'slices'
     """The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slip"""
+    n_wavelength: int = 0
+    """The field's plane along tau, a whole multiple of window.n_wavelength. 0 takes the window's slice under the slice propagator, which holds one plane a slice and takes no other, and under the spectral propagator derives a fraction of the coope [wavelengths] Bounds: from 0."""
 
 
 @dataclass

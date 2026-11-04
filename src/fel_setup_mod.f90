@@ -735,6 +735,9 @@ logical td
 !
 
 rho = described_pierce ()
+td = (run%beam_init%sig_z > 0 .or. &
+      run%beam_init%grid(3)%x_max > run%beam_init%grid(3)%x_min .or. &
+      run%slicing%window_length > 0 .or. run%slicing%n_slice > 0)
 
 ! The spacing is derived only for a time-dependent description this program sizes
 ! itself. In the steady state the whole charge sits in the one slice, so the spacing
@@ -743,9 +746,6 @@ rho = described_pierce ()
 ! unset.
 
 if (run%slicing%n_wavelength == 0) then
-  td = (run%beam_init%sig_z > 0 .or. &
-        run%beam_init%grid(3)%x_max > run%beam_init%grid(3)%x_min .or. &
-        run%slicing%window_length > 0 .or. run%slicing%n_slice > 0)
   if (td .and. rho > 0) then
     l_coop = run%winit%lambda0 / (4 * pi * rho)
     n_wl = max(1, int(0.25_rp * l_coop / run%winit%lambda0))
@@ -793,7 +793,85 @@ endif
 
 end subroutine derive_slicing_and_step
 
+
 end subroutine fel_setup_lattice
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_pierce_of_beam (run) result (rho)
+!
+! Routine to return the one-dimensional Pierce parameter of the beam as built, at the
+! first FEL element, in Genesis's form rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2):
+! the current of the slice with the most charge, its rms size sqrt((<x^2> + <y^2>)/2)
+! about the slice's centroid, and the first undulator's coupling. Where the description's
+! form (described_pierce in fel_setup_lattice) serves the slicing before the beam exists,
+! this serves what is settled after it, the field's sampling (fel_init_wavefront), for a
+! loaded beam as for a described one.
+!
+! Input:
+!   run -- fel_run_struct: The run, after fel_init_beam.
+!
+! Output:
+!   rho -- real(rp): The Pierce parameter, or zero where there is nothing to derive from.
+!-
+
+function fel_pierce_of_beam (run) result (rho)
+
+type (fel_run_struct), target :: run
+type (fel_beam_struct), pointer :: fbeam
+type (fel_slice_struct), pointer :: sl
+type (fel_und_struct), pointer :: und
+real(rp) rho, cur, q, qmax, sig, fc, xm, ym, wsum, p_mc, gamma
+integer is, is_peak, je, je_first, ip
+
+!
+
+rho = 0
+fbeam => run%fbeam
+if (.not. allocated(fbeam%slice)) return
+if (fbeam%slice_spacing <= 0) return
+
+je_first = 0
+do je = 1, run%lat%branch(0)%n_ele_track
+  if (run%is_fel(je)) then
+    je_first = je
+    exit
+  endif
+enddo
+if (je_first == 0) return
+und => run%und_of(je_first)
+if (und%ku <= 0) return
+fc = fel_und_coupling (und, 1)
+if (fc == 0) return
+
+qmax = 0;  is_peak = 0
+do is = 1, size(fbeam%slice)
+  sl => fbeam%slice(is)
+  if (sl%n == 0) cycle
+  q = sum(sl%weight(1:sl%n))
+  if (q > qmax) then
+    qmax = q;  is_peak = is
+  endif
+enddo
+if (is_peak == 0) return
+cur = qmax * c_light / fbeam%slice_spacing
+
+sl => fbeam%slice(is_peak)
+wsum = sum(sl%weight(1:sl%n))
+xm = sum(sl%weight(1:sl%n) * sl%x(1:sl%n)) / wsum
+ym = sum(sl%weight(1:sl%n) * sl%y(1:sl%n)) / wsum
+sig = sqrt(0.5_rp * (sum(sl%weight(1:sl%n) * (sl%x(1:sl%n) - xm)**2) + &
+                     sum(sl%weight(1:sl%n) * (sl%y(1:sl%n) - ym)**2)) / wsum)
+if (sig <= 0) return
+
+p_mc = fel_p0_mc(fbeam)
+gamma = sqrt(p_mc**2 + 1)
+rho = ((cur / (4 * pi * m_electron / (mu_0_vac * c_light))) * fc**2 / &
+       (8 * gamma**3 * sig**2 * und%ku**2)) ** (1.0_rp / 3.0_rp)
+
+end function fel_pierce_of_beam
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1393,8 +1471,10 @@ endif
 timerun = (nslice > 1)
 do ih = 1, n_harm       ! Same values for every field: one window, lockstep rotation
                         ! in fundamental-wavelength units (Genesis's one Control::sample).
+                        ! A plane of the record is the field's own sampling, the beam's
+                        ! slice under the slice propagator (fel_init_wavefront).
   ffield(ih)%slip%timerun = timerun
-  ffield(ih)%slip%sample = fbeam%n_wavelength
+  ffield(ih)%slip%sample = ffield(ih)%n_wavelength
 enddo
 run%gamma0_ref = fel_gamma0(fbeam)
 gamma0_ref = run%gamma0_ref
@@ -1441,6 +1521,26 @@ if (run%spectral%on) then
                                    'WHOSE DEPOSIT IS fel_field_step''S OWN.')
     err_flag = .true.;  return
   endif
+
+  ! A field coarser than the beam's slices (fel_field_sample) is carried for the
+  ! fundamental alone, and the field reductions, which are taken plane by plane of the
+  ! record, are not taken on the slice's interpolated plane.
+
+  if (ffield(1)%n_per > 1) then
+    if (n_harm > 1) then
+      call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ ABOVE WINDOW.N_WAVELENGTH = \i0\ DOES NOT', &
+                   'COVER HARMONIC FIELDS: THE COARSE FIELD IS CARRIED FOR THE FUNDAMENTAL ALONE.', &
+                   'POSSIBLE SOLUTION: FIELD.N_WAVELENGTH = WINDOW.N_WAVELENGTH, OR THE FUNDAMENTAL ALONE.', &
+                   i_array = [ffield(1)%n_wavelength, fbeam%n_wavelength])
+      err_flag = .true.;  return
+    endif
+    if (run%global%dump_reduced) then
+      call out_io (s_error$, r_name, 'RUN.DUMP_REDUCED IS NOT CARRIED UNDER A FIELD COARSER THAN THE BEAM''S SLICES,', &
+                   'FIELD.N_WAVELENGTH = \i0\ ABOVE WINDOW.N_WAVELENGTH = \i0\ .', &
+                   i_array = [ffield(1)%n_wavelength, fbeam%n_wavelength])
+      err_flag = .true.;  return
+    endif
+  endif
 endif
 
 
@@ -1462,7 +1562,7 @@ if (err_flag) return
 ! allocated dark on every member (fel_spectral_size, fel_spectral_mod).
 
 if (run%spectral%on) then
-  call fel_spectral_size (run%spectral, nslice)
+  call fel_spectral_size (run%spectral, run%nfield)
   if (run%spectral%n_pad > 0) then
     block
       integer ih_s, n_grid_s(3)

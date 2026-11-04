@@ -13,11 +13,16 @@ leaves, which docs/spectral-field.md measures. Four checks:
               slice run: the power, the bunching, the energy and the sizes along s. The
               two propagators are one transform pair apart here, so the level is rounding.
   sase        the SASE tier with the source filter on under both propagators, Lucifer
-              against Lucifer: the power along s and the exit power across the window.
-              The tolerance is the measured level with its margin.
+              against Lucifer, the spectral run at one plane a slice: the exit power
+              across the window. The tolerance is the measured level with its margin.
   one slice   a Gaussian pulse through a pipe whose slippage is one slice, with no beam,
               under both propagators: the ramp by one slice is the rotation by one slice
               to rounding, since a shift by a whole slot is exact in the transform.
+  coarse      the SASE tier under spectral with field.n_wavelength left to derive, so the
+              field is sampled coarser than the beam's slices as far as the tier's window
+              of 32 slices allows, against the same tier at one plane a slice: the exit
+              power per beam slice, which the stats take from the plane each slice reads.
+              The bound is the sweep's (docs/spectral-field.md).
   bank        the same pulse placed so that it crosses the head over a pipe of 41 slices
               of slippage: the window's energy at the exit plus the escaped energy equals
               the energy that entered, the pulse file holds the 41 planes the header
@@ -56,6 +61,8 @@ from lucifer.field import read_field  # noqa: E402
 from lucifer.flat import to_toml  # noqa: E402
 
 STEADY_TOL = 1e-11      # The steady state: one transform pair apart, 1e-12 measured.
+COARSE_TOL = 1.5e-1     # The derived coarse field against one plane a slice on the SASE tier, 8.0e-2 measured
+                        #   on a window of 32 slices at saturation (docs/spectral-field.md).
 ONE_SLICE_TOL = 1e-8    # The ramp by a whole slice against the rotation, over the pulse's peak, 1e-9 measured.
 BANK_TOL = {"slices": 1e-9, "spectral": 1e-5}   # The ledger's closure, relative to the energy that
                                                  #   entered: rounding under the rotation, and 1e-6 under
@@ -195,9 +202,19 @@ def steady(exe, wd, threads):
     return good
 
 
+def window_n_wavelength(wd, toml):
+    """window.n_wavelength of an input file, so a spectral run can be held to one plane a slice."""
+    import tomllib
+    with open(wd / toml, "rb") as fh:
+        return int(tomllib.load(fh)["window"]["n_wavelength"])
+
+
 def sase(exe, wd, threads, tol):
+    # The spectral run at one plane a slice: field.n_wavelength would otherwise derive a
+    # coarser field, which the coarse step measures on its own.
+    n_wl = window_n_wavelength(wd, "tdsase.toml")
     roots = {}
-    for key, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
+    for key, more in (("slices", []), ("spectral", ["field.propagator=spectral", f"field.n_wavelength={n_wl}"])):
         root = f"spec_tdsase_{key}"
         if run(exe, wd, "tdsase.toml", root, ["run.source_filter=true"] + more, threads) is None:
             return False
@@ -211,6 +228,28 @@ def sase(exe, wd, threads, tol):
     record("SASE tier with the source filter on, spectral against slices", worst, tol, "max", good)
     if not good:
         print(f"FAIL: the SASE tier differs by {worst:.2e} between the propagators", file=sys.stderr)
+    return good
+
+
+def coarse(exe, wd, threads):
+    root = "spec_tdsase_coarse"
+    text = run(exe, wd, "tdsase.toml", root, ["run.source_filter=true", "field.propagator=spectral"],
+               threads + 0)
+    if text is None:
+        return False
+    m = re.search(r"Field\s+(\d+) planes of (\d+) wavelengths over the window, (\d+) slices a plane", text)
+    planes, n_wl, n_per = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 1)
+    d = worst_of(differences(read_curves(wd / f"{root}.stats.h5"),
+                             read_curves(wd / "spec_tdsase_spectral.stats.h5")), ("exit_power",))
+    worst = max(d.values())
+    good = worst <= COARSE_TOL and n_per > 1
+    print(f"  coarse field, {planes} planes of {n_wl} wavelengths, {n_per} slices a plane, against one a slice: "
+          f"exit power {worst:.2e} (tolerance {COARSE_TOL:.1e})")
+    record("the derived coarse field against one plane a slice, SASE tier", worst, COARSE_TOL, "max", good)
+    record("the derived coarse field's slices a plane, SASE tier", n_per, 1, "min", n_per > 1)
+    if not good:
+        print(f"FAIL: the coarse field differs by {worst:.2e}, or was not coarser ({n_per} slices a plane)",
+              file=sys.stderr)
     return good
 
 
@@ -289,6 +328,7 @@ def main():
 
     ok = steady(exe, wd, a.threads)
     ok = sase(exe, wd, a.threads, a.sase_tol) and ok
+    ok = coarse(exe, wd, a.threads) and ok
     ok = one_slice(exe, wd, a.threads) and ok
     ok = bank(exe, wd, a.threads) and ok
     print("  spectral checks: PASS" if ok else "  spectral checks: FAIL")

@@ -22,13 +22,55 @@ The kernel factors: $\exp(-i\,\delta z\,(m_x^2 + m_y^2)\,\delta k^2 / 2k(\kappa)
 In the steady state the window is one slice, the transform along $\tau$ is the identity, and the two propagators agree to rounding: on the `tier1` tier the power curves differ by $4.8\times10^{-15}$.
 
 (spectral-keys)=
-## The key
+## The keys
 
 | Key | Default | What it does |
 |---|---|---|
 | `field.propagator` | `slices` | `spectral` selects the spectral propagator. |
+| `field.n_wavelength` | 0 | The field's plane along $\tau$ in wavelengths, a whole multiple of `window.n_wavelength`. 0 takes the window's slice under `slices` and derives a coarser plane under `spectral` ([](#spectral-coarse)). |
 
-The spectral propagator covers the averaged mode on the CPU in double precision. The unaveraged mode, the device, the FP32 check and the coherent source model each carry a propagator or a deposit of their own, and each is refused with the key, the message naming which. The header prints a `Propagator` line that states the kernel, the ramp and the pad in force.
+The spectral propagator covers the averaged mode on the CPU in double precision, for the fundamental alone when the field is coarser than the slices. The unaveraged mode, the device, the FP32 check and the coherent source model each carry a propagator or a deposit of their own, and each is refused with the key, the message naming which. The header prints a `Propagator` line that states the kernel, the ramp and the pad in force, and a `Field` line with the planes when they are coarser than the slices.
+
+(spectral-coarse)=
+## The field's own sampling along tau
+
+The window is the beam's partition, `window.n_wavelength` wavelengths a slice, and under the slice propagator the field has one plane a slice and no other sampling. Under the spectral propagator the field may be sampled coarser, `field.n_wavelength` wavelengths a plane, a whole multiple of the slice ([](fel-physics.md#sec-window)). A SASE field at saturation is band limited to a few $\rho$ about the carrier, so a plane every fraction of the cooperation length $\lambda_s / 4\pi\rho$ carries it, while the beam's slice stays where the loader put it, and a step then pays for the field at that sampling and for the beam at its slice. The continuous slippage is what makes it possible: a step slips a fraction of a plane, which the ramp applies exactly and the whole-slice rotation could not.
+
+The field's record holds the window at that sampling, `fel_field_planes` planes of it, with one more past the last slice when the last slice falls between two planes. A beam slice sits between two planes and reads them by linear weights along $\tau$ (`fel_field_sample`), $1 - w$ on the plane at or below it and $w$ on the one above, so a slice on a plane reads that plane alone, which is every slice at one plane a slice, where nothing changes to the bit. The deposit splits each slice's source between the same two planes by the same weights and divides a plane's sum by the slices a plane spans, so the deposit is the readback's adjoint under each grid's own measure, a uniform source over the slices gives every plane that one slice's source, and the source filter runs once on each plane's sum (`fel_spectral_deposit_coarse`), one transform pair a plane a step and not one a slice. The stats' field rows stay on the beam's axis, each slice's row taken from the plane it reads, so every reader and comparison works as before, and the field's own planes are what the dumps and the pulse file carry, their spacing the field's. A frame of a slice range writes the planes those slices read. The bank banks a plane each time the slippage crosses a whole plane, and the header's `Bank` line counts planes. A field file at another spacing is refused unless it is dark, when its transverse grid alone is taken and the field starts dark on its own planes, so a SASE input file whose field file fixes the grid runs at any sampling. The escaped light's planes are the field's spacing apart in the escaped and pulse files, and `lucifer.field` reads that spacing as it reads the slice's.
+
+The sampling is derived at setup when `field.n_wavelength` is unset: a tenth of the cooperation length at the $\rho$ of the beam as built (`fel_pierce_of_beam`: the slice with the most charge, its rms size and the first undulator's coupling), rounded to whole slices, printed with its origin, and cut so the window keeps 8 planes. A stated value is held to a whole multiple of the slice, to at least 8 planes over the window, and below the cliff the sweep found, a quarter of the cooperation length, where the run is refused with the cooperation length and the cliff in the message. Harmonic fields and `run.dump_reduced` are refused with a field coarser than the slices.
+
+(spectral-sweep)=
+### The sweep
+
+Four lines from noise under the spectral propagator, each at 1, 2, 5, 10, 20 and 40 slices a plane, against its own run at one plane a slice: the SASE tier's beam over 1280 slices of 3 wavelengths through Aramis, which is the seeded case's line and bunch with no seed, and the `sase`, `flash1` and `lcls` examples as they ship, 96 slices of 3 wavelengths, 351 of 12 and 300 of 68. Each row gives the field's planes, the window's and the pulse's energy at the exit, the peak slice power, the exit power per beam slice against the finest run over its peak, and the walk, at 12 threads on the release build, gfortran 15.3, Apple M3 Max, 2026-11-03, with the cliff open. The plane's length is also given as the fraction of the cooperation length $\lambda_s / 4\pi\rho$ at the beam's $\rho$: 155 wavelengths at 5.1e-4 on Aramis, 40.5 at 2.0e-3 on FLASH1 and 135 at 5.9e-4 on LCLS. The spectrum's rms width was also taken and is not a measure here: at one plane a slice the window's Nyquist band is a sixth of $k_0$ and the shot noise's floor across it sets the width, which then falls with the band as the plane coarsens, while the spectrum's centroid holds at 1e-3 below the carrier on every Aramis row.
+
+| Line | Slices a plane | Plane [wavelengths] | Of $L_c$ | Planes | Window energy | Pulse energy | Peak power | Exit power against the finest | Walk |
+|---|---|---|---|---|---|---|---|---|---|
+| Aramis, 1280 slices | 1 | 3 | 0.019 | 1280 | 2.776 µJ | 4.151 µJ | 8.14 GW | 0 | 692 s |
+| | 2 | 6 | 0.039 | 641 | 2.762 µJ | 4.128 µJ | 8.09 GW | 1.5e-2 | 500 s |
+| | 5 | 15 | 0.097 | 257 | 2.762 µJ | 4.095 µJ | 8.04 GW | 3.6e-2 | 195 s |
+| | 10 | 30 | 0.19 | 129 | 2.714 µJ | 4.018 µJ | 7.78 GW | 7.0e-2 | 169 s |
+| | 20 | 60 | 0.39 | 65 | 2.477 µJ | 3.691 µJ | 6.45 GW | 2.6e-1 | 121 s |
+| | 40 | 120 | 0.77 | 33 | 1.905 µJ | 2.889 µJ | 4.92 GW | 5.1e-1 | 105 s |
+| `sase`, 96 slices | 1 | 3 | 0.019 | 96 | 34.2 pJ | 851 pJ | 1.95 MW | 0 | 97 s |
+| | 2 | 6 | 0.039 | 49 | 31.2 pJ | 803 pJ | 1.75 MW | 1.2e-1 | 50 s |
+| | 5 | 15 | 0.097 | 20 | 36.6 pJ | 937 pJ | 2.19 MW | 1.5e-1 | 28 s |
+| | 10 | 30 | 0.19 | 11 | 30.5 pJ | 724 pJ | 1.71 MW | 1.2e-1 | 24 s |
+| | 20, 40 | | | | refused: fewer than 8 planes | | | | |
+| `flash1`, 351 slices | 1 | 12 | 0.30 | 351 | 47.2 µJ | 47.2 µJ | 4.59 GW | 0 | 55 s |
+| | 2 | 24 | 0.59 | 176 | 42.9 µJ | 42.9 µJ | 4.21 GW | 1.8e-1 | 26 s |
+| | 5 | 60 | 1.5 | 71 | 33.4 µJ | 33.4 µJ | 2.67 GW | 6.1e-1 | 18 s |
+| | 10 | 120 | 3.0 | 36 | 28.2 µJ | 28.2 µJ | 1.02 GW | 9.2e-1 | 16 s |
+| | 20 | 240 | 5.9 | 19 | 24.4 µJ | 24.4 µJ | 1.10 GW | 9.8e-1 | 16 s |
+| `lcls`, 300 slices | 1 | 68 | 0.50 | 300 | 288 µJ | 315 µJ | 121 GW | 0 | 118 s |
+| | 2 | 136 | 1.0 | 151 | 155 µJ | 171 µJ | 79 GW | 9.4e-1 | 129 s |
+| | 5 | 340 | 2.5 | 61 | 84 µJ | 91 µJ | 16 GW | 9.2e-1 | 55 s |
+| | 10 | 680 | 5.0 | 31 | 78 µJ | 79 µJ | 16 GW | 9.4e-1 | 53 s |
+
+The long Aramis window is the measurement, since its 1280 slices hold enough spikes for the energy to be a mean and its slices are fine enough to place the plane from a fiftieth of the cooperation length to most of it. There the energy holds to 0.5 percent up to a tenth of the cooperation length, falls 2 percent at a fifth, 11 percent at 0.4 and 31 percent at 0.8, and the exit power per slice differs by 1.5, 3.6 and 7 percent of the peak at the first three samplings, the saturated light's own sensitivity to any change of the operations, which the step's halving showed at 9.5 percent on the seeded line ([](#spectral-seeded)). The walk falls from 692 s to 195 s at a tenth of the cooperation length, 3.5 times, and the push then holds what is left. The other three lines agree with that curve where they reach it: FLASH1 loses 9 percent at 0.6 of the cooperation length and LCLS 46 percent at 1.0, and their own slices, 12 and 68 wavelengths, already sit at 0.3 and 0.5 of it, so a coarser field than their slice costs output and the derived sampling keeps their slice. The `sase` example's window of 96 slices holds two cooperation lengths, so its energy moves 10 percent either way between samplings, a realization's own spread and not a trend, which is why a short window is no measure of the sampling.
+
+From that curve the derived sampling is a tenth of the cooperation length, `fel_field_coop_fraction$`, where the energy holds to 0.5 percent and the field costs a fifth of its fine cost, and the cliff is a quarter, `fel_field_coop_cliff$`, past which the energy falls by percent and a stated `field.n_wavelength` is refused. On the SASE tier's window of 32 slices the derived sampling is cut to 4 slices a plane so the window keeps 9 planes, and the exit power per slice there differs from one plane a slice by 8.0e-2 at saturation, which the `spectral` section of the validation suite holds below 1.5e-1 ([](validation.md#val-spectral)). The cost estimate counts the field's planes and not the beam's slices, so the header's estimate falls with the sampling ([](performance.md)).
 
 (spectral-bank)=
 ## The head and the bank

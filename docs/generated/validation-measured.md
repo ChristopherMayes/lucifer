@@ -240,6 +240,8 @@ where the two builds agree to every printed digit.
 |---|---|---|---|
 | steady state, spectral against the slice run | 8.0147e-15 | 2.3261e-14 | <= 1.0000e-11 |
 | SASE tier with the source filter on, spectral against slices | 8.6540e-03 | same | <= 2.0000e-02 |
+| the derived coarse field against one plane a slice, SASE tier | 8.0345e-02 | same | <= 1.5000e-01 |
+| the derived coarse field's slices a plane, SASE tier | 4 | same | >= 1 |
 | one slice by the ramp against one by the rotation | 1.0729e-09 | same | <= 1.0000e-08 |
 | the ledger closes, slices | 6.7968e-11 | same | <= 1.0000e-09 |
 | the tail slice stays dark, slices | 0.0000e+00 | same | <= 1.0000e-09 |

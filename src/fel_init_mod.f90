@@ -1237,7 +1237,7 @@ type (wavefront_struct), pointer :: wf
 character(400) field_file(9)
 character(1) seed_polarization
 logical two_pol, err
-integer n_harm, nslice, ih, is
+integer n_harm, nslice, ih, is, n_per, n_per_max, nfield
 real(rp) lambda0, seed_power, seed_waist_size, grid_half_width
 integer grid_n_pts
 character(*), parameter :: r_name = 'fel_init_wavefront'
@@ -1252,6 +1252,41 @@ field_file = run%field_file
 two_pol = run%two_pol
 n_harm = run%n_harm
 nslice = run%nslice
+
+! The field's plane along tau, field.n_wavelength (fel_field_sample): the window's
+! slice under the slice propagator, and under the spectral one a stated whole multiple
+! of it below the cliff, or one derived from the built beam's rho. Then the planes over
+! the window (fel_field_planes). A derived sampling is cut so the window keeps
+! fel_field_planes_min$ planes, a stated one below that is refused, and the steady
+! state's one slice is one plane.
+
+call settle_field_sampling ()
+if (err_flag) return
+n_per = max(1, run%winit%n_wavelength / max(1, fbeam%n_wavelength))
+if (nslice == 1) n_per = 1
+if (nslice > 1 .and. n_per > 1) then
+  n_per_max = max(1, (nslice - 1) / (fel_field_planes_min$ - 1))
+  if (n_per > n_per_max) then
+    if (run%field_sampling_derived) then
+      n_per = n_per_max
+      call out_io (s_info$, r_name, 'Field sampling cut to \i0\ wavelengths, \i0\ slices a plane, so the ' // &
+                   'window of \i0\ slices keeps \i0\ planes.', &
+                   i_array = [n_per * fbeam%n_wavelength, n_per, nslice, fel_field_planes(nslice, n_per)])
+    else
+      call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ LEAVES THE WINDOW OF \i0\ SLICES FEWER THAN', &
+                   '\i0\ FIELD PLANES. POSSIBLE SOLUTION: AT MOST \i0\ WAVELENGTHS, OR LEAVE IT UNSET.', &
+                   i_array = [run%winit%n_wavelength, nslice, fel_field_planes_min$, n_per_max * fbeam%n_wavelength])
+      err_flag = .true.;  return
+    endif
+  endif
+endif
+run%winit%n_wavelength = n_per * fbeam%n_wavelength
+nfield = fel_field_planes(nslice, n_per)
+run%nfield = nfield
+do ih = 1, n_harm
+  ffield(ih)%n_wavelength = n_per * fbeam%n_wavelength
+  ffield(ih)%n_per = n_per
+enddo
 seed_polarization = run%winit%seed_polarization
 lambda0 = run%winit%lambda0
 seed_power = run%winit%seed_power
@@ -1291,7 +1326,7 @@ if (field_file(1) /= '') then
     wf%Ey = 0
   endif
 else
-  call generate_seed_field (nslice)
+  call generate_seed_field (nfield)
   if (err_flag) return
 endif
 
@@ -1320,12 +1355,12 @@ enddo
 
 run%ks = twopi / wf%wavelength
 
-! The beam and field must describe the same time window: one field slice per beam slice,
-! at the same wavelength. Checked, never assumed.
+! The beam and field must describe the same time window: the field's planes over the
+! beam's slices (fel_field_planes), at the same wavelength. Checked, never assumed.
 
-if (size(wf%Ex, 3) /= nslice) then
-  call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES BUT THE FIELD HAS \i0\ ', &
-               i_array = [nslice, size(wf%Ex, 3)])
+if (size(wf%Ex, 3) /= nfield) then
+  call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES, WHICH NEED \i0\ FIELD PLANES, BUT THE FIELD HAS \i0\ ', &
+               i_array = [nslice, nfield, size(wf%Ex, 3)])
   err_flag = .true.;  return
 endif
 if (abs(wf%wavelength - fbeam%wavelength) > 1e-12_rp * fbeam%wavelength) then
@@ -1336,6 +1371,85 @@ endif
 
 !------------------------------------------------------------------------------
 contains
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine settle_field_sampling ()
+!
+! Routine to settle field.n_wavelength (fel_field_sample, docs/spectral-field.md).
+! Under the slice propagator it is the window's slice and nothing else, since that
+! propagator holds one plane a slice. Under the spectral propagator a stated value is a
+! whole multiple of the slice, held below the cliff the sweep found,
+! fel_field_coop_cliff$ of the cooperation length lambda/(4 pi rho), and an unstated one
+! is derived as fel_field_coop_fraction$ of the cooperation length in whole slices from
+! the built beam's rho (fel_pierce_of_beam), described or loaded, and is the slice where
+! there is no rho or one slice.
+!-
+
+subroutine settle_field_sampling ()
+
+real(rp) rho, l_coop, want
+integer n_wl, n_fld
+
+!
+
+n_wl = max(1, fbeam%n_wavelength)
+run%field_sampling_derived = .false.
+
+if (run%winit%propagator /= 'spectral') then
+  if (run%winit%n_wavelength == 0) then
+    run%winit%n_wavelength = n_wl
+  elseif (run%winit%n_wavelength /= n_wl) then
+    call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ UNDER FIELD.PROPAGATOR = "slices" MUST EQUAL', &
+                 'WINDOW.N_WAVELENGTH = \i0\, SINCE THE SLICE PROPAGATOR HOLDS ONE PLANE A SLICE.', &
+                 'POSSIBLE SOLUTION: FIELD.PROPAGATOR = "spectral", OR LEAVE FIELD.N_WAVELENGTH UNSET.', &
+                 i_array = [run%winit%n_wavelength, n_wl])
+    err_flag = .true.
+  endif
+  return
+endif
+
+rho = 0
+if (nslice > 1) rho = fel_pierce_of_beam (run)
+l_coop = 0
+if (rho > 0) l_coop = fbeam%wavelength / (4 * pi * rho)
+
+if (run%winit%n_wavelength == 0) then
+  if (rho > 0) then
+    want = fel_field_coop_fraction$ * l_coop / fbeam%wavelength
+    n_fld = n_wl * max(1, nint(want / n_wl))
+    run%winit%n_wavelength = n_fld
+    run%field_sampling_derived = .true.
+    call out_io (s_info$, r_name, 'Field sampling \i0\ wavelengths, \i0\ slices a plane, derived: ' // &
+                 '\f0.2\ of the cooperation length \es10.3\ m at rho = \es10.3\ , in whole slices.', &
+                 i_array = [n_fld, n_fld / n_wl], r_array = [fel_field_coop_fraction$, l_coop, rho])
+  else
+    run%winit%n_wavelength = n_wl
+    if (nslice > 1) call out_io (s_info$, r_name, 'Field sampling the window''s slice, \i0\ wavelengths: ' // &
+                                 'nothing to derive a coarser one from.', i_array = [n_wl])
+  endif
+  return
+endif
+
+if (mod(run%winit%n_wavelength, n_wl) /= 0) then
+  call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ IS NOT A WHOLE MULTIPLE OF WINDOW.N_WAVELENGTH = \i0\ .', &
+               'A FIELD PLANE SPANS WHOLE BEAM SLICES (fel_field_sample).', &
+               i_array = [run%winit%n_wavelength, n_wl])
+  err_flag = .true.
+  return
+endif
+if (rho > 0) then
+  if (run%winit%n_wavelength * fbeam%wavelength > fel_field_coop_cliff$ * l_coop) then
+    call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ WAVELENGTHS IS ABOVE \f0.2\ OF THE COOPERATION', &
+                 'LENGTH \es10.3\ m AT rho = \es10.3\ , WHERE THE SWEEP ON docs/spectral-field.md FOUND THE', &
+                 'OUTPUT MOVE. POSSIBLE SOLUTION: A SMALLER FIELD.N_WAVELENGTH, OR LEAVE IT UNSET.', &
+                 i_array = [run%winit%n_wavelength], r_array = [fel_field_coop_cliff$, l_coop, rho])
+    err_flag = .true.
+    return
+  endif
+endif
+
+end subroutine settle_field_sampling
 
 !------------------------------------------------------------------------------
 !+
@@ -1366,7 +1480,7 @@ endif
 
 dx_grid = 2 * grid_half_width / (grid_n_pts - 1)
 call wavefront_init (wf, grid_n_pts, grid_n_pts, nslice_f, dx_grid, dx_grid, &
-                     fbeam%slice_spacing, lambda0, 'x', 0.0_rp)
+                     n_per * fbeam%slice_spacing, lambda0, 'x', 0.0_rp)
 
 if (two_pol .and. .not. allocated(wf%Ey)) then
   allocate (wf%Ey(grid_n_pts, grid_n_pts, nslice_f))

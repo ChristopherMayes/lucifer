@@ -398,7 +398,7 @@ type (fel_beam_struct), pointer :: fbeam
 type (wavefront_struct), pointer :: wf
 type (wavefront_struct) wf_sub
 real(rp) s_frame
-integer ie, ihh, first_was, nsub, nslice, j, ifld
+integer ie, ihh, first_was, nsub, nslice, j, ifld, js1, js2, m
 logical at_end, err_flag, eerr, any_err, whole, ckpt
 character(200) prefix
 character(8) hsuf
@@ -469,9 +469,17 @@ do ihh = 1, run%n_harm
     ! That cost 2.5 s a frame for 12 slices of a 4212-slice window at 128 by 128
     ! (docs/performance.md).
 
+    ! Under a field coarser than the slices (fel_field_sample) the slab is the planes the
+    ! range's slices read, from the plane at or below the first to the one at or above
+    ! the last, and its z origin is the first plane's.
+
     wf => ffield(ihh)%wf
     nslice = size(wf%Ex, 3)
-    nsub = run%dump_is2 - run%dump_is1 + 1
+    m = ffield(ihh)%n_per
+    js1 = (run%dump_is1 - 1) / m + 1
+    js2 = (run%dump_is2 - 1) / m + 1
+    if (mod(run%dump_is2 - 1, m) /= 0) js2 = min(nslice, js2 + 1)
+    nsub = js2 - js1 + 1
     if (allocated(wf_sub%Ex)) deallocate (wf_sub%Ex)
     if (allocated(wf_sub%Ey)) deallocate (wf_sub%Ey)
     allocate (wf_sub%Ex(size(wf%Ex, 1), size(wf%Ex, 2), nsub))
@@ -484,7 +492,7 @@ do ihh = 1, run%n_harm
 
     !$OMP parallel do private(ifld)
     do j = 1, nsub
-      ifld = fel_field_index(ffield(ihh)%slip, run%dump_is1 + j - 1, nslice)
+      ifld = fel_field_index(ffield(ihh)%slip, js1 + j - 1, nslice)
       wf_sub%Ex(:,:,j) = wf%Ex(:,:,ifld)
       if (allocated(wf%Ey)) wf_sub%Ey(:,:,j) = wf%Ey(:,:,ifld)
     enddo
@@ -506,7 +514,7 @@ do ihh = 1, run%n_harm
     ! would sit. It sits beside the cut beam, whose timeOffset places each slice.
 
     call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', eerr, &
-                                  z_offset = (run%dump_is1 - 1) * wf%dz)
+                                  z_offset = (js1 - 1) * wf%dz)
     if (eerr) return
   else
 
@@ -702,6 +710,11 @@ if (run%nslice > 1) then
     write (line, '(a, i0, a, i0, a, f0.6, a)') ' Window      derived: ', run%nslice - run%n_headroom, &
           ' slices for the bunch and ', run%n_headroom, ' of headroom for ', run%slip_headroom, &
           ' wavelengths of slippage'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
+  if (run%ffield(1)%n_per > 1) then
+    write (line, '(a, i0, a, i0, a, i0, a)') ' Field       ', run%nfield, ' planes of ', &
+          run%ffield(1)%n_wavelength, ' wavelengths over the window, ', run%ffield(1)%n_per, ' slices a plane'
     call out_io (s_blank$, r_name, trim(line))
   endif
 endif
@@ -918,7 +931,7 @@ contains
 subroutine write_bank_bytes ()
 
 real(rp) s_line, b_plane, b_rows, b_esc, b_pulse
-integer ihh, n_rot, is1, is, n_grid(3), n_comp
+integer ihh, n_rot, is1, if1, is, n_grid(3), n_comp
 logical lit, any_lit
 
 !
@@ -929,16 +942,18 @@ s_line = run%ffield(1)%slip%accuslip + sum(run%und_slip(run%i_start:run%i_end)) 
          sum(run%ele_slip(run%i_start:run%i_end))
 n_rot = max(0, ceiling(s_line / run%fbeam%n_wavelength - 0.8_rp))
 
-! The spectral propagator banks a plane at each whole slice the ramp crosses
-! (fel_spectral_apply), and its count starts from the ramp's own residual.
+! The spectral propagator banks a plane at each whole plane the ramp crosses
+! (fel_spectral_apply), the field's own spacing, and its count starts from the ramp's
+! own residual.
 
 if (run%spectral%on) then
   s_line = run%ffield(1)%slip%ramp_slip + sum(run%und_slip(run%i_start:run%i_end)) + &
            sum(run%ele_slip(run%i_start:run%i_end))
-  n_rot = max(0, floor(s_line / run%fbeam%n_wavelength + 1e-9_rp))
+  n_rot = max(0, floor(s_line / run%ffield(1)%n_wavelength + 1e-9_rp))
 endif
 if (n_rot == 0) return
-is1 = max(1, run%nslice - n_rot + 1)
+is1 = max(1, run%nslice - n_rot * run%ffield(1)%n_per + 1)
+if1 = max(1, run%nfield - n_rot + 1)
 
 any_lit = .false.
 do ihh = 1, run%n_harm
@@ -946,14 +961,19 @@ do ihh = 1, run%n_harm
   do is = is1, run%nslice
     if (sum(run%fbeam%slice(is)%weight(1:run%fbeam%slice(is)%n)) > 0) lit = .true.
   enddo
-  if (any(run%ffield(ihh)%wf%Ex(:,:,is1:run%nslice) /= 0)) lit = .true.
+  if (any(run%ffield(ihh)%wf%Ex(:,:,if1:run%nfield) /= 0)) lit = .true.
   if (allocated(run%ffield(ihh)%wf%Ey)) then
-    if (any(run%ffield(ihh)%wf%Ey(:,:,is1:run%nslice) /= 0)) lit = .true.
+    if (any(run%ffield(ihh)%wf%Ey(:,:,if1:run%nfield) /= 0)) lit = .true.
   endif
   if (.not. lit) cycle
 
   if (.not. any_lit) then
-    write (line, '(a, i0, a)') ' Bank        ', n_rot, ' slices leave the window over the tracked line'
+    if (run%ffield(1)%n_per == 1) then
+      write (line, '(a, i0, a)') ' Bank        ', n_rot, ' slices leave the window over the tracked line'
+    else
+      write (line, '(a, i0, a, i0, a)') ' Bank        ', n_rot, ' field planes of ', run%ffield(1)%n_per, &
+            ' slices leave the window over the tracked line'
+    endif
     call out_io (s_blank$, r_name, trim(line))
     any_lit = .true.
   endif
@@ -964,7 +984,7 @@ do ihh = 1, run%n_harm
   b_plane = 16.0_rp * n_grid(1) * n_grid(2) * n_comp
   b_rows = 8.0_rp * n_rot * (1 + 25 * n_comp)
   b_esc = n_rot * b_plane + b_rows
-  b_pulse = (run%nslice + n_rot) * b_plane + b_rows
+  b_pulse = (run%nfield + n_rot) * b_plane + b_rows
   if (run%global%write_escaped) then
     write (line, '(a, i0, a, es10.4, a)') '             h', run%ffield(ihh)%harm, &
           ': the pulse and escaped files about ', b_pulse + b_esc, ' bytes kept, which is the peak'
@@ -1338,7 +1358,8 @@ integer(hid_t) f_id, g_id
 character(*) fname
 integer ihh, ihc, h5_err
 real(rp) e_photon, residual, s_c
-logical rerr, err_flag, has_res
+integer n_x, n_y
+logical rerr, err_flag, has_res, dark
 character(60) fmt_str
 character(40) name_c
 character(*), parameter :: r_name = 'fel_read_openpmd_into_field'
@@ -1357,7 +1378,36 @@ if (abs(ffield(ihh)%wf%wavelength - fbeam%wavelength) > 1e-6_rp * fbeam%waveleng
                r_array = [ffield(ihh)%wf%wavelength, fbeam%wavelength])
   err_flag = .true.;  return
 endif
-ffield(ihh)%wf%dz = fbeam%slice_spacing
+! The file's planes are the field's own spacing apart, the beam's slice times the
+! slices a plane spans (fel_field_sample), to the rounding a writer leaves. A dark file
+! at another spacing carries nothing to resample, so its transverse grid alone is taken
+! and the record is built dark on the field's own planes: a SASE input file whose field
+! file fixes the grid then runs at any sampling.
+
+if (abs(ffield(ihh)%wf%dz - ffield(ihh)%n_per * fbeam%slice_spacing) > 1e-9_rp * fbeam%slice_spacing) then
+  dark = all(ffield(ihh)%wf%Ex == 0)
+  if (dark .and. allocated(ffield(ihh)%wf%Ey)) dark = all(ffield(ihh)%wf%Ey == 0)
+  if (.not. dark) then
+    call out_io (s_error$, r_name, 'THE FIELD FILE''S PLANES ARE \es14.6\ m APART, AND THE RUN''S FIELD', &
+                 'SAMPLES EVERY \es14.6\ m: \i0\ WAVELENGTHS, \i0\ BEAM SLICES A PLANE. THE FILE: ' // trim(fname), &
+                 r_array = [ffield(ihh)%wf%dz, ffield(ihh)%n_per * fbeam%slice_spacing], &
+                 i_array = [ffield(ihh)%n_wavelength, ffield(ihh)%n_per])
+    return
+  endif
+  n_x = size(ffield(ihh)%wf%Ex, 1);  n_y = size(ffield(ihh)%wf%Ex, 2)
+  deallocate (ffield(ihh)%wf%Ex)
+  allocate (ffield(ihh)%wf%Ex(n_x, n_y, run%nfield))
+  ffield(ihh)%wf%Ex = 0
+  if (allocated(ffield(ihh)%wf%Ey)) then
+    deallocate (ffield(ihh)%wf%Ey)
+    allocate (ffield(ihh)%wf%Ey(n_x, n_y, run%nfield))
+    ffield(ihh)%wf%Ey = 0
+  endif
+  call out_io (s_info$, r_name, 'The field file is dark and its planes are \es12.4\ m apart, so its grid alone is ' // &
+               'taken and the field starts dark on \i0\ planes \es12.4\ m apart.', &
+               r_array = [ffield(ihh)%wf%dz, ffield(ihh)%n_per * fbeam%slice_spacing], i_array = [run%nfield])
+endif
+ffield(ihh)%wf%dz = ffield(ihh)%n_per * fbeam%slice_spacing
 ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength for beam and field, as the
                                                !   1e-12 consistency check requires.
 
@@ -1392,11 +1442,11 @@ if (g_id >= 0) then
   endif
 endif
 if (has_res) then
-  if (.not. ieee_is_finite(residual) .or. (fbeam%n_wavelength >= 1 .and. abs(residual) >= fbeam%n_wavelength)) then
+  if (.not. ieee_is_finite(residual) .or. abs(residual) >= ffield(ihh)%n_wavelength) then
     call h5fclose_f (f_id, h5_err)
     call out_io (s_error$, r_name, 'THE FIELD FILE''S slippageResidual IS NOT A VALUE THIS TRACKER WRITES: \es12.4\ ', &
-                 'ITS MAGNITUDE MUST STAY BELOW n_wavelength = \i0\. THE FILE: ' // trim(fname), &
-                 r_array = [residual], i_array = [fbeam%n_wavelength])
+                 'ITS MAGNITUDE MUST STAY BELOW THE FIELD''S n_wavelength = \i0\. THE FILE: ' // trim(fname), &
+                 r_array = [residual], i_array = [ffield(ihh)%n_wavelength])
     return
   endif
 endif
@@ -1651,7 +1701,7 @@ endif
 
 do k = 1, bnk%n
   call wavefront_params_of_plane (bnk%plane(:,:,k), wfl%dx, wfl%wavelength, &
-                                  fbeam%slice_spacing, pms, .true., berr)
+                                  wfl%dz, pms, .true., berr)
   if (berr) return
   pms%s = z_now
   run%bank_z(n0 + k, ihh) = z_now
@@ -1659,7 +1709,7 @@ do k = 1, bnk%n
                            pms%energy, pms%power, pms%on_axis_intensity, pms%emit_x, pms%emit_y]
   if (two) then
     call wavefront_params_of_plane (bnk%plane_y(:,:,k), wfl%dx, wfl%wavelength, &
-                                    fbeam%slice_spacing, pms, .true., berr)
+                                    wfl%dz, pms, .true., berr)
     if (berr) return
     run%bank_pms_y(:, n0 + k, ihh) = [pms%centroid, reshape(pms%sigma, [16]), &
                            pms%energy, pms%power, pms%on_axis_intensity, pms%emit_x, pms%emit_y]
@@ -1678,13 +1728,13 @@ if (run%pul_id(ihh) == 0) then
     err_flag = .false.
     return
   endif
-  call wavefront_openpmd_create (trim(fel_bank_file_name(run, ihh, 'pulse')), wfl, run%nslice, &
+  call wavefront_openpmd_create (trim(fel_bank_file_name(run, ihh, 'pulse')), wfl, run%nfield, &
                                  run%pul_id(ihh), m_id, berr, extendable = .true.)
   if (berr) return
   call H5Gclose_f (m_id, h5e)
   if (run%global%write_escaped) then
     call wavefront_openpmd_create (trim(fel_bank_file_name(run, ihh, 'escaped')), wfl, 0, run%esc_id(ihh), m_id, &
-                                   berr, z_offset = run%nslice * fbeam%slice_spacing, extendable = .true., &
+                                   berr, z_offset = run%nfield * wfl%dz, extendable = .true., &
                                    z_coordinate = ieee_value(0.0_rp, ieee_quiet_nan))
     if (berr) return
     call H5Gclose_f (m_id, h5e)
@@ -1692,7 +1742,7 @@ if (run%pul_id(ihh) == 0) then
   fresh = .true.
 endif
 
-call append_planes (run%pul_id(ihh), run%nslice);  if (berr) return
+call append_planes (run%pul_id(ihh), run%nfield);  if (berr) return
 if (run%esc_id(ihh) /= 0) call append_planes (run%esc_id(ihh), 0)
 if (berr) return
 run%n_banked(ihh) = n0 + bnk%n
@@ -2106,7 +2156,7 @@ character(*), parameter :: r_name = 'fel_finish_pulse'
 !
 
 err_flag = .true.
-nslice = run%nslice
+nslice = run%nfield       ! The pulse's window is the field's planes.
 n = run%n_banked(ihh)
 wfl => run%ffield(ihh)%wf
 two = allocated(wfl%Ey)

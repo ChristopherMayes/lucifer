@@ -433,6 +433,120 @@ end function fel_field_index
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function fel_field_planes (nslice, n_per) result (nplane)
+!
+! Routine to return the planes a field record holds over a window of nslice beam slices
+! when one plane spans n_per of them (field.n_wavelength over window.n_wavelength): a
+! plane at every n_per-th slice from the first, and one more past the last slice when
+! that slice falls between two, so every slice has a plane on each side
+! (fel_field_sample). With n_per = 1 it is nslice.
+!
+! Input:
+!   nslice -- integer: Beam slices in the window.
+!   n_per  -- integer: Beam slices per field plane.
+!
+! Output:
+!   nplane -- integer: Planes of the record.
+!-
+
+function fel_field_planes (nslice, n_per) result (nplane)
+
+integer nslice, n_per, nplane
+
+!
+
+nplane = (nslice - 1) / n_per + 1
+if (mod(nslice - 1, n_per) /= 0) nplane = nplane + 1
+
+end function fel_field_planes
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_field_sample (slip, is, n_per, nplane, ifld, ifld2, w)
+!
+! Routine to return the record planes beam slice is reads under a field whose plane
+! spans n_per beam slices, and the weight of the second. Slice is sits at (is-1)/n_per
+! planes along tau, between window planes j = (is-1)/n_per and j+1 (0-based), with the
+! weight w = mod(is-1, n_per)/n_per on the second, and each window plane is mapped to
+! its record plane through fel_field_index. With w = 0 the slice sits on a plane and
+! ifld2 = ifld, so a reader takes one plane, which is every slice under n_per = 1. The
+! deposit splits a slice's source between the two planes by the same weights
+! (fel_spectral_deposit_coarse), so the readback is the deposit's adjoint and a slice on
+! a plane sees that plane alone (docs/spectral-field.md).
+!
+! Input:
+!   slip   -- fel_slip_struct: The record's rotation.
+!   is     -- integer: Beam slice, 1-based.
+!   n_per  -- integer: Beam slices per plane.
+!   nplane -- integer: Planes of the record.
+!
+! Output:
+!   ifld   -- integer: Record plane at or below the slice.
+!   ifld2  -- integer: The plane above it, or ifld when w = 0.
+!   w      -- real(rp): The weight of ifld2.
+!-
+
+subroutine fel_field_sample (slip, is, n_per, nplane, ifld, ifld2, w)
+
+type (fel_slip_struct) slip
+integer is, n_per, nplane, ifld, ifld2, j
+real(rp) w
+
+!
+
+j = (is - 1) / n_per
+w = real(mod(is - 1, n_per), rp) / n_per
+ifld = fel_field_index(slip, j + 1, nplane)
+ifld2 = ifld
+if (w /= 0) ifld2 = fel_field_index(slip, j + 2, nplane)
+
+end subroutine fel_field_sample
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_field_slice_plane (wf, ifld, ifld2, w, ex, ey)
+!
+! Routine to form the plane a beam slice reads from the two record planes around it,
+! (1 - w) times the first plus w times the second (fel_field_sample), for the stats and
+! the diagnostics, which take a plane. With w = 0 it is a copy of the first.
+!
+! Input:
+!   wf           -- wavefront_struct: The record.
+!   ifld, ifld2  -- integer: The two record planes.
+!   w            -- real(rp): The second's weight.
+!
+! Output:
+!   ex(:,:)      -- complex(wf_rp): The x plane, allocated here.
+!   ey(:,:)      -- complex(wf_rp), allocatable: The y plane, allocated when the record has one.
+!-
+
+subroutine fel_field_slice_plane (wf, ifld, ifld2, w, ex, ey)
+
+type (wavefront_struct) wf
+complex(wf_rp), allocatable :: ex(:,:), ey(:,:)
+integer ifld, ifld2
+real(rp) w
+
+!
+
+if (w == 0) then
+  ex = wf%Ex(:,:,ifld)
+  if (allocated(wf%Ey)) ey = wf%Ey(:,:,ifld)
+else
+  ex = (1 - w) * wf%Ex(:,:,ifld) + w * wf%Ex(:,:,ifld2)
+  if (allocated(wf%Ey)) ey = (1 - w) * wf%Ey(:,:,ifld) + w * wf%Ey(:,:,ifld2)
+endif
+
+end subroutine fel_field_slice_plane
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_apply_slippage (slip, wf, slippage, bank, harm, err_flag)
 !
 ! Routine to account the slippage of one step and rotate the field record when it
@@ -869,7 +983,7 @@ call fel_assert_averaged_chart (beam, r_name, err)
 if (err) return
 
 nslice = size(ff(1)%wf%Ex, 3)
-if (size(beam%slice) /= nslice) then
+if (fel_field_planes(size(beam%slice), ff(1)%n_per) /= nslice) then
   call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES BUT THE FIELD RECORD HAS \i0\ .', &
                                  i_array = [size(beam%slice), nslice])
   return
@@ -897,7 +1011,7 @@ enddo
 call fel_toc (fel_t_und_prep$)
 
 call fel_tic (fel_t_sc_profile$)
-if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(nslice))
+if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(size(beam%slice)))
 call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_esc)
 call fel_toc (fel_t_sc_profile$)
 
@@ -1906,15 +2020,16 @@ real(rp) gridmax
 integer ngrid_arr(3)
 complex(rp) cpart, rpart
 complex(rp) rpart_h(size(ff))
-integer ip, ix, iy, ifld, io, nf
+integer ip, ix, iy, ifld, ifld2, io, nf
 integer ifld_h(size(ff))
+real(rp) wz
 logical on_grid
 
 !
 
 nf = size(ff)
 wf => ff(1)%wf
-ifld = fel_field_index(ff(1)%slip, is, size(wf%Ex, 3))
+call fel_field_sample (ff(1)%slip, is, ff(1)%n_per, size(wf%Ex, 3), ifld, ifld2, wz)
 
 p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
@@ -1945,7 +2060,60 @@ rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
 ngrid_arr = wavefront_shape(wf)
 gridmax = (ngrid_arr(1) - 1) * wf%dx / 2
 
-if (nf == 1) then
+if (nf == 1 .and. wz /= 0) then
+
+  ! Single field sampled coarser than the slices: the slice reads the two planes around
+  ! it by the weights of fel_field_sample. The loop is the scalar path's below, with the
+  ! second plane added at each grid point, kept apart so that path's arithmetic stays as
+  ! it was.
+
+  do ip = 1, sl%n
+    p_mc = p0_mc * (1 + sl%pz(ip))
+    gamma = sqrt(p_mc**2 + 1)
+    beta = p_mc / gamma
+    theta = beam%phi0 + xks * sl%z(ip) / beta
+
+    awloc = faw(und, sl%x(ip), sl%y(ip))
+    px_g = sl%px(ip) * p0_mc
+    py_g = sl%py(ip) * p0_mc
+    btpar = 1 + px_g*px_g + py_g*py_g + aw*aw*awloc*awloc
+
+    call fel_grid_weights_pre (gridmax, wf%dx, wf%dy, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
+    if (on_grid) then
+      cpart = (1 - wz) * (wf%Ex(ix,   iy,   ifld) * wx * wy &
+                        + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy &
+                        + wf%Ex(ix,   iy+1, ifld) * wx * (1-wy) &
+                        + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)) &
+            + wz * (wf%Ex(ix,   iy,   ifld2) * wx * wy &
+                  + wf%Ex(ix+1, iy,   ifld2) * (1-wx) * wy &
+                  + wf%Ex(ix,   iy+1, ifld2) * wx * (1-wy) &
+                  + wf%Ex(ix+1, iy+1, ifld2) * (1-wx) * (1-wy))
+      if (allocated(wf%Ey)) then
+        cpart = conjg(und%pol(1)) * cpart
+        cpart = cpart + conjg(und%pol(2)) * ((1 - wz) * (wf%Ey(ix,   iy,   ifld) * wx * wy &
+                                                       + wf%Ey(ix+1, iy,   ifld) * (1-wx) * wy &
+                                                       + wf%Ey(ix,   iy+1, ifld) * wx * (1-wy) &
+                                                       + wf%Ey(ix+1, iy+1, ifld) * (1-wx) * (1-wy)) &
+                                           + wz * (wf%Ey(ix,   iy,   ifld2) * wx * wy &
+                                                 + wf%Ey(ix+1, iy,   ifld2) * (1-wx) * wy &
+                                                 + wf%Ey(ix,   iy+1, ifld2) * wx * (1-wy) &
+                                                 + wf%Ey(ix+1, iy+1, ifld2) * (1-wx) * (1-wy)))
+      endif
+      rpart = rtmp * awloc * conjg(cpart)
+    else
+      rpart = 0
+    endif
+
+    ez_ip = ez(ip) + esc_loss
+    call fel_runge_kutta (delz, xks, xku, btpar, rpart, ez_ip, gamma, theta)
+
+    p_mc = sqrt(gamma**2 - 1)
+    sl%pz(ip) = (p_mc - p0_mc) / p0_mc
+    beta = p_mc / gamma
+    sl%z(ip) = -beta * (phi0_new - theta) / xks
+  enddo
+
+elseif (nf == 1) then
 
   ! Single field: the scalar path.
 
@@ -3364,5 +3532,62 @@ if (allocated(wf%Ey)) then
 endif
 
 end subroutine fel_field_diag
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_field_diag_plane (ex, dx, power, on_axis_intensity, ey)
+!
+! Routine to return fel_field_diag's power and on-axis intensity of a plane given
+! directly, the plane a beam slice reads under a field coarser than its slices
+! (fel_field_slice_plane). The arithmetic is fel_field_diag's.
+!
+! Input:
+!   ex(:,:) -- complex(wf_rp): The x plane.
+!   dx      -- real(rp): Grid spacing [m].
+!   ey(:,:) -- complex(wf_rp), optional: The y plane.
+!
+! Output:
+!   power             -- real(rp): Slice power [W].
+!   on_axis_intensity -- real(rp): Intensity at the grid center [W/m^2].
+!-
+
+subroutine fel_field_diag_plane (ex, dx, power, on_axis_intensity, ey)
+
+complex(wf_rp) ex(:,:)
+complex(wf_rp), optional :: ey(:,:)
+real(rp) dx, power, on_axis_intensity, scl, wei
+integer ix, iy, ngrid, ic
+
+!
+
+ngrid = size(ex, 1)
+scl = dx**2 / (2 * (mu_0_vac * c_light))
+
+power = 0
+do iy = 1, ngrid
+  do ix = 1, ngrid
+    wei = real(ex(ix,iy), rp)**2 + aimag(ex(ix,iy))**2
+    power = power + wei
+  enddo
+enddo
+if (present(ey)) then
+  do iy = 1, ngrid
+    do ix = 1, ngrid
+      wei = real(ey(ix,iy), rp)**2 + aimag(ey(ix,iy))**2
+      power = power + wei
+    enddo
+  enddo
+endif
+power = power * scl
+
+ic = ngrid/2 + 1
+on_axis_intensity = (real(ex(ic,ic), rp)**2 + aimag(ex(ic,ic))**2) / (2 * (mu_0_vac * c_light))
+if (present(ey)) then
+  on_axis_intensity = on_axis_intensity + (real(ey(ic,ic), rp)**2 + aimag(ey(ic,ic))**2) / (2 * (mu_0_vac * c_light))
+endif
+
+end subroutine fel_field_diag_plane
 
 end module fel_track_mod

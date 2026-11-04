@@ -46,6 +46,13 @@ so a set that takes hours is re-analyzed from its files.
             through the full line under both propagators, unchirped and at three chirps.
             The same three numbers and the slope the exit wavelengths carry against minus
             twice the energy chirp. Needs --validation-dir for the lattice.
+  sweep     The field's sampling along tau, field.n_wavelength, at 1, 2, 5, 10, 20 and
+            40 slices a plane on four lines from noise under the spectral propagator:
+            the SASE tier's beam over 1280 slices, and the sase, flash1 and lcls
+            examples. For each run the window's and the pulse's energy, the peak power,
+            the exit power per slice against the run at one slice a plane, the exit
+            spectrum's rms width and centroid, and the walk. Needs --validation-dir for
+            the Aramis lattice.
 
 The tracker is run from the work directory, into which the validation directory's
 inputs are linked, so the validation directory is read and never written.
@@ -714,6 +721,107 @@ def chirped(args, wdir):
 
 
 # --------------------------------------------------------------------------------------
+# The sweep of the field's sampling along tau, field.n_wavelength, on four lines.
+
+SWEEP_FACTORS = (1, 2, 5, 10, 20, 40)   # Slices a plane.
+
+
+def sweep_measure(wdir, root, ref=None):
+    """What one run of the sweep is judged on: the window's and the pulse's energy, the
+    peak slice power at the exit, the exit power per beam slice against the reference
+    run's over the reference's peak, the rms width of the exit spectrum relative to the
+    carrier from the final field file, taken on the field's own planes, and the walk."""
+    from lucifer.stats import read_stats
+    from lucifer.field import read_field
+    text = (wdir / f"{root}.log").read_text()
+    f = footer(text)
+    with read_stats(wdir / f"{root}.stats.h5") as st:
+        power = np.asarray(st["field/total/power"])[-1]
+    fld = read_field(wdir / f"{root}-final.wf.h5")
+    u, dz, lam = fld["u"], fld["dz"], fld["wavelength"]
+    a = u.sum(axis=(1, 2))
+    spec = np.abs(np.fft.fft(a))**2
+    kappa = 2 * np.pi * np.fft.fftfreq(a.size, d=dz)
+    k0 = 2 * np.pi / lam
+    tot = spec.sum()
+    mean = (spec * kappa).sum() / tot if tot > 0 else float("nan")
+    width = np.sqrt((spec * (kappa - mean)**2).sum() / tot) / k0 if tot > 0 else float("nan")
+    out = dict(window_energy=f.get("window_energy", float("nan")), pulse_energy=f.get("pulse_energy", float("nan")),
+               peak_power=float(power.max()), width=float(width), centroid=float(mean / k0),
+               walk=f.get("walk_seconds", float("nan")), planes=int(u.shape[0]), power=power)
+    if ref is not None:
+        out["exit_diff"] = float(np.abs(power - ref["power"]).max() / np.abs(ref["power"]).max())
+    return out
+
+
+def sweep_machines(args, wdir):
+    """The four lines, each as (name, directory, input file, window n_wavelength, extra
+    overrides): the SASE tier's beam over 1280 slices from noise, and the sase, flash1 and
+    lcls examples as they ship."""
+    import shutil
+    import tomllib
+    here = pathlib.Path(__file__).resolve().parents[2]
+    machines = []
+    beam, dark = chirp_prepare(args, wdir)
+    (wdir / "aramis_sweep.toml").write_text(to_toml_text(CHIRP_RUN_INPUT.format(
+        lattice="chirp-line.bmad", beam=beam.name, field=dark.name)))
+    machines.append(("aramis", wdir, "aramis_sweep.toml", 3, []))
+    for name in ("sase", "flash1", "lcls"):
+        d = wdir / name
+        d.mkdir(exist_ok=True)
+        src = here / "examples" / name
+        for f in src.iterdir():
+            if f.suffix in (".toml", ".bmad"):
+                shutil.copyfile(f, d / f.name)
+        shutil.copyfile(here / "examples" / "aramis.bmad", wdir / "aramis.bmad")
+        with open(d / "lucifer.toml", "rb") as fh:
+            n_wl = int(tomllib.load(fh)["window"]["n_wavelength"])
+        machines.append((name, d, "lucifer.toml", n_wl, []))
+    return machines
+
+
+def to_toml_text(flat):
+    from lucifer.flat import to_toml
+    return to_toml(flat)
+
+
+def sweep(args, wdir):
+    print("--- sweep: the field's sampling along tau on four lines, from noise, under the spectral propagator")
+    print(f"  {args.threads} threads; each run against the same line at the window's slice")
+    print()
+    results = {}
+    for name, d, toml, n_wl, extra in sweep_machines(args, wdir):
+        print(f"  {name}: window.n_wavelength = {n_wl}")
+        print("    slices a plane   field.n_wavelength   planes   window energy   pulse energy   peak power   "
+              "exit power vs finest   spectrum rms width   centroid   walk")
+        ref = None
+        for fac in SWEEP_FACTORS:
+            root = f"sweep_{name}_{fac}"
+            over = ["field.propagator=spectral", f"field.n_wavelength={fac * n_wl}", "run.keep_escaped_field=true"] + extra
+            rc, text = run(args.exe, toml, over, root, d, args.threads)
+            if rc != 0:
+                m = re.search(r"\n\s*\[ERROR.*?\n(.*?)\n", text)
+                reason = text.strip().splitlines()[-1] if text.strip() else "no message"
+                for line in text.splitlines():
+                    if "FIELD.N_WAVELENGTH" in line:
+                        reason = line.strip()
+                        break
+                print(f"    {fac:6d}   {fac * n_wl:8d}   refused: {reason[:110]}")
+                results[(name, fac)] = dict(refused=reason)
+                continue
+            r = sweep_measure(d, root, ref)
+            if ref is None:
+                ref = r
+            results[(name, fac)] = r
+            diff = r.get("exit_diff", 0.0)
+            print(f"    {fac:6d}   {fac * n_wl:8d}   {r['planes']:6d}   {r['window_energy']:.4e} J   "
+                  f"{r['pulse_energy']:.4e} J   {r['peak_power']:.4e} W   {diff:.3e}   {r['width']:.3e}   "
+                  f"{r['centroid']:+.2e}   {r['walk']:.1f} s")
+        print()
+    return results
+
+
+# --------------------------------------------------------------------------------------
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -722,7 +830,7 @@ def main():
     p.add_argument("--validation-dir", help="a completed validation pass's work directory")
     p.add_argument("--threads", type=int, default=1, help="OMP_NUM_THREADS for every run")
     p.add_argument("--reuse", action="store_true", help="keep a run whose log and final field exist")
-    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped"],
+    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped", "sweep"],
                    help="which measurements; the first four by default")
     args = p.parse_args()
     global REUSE

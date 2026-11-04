@@ -289,6 +289,12 @@ call add ('field', 'propagator', key_string$, '', 'propagator', &
       'diffracted at its own wavenumber and the slippage a continuous phase ramp, the light it carries ' // &
       'past the head banked as the escaped field (docs/spectral-field.md).', &
       allowed = [character(16) :: 'slices', 'spectral'])
+call add ('field', 'n_wavelength', key_int$, 'wavelengths', 'field sampling', &
+      'The field''s plane along tau, a whole multiple of window.n_wavelength. 0 takes the window''s slice ' // &
+      'under the slice propagator, which holds one plane a slice and takes no other, and under the ' // &
+      'spectral propagator derives a fraction of the cooperation length in whole slices, cut so the ' // &
+      'window keeps 8 planes. A stated value above the cliff the sweep found is refused ' // &
+      '(docs/spectral-field.md).', lo = 0.0_rp)
 
 ! [wake]: fel_chamber_wake_init_struct.
 
@@ -593,6 +599,7 @@ case ('field.seed_power');                 run%winit%seed_power = rv
 case ('field.seed_waist_size');            run%winit%seed_waist_size = rv
 case ('field.seed_polarization');          call put (run%winit%seed_polarization)
 case ('field.propagator');                 call put (run%winit%propagator)
+case ('field.n_wavelength');               run%winit%n_wavelength = iv
 case ('field.harmonics')
   if (.not. fits(size(run%winit%harmonics))) return
   run%winit%harmonics = 0
@@ -956,6 +963,7 @@ case ('field.seed_power');                 rv = run%winit%seed_power
 case ('field.seed_waist_size');            rv = run%winit%seed_waist_size
 case ('field.seed_polarization');          sv = run%winit%seed_polarization
 case ('field.propagator');                 sv = run%winit%propagator
+case ('field.n_wavelength');               iv = run%winit%n_wavelength
 case ('field.harmonics')
   n = count(run%winit%harmonics > 0)
   ilist = run%winit%harmonics(1:n)

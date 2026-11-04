@@ -30,6 +30,23 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-04 Added: `field.n_wavelength`, the field's plane along tau in wavelengths, a whole multiple
+  of `window.n_wavelength`, so under the spectral propagator the field is sampled coarser than the
+  beam's slices (`docs/spectral-field.md`). A beam slice reads the two planes around it by linear
+  weights, the deposit splits each slice's source between them by the same weights and divides a
+  plane's sum by the slices it spans, and the source filter runs once a plane, so a step pays for
+  the field at its planes and for the beam at its slices. The stats' field rows stay on the beam's
+  axis, each from the plane its slice reads, and the dumps, the frames and the pulse file carry the
+  field's own planes at their spacing. Unset, the key derives a tenth of the cooperation length at
+  the beam's rho, printed with its origin and cut so the window keeps 8 planes, which on the SASE
+  tier's beam over 1280 slices holds the exit energy to 0.5 percent of one plane a slice and cuts
+  the walk from 692 to 195 s at 12 threads. A stated value above a quarter of the cooperation
+  length is refused, where the sweep found the energy falling by percent. Under the slice
+  propagator the key must equal the window's slice. The validation suite's `spectral` section gains
+  the derived coarse field against one plane a slice on the SASE tier, 8.0e-2 of the exit peak
+  against a bound of 1.5e-1, and its spectral run is held to one plane a slice. A dark field file
+  at another spacing gives its grid alone and the field starts dark on its own planes. Harmonic
+  fields and `run.dump_reduced` are refused with a coarse field.
 - 2026-11-03 Changed: the spectral propagator, `field.propagator = "spectral"`, is a mode of the
   program, checked in the keystone, and its slippage is the phase ramp alone with the escaped-field
   bank under it (`docs/spectral-field.md`). The window is followed along tau by a pad of 4 free

@@ -1354,7 +1354,8 @@ Output:
   n_pstep     -- real(rp): Particle-steps, the product of the two. Real since it
                    passes 2^31 on an ordinary time-dependent run.
   n_gpt       -- real(rp): Transverse grid points the field solve touches per step,
-                   over the window and over every member and plane of the field set.
+                   over the field's planes of the window and over every member and
+                   polarization of the field set.
   ngrid       -- integer: Transverse points on a side of one grid.
   nstep_unavg -- integer: How many of nstep are unaveraged substeps.
 ```
@@ -3181,6 +3182,22 @@ Output:
   err_flag  -- logical: Set True if there is an error. False otherwise.
 ```
 
+(api-settle-field-sampling)=
+### `settle_field_sampling`
+
+*Subroutine* `()`
+
+```
+Routine to settle field.n_wavelength (fel_field_sample, docs/spectral-field.md).
+Under the slice propagator it is the window's slice and nothing else, since that
+propagator holds one plane a slice. Under the spectral propagator a stated value is a
+whole multiple of the slice, held below the cliff the sweep found,
+fel_field_coop_cliff$ of the cooperation length lambda/(4 pi rho), and an unstated one
+is derived as fel_field_coop_fraction$ of the cooperation length in whole slices from
+the built beam's rho (fel_pierce_of_beam), described or loaded, and is the slice where
+there is no rho or one slice.
+```
+
 (api-generate-seed-field)=
 ### `generate_seed_field`
 
@@ -4432,6 +4449,29 @@ since the bookkeeper leaves nothing else to read. So an element whose step is
 l_period/20 by the input file's own choice is derived over. Any other stated step is kept.
 ```
 
+(api-fel-pierce-of-beam)=
+### `fel_pierce_of_beam`
+
+*Function* `(run) result (rho)`
+
+```
+Routine to return the one-dimensional Pierce parameter of the beam as built, at the
+first FEL element, in Genesis's form rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2):
+the current of the slice with the most charge, its rms size sqrt((<x^2> + <y^2>)/2)
+about the slice's centroid, and the first undulator's coupling. Where the description's
+form (described_pierce in fel_setup_lattice) serves the slicing before the beam exists,
+this serves what is settled after it, the field's sampling (fel_init_wavefront), for a
+loaded beam as for a described one.
+```
+
+```
+Input:
+  run -- fel_run_struct: The run, after fel_init_beam.
+
+Output:
+  rho -- real(rp): The Pierce parameter, or zero where there is nothing to derive from.
+```
+
 (api-fel-setup-slippage)=
 ### `fel_setup_slippage`
 
@@ -4889,6 +4929,61 @@ Input:
 Output:
   wf       -- wavefront_struct: Source added to the slice's field record.
   err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-fel-spectral-deposit-coarse)=
+### `fel_spectral_deposit_coarse`
+
+*Subroutine* `(und, beam, fs, delz, xks1, err_flag)`
+
+```
+Routine to deposit every slice's source into a field sampled coarser than the slices
+(fel_field_sample): plane by plane, in parallel over the planes, each plane summing
+the sources of the slices on it and of the slices between it and its neighbors, each
+slice's source weighted by the slice's distance from the plane, 1 - w on the plane
+below it and w on the plane above, and the sum divided by the slices a plane spans.
+The weights on a plane add to that count, and the source the envelope equation takes
+at a plane is the source per slice there, so the division makes the deposit the
+readback's adjoint under each grid's own measure: a uniform source over the slices
+gives every plane that one slice's source, as one plane a slice does. The source
+filter then runs once on the plane's sum, since the filter is linear, so a step costs
+one transform pair a plane and not one a slice. The per-particle scatter is
+fel_spectral_deposit's, and the scale, the phase and the add of 2*crsource are
+fel_field_step's.
+```
+
+```
+Input:
+  und      -- fel_und_struct: Undulator parameters.
+  beam     -- fel_beam_struct: The beam.
+  fs       -- fel_field_struct: The member, the fundamental.
+  delz     -- real(rp): Step length [m].
+  xks1     -- real(rp): Fundamental radiation wavenumber [1/m].
+
+Output:
+  fs       -- fel_field_struct: The sources added to the record.
+  err_flag -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-plane-source)=
+### `plane_source`
+
+*Subroutine* `(j)`
+
+```
+Routine to sum, filter and add the source of window plane j: the slices from
+(j-1) m + 1 to j m sit on it or above it, with the weight 1 - w, and the slices from
+(j-2) m + 1 to (j-1) m below it, with the weight w of fel_field_sample.
+```
+
+(api-scatter)=
+### `scatter`
+
+*Subroutine* `(sl, weight, crsource)`
+
+```
+Routine to add one slice's source times weight to a plane's sum, the per-particle
+scatter of fel_spectral_deposit.
 ```
 
 (api-spectral-fft1)=
@@ -6303,6 +6398,80 @@ record out. Field slice fel_field_index(slip, is, nslice) is the field at time w
 position is.
 ```
 
+(api-fel-field-planes)=
+### `fel_field_planes`
+
+*Function* `(nslice, n_per) result (nplane)`
+
+```
+Routine to return the planes a field record holds over a window of nslice beam slices
+when one plane spans n_per of them (field.n_wavelength over window.n_wavelength): a
+plane at every n_per-th slice from the first, and one more past the last slice when
+that slice falls between two, so every slice has a plane on each side
+(fel_field_sample). With n_per = 1 it is nslice.
+```
+
+```
+Input:
+  nslice -- integer: Beam slices in the window.
+  n_per  -- integer: Beam slices per field plane.
+
+Output:
+  nplane -- integer: Planes of the record.
+```
+
+(api-fel-field-sample)=
+### `fel_field_sample`
+
+*Subroutine* `(slip, is, n_per, nplane, ifld, ifld2, w)`
+
+```
+Routine to return the record planes beam slice is reads under a field whose plane
+spans n_per beam slices, and the weight of the second. Slice is sits at (is-1)/n_per
+planes along tau, between window planes j = (is-1)/n_per and j+1 (0-based), with the
+weight w = mod(is-1, n_per)/n_per on the second, and each window plane is mapped to
+its record plane through fel_field_index. With w = 0 the slice sits on a plane and
+ifld2 = ifld, so a reader takes one plane, which is every slice under n_per = 1. The
+deposit splits a slice's source between the two planes by the same weights
+(fel_spectral_deposit_coarse), so the readback is the deposit's adjoint and a slice on
+a plane sees that plane alone (docs/spectral-field.md).
+```
+
+```
+Input:
+  slip   -- fel_slip_struct: The record's rotation.
+  is     -- integer: Beam slice, 1-based.
+  n_per  -- integer: Beam slices per plane.
+  nplane -- integer: Planes of the record.
+
+Output:
+  ifld   -- integer: Record plane at or below the slice.
+  ifld2  -- integer: The plane above it, or ifld when w = 0.
+  w      -- real(rp): The weight of ifld2.
+```
+
+(api-fel-field-slice-plane)=
+### `fel_field_slice_plane`
+
+*Subroutine* `(wf, ifld, ifld2, w, ex, ey)`
+
+```
+Routine to form the plane a beam slice reads from the two record planes around it,
+(1 - w) times the first plus w times the second (fel_field_sample), for the stats and
+the diagnostics, which take a plane. With w = 0 it is a copy of the first.
+```
+
+```
+Input:
+  wf           -- wavefront_struct: The record.
+  ifld, ifld2  -- integer: The two record planes.
+  w            -- real(rp): The second's weight.
+
+Output:
+  ex(:,:)      -- complex(wf_rp): The x plane, allocated here.
+  ey(:,:)      -- complex(wf_rp), allocatable: The y plane, allocated when the record has one.
+```
+
 (api-fel-apply-slippage)=
 ### `fel_apply_slippage`
 
@@ -7235,6 +7404,28 @@ Input:
 Output:
   power             -- real(rp): Radiation power of the record [W].
   on_axis_intensity -- real(rp): Genesis's on-axis intensity diagnostic.
+```
+
+(api-fel-field-diag-plane)=
+### `fel_field_diag_plane`
+
+*Subroutine* `(ex, dx, power, on_axis_intensity, ey)`
+
+```
+Routine to return fel_field_diag's power and on-axis intensity of a plane given
+directly, the plane a beam slice reads under a field coarser than its slices
+(fel_field_slice_plane). The arithmetic is fel_field_diag's.
+```
+
+```
+Input:
+  ex(:,:) -- complex(wf_rp): The x plane.
+  dx      -- real(rp): Grid spacing [m].
+  ey(:,:) -- complex(wf_rp), optional: The y plane.
+
+Output:
+  power             -- real(rp): Slice power [W].
+  on_axis_intensity -- real(rp): Intensity at the grid center [W/m^2].
 ```
 
 ## `fel_unaveraged_mod.f90`

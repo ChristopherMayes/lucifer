@@ -113,7 +113,8 @@
         "seed_waist_size": {"type": "number", "default": 0.0, "minimum": 0.0, "description": "The seed's intensity 1/e^2 radius. [m]"},
         "seed_polarization": {"type": "string", "default": "x", "enum": ["x", "y"], "description": "The seed's polarization, x or y."},
         "harmonics": {"type": "array", "items": {"type": "integer"}, "default": [1], "description": "The field set: 1 first, then further harmonic numbers in increasing order."},
-        "propagator": {"type": "string", "default": "slices", "enum": ["slices", "spectral"], "description": "The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slip"}
+        "propagator": {"type": "string", "default": "slices", "enum": ["slices", "spectral"], "description": "The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slip"},
+        "n_wavelength": {"type": "integer", "default": 0, "minimum": 0, "description": "The field's plane along tau, a whole multiple of window.n_wavelength. 0 takes the window's slice under the slice propagator, which holds one plane a slice and takes no other, and under the spectral propagator derives a fraction of the coope [wavelengths]"}
       }
     },
     "wake": {
