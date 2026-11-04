@@ -134,6 +134,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The validation suite leaves about 13 GB in its work directory on either build,
+      # measured on the recording machine on 2026-11-04: 12 GB of it in the check sections,
+      # of which the spectral section's wavefront files are 2.8 GB, program-structure's
+      # 2.3 GB and source-filter's 2.1 GB. A runner's root disk also holds the image's
+      # toolsets, which this job never touches, and on 2026-11-04 the release job's runner
+      # filled during the check sections after five runs had fit, and the runner lost its
+      # own log with it. This step removes those toolsets and prints the disk before and
+      # after, and the step after the two validations prints it again with the work
+      # directories' sizes, so the margin is on every log.
+      - name: Make room on the runner's disk, ${{ matrix.build }} build
+        shell: bash
+        run: |
+          df -h / "$RUNNER_TEMP"
+          for d in /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup \
+                   /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/powershell; do
+            if [ -d "$d" ]; then sudo rm -rf "$d"; fi
+          done
+          docker image prune -af > /dev/null 2>&1 || true
+          df -h / "$RUNNER_TEMP"
+
       # The build environment is the repository's own file: conda-forge's bmad in its
       # nompi variant, the compilers and cmake, each a minimum. The package resolves on the
       # day the job runs, so the release it carries is checked against BMAD_RELEASE below
@@ -270,6 +290,15 @@ jobs:
           ./tests/wavefront/run_validation.sh \
               --exe "$PWD/${{ matrix.dir }}/bin/wavefront_drift_test" \
               --work-dir "$RUNNER_TEMP/wd-wf-${{ matrix.build }}"
+
+      # The disk after both validations, with the work directories' sizes, so a run
+      # that fills its runner is read against the log of the run before it.
+      - name: Disk after the validations, ${{ matrix.build }} build
+        if: always()
+        shell: bash
+        run: |
+          df -h / "$RUNNER_TEMP"
+          du -sh "$RUNNER_TEMP"/wd-* 2>/dev/null || true
 
       # The results file records what ran, what skipped and why, and each tier's level.
       # It is not what writes the generated table: report_validation.py refuses a file

@@ -30,6 +30,11 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-04 Changed: `.github/workflows/lucifer-linux.yml` removes the runner image's toolsets the job
+  never uses before it builds, and prints the disk before and after the validations with the work
+  directories' sizes. The validation suite leaves about 13 GB in its work directory on either build,
+  12 GB of it in the check sections, and on 2026-11-04 the release job's runner filled during the
+  sections after five runs had fit.
 - 2026-11-04 Changed: `docs/spectral-field.md` is written from one record. `tests/scripts/spectral_field.py all`
   runs the seven measurements, the sweep and the two FEL cases included, and writes every number and curve
   into `docs/generated/spectral/measured.json` as each finishes, with the tracker's version, the toolchain,
