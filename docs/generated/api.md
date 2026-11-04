@@ -1316,6 +1316,11 @@ particle count. A deposit linear in particle-steps sits beside it. The 512 and 8
 particle rows of docs/performance.md separate the two terms: the push moves by a factor
 of 14 between them and the transform by 8 percent.
 
+Under the spectral propagator (fel_spectral_mod) a third term counts what that mode
+adds: the pad's planes in the transverse transform, and the passes along tau, each a
+transform pair over every line of the window and the pad, two a step and the
+interludes' own (fel_cost_passes).
+
 The rates below are per thread. The page's tables were taken at twelve threads. The
 thread scan there gives a serial fraction of 2.1 percent. The parallelism is over
 slices, so the effective thread count is the smaller of the thread and slice counts.
@@ -1358,6 +1363,31 @@ Output:
                    polarization of the field set.
   ngrid       -- integer: Transverse points on a side of one grid.
   nstep_unavg -- integer: How many of nstep are unaveraged substeps.
+```
+
+(api-fel-cost-passes)=
+### `fel_cost_passes`
+
+*Subroutine* `(run, n_int_kernel, n_int_slip)`
+
+```
+Routine to count the passes the spectral propagator makes outside the undulator
+steps, as fel_track_line_mod makes them. An interlude element the walk tracks takes
+one kernel pass a piece (fel_spectral_drift), the pieces fel_interlude_pieces cuts it
+into under the bmad interlude model and one under Genesis's, and its slippage in slip
+passes of at most one plane each (fel_spectral_slip). An undulator's steps take their
+two passes a step, which fel_cost_estimate counts from nstep, and an undulator whose
+last step carries a slippage of its own takes that slippage's passes, counted here.
+An element the walk passes over (fel_element_inert) takes none.
+```
+
+```
+Input:
+  run          -- fel_run_struct: The run, after fel_setup_schedule.
+
+Output:
+  n_int_kernel -- integer: Kernel passes outside the undulator steps.
+  n_int_slip   -- integer: Slip passes outside the undulator steps' own.
 ```
 
 (api-fel-cost-estimate)=
