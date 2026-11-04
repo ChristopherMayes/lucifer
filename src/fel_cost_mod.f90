@@ -104,7 +104,8 @@ contains
 !   n_pstep     -- real(rp): Particle-steps, the product of the two. Real since it
 !                    passes 2^31 on an ordinary time-dependent run.
 !   n_gpt       -- real(rp): Transverse grid points the field solve touches per step,
-!                    over the window and over every member and plane of the field set.
+!                    over the field's planes of the window and over every member and
+!                    polarization of the field set.
 !   ngrid       -- integer: Transverse points on a side of one grid.
 !   nstep_unavg -- integer: How many of nstep are unaveraged substeps.
 !-
@@ -152,7 +153,7 @@ n_grid = wavefront_shape(run%ffield(1)%wf)
 ngrid = n_grid(1)
 npol = 1
 if (run%two_pol) npol = 2
-n_gpt = real(run%nslice, rp) * n_grid(1) * n_grid(2) * run%n_harm * npol
+n_gpt = real(run%nfield, rp) * n_grid(1) * n_grid(2) * run%n_harm * npol
 
 end subroutine fel_cost_count
 
@@ -195,9 +196,9 @@ if (ngrid > 1) t_one = t_one + fel_cost_solve$ * n_gpt * log(real(ngrid, rp)) / 
 ! The spectral propagator's passes along tau, over the window and its pad, which a
 ! window of one slice does not have.
 
-if (run%spectral%on .and. run%nslice > 1) then
-  n_t = run%nslice + fel_cost_n_pad$
-  t_one = t_one + 2 * fel_cost_tau$ * n_gpt * (real(n_t, rp) / run%nslice) * log(real(n_t, rp)) / log(2.0_rp) * nstep
+if (run%spectral%on .and. run%nfield > 1) then
+  n_t = run%nfield + fel_cost_n_pad$
+  t_one = t_one + 2 * fel_cost_tau$ * n_gpt * (real(n_t, rp) / run%nfield) * log(real(n_t, rp)) / log(2.0_rp) * nstep
 endif
 
 n_omp = 1

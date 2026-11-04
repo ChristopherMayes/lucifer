@@ -61,7 +61,8 @@ use bmad
 use beam_utils, only: calc_bunch_params, calc_emittances_and_twiss_from_sigma_matrix
 use fel_beam_mod
 use wavefront_mod
-use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel_field_diag, fel_slice_to_bunch
+use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel_field_diag, fel_slice_to_bunch, &
+                         fel_field_sample, fel_field_slice_plane, fel_field_diag_plane
 use hdf5_interface
 use fel_h5_mod
 use, intrinsic :: ieee_arithmetic
@@ -458,8 +459,9 @@ real(rp) z_now
 integer ix_ele
 logical with_angles, err_flag
 
-real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), vmin(6), vmax(6), beta0, ks
-integer ir, is, ip, i, j, nslice
+complex(wf_rp), allocatable :: pl(:,:), pl_y(:,:)
+real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), vmin(6), vmax(6), beta0, ks, wz
+integer ir, is, ip, i, j, nslice, ifld, ifld2
 logical err, any_err
 character(*), parameter :: r_name = 'fel_stats_record'
 
@@ -489,11 +491,27 @@ any_err = .false.
 ! every slice, so the diag writer only prints. Each slice's arithmetic is the serial
 ! code, so diag.txt is bit-for-bit the same as a serial sweep.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, p_in, p_in_y, err) &
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, p_in, p_in_y, err, &
+!$OMP&                     ifld, ifld2, wz, pl, pl_y) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
-  call fel_field_diag (wf, fel_field_index(ff(1)%slip, is, nslice), fpow(is), fonax(is))
+
+  ! The field the slice reads: its own plane, or under a field coarser than the slices
+  ! the two planes around it by the readback's weights (fel_field_sample), so a field
+  ! row is what the beam saw at that slice.
+
+  call fel_field_sample (ff(1)%slip, is, ff(1)%n_per, size(wf%Ex, 3), ifld, ifld2, wz)
+  if (ff(1)%n_per == 1) then
+    call fel_field_diag (wf, ifld, fpow(is), fonax(is))
+  else
+    call fel_field_slice_plane (wf, ifld, ifld2, wz, pl, pl_y)
+    if (allocated(pl_y)) then
+      call fel_field_diag_plane (pl, wf%dx, fpow(is), fonax(is), pl_y)
+    else
+      call fel_field_diag_plane (pl, wf%dx, fpow(is), fonax(is))
+    endif
+  endif
   call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
   ! Two-pass weighted moments: mean first, then centered second moments
@@ -556,9 +574,15 @@ do is = 1, nslice
 
   ! The field slice this beam slice couples to, unrotated exactly as the dumps are.
 
-  call wavefront_params_of_plane (wf%Ex(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
-                                  wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
-                                  theta_cut = stats%split_angle, power_inside = p_in)
+  if (ff(1)%n_per == 1) then
+    call wavefront_params_of_plane (wf%Ex(:,:,ifld), wf%dx, &
+                                    wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
+                                    theta_cut = stats%split_angle, power_inside = p_in)
+  else
+    call wavefront_params_of_plane (pl, wf%dx, &
+                                    wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
+                                    theta_cut = stats%split_angle, power_inside = p_in)
+  endif
   any_err = any_err .or. err
   pms%s = z_now
   stats%f_centroid(:, is, ir) = pms%centroid
@@ -576,9 +600,15 @@ do is = 1, nslice
   ! plane returns NaN, since it has nothing to take moments of, and holds no power to add.
 
   if (allocated(wf%Ey)) then
-    call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
-                                    wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
-                                    theta_cut = stats%split_angle, power_inside = p_in_y)
+    if (ff(1)%n_per == 1) then
+      call wavefront_params_of_plane (wf%Ey(:,:,ifld), wf%dx, &
+                                      wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
+                                      theta_cut = stats%split_angle, power_inside = p_in_y)
+    else
+      call wavefront_params_of_plane (pl_y, wf%dx, &
+                                      wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
+                                      theta_cut = stats%split_angle, power_inside = p_in_y)
+    endif
     any_err = any_err .or. err
     if (pms%power > 0) stats%f_p_in(is, ir) = stats%f_p_in(is, ir) + p_in_y
     stats%f2_centroid(:, is, ir) = pms%centroid

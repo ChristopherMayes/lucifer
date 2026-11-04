@@ -74,6 +74,15 @@ private spectral_fft1, spectral_fft1_plan, spectral_fft1_plan_threads, bank_appe
 integer, parameter :: fel_spectral_n_free$ = 4      ! Free slots, the first where the bank reads its planes.
 integer, parameter :: fel_spectral_n_sponge$ = 12   ! The cos^2 sponge after them.
 
+! The field's sampling along tau under the spectral propagator, field.n_wavelength
+! (fel_field_sample, docs/spectral-field.md): the fraction of the cooperation length
+! lambda/(4 pi rho) a derived plane spans, the fraction above which a stated one is
+! refused, and the planes a window keeps at least. The two fractions are the sweep's.
+
+real(rp), parameter :: fel_field_coop_fraction$ = 0.1_rp
+real(rp), parameter :: fel_field_coop_cliff$ = 0.25_rp
+integer, parameter :: fel_field_planes_min$ = 8
+
 !+
 ! Struct fel_spectral_struct
 !
@@ -214,14 +223,19 @@ do io = 1, size(ff)
   if (err) return
   nslice_f = size(ff(io)%wf%Ex, 3)
   any_err = .false.
-  !$OMP parallel do private(err) reduction(.or.: any_err)
-  do is = 1, size(beam%slice)
-    call fel_spectral_deposit (und, beam, beam%slice(is), ff(io)%wf, &
-                               fel_field_index(ff(io)%slip, is, nslice_f), dz, ff(io)%harm, ks, err)
-    any_err = any_err .or. err
-  enddo
-  !$OMP end parallel do
-  if (any_err) return
+  if (ff(io)%n_per > 1) then
+    call fel_spectral_deposit_coarse (und, beam, ff(io), dz, ks, err)
+    if (err) return
+  else
+    !$OMP parallel do private(err) reduction(.or.: any_err)
+    do is = 1, size(beam%slice)
+      call fel_spectral_deposit (und, beam, beam%slice(is), ff(io)%wf, &
+                                 fel_field_index(ff(io)%slip, is, nslice_f), dz, ff(io)%harm, ks, err)
+      any_err = any_err .or. err
+    enddo
+    !$OMP end parallel do
+    if (any_err) return
+  endif
   call fel_spectral_slip (sp, ff(io), slippage, keep, err)
   if (err) return
 enddo
@@ -769,6 +783,190 @@ endif
 err_flag = .false.
 
 end subroutine fel_spectral_deposit
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_deposit_coarse (und, beam, fs, delz, xks1, err_flag)
+!
+! Routine to deposit every slice's source into a field sampled coarser than the slices
+! (fel_field_sample): plane by plane, in parallel over the planes, each plane summing
+! the sources of the slices on it and of the slices between it and its neighbors, each
+! slice's source weighted by the slice's distance from the plane, 1 - w on the plane
+! below it and w on the plane above, and the sum divided by the slices a plane spans.
+! The weights on a plane add to that count, and the source the envelope equation takes
+! at a plane is the source per slice there, so the division makes the deposit the
+! readback's adjoint under each grid's own measure: a uniform source over the slices
+! gives every plane that one slice's source, as one plane a slice does. The source
+! filter then runs once on the plane's sum, since the filter is linear, so a step costs
+! one transform pair a plane and not one a slice. The per-particle scatter is
+! fel_spectral_deposit's, and the scale, the phase and the add of 2*crsource are
+! fel_field_step's.
+!
+! Input:
+!   und      -- fel_und_struct: Undulator parameters.
+!   beam     -- fel_beam_struct: The beam.
+!   fs       -- fel_field_struct: The member, the fundamental.
+!   delz     -- real(rp): Step length [m].
+!   xks1     -- real(rp): Fundamental radiation wavenumber [1/m].
+!
+! Output:
+!   fs       -- fel_field_struct: The sources added to the record.
+!   err_flag -- logical: Set True if there is an error. False otherwise.
+!-
+
+subroutine fel_spectral_deposit_coarse (und, beam, fs, delz, xks1, err_flag)
+
+type (fel_und_struct) und
+type (fel_beam_struct), target :: beam
+type (fel_field_struct), target :: fs
+type (wavefront_struct), pointer :: wf
+real(rp) delz, xks1
+logical err_flag
+
+real(rp) dgrid, scl_w, p0_mc
+real(rp), pointer :: sigmoid(:,:)
+integer ngrid_arr(3), ngrid, nz, nf, m, j, is, is1, is2, ifld
+logical any_err
+character(*), parameter :: r_name = 'fel_spectral_deposit_coarse'
+
+!
+
+err_flag = .true.
+wf => fs%wf
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+nf = ngrid_arr(3)
+nz = size(beam%slice)
+m = fs%n_per
+dgrid = wf%dx
+p0_mc = fel_p0_mc(beam)
+
+scl_w = fel_und_coupling(und, fs%harm) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
+scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
+
+sigmoid => null()
+if (und%filter%on) then
+  sigmoid => fel_field_kernel_sigmoid(twopi / wf%wavelength)
+  if (.not. associated(sigmoid)) then
+    call out_io (s_error$, r_name, 'SOURCE FILTER IS ON BUT ITS SIGMOID WAS NOT BUILT FOR THIS WAVELENGTH.', &
+                                   'PLEASE REPORT THIS!')
+    return
+  endif
+endif
+
+any_err = .false.
+!$OMP parallel do private(is, is1, is2, ifld) reduction(.or.: any_err)
+do j = 1, nf
+  call plane_source (j)
+enddo
+!$OMP end parallel do
+err_flag = any_err
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine plane_source (j)
+!
+! Routine to sum, filter and add the source of window plane j: the slices from
+! (j-1) m + 1 to j m sit on it or above it, with the weight 1 - w, and the slices from
+! (j-2) m + 1 to (j-1) m below it, with the weight w of fel_field_sample.
+!-
+
+subroutine plane_source (j)
+
+complex(rp), allocatable :: crsource(:,:)
+integer j, is_l, is1_l, is2_l, ifld_l
+real(rp) w_l
+logical err_l
+
+!
+
+allocate (crsource(ngrid, ngrid))
+crsource = 0
+
+if (scl_w /= 0) then
+  is1_l = (j - 1) * m + 1
+  is2_l = min(nz, j * m)
+  do is_l = is1_l, is2_l
+    w_l = real(mod(is_l - 1, m), rp) / m
+    call scatter (beam%slice(is_l), (1 - w_l) / m, crsource)
+  enddo
+  is1_l = (j - 2) * m + 1
+  is2_l = min(nz, (j - 1) * m)
+  do is_l = max(1, is1_l), is2_l
+    w_l = real(mod(is_l - 1, m), rp) / m
+    if (w_l /= 0) call scatter (beam%slice(is_l), w_l / m, crsource)
+  enddo
+endif
+
+if (associated(sigmoid)) then
+  call wavefront_fft2 (crsource, wf_fft_forward$, err_l)
+  if (err_l) then
+    any_err = .true.;  return
+  endif
+  crsource = crsource * sigmoid
+  call wavefront_fft2 (crsource, wf_fft_backward$, err_l)
+  if (err_l) then
+    any_err = .true.;  return
+  endif
+  crsource = crsource / real(ngrid*ngrid, rp)
+endif
+
+ifld_l = fel_field_index(fs%slip, j, nf)
+if (allocated(wf%Ey)) then
+  wf%Ex(:,:,ifld_l) = wf%Ex(:,:,ifld_l) + 2 * und%pol(1) * crsource
+  wf%Ey(:,:,ifld_l) = wf%Ey(:,:,ifld_l) + 2 * und%pol(2) * crsource
+else
+  wf%Ex(:,:,ifld_l) = wf%Ex(:,:,ifld_l) + 2 * crsource
+endif
+
+end subroutine plane_source
+
+!+
+! Subroutine scatter (sl, weight, crsource)
+!
+! Routine to add one slice's source times weight to a plane's sum, the per-particle
+! scatter of fel_spectral_deposit.
+!-
+
+subroutine scatter (sl, weight, crsource)
+
+type (fel_slice_struct) sl
+complex(rp) crsource(:,:)
+real(rp) weight, part, theta, beta, wx, wy, gam, p_mc, s_t, c_t
+complex(rp) cpart
+integer ip, ix, iy
+logical on_grid
+
+!
+
+do ip = 1, sl%n
+  call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
+  if (.not. on_grid) cycle
+
+  p_mc = p0_mc * (1 + sl%pz(ip))
+  gam = sqrt(p_mc**2 + 1)
+  beta = p_mc / gam
+
+  theta = beam%phi0 + xks1 * sl%z(ip) / beta
+  if (fs%harm /= 1) theta = fs%harm * theta
+
+  part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * scl_w * sl%weight(ip) / gam * weight
+  call fel_sincos (theta, s_t, c_t)
+  cpart = cmplx(s_t, c_t, rp) * part
+
+  crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cpart
+  crsource(ix+1, iy)   = crsource(ix+1, iy)   + ((1-wx) * wy) * cpart
+  crsource(ix,   iy+1) = crsource(ix,   iy+1) + (wx * (1-wy)) * cpart
+  crsource(ix+1, iy+1) = crsource(ix+1, iy+1) + ((1-wx) * (1-wy)) * cpart
+enddo
+
+end subroutine scatter
+
+end subroutine fel_spectral_deposit_coarse
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

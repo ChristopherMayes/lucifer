@@ -50,7 +50,7 @@ KEYS = {
     ],
     "beam.resample": ["slice_width", "n_particle_per_slice", "beamlet_size", "n_slice", "use_beam_init"],
     "field": ["file", "lambda0", "grid_n_pts", "grid_half_width", "seed_power", "seed_waist_size",
-              "seed_polarization", "harmonics", "propagator"],
+              "seed_polarization", "harmonics", "propagator", "n_wavelength"],
     "wake": ["on", "model", "loss", "radius", "conductivity", "relaxation", "roundpipe", "material",
              "gap", "lgap", "hrough", "lrough", "write_kernels"],
     "space_charge": ["model", "rmax", "ngrid", "nz", "nphi", "longrange"],

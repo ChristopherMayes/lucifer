@@ -256,6 +256,9 @@ type wavefront_init_struct
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
   ! The field propagator (fel_spectral_mod, docs/spectral-field.md).
   character(16) :: propagator = 'slices'            ! slices or spectral.
+  integer :: n_wavelength = 0                       ! The field's plane along tau [wavelengths]: 0 takes
+                                                    !   the window's slice under slices and derives it
+                                                    !   under spectral (fel_setup_lattice).
 end type
 
 ! The transverse grid derived from the beam when the input file sets none
@@ -405,6 +408,8 @@ type fel_run_struct
   real(rp) :: ks = 0                       ! 2pi/lambda.
   real(rp) :: z_now = 0
   integer :: nslice = 0, n_harm = 1
+  integer :: nfield = 0                    ! Planes of a field record over the window (fel_field_planes).
+  logical :: field_sampling_derived = .false.   ! field.n_wavelength was derived, so the window may cut it.
   logical :: two_pol = .false., any_unavg = .false., timerun = .false.
   ! Running counters and ledger terms.
   real(rp) :: u_spont_cum = 0, e_rad_cum = 0

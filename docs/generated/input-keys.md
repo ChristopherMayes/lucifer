@@ -126,6 +126,7 @@
 | `seed_polarization` | string | `"x"` |  | `"x"`, `"y"` | The seed's polarization, x or y. |
 | `harmonics` | list of integers | `[1]` |  |  | The field set: 1 first, then further harmonic numbers in increasing order. |
 | `propagator` | string | `"slices"` |  | `"slices"`, `"spectral"` | The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slip |
+| `n_wavelength` | integer | `0` | wavelengths | from 0 | The field's plane along tau, a whole multiple of window.n_wavelength. 0 takes the window's slice under the slice propagator, which holds one plane a slice and takes no other, and under the spectral propagator derives a fraction of the coope |
 <!-- end keys-field -->
 
 (keys-wake)=
