@@ -125,11 +125,7 @@
 | `seed_waist_size` | real | `0` | m | from 0 | The seed's intensity 1/e^2 radius. |
 | `seed_polarization` | string | `"x"` |  | `"x"`, `"y"` | The seed's polarization, x or y. |
 | `harmonics` | list of integers | `[1]` |  |  | The field set: 1 first, then further harmonic numbers in increasing order. |
-| `propagator` | string | `"slices"` |  | `"slices"`, `"spectral"` | The field propagator: slices, one transverse transform per slice at the reference wavenumber, or spectral, a research prototype that transforms the whole window in (x, y, tau) with the frequency-dependent kernel (docs/spectral-field.md). |
-| `spectral_slippage` | string | `"ramp"` |  | `"ramp"`, `"slices"` | Under the spectral propagator, the slippage as the continuous phase ramp, or as the whole-slice rotation of the slice propagator. |
-| `spectral_boundary` | string | `"headroom"` |  | `"headroom"`, `"sponge"`, `"pad"` | Under the spectral propagator, what meets light the ramp moves to the window's head: the headroom alone, the run refused when the head slice holds more than spectral_head_tolerance of the window's energy; a cos^2 sponge over spectral_sponge |
-| `spectral_sponge_slices` | integer | `0` |  | from 0 | Slices of the cos^2 sponge at the window's head. 0 derives an eighth of the window, at least 4. |
-| `spectral_head_tolerance` | real | `0.001` |  | from 0 | The head slice's share of the window's energy above which a run under the headroom boundary is refused. |
+| `propagator` | string | `"slices"` |  | `"slices"`, `"spectral"` | The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slip |
 <!-- end keys-field -->
 
 (keys-wake)=

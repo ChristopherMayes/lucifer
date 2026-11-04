@@ -52,6 +52,16 @@ real(rp), parameter :: fel_cost_push$ = 2.03e-7_rp     ! s per particle-step.
 real(rp), parameter :: fel_cost_deposit$ = 2.08e-8_rp  ! s per particle-step.
 real(rp), parameter :: fel_cost_solve$ = 4.68e-9_rp    ! s per grid point per log2(ngrid) per step.
 
+! The spectral propagator's two passes along tau per step (fel_spectral_mod), each a
+! gather of every line of the window and its pad across the stack's stride, a transform
+! pair along tau and a scatter. Per grid point of a line, per log2 of the transform's
+! length, per pass, from the cost table of docs/spectral-field.md at one thread: the
+! field phase's excess over the slice propagator's, 32 slices and a pad of 16 on a
+! 255 by 255 grid over 1068 steps.
+
+real(rp), parameter :: fel_cost_tau$ = 1.76e-9_rp   ! s per point per log2(n_t) per pass.
+integer, parameter :: fel_cost_n_pad$ = 16                    ! The pad's slots (fel_spectral_mod).
+
 ! The thread scan's serial fraction, and the share of the walk the push and the solve
 ! own. The share is 88.5, 87.5 and 85.9 percent over a factor of 16 in particles per
 ! slice and 88.1 percent at 504 slices, so one constant carries it.
@@ -169,7 +179,7 @@ subroutine fel_cost_estimate (run, secs, backend)
 
 type (fel_run_struct), target :: run
 real(rp) secs, n_pstep, n_gpt, t_one, speedup
-integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff
+integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff, n_t
 character(*) backend
 
 !
@@ -181,6 +191,14 @@ call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
 
 t_one = (fel_cost_push$ + fel_cost_deposit$) * n_pstep
 if (ngrid > 1) t_one = t_one + fel_cost_solve$ * n_gpt * log(real(ngrid, rp)) / log(2.0_rp) * nstep
+
+! The spectral propagator's passes along tau, over the window and its pad, which a
+! window of one slice does not have.
+
+if (run%spectral%on .and. run%nslice > 1) then
+  n_t = run%nslice + fel_cost_n_pad$
+  t_one = t_one + 2 * fel_cost_tau$ * n_gpt * (real(n_t, rp) / run%nslice) * log(real(n_t, rp)) / log(2.0_rp) * nstep
+endif
 
 n_omp = 1
 !$ n_omp = omp_get_max_threads()

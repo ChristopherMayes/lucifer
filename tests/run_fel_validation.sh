@@ -696,12 +696,12 @@ echo
 # passes share while it runs, and the CPU sections of either pass carry on beside
 # it (scripts/with_lock.py).
 
-SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter fp32-lockstep device unaveraged spontaneous element-offsets two-polarization beam-format harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
+SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous element-offsets two-polarization beam-format harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
 
 # The launch order is longest first, by the section times of one debug pass (device
 # 116 s, source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section
 # is not left to run alone at the end. The printed order is SECTION_ORDER regardless.
-LAUNCH_ORDER="device source-filter spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
+LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
 
 SECTIONS="$WORK_DIR/sections"
 DEVICE_LOCK="${LUCIFER_DEVICE_LOCK:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/device.lock}"
@@ -791,6 +791,17 @@ sec_source_filter () {
   echo "--- source-filter checks --------------------------------------------------------"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_source_filter.py" --exe "$EXE" --workdir "$1" \
     || { echo "FAIL: source-filter checks; outputs kept in: $1" >&2; return 1; }
+}
+
+# The spectral propagator's checks run field.propagator = "spectral" against the slice
+# propagator: the steady-state tier against the pass's own run, the SASE tier with the
+# source filter on under both, and a pulse through a pipe for the ramp's whole-slice
+# shift and the escaped-field bank's ledger.
+
+sec_spectral () {
+  echo "--- spectral propagator checks ---------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_spectral.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: spectral propagator checks; outputs kept in: $1" >&2; return 1; }
 }
 
 # In the FP32 lockstep checks, the single-precision particle path's divergence from the
@@ -1010,6 +1021,8 @@ mkdir -p "$SECTIONS"
 for name in $SECTION_ORDER; do stage_section "$SECTIONS/$name"; done
 cp AramisTDSASEF.out.h5 AramisTDSASEF-initial.par.h5 AramisTDSASEF-initial.beam.h5 \
    AramisTDSASEF-initial.wf.h5 "$SECTIONS/source-filter/"
+cp tier1.toml tier1.stats.h5 Aramis-initial.beam.h5 Aramis-initial.wf.h5 tdsase.toml \
+   AramisTDSASE-initial.beam.h5 AramisTDSASE-initial.wf.h5 "$SECTIONS/spectral/"
 
 echo "--- check sections: $SECTION_WORKERS at once, $SECTION_CPUS cores each, in $SECTIONS ---"
 echo

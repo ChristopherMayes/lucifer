@@ -254,12 +254,8 @@ type wavefront_init_struct
   ! The field set: harmonics(1) must be 1 (the fundamental). Further entries are
   ! harmonic numbers in increasing order, 0 = unused.
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
-  ! The spectral propagator, a research prototype (fel_spectral_mod, docs/spectral-field.md).
+  ! The field propagator (fel_spectral_mod, docs/spectral-field.md).
   character(16) :: propagator = 'slices'            ! slices or spectral.
-  character(16) :: spectral_slippage = 'ramp'       ! ramp or slices.
-  character(16) :: spectral_boundary = 'headroom'   ! headroom, sponge or pad.
-  integer :: spectral_sponge_slices = 0             ! 0 derives it.
-  real(rp) :: spectral_head_tolerance = 1e-3_rp
 end type
 
 ! The transverse grid derived from the beam when the input file sets none

@@ -76,7 +76,7 @@ integer(8) prog_count0, prog_count_last, prog_rate
 real(rp) prog_power, prog_energy, prog_bunch
 logical prog_header_done
 logical write_diag, keep_escaped_field, migrate, migrate_check, any_unavg, two_pol, err
-logical spectral, ramp_slip      ! The spectral propagator, and its slippage as the ramp.
+logical spectral                 ! The spectral propagator.
 real(rp) slip_step
 character(400) out_root
 character(16) interlude_model
@@ -138,11 +138,11 @@ comb = run%global%comb_ds_save
 run%z_last_rec = -1e30_rp
 
 ! The spectral propagator (fel_spectral_mod) takes the field half of every step and
-! interlude when it is on, and under its ramp the slippage rides inside it, so the
-! record is never rotated and the bank stays empty.
+! interlude when it is on, the slippage riding inside it as the ramp, so the record is
+! never rotated and the bank is filled by the ramp's whole-slice crossings and drained
+! here (drain_spectral_banks).
 
 spectral = run%spectral%on
-ramp_slip = spectral .and. run%spectral%ramp
 
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
@@ -325,7 +325,7 @@ do ie = run%i_start, run%i_end
       if (istep == und%nstep) slip_step = slip_step + ele_slip(ie)
       if (spectral) then
         call fel_tic (fel_t_solve$)
-        call fel_spectral_step (run%spectral, und, fbeam, ffield, und%dz, slip_step, err)
+        call fel_spectral_step (run%spectral, und, fbeam, ffield, und%dz, slip_step, keep_escaped_field, err)
         call fel_toc (fel_t_solve$)
         if (err) then
           err_flag = .true.;  return
@@ -345,10 +345,12 @@ do ie = run%i_start, run%i_end
 
       z_now = z_now + und%dz
       call set_field_position ()
-      if (.not. ramp_slip) then
+      if (spectral) then
+        call drain_spectral_banks ()
+      else
         call apply_slippage_banked (slip_step)
-        if (err_flag) return
       endif
+      if (err_flag) return
       ! The offset is given back before the migration re-slices the beam. Migration
       ! reads each particle's phase against its slice's window. With the displaced phase
       ! still applied, every mover lands outside its new slice once the nominal phase
@@ -511,7 +513,7 @@ do ie = run%i_start, run%i_end
       call fel_tic (fel_t_drift$)
       if (spectral) then
         call fel_spectral_drift (run%spectral, ffield, l_piece - light_corr(ie) * f_piece, &
-                                 ele_slip(ie) / n_piece, err)
+                                 ele_slip(ie) / n_piece, keep_escaped_field, err)
       else
         do ih = 1, n_harm    ! Each field diffracts at its own wavelength. Through a
                              ! geometry break the light takes the chord and not the arc.
@@ -553,10 +555,12 @@ do ie = run%i_start, run%i_end
         z_now = z_ele0 + i_piece * (ele%value(l$) / n_piece)
       endif
       call set_field_position ()
-      if (.not. ramp_slip) then
+      if (spectral) then
+        call drain_spectral_banks ()
+      else
         call apply_slippage_banked (ele_slip(ie) / n_piece)
-        if (err_flag) return
       endif
+      if (err_flag) return
 
       if (i_piece == n_piece) then
         call do_migrate ()
@@ -589,7 +593,8 @@ do ie = run%i_start, run%i_end
     if (ele%key == quadrupole$) qf = ele%value(k1$)
     call fel_tic (fel_t_gen_int$)
     call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err, field = .not. spectral)
-    if (spectral .and. .not. err) call fel_spectral_drift (run%spectral, ffield, ele%value(l$), ele_slip(ie), err)
+    if (spectral .and. .not. err) call fel_spectral_drift (run%spectral, ffield, ele%value(l$), ele_slip(ie), &
+                                                            keep_escaped_field, err)
     call fel_toc (fel_t_gen_int$)
     if (absolute_time_tracking(ele)) then      ! Absolute-time phasing (sec-phasing).
       fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$)
@@ -603,10 +608,12 @@ do ie = run%i_start, run%i_end
     endif
     z_now = z_now + ele%value(l$)
     call set_field_position ()
-    if (.not. ramp_slip) then
+    if (spectral) then
+      call drain_spectral_banks ()
+    else
       call apply_slippage_banked (ele_slip(ie))
-      if (err_flag) return
     endif
+    if (err_flag) return
 
     call do_migrate ()
     if (err_flag) return
@@ -1205,6 +1212,35 @@ endif
 call fel_toc (fel_t_slippage$)
 
 end subroutine apply_slippage_banked
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine drain_spectral_banks ()
+!
+! Routine to drain every member's escape bank to the pulse file after the spectral
+! propagator has filled it (fel_spectral_step, fel_spectral_drift), when the escaped
+! field is kept. It runs where apply_slippage_banked runs for the slice propagator, after
+! z_now has moved, so each plane's z is the step's end as it is there.
+!-
+
+subroutine drain_spectral_banks ()
+
+integer ihh
+logical err_b
+
+!
+
+if (.not. keep_escaped_field) return
+call fel_tic (fel_t_slippage$)
+do ihh = 1, n_harm
+  call fel_drain_bank (run, ihh, err_b)
+  if (err_b) then
+    err_flag = .true.;  exit
+  endif
+enddo
+call fel_toc (fel_t_slippage$)
+
+end subroutine drain_spectral_banks
 
 !------------------------------------------------------------------------------
 !+

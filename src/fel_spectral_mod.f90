@@ -1,8 +1,8 @@
 !+
 ! Module fel_spectral_mod
 !
-! The spectral field propagator, a research prototype (docs/spectral-field.md). The
-! slice propagator (fel_field_step, fel_field_diffract) advances every slice of the
+! The spectral field propagator, field.propagator = "spectral" (docs/spectral-field.md).
+! The slice propagator (fel_field_step, fel_field_diffract) advances every slice of the
 ! window by the paraxial kernel exp(-i dz k_perp^2 / 2 k0) at the one reference
 ! wavenumber k0, and the slippage moves the record by whole slices once 0.8 of a slice
 ! has accumulated (fel_apply_slippage). This module transforms a member's whole window
@@ -11,9 +11,9 @@
 ! wavenumber conjugate to the window coordinate tau and c kappa is the frequency offset
 ! from the carrier. That is the term a chirped or short pulse gets wrong at relative
 ! order dOmega/omega under one k0. And the slippage becomes the phase ramp
-! exp(-i kappa delta), delta the step's slippage as a length, exact and continuous, or
-! stays the whole-slice rotation under field.spectral_slippage = "slices". The push, the
-! deposit and the averaged equations are untouched.
+! exp(-i kappa delta), delta the step's slippage as a length, exact and continuous, so
+! a step may slip a fraction of a slice and the field is never a fraction of a slice
+! behind the beam. The push, the deposit and the averaged equations are untouched.
 !
 ! The window coordinate. Window slice i (fel-physics.md sec-window) sits at
 ! tau = (i - 1) * slice_spacing, so tau grows toward the head, the end light slips
@@ -23,20 +23,31 @@
 ! window carries kappa_m = 2 pi m / (n_t slice_spacing) for m up to half of n_t and
 ! negative beyond, as the transverse table does (fel_field_kernel_init).
 !
-! The transform along tau is periodic, so light the ramp moves past the head would
-! reappear at the tail. A derived window holds the line's slippage ahead of the bunch
-! and nothing reaches the tail. Three forms meet the head on a shorter window
-! (field.spectral_boundary): the headroom alone, with the run refused once the head
-! slice holds more than field.spectral_head_tolerance of the window's energy; a cos^2
-! sponge over the last field.spectral_sponge_slices slices, applied before each shift
-! of at most a slice, the slippage taken in such chunks, whose removed energy joins the
-! member's escaped energy; and zero padding of the transform along tau, eight slices
-! beyond the largest shift one pass applies, with what crosses into the padding removed
-! and its energy joined the same way. Under "slices"
-! slippage the rotation zero-fills the slice it transmits and the slice propagator's
-! bank (fel_apply_slippage) keeps the light itself, so nothing wraps and the headroom
-! form checks nothing, while the padding then meets the kernel's own spread alone,
-! which is below one wavelength a step.
+! The head and the bank. The transform along tau is periodic, so light the ramp moves
+! past the head would reappear at the tail. The window is followed along tau by a pad of
+! fel_spectral_n_free$ free slots and a cos^2 sponge of fel_spectral_n_sponge$ slots
+! that falls to zero at the pad's end, and every transform runs over the window and the
+! pad together. Light the ramp carries past the head enters the pad, diffracts there
+! under the kernel as escaped light does in vacuum, and is attenuated by the sponge
+! after every slip pass, so the field is smooth at the periodic seam and nothing reaches
+! the tail. The escape bank takes its planes from the pad's first slot. The slippage
+! accumulates in slip%ramp_slip, and each time it crosses a whole slice the pass is
+! split there in the transform domain, the field at that slot is read by a direct sum
+! over the modes, and the plane goes to the bank as fel_apply_slippage's transmitted
+! slice does, its energy added to u_escaped. Between two crossings the ramp moves the
+! field by exactly one slot, which the transform does exactly, so the bank receives the
+! window's samples one slice apart, each once, and the pulse file is assembled as
+! before. The sponge removes light the bank already holds and counts nothing. One pass
+! slips at most one slice, so light walks through every slot of the sponge and reaches
+! its end at the product of the weights, below 1e-5 of its amplitude two slots before
+! the seam, and a larger slippage, an interlude's, is taken in such passes. A pass of
+! several slices was measured to jump light into the sponge's last slots, where the
+! next pass's interpolation carried 2e-3 of the exit peak power round to the tail slice
+! of the SASE tier's window.
+!
+! Note: A dump carries the window and not the pad. A continuation starts with an empty
+! pad, and every plane that had entered it was banked when it crossed, so the ledger
+! loses nothing.
 !
 ! The kernel factors. exp(-i dz (m_x^2 + m_y^2) dk^2 / 2 k(kappa)) is the product of a
 ! table in (m_x, kappa) and one in (m_y, kappa), each n_grid by n_t, so the whole kernel
@@ -56,31 +67,24 @@ use, intrinsic :: iso_c_binding
 
 implicit none
 
-private spectral_fft1, spectral_fft1_plan, spectral_fft1_plan_threads, plane_energy
+private spectral_fft1, spectral_fft1_plan, spectral_fft1_plan_threads, bank_append
 
-! The boundary forms (field.spectral_boundary) and the padding of the third.
+! The pad beyond the window's head (module header), in slices.
 
-integer, parameter :: fel_spectral_headroom$ = 1, fel_spectral_sponge$ = 2, fel_spectral_pad$ = 3
-integer, parameter :: fel_spectral_n_pad$ = 8    ! Slices of zero padding along tau beyond the
-                                                 !   schedule's largest shift (fel_setup_lattice).
+integer, parameter :: fel_spectral_n_free$ = 4      ! Free slots, the first where the bank reads its planes.
+integer, parameter :: fel_spectral_n_sponge$ = 12   ! The cos^2 sponge after them.
 
 !+
 ! Struct fel_spectral_struct
 !
-! The spectral propagator's switches, resolved at setup from the [field] keys, and what
-! it measured on the way: the largest share of the window's energy the head slice held,
-! and where.
+! The spectral propagator's switch and the pad it sized for the window.
 !-
 
 type fel_spectral_struct
-  logical :: on = .false.               ! field.propagator = "spectral".
-  logical :: ramp = .true.              ! The slippage as the phase ramp. False: whole-slice rotation.
-  integer :: boundary = fel_spectral_headroom$
-  integer :: n_sponge = 0               ! Sponge slices at the head.
-  integer :: n_pad = 0                  ! Zero-padding slices along tau.
-  real(rp) :: head_tolerance = 1e-3_rp  ! The headroom form's refusal threshold.
-  real(rp) :: head_max = 0              ! Largest head-slice share seen.
-  real(rp) :: z_head_max = 0            ! Where [m].
+  logical :: on = .false.      ! field.propagator = "spectral".
+  integer :: n_free = 0        ! Free slots of the pad beyond the head.
+  integer :: n_sponge = 0      ! Sponge slots after them.
+  integer :: n_pad = 0         ! Their sum. 0 on a window of one slice, which never slips.
 end type
 
 ! The plan cache for the transform along tau, one per thread (see the module header).
@@ -98,41 +102,28 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_setup (sp, propagator, slippage, boundary, n_sponge, head_tolerance)
+! Subroutine fel_spectral_setup (sp, propagator)
 !
-! Routine to resolve the [field] keys of the spectral propagator into its switches. The
-! key table has already refused a name outside each key's set. fel_spectral_size then
-! sizes the sponge and the padding from the window and the schedule.
+! Routine to resolve field.propagator into the switch. The key table has already
+! refused a name outside the key's set. fel_spectral_size then sizes the pad.
 !
 ! Input:
-!   propagator     -- character(*): field.propagator, "slices" or "spectral".
-!   slippage       -- character(*): field.spectral_slippage, "ramp" or "slices".
-!   boundary       -- character(*): field.spectral_boundary, "headroom", "sponge" or "pad".
-!   n_sponge       -- integer: field.spectral_sponge_slices, 0 derived.
-!   head_tolerance -- real(rp): field.spectral_head_tolerance.
+!   propagator -- character(*): field.propagator, "slices" or "spectral".
 !
 ! Output:
-!   sp             -- fel_spectral_struct: The resolved switches.
+!   sp         -- fel_spectral_struct: The switch set.
 !-
 
-subroutine fel_spectral_setup (sp, propagator, slippage, boundary, n_sponge, head_tolerance)
+subroutine fel_spectral_setup (sp, propagator)
 
 type (fel_spectral_struct) sp
-character(*) propagator, slippage, boundary
-integer n_sponge
-real(rp) head_tolerance
+character(*) propagator
 
 !
 
 sp%on = (propagator == 'spectral')
-sp%ramp = (slippage /= 'slices')
-select case (boundary)
-case ('sponge');   sp%boundary = fel_spectral_sponge$
-case ('pad');      sp%boundary = fel_spectral_pad$
-case default;      sp%boundary = fel_spectral_headroom$
-end select
-sp%head_tolerance = head_tolerance
-sp%n_sponge = n_sponge
+sp%n_free = 0
+sp%n_sponge = 0
 sp%n_pad = 0
 
 end subroutine fel_spectral_setup
@@ -141,59 +132,33 @@ end subroutine fel_spectral_setup
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_size (sp, shift_max, nslice, err_flag)
+! Subroutine fel_spectral_size (sp, nslice)
 !
-! Routine to size the sponge and the padding. The padding is eight slices beyond the
-! largest shift one pass applies, an element's end slippage with its last step's, in
-! slices, since the ramp takes it in one pass. The sponge takes the slippage in chunks
-! of a slice (fel_spectral_shift), so its width is the window's alone: a count of 0
-! derives an eighth of the window, at least 4 slices, and a count not below the window
-! is refused. A window of one slice, the steady state, takes no boundary, since
-! nothing slips.
+! Routine to size the pad (module header). A window of one slice, the steady state,
+! takes none, since nothing slips.
 !
 ! Input:
-!   shift_max -- real(rp): The largest shift one pass applies [slices].
-!   nslice    -- integer: The window's slices.
+!   nslice -- integer: The window's slices.
 !
 ! Output:
-!   sp        -- fel_spectral_struct: n_sponge and n_pad set.
-!   err_flag  -- logical: Set True on a sponge not below the window.
+!   sp     -- fel_spectral_struct: n_free, n_sponge and n_pad set.
 !-
 
-subroutine fel_spectral_size (sp, shift_max, nslice, err_flag)
+subroutine fel_spectral_size (sp, nslice)
 
 type (fel_spectral_struct) sp
-real(rp) shift_max
-integer nslice, n_shift
-logical err_flag
-character(*), parameter :: r_name = 'fel_spectral_size'
+integer nslice
 
 !
 
-err_flag = .true.
-n_shift = ceiling(shift_max)
-
 if (nslice == 1) then
+  sp%n_free = 0
   sp%n_sponge = 0
-  sp%n_pad = 0
-  err_flag = .false.
-  return
-endif
-
-if (sp%boundary == fel_spectral_sponge$) then
-  if (sp%n_sponge == 0) sp%n_sponge = max(4, nslice / 8)
-  if (sp%n_sponge >= nslice) then
-    call out_io (s_error$, r_name, 'THE SPONGE OF \i0\ SLICES IS NOT BELOW THE WINDOW''S \i0\ SLICES.', &
-                 i_array = [sp%n_sponge, nslice])
-    return
-  endif
 else
-  sp%n_sponge = 0
+  sp%n_free = fel_spectral_n_free$
+  sp%n_sponge = fel_spectral_n_sponge$
 endif
-
-if (sp%boundary == fel_spectral_pad$) sp%n_pad = fel_spectral_n_pad$ + n_shift
-
-err_flag = .false.
+sp%n_pad = sp%n_free + sp%n_sponge
 
 end subroutine fel_spectral_size
 
@@ -201,37 +166,39 @@ end subroutine fel_spectral_size
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_step (sp, und, beam, ff, dz, slippage, err_flag)
+! Subroutine fel_spectral_step (sp, und, beam, ff, dz, slippage, keep, err_flag)
 !
 ! Routine to do the field half of one undulator step under the spectral propagator,
 ! in the slice propagator's order (fel_field_step, then fel_apply_slippage): each
 ! member's window is propagated over the step by the kernel, the source is deposited
 ! slice by slice from the just-advanced particles (fel_spectral_deposit), and the
-! slippage then moves the field and the fresh source together, as the phase ramp with
-! the boundary (fel_spectral_shift), or by the caller's rotation under "slices"
-! slippage. fel_track_und_step has pushed the particles and skipped its own field solve.
+! slippage then moves the field and the fresh source together as the ramp, with the
+! planes that cross a slice banked (fel_spectral_slip). fel_track_und_step has pushed
+! the particles and skipped its own field solve. The caller drains each member's bank
+! afterwards (fel_drain_bank).
 !
 ! Input:
-!   sp       -- fel_spectral_struct: The propagator's switches.
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
 !   und      -- fel_und_struct: The segment.
 !   beam     -- fel_beam_struct: The beam, pushed over the step.
 !   ff(:)    -- fel_field_struct: The field set.
 !   dz       -- real(rp): Step length [m].
 !   slippage -- real(rp): The step's slippage [fundamental wavelengths].
+!   keep     -- logical: Bank the planes that cross? False adds their energy alone.
 !
 ! Output:
-!   ff(:)    -- fel_field_struct: Every member advanced.
+!   ff(:)    -- fel_field_struct: Every member advanced, its bank holding the planes.
 !   err_flag -- logical: Set True if there is an error. False otherwise.
 !-
 
-subroutine fel_spectral_step (sp, und, beam, ff, dz, slippage, err_flag)
+subroutine fel_spectral_step (sp, und, beam, ff, dz, slippage, keep, err_flag)
 
 type (fel_spectral_struct) sp
 type (fel_und_struct) und
 type (fel_beam_struct), target :: beam
 type (fel_field_struct), target :: ff(:)
 real(rp) dz, slippage
-logical err_flag
+logical keep, err_flag
 
 real(rp) ks
 integer io, is, nslice_f
@@ -243,7 +210,7 @@ err_flag = .true.
 ks = twopi / ff(1)%wf%wavelength
 
 do io = 1, size(ff)
-  call fel_spectral_apply (sp, ff(io), dz, 0.0_rp, .true., err)
+  call fel_spectral_apply (sp, ff(io), dz, 0.0_rp, .true., keep, err)
   if (err) return
   nslice_f = size(ff(io)%wf%Ex, 3)
   any_err = .false.
@@ -255,7 +222,7 @@ do io = 1, size(ff)
   enddo
   !$OMP end parallel do
   if (any_err) return
-  call fel_spectral_shift (sp, ff(io), slippage, err)
+  call fel_spectral_slip (sp, ff(io), slippage, keep, err)
   if (err) return
 enddo
 
@@ -267,40 +234,42 @@ end subroutine fel_spectral_step
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_drift (sp, ff, dz, slippage, err_flag)
+! Subroutine fel_spectral_drift (sp, ff, dz, slippage, keep, err_flag)
 !
 ! Routine to propagate every member of the field set through an interlude under the
 ! spectral propagator: the kernel over the interlude's length with no source, then
-! the slippage the schedule charges it with the boundary (fel_spectral_shift). This is
-! what wavefront_drift does for the slice propagator, with the kernel at k(kappa) and
-! the slippage as the ramp.
+! the slippage the schedule charges it, as the ramp with the bank (fel_spectral_slip).
+! This is what wavefront_drift and fel_apply_slippage do for the slice propagator, with
+! the kernel at k(kappa) and the slippage continuous. The caller drains each member's
+! bank afterwards (fel_drain_bank).
 !
 ! Input:
-!   sp       -- fel_spectral_struct: The propagator's switches.
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
 !   ff(:)    -- fel_field_struct: The field set.
 !   dz       -- real(rp): The light's path [m].
 !   slippage -- real(rp): The interlude's slippage [fundamental wavelengths].
+!   keep     -- logical: Bank the planes that cross? False adds their energy alone.
 !
 ! Output:
-!   ff(:)    -- fel_field_struct: Every member advanced.
+!   ff(:)    -- fel_field_struct: Every member advanced, its bank holding the planes.
 !   err_flag -- logical: Set True if there is an error. False otherwise.
 !-
 
-subroutine fel_spectral_drift (sp, ff, dz, slippage, err_flag)
+subroutine fel_spectral_drift (sp, ff, dz, slippage, keep, err_flag)
 
 type (fel_spectral_struct) sp
 type (fel_field_struct), target :: ff(:)
 real(rp) dz, slippage
-logical err_flag
+logical keep, err_flag
 integer io
 
 !
 
 err_flag = .true.
 do io = 1, size(ff)
-  call fel_spectral_apply (sp, ff(io), dz, 0.0_rp, .true., err_flag)
+  call fel_spectral_apply (sp, ff(io), dz, 0.0_rp, .true., keep, err_flag)
   if (err_flag) return
-  call fel_spectral_shift (sp, ff(io), slippage, err_flag)
+  call fel_spectral_slip (sp, ff(io), slippage, keep, err_flag)
   if (err_flag) return
 enddo
 err_flag = .false.
@@ -311,111 +280,121 @@ end subroutine fel_spectral_drift
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_shift (sp, fs, slippage, err_flag)
+! Subroutine fel_spectral_slip (sp, fs, slippage, keep, err_flag)
 !
-! Routine to slip one member by the ramp with the boundary form in force, in passes
-! along tau alone. Under the sponge the slippage is taken in chunks of at most one
-! slice with the sponge applied before each, so what a chunk carries past the head is
-! the sponge's zero on the head slice and nothing else; an interlude's whole slippage,
-! tens of slices on a line like Aramis, would otherwise carry its unsponged slices
-! round to the tail. The other forms take the slippage in one pass, the padding sized
-! to hold it, and the headroom check follows. Under "slices" slippage the sponge alone
-! runs, before the caller's rotation, and nothing else.
+! Routine to slip one member by the ramp, in passes along tau alone of at most one
+! slice each (module header), the plane that crosses a slice banked by the pass that
+! crosses it. The member's bank is emptied first and holds every plane of the call on
+! return, in transmission order, for the caller to drain. A steady-state record never
+! slips.
+!
+! Note: Backward slippage is refused, as fel_apply_slippage refuses it with the bank:
+! a plane that leaves at the tail has no place ahead of the window in the pulse file,
+! and the pad is at the head.
 !
 ! Input:
-!   sp       -- fel_spectral_struct: The propagator's switches.
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
 !   fs       -- fel_field_struct: The member.
 !   slippage -- real(rp): The slippage to apply [fundamental wavelengths].
+!   keep     -- logical: Bank the planes that cross? False adds their energy alone.
 !
 ! Output:
-!   fs       -- fel_field_struct: The window slipped, u_escaped grown by what the
-!                 boundary removed.
-!   err_flag -- logical: Set True on a transform failure or the headroom refusal.
+!   fs       -- fel_field_struct: The window slipped, the bank filled, u_escaped and
+!                 slip%ramp_slip advanced.
+!   err_flag -- logical: Set True on a transform failure or backward slippage.
 !-
 
-subroutine fel_spectral_shift (sp, fs, slippage, err_flag)
+subroutine fel_spectral_slip (sp, fs, slippage, keep, err_flag)
 
 type (fel_spectral_struct) sp
 type (fel_field_struct), target :: fs
 real(rp) slippage, chunk, left
-logical err_flag
+logical keep, err_flag
 integer n_chunk, ic
+character(*), parameter :: r_name = 'fel_spectral_slip'
 
 !
 
 err_flag = .false.
-if (.not. sp%ramp) then
-  call fel_spectral_sponge (sp, fs)
+fs%bank%n = 0
+if (.not. fs%slip%timerun) return
+if (slippage == 0) return
+
+if (slippage < 0) then
+  call out_io (s_error$, r_name, 'BACKWARD SLIPPAGE UNDER FIELD.PROPAGATOR = "spectral".', &
+                                 'THE PAD THAT FEEDS THE ESCAPED-FIELD BANK IS AT THE WINDOW''S HEAD,', &
+                                 'AND A PLANE THAT LEAVES AT THE TAIL HAS NO PLACE IN THE PULSE FILE.', &
+                                 'POSSIBLE SOLUTION: FIELD.PROPAGATOR = "slices" WITH KEEP_ESCAPED_FIELD = F.')
+  err_flag = .true.
   return
 endif
-if (.not. fs%slip%timerun) return
 
-if (sp%boundary == fel_spectral_sponge$) then
-  n_chunk = max(1, ceiling(abs(slippage) / fs%slip%sample - 1e-9_rp))
-  left = slippage
-  do ic = 1, n_chunk
-    chunk = slippage / n_chunk
-    if (ic == n_chunk) chunk = left
-    left = left - chunk
-    call fel_spectral_sponge (sp, fs)
-    call fel_spectral_apply (sp, fs, 0.0_rp, chunk, .false., err_flag)
-    if (err_flag) return
-  enddo
-else
-  call fel_spectral_apply (sp, fs, 0.0_rp, slippage, .false., err_flag)
+n_chunk = max(1, ceiling(slippage / fs%slip%sample - 1e-9_rp))
+left = slippage
+do ic = 1, n_chunk
+  chunk = slippage / n_chunk
+  if (ic == n_chunk) chunk = left
+  left = left - chunk
+  call fel_spectral_apply (sp, fs, 0.0_rp, chunk, .false., keep, err_flag)
   if (err_flag) return
-  call fel_spectral_head_check (sp, fs, err_flag)
-endif
+enddo
 
-end subroutine fel_spectral_shift
+end subroutine fel_spectral_slip
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_apply (sp, fs, dz, slippage, transverse, err_flag)
+! Subroutine fel_spectral_apply (sp, fs, dz, slippage, transverse, keep, err_flag)
 !
-! Routine to apply the kernel over dz and the ramp for the slippage to one member's
-! whole window, under sp%ramp, or the ramp alone when transverse is False, which is the
-! step's pass after the deposit (fel_spectral_step). The record is read and written
-! in window order through fel_field_index, so a rotated record is handled as the slice
-! propagator handles it, and under "slices" slippage the caller rotates it afterwards
-! (fel_apply_slippage) as before.
+! Routine to apply the kernel over dz to one member's whole window and pad, when
+! transverse is True, or the ramp for the slippage alone when it is False, which is the
+! slip pass (fel_spectral_slip). The record is read and written in window order through
+! fel_field_index, so a rotated record is handled as the slice propagator handles it,
+! and the pad follows it.
 !
-! The passes, per polarization: the forward transverse transform of every slice; on
+! The passes, per polarization: the forward transverse transform of every plane; on
 ! every line of the transverse spectrum the forward transform along tau, the kernel
-! and ramp factors, and the inverse; the inverse transverse transform of every slice.
-! The transforms are unnormalized, so the result is scaled by n_t and by n_grid^2. The
+! factors, and the inverse; the inverse transverse transform of every plane. The
+! transforms are unnormalized, so the result is scaled by n_t and by n_grid^2. The
 ! ramp alone is diagonal in tau's conjugate and needs no transverse pass, so it runs
-! on the lines of the field itself.
+! on the lines of the field itself. A slip pass is split at each whole slice the
+! accumulated slippage crosses: the ramp to the crossing, the field at the pad's first
+! slot read by a direct sum over the modes into a plane for the bank, then the ramp on,
+! and the sponge on the pad afterwards (module header).
 !
 ! Input:
-!   sp         -- fel_spectral_struct: The propagator's switches.
-!   fs         -- fel_field_struct: The member: its wavefront, slippage state and harmonic.
+!   sp         -- fel_spectral_struct: The propagator's switch and pad.
+!   fs         -- fel_field_struct: The member: its wavefront, pad, slippage state and bank.
 !   dz         -- real(rp): Step length [m].
-!   slippage   -- real(rp): The slippage to apply [fundamental wavelengths].
+!   slippage   -- real(rp): The slippage to apply [fundamental wavelengths], 0 with
+!                   transverse True.
 !   transverse -- logical: Apply the kernel, with the transverse passes. False applies
 !                   the ramp alone.
+!   keep       -- logical: Bank the planes that cross? False adds their energy alone.
 !
 ! Output:
-!   fs         -- fel_field_struct: The window advanced, u_escaped grown by what the
-!                   padding removed.
+!   fs         -- fel_field_struct: The window and pad advanced, the bank grown by the
+!                   planes that crossed, u_escaped and slip%ramp_slip advanced.
 !   err_flag   -- logical: Set True on a transform failure. False otherwise.
 !-
 
-subroutine fel_spectral_apply (sp, fs, dz, slippage, transverse, err_flag)
+subroutine fel_spectral_apply (sp, fs, dz, slippage, transverse, keep, err_flag)
 
 type (fel_spectral_struct) sp
 type (fel_field_struct), target :: fs
 type (wavefront_struct), pointer :: wf
 real(rp) dz, slippage
-logical transverse, err_flag
+logical transverse, keep, err_flag
 
-complex(rp), allocatable :: ax(:,:), ay(:,:)
-real(rp) k0, dk, dtau, delta, kappa, kt, e_scale, t_slice, e_pad, grid_norm
+complex(rp), allocatable :: ax(:,:), ay(:,:), ramp(:,:), samp(:)
+complex(wf_rp), allocatable :: planes(:,:,:), planes_y(:,:,:)
+real(rp), allocatable :: shift(:)
+real(rp) k0, dk, dtau, delta, kappa, kt, e_scale, t_slice, w
 integer, allocatable :: idx(:)
-integer ngrid_arr(3), ngrid, nz, nt, ix, m, mx, mt, j
-logical err, any_err
+integer ngrid_arr(3), ngrid, nz, nt, ix, m, mx, mt, j, n_cross, k
+logical err
+character(*), parameter :: r_name = 'fel_spectral_apply'
 
 !
 
@@ -429,40 +408,63 @@ k0 = twopi / wf%wavelength
 dk = twopi / (ngrid * wf%dx)
 dtau = wf%dz
 
-! The slippage as a length, in the window. A steady-state record never slips.
+if (transverse .and. slippage /= 0) then
+  call out_io (s_error$, r_name, 'A KERNEL PASS WAS ASKED TO SLIP. PLEASE REPORT THIS!')
+  return
+endif
+if (sp%n_pad > 0 .and. .not. allocated(fs%pad)) then
+  call out_io (s_error$, r_name, 'THE PAD WAS NOT ALLOCATED. PLEASE REPORT THIS!')
+  return
+endif
 
-delta = 0
-if (sp%ramp .and. fs%slip%timerun) delta = slippage * wf%wavelength * fs%harm
+! The crossings of the slip pass (module header): the shift to each, then the rest.
+! The slippage and the slice are in fundamental wavelengths, and a shift becomes a
+! length through the member's own wavelength times its harmonic, the fundamental's.
+! A steady-state record never slips.
 
-! The energy of one plane, as fel_field_diag and fel_apply_slippage take it: the sum of
-! |E|^2 over the grid times dx^2 / 2 Z0 is the slice's power, and times the slice's
-! light time its energy. A harmonic member's wavelength is the fundamental's over harm,
-! and the window is the fundamental's, so the light time is scaled back up. In the
-! transverse spectrum the sum is n_grid^2 times the field's (Parseval).
+n_cross = 0
+if (fs%slip%timerun .and. slippage /= 0) then
+  n_cross = floor((fs%slip%ramp_slip + slippage) / fs%slip%sample + 1e-9_rp)
+endif
+allocate (shift(n_cross + 1))
+if (n_cross > 0) then
+  shift(1) = fs%slip%sample - fs%slip%ramp_slip
+  shift(2:n_cross) = fs%slip%sample
+  shift(n_cross + 1) = slippage - (n_cross * fs%slip%sample - fs%slip%ramp_slip)
+else
+  shift(1) = slippage
+endif
+if (fs%slip%timerun .and. slippage /= 0) then
+  fs%slip%ramp_slip = max(0.0_rp, fs%slip%ramp_slip + slippage - n_cross * fs%slip%sample)
+endif
+
+! The energy of one plane, as fel_apply_slippage takes it: the sum of |E|^2 over the grid
+! times dx^2 / 2 Z0 is the slice's power, and times the slice's light time its energy. A
+! harmonic member's wavelength is the fundamental's over harm, and the window is the
+! fundamental's, so the light time is scaled back up.
 
 e_scale = wf%dx**2 / (2 * (mu_0_vac * c_light))
 t_slice = fs%slip%sample * wf%wavelength * fs%harm / c_light
-grid_norm = 1
-if (transverse) grid_norm = real(ngrid*ngrid, rp)
 
-! The two kernel tables (module header). Each column m is one kappa, each row one
-! transverse mode, and the ramp rides the x table. The ramp alone is a column vector.
+! The two kernel tables (module header), each column one kappa and each row one
+! transverse mode, the ramp of each segment of the slip pass, and the phasor that reads
+! the pad's first slot, window index nz, from the unnormalized spectrum.
 
-allocate (ax(ngrid, nt), ay(ngrid, nt), idx(nz))
+allocate (ax(ngrid, nt), ay(ngrid, nt), ramp(nt, n_cross + 1), samp(nt), idx(nz))
 do m = 1, nt
   mt = m - 1;  if (2*mt > nt-1) mt = mt - nt
   kappa = twopi * mt / (nt * dtau)
   kt = k0 + kappa
   do ix = 1, ngrid
     mx = ix - 1;  if (2*mx > ngrid-1) mx = mx - ngrid
-    if (transverse) then
-      ax(ix, m) = exp(cmplx(0.0_rp, -dz * (mx * dk)**2 / (2 * kt) - kappa * delta, rp))
-      ay(ix, m) = exp(cmplx(0.0_rp, -dz * (mx * dk)**2 / (2 * kt), rp))
-    else
-      ax(ix, m) = exp(cmplx(0.0_rp, -kappa * delta, rp))
-      ay(ix, m) = 1
-    endif
+    ax(ix, m) = exp(cmplx(0.0_rp, -dz * (mx * dk)**2 / (2 * kt), rp))
+    ay(ix, m) = ax(ix, m)
   enddo
+  do k = 1, n_cross + 1
+    delta = shift(k) * wf%wavelength * fs%harm
+    ramp(m, k) = exp(cmplx(0.0_rp, -kappa * delta, rp))
+  enddo
+  samp(m) = exp(cmplx(0.0_rp, twopi * real(mt, rp) * nz / nt, rp)) / nt
 enddo
 do j = 1, nz
   idx(j) = fel_field_index(fs%slip, j, nz)
@@ -475,12 +477,43 @@ if (transverse) then
 endif
 call spectral_fft1_plan_threads (nt, err);  if (err) return
 
-e_pad = 0
-call apply_component (wf%Ex, err);  if (err) return
+allocate (planes(ngrid, ngrid, n_cross))
+call apply_component (wf%Ex, fs%pad, planes, err);  if (err) return
 if (allocated(wf%Ey)) then
-  call apply_component (wf%Ey, err);  if (err) return
+  allocate (planes_y(ngrid, ngrid, n_cross))
+  call apply_component (wf%Ey, fs%pad_y, planes_y, err);  if (err) return
 endif
-fs%slip%u_escaped = fs%slip%u_escaped + e_pad * e_scale * t_slice / grid_norm
+
+! The sponge, after a slip pass: the weight falls from just under 1 on the sponge's
+! first slot to 0 on the pad's last, so what the next pass carries round to the tail is
+! zero. The light it removes was banked when it crossed, so nothing is counted.
+
+if (.not. transverse .and. sp%n_sponge > 0) then
+  do j = 1, sp%n_sponge
+    w = cos(0.5_rp * pi * real(j, rp) / sp%n_sponge)**2
+    fs%pad(:,:,sp%n_free + j) = fs%pad(:,:,sp%n_free + j) * w
+    if (allocated(fs%pad_y)) fs%pad_y(:,:,sp%n_free + j) = fs%pad_y(:,:,sp%n_free + j) * w
+  enddo
+endif
+
+! The planes that crossed, in order: their energy to the ledger and, when kept, the
+! planes themselves to the bank.
+
+do k = 1, n_cross
+  fs%slip%u_escaped = fs%slip%u_escaped + &
+                sum(real(planes(:,:,k), rp)**2 + aimag(planes(:,:,k))**2) * e_scale * t_slice
+  if (allocated(planes_y)) then
+    fs%slip%u_escaped = fs%slip%u_escaped + &
+                sum(real(planes_y(:,:,k), rp)**2 + aimag(planes_y(:,:,k))**2) * e_scale * t_slice
+  endif
+  if (keep) then
+    if (allocated(planes_y)) then
+      call bank_append (fs%bank, planes(:,:,k), planes_y(:,:,k))
+    else
+      call bank_append (fs%bank, planes(:,:,k))
+    endif
+  endif
+enddo
 
 err_flag = .false.
 
@@ -488,18 +521,19 @@ err_flag = .false.
 contains
 
 !+
-! Subroutine apply_component (e, err)
+! Subroutine apply_component (e, pad, pl, err)
 !
-! Routine to put one polarization's planes through the passes of the header. The
-! padding's energy is summed into e_pad over the lines, in the units of the pass.
+! Routine to put one polarization's planes, the window's and the pad's, through the
+! passes of the header, reading the plane at each crossing into pl.
 !-
 
-subroutine apply_component (e, err)
+subroutine apply_component (e, pad, pl, err)
 
-complex(wf_rp) e(:,:,:)
+complex(wf_rp) e(:,:,:), pl(:,:,:)
+complex(wf_rp), allocatable :: pad(:,:,:)
 logical err
-integer is_l, ix_l, iy_l, m_l, j_l
-logical err_l
+integer is_l, ix_l, iy_l, m_l, j_l, k_l
+logical err_l, any_err
 
 !
 
@@ -507,33 +541,52 @@ err = .true.
 any_err = .false.
 if (transverse) then
   !$OMP parallel do private(err_l) reduction(.or.: any_err)
-  do is_l = 1, nz
-    call wavefront_fft2 (e(:,:,is_l), wf_fft_forward$, err_l)
+  do is_l = 1, nt
+    if (is_l <= nz) then
+      call wavefront_fft2 (e(:,:,is_l), wf_fft_forward$, err_l)
+    else
+      call wavefront_fft2 (pad(:,:,is_l-nz), wf_fft_forward$, err_l)
+    endif
     any_err = any_err .or. err_l
   enddo
   !$OMP end parallel do
   if (any_err) return
 endif
 
-!$OMP parallel do private(ix_l, j_l, m_l, err_l) reduction(.or.: any_err) reduction(+: e_pad)
+!$OMP parallel do private(ix_l, j_l, m_l, k_l, err_l) reduction(.or.: any_err)
 do iy_l = 1, ngrid
   do ix_l = 1, ngrid
     do j_l = 1, nz
       sp_buf(j_l) = e(ix_l, iy_l, idx(j_l))
     enddo
-    if (nt > nz) sp_buf(nz+1:nt) = 0
+    do j_l = nz + 1, nt
+      sp_buf(j_l) = pad(ix_l, iy_l, j_l - nz)
+    enddo
     call spectral_fft1 (wf_fft_forward$, err_l)
     any_err = any_err .or. err_l
-    do m_l = 1, nt
-      sp_buf(m_l) = sp_buf(m_l) * (ax(ix_l, m_l) * ay(iy_l, m_l))
+    if (transverse) then
+      do m_l = 1, nt
+        sp_buf(m_l) = sp_buf(m_l) * (ax(ix_l, m_l) * ay(iy_l, m_l))
+      enddo
+    endif
+    do k_l = 1, n_cross
+      do m_l = 1, nt
+        sp_buf(m_l) = sp_buf(m_l) * ramp(m_l, k_l)
+      enddo
+      pl(ix_l, iy_l, k_l) = sum(sp_buf(1:nt) * samp(1:nt))
     enddo
+    if (shift(n_cross + 1) /= 0) then
+      do m_l = 1, nt
+        sp_buf(m_l) = sp_buf(m_l) * ramp(m_l, n_cross + 1)
+      enddo
+    endif
     call spectral_fft1 (wf_fft_backward$, err_l)
     any_err = any_err .or. err_l
     do j_l = 1, nz
       e(ix_l, iy_l, idx(j_l)) = sp_buf(j_l) / real(nt, rp)
     enddo
     do j_l = nz + 1, nt
-      e_pad = e_pad + (real(sp_buf(j_l), rp)**2 + aimag(sp_buf(j_l))**2) / real(nt, rp)**2
+      pad(ix_l, iy_l, j_l - nz) = sp_buf(j_l) / real(nt, rp)
     enddo
   enddo
 enddo
@@ -542,9 +595,14 @@ if (any_err) return
 
 if (transverse) then
   !$OMP parallel do private(err_l) reduction(.or.: any_err)
-  do is_l = 1, nz
-    call wavefront_fft2 (e(:,:,is_l), wf_fft_backward$, err_l)
-    e(:,:,is_l) = e(:,:,is_l) / real(ngrid*ngrid, rp)
+  do is_l = 1, nt
+    if (is_l <= nz) then
+      call wavefront_fft2 (e(:,:,is_l), wf_fft_backward$, err_l)
+      e(:,:,is_l) = e(:,:,is_l) / real(ngrid*ngrid, rp)
+    else
+      call wavefront_fft2 (pad(:,:,is_l-nz), wf_fft_backward$, err_l)
+      pad(:,:,is_l-nz) = pad(:,:,is_l-nz) / real(ngrid*ngrid, rp)
+    endif
     any_err = any_err .or. err_l
   enddo
   !$OMP end parallel do
@@ -561,139 +619,42 @@ end subroutine fel_spectral_apply
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_spectral_sponge (sp, fs)
+! Subroutine bank_append (bank, plane, plane_y)
 !
-! Routine to apply the cos^2 sponge at the window's head when it is the boundary
-! (module header), before each shift of at most a slice, so what the shift carries
-! past the head is the sponge's zero. The weight falls from just under 1 on the sponge's
-! first slice to 0 on the head slice, in window order, and the field is multiplied by
-! it, so a slice keeps w^2 of its energy and the rest joins u_escaped. A window of one
-! slice takes no sponge.
-!
-! Input:
-!   sp       -- fel_spectral_struct: The propagator's switches.
-!   fs       -- fel_field_struct: The member.
-!
-! Output:
-!   fs       -- fel_field_struct: The sponge applied, u_escaped grown by what it removed.
+! Routine to append one transmitted plane to a member's escape bank, growing it as
+! fel_apply_slippage grows it: four planes at first, then doubling.
 !-
 
-subroutine fel_spectral_sponge (sp, fs)
+subroutine bank_append (bank, plane, plane_y)
 
-type (fel_spectral_struct) sp
-type (fel_field_struct), target :: fs
-type (wavefront_struct), pointer :: wf
-
-real(rp) e_scale, t_slice, w, e_before
-integer ngrid_arr(3), nz, j, ifld
+type (fel_bank_struct) bank
+complex(wf_rp) plane(:,:)
+complex(wf_rp), optional :: plane_y(:,:)
+complex(wf_rp), allocatable :: grow(:,:,:)
 
 !
 
-if (sp%boundary /= fel_spectral_sponge$) return
-wf => fs%wf
-ngrid_arr = wavefront_shape(wf)
-nz = ngrid_arr(3)
-if (nz == 1) return
-
-e_scale = wf%dx**2 / (2 * (mu_0_vac * c_light))
-t_slice = fs%slip%sample * wf%wavelength * fs%harm / c_light
-
-do j = nz - sp%n_sponge + 1, nz
-  ifld = fel_field_index(fs%slip, j, nz)
-  w = cos(0.5_rp * pi * real(j - (nz - sp%n_sponge), rp) / sp%n_sponge)**2
-  e_before = plane_energy(wf, ifld)
-  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * w
-  if (allocated(wf%Ey)) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * w
-  fs%slip%u_escaped = fs%slip%u_escaped + (e_before - plane_energy(wf, ifld)) * e_scale * t_slice
-enddo
-
-end subroutine fel_spectral_sponge
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine fel_spectral_head_check (sp, fs, err_flag)
-!
-! Routine to hold the window's head after a pass under the headroom form (module
-! header): the run is refused once the head slice holds more than sp%head_tolerance of
-! the window's energy, and the largest share seen is recorded with its position. The
-! check is the ramp's alone, since the whole-slice rotation banks and zero-fills what
-! reaches the head, and a window of one slice takes none.
-!
-! Input:
-!   sp       -- fel_spectral_struct: The propagator's switches.
-!   fs       -- fel_field_struct: The member.
-!
-! Output:
-!   sp       -- fel_spectral_struct: head_max and z_head_max updated.
-!   err_flag -- logical: Set True on the refusal. False otherwise.
-!-
-
-subroutine fel_spectral_head_check (sp, fs, err_flag)
-
-type (fel_spectral_struct) sp
-type (fel_field_struct), target :: fs
-type (wavefront_struct), pointer :: wf
-logical err_flag
-
-real(rp) e_head, e_total
-integer ngrid_arr(3), nz, j
-character(*), parameter :: r_name = 'fel_spectral_head_check'
-
-!
-
-err_flag = .false.
-if (sp%boundary /= fel_spectral_headroom$ .or. .not. sp%ramp) return
-wf => fs%wf
-ngrid_arr = wavefront_shape(wf)
-nz = ngrid_arr(3)
-if (nz == 1) return
-
-e_head = plane_energy(wf, fel_field_index(fs%slip, nz, nz))
-e_total = 0
-do j = 1, nz
-  e_total = e_total + plane_energy(wf, j)
-enddo
-if (e_total <= 0) return
-
-if (e_head / e_total > sp%head_max) then
-  sp%head_max = e_head / e_total
-  sp%z_head_max = wf%s_position
+if (.not. allocated(bank%plane)) then
+  allocate (bank%plane(size(plane,1), size(plane,2), 4))
+elseif (bank%n == size(bank%plane, 3)) then
+  call move_alloc (bank%plane, grow)
+  allocate (bank%plane(size(grow,1), size(grow,2), 2*size(grow,3)))
+  bank%plane(:,:,1:size(grow,3)) = grow
+  deallocate (grow)
 endif
-if (e_head > sp%head_tolerance * e_total) then
-  call out_io (s_error$, r_name, &
-        'THE WINDOW''S HEAD SLICE HOLDS \es10.2\ OF THE WINDOW''S ENERGY AT s = \f0.3\ m, ABOVE', &
-        'FIELD.SPECTRAL_HEAD_TOLERANCE = \es10.2\ . THE TRANSFORM ALONG TAU IS PERIODIC, SO LIGHT', &
-        'PAST THE HEAD WOULD REAPPEAR AT THE TAIL. POSSIBLE SOLUTION: A LONGER WINDOW, OR', &
-        'FIELD.SPECTRAL_BOUNDARY = "sponge" OR "pad".', &
-        r_array = [e_head / e_total, wf%s_position, sp%head_tolerance])
-  err_flag = .true.
+if (present(plane_y) .and. .not. allocated(bank%plane_y)) then
+  allocate (bank%plane_y(size(plane,1), size(plane,2), size(bank%plane,3)))
+elseif (allocated(bank%plane_y) .and. size(bank%plane_y,3) < size(bank%plane,3)) then
+  call move_alloc (bank%plane_y, grow)
+  allocate (bank%plane_y(size(grow,1), size(grow,2), size(bank%plane,3)))
+  bank%plane_y(:,:,1:size(grow,3)) = grow
+  deallocate (grow)
 endif
+bank%n = bank%n + 1
+bank%plane(:,:,bank%n) = plane
+if (present(plane_y)) bank%plane_y(:,:,bank%n) = plane_y
 
-end subroutine fel_spectral_head_check
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Function plane_energy (wf, ifld) result (e_sum)
-!
-! Routine to sum |E|^2 over one record plane, both polarizations, in grid units.
-!-
-
-function plane_energy (wf, ifld) result (e_sum)
-
-type (wavefront_struct) wf
-integer ifld
-real(rp) e_sum
-
-!
-
-e_sum = sum(real(wf%Ex(:,:,ifld), rp)**2 + aimag(wf%Ex(:,:,ifld))**2)
-if (allocated(wf%Ey)) e_sum = e_sum + sum(real(wf%Ey(:,:,ifld), rp)**2 + aimag(wf%Ey(:,:,ifld))**2)
-
-end function plane_energy
+end subroutine bank_append
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
