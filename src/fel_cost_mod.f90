@@ -14,6 +14,11 @@
 ! particle rows of docs/performance.md separate the two terms: the push moves by a factor
 ! of 14 between them and the transform by 8 percent.
 !
+! Under the spectral propagator (fel_spectral_mod) a third term counts what that mode
+! adds: the pad's planes in the transverse transform, and the passes along tau, each a
+! transform pair over every line of the window and the pad, two a step and the
+! interludes' own (fel_cost_passes).
+!
 ! The rates below are per thread. The page's tables were taken at twelve threads. The
 ! thread scan there gives a serial fraction of 2.1 percent. The parallelism is over
 ! slices, so the effective thread count is the smaller of the thread and slice counts.
@@ -52,15 +57,19 @@ real(rp), parameter :: fel_cost_push$ = 2.03e-7_rp     ! s per particle-step.
 real(rp), parameter :: fel_cost_deposit$ = 2.08e-8_rp  ! s per particle-step.
 real(rp), parameter :: fel_cost_solve$ = 4.68e-9_rp    ! s per grid point per log2(ngrid) per step.
 
-! The spectral propagator's two passes along tau per step (fel_spectral_mod), each a
-! gather of every line of the window and its pad across the stack's stride, a transform
-! pair along tau and a scatter. Per grid point of a line, per log2 of the transform's
-! length, per pass, from the cost table of docs/spectral-field.md at one thread: the
-! field phase's excess over the slice propagator's, 32 slices and a pad of 16 on a
-! 255 by 255 grid over 1068 steps.
+! The spectral propagator's pass along tau (fel_spectral_apply): a gather of every line
+! of the window and its pad across the stack's stride, a transform pair of n_t points
+! along tau, n_t the field's planes plus the pad, and a scatter. The rate is the seconds
+! one pass takes per point of the transforms, per log2(n_t), at one thread. It is
+! measured on the SASE tier (docs/spectral-field.md, the cost table): the field phase of
+! the spectral run less the slice run's at one thread, less the transverse transform pair
+! the pad's planes add at fel_cost_solve$, over the points the two passes a step
+! transform. tests/scripts/spectral_field.py's cost subcommand makes that fit from its
+! own rows and prints the rate, and fel_cost_passes below counts the passes a run makes.
+! The rate was taken on 2026-11-04 from the run the page records, 32 planes and a pad of
+! 16 on a 255 by 255 grid over 1068 steps.
 
-real(rp), parameter :: fel_cost_tau$ = 1.76e-9_rp   ! s per point per log2(n_t) per pass.
-integer, parameter :: fel_cost_n_pad$ = 16                    ! The pad's slots (fel_spectral_mod).
+real(rp), parameter :: fel_cost_tau$ = 6.72e-10_rp  ! s per point per log2(n_t) per pass.
 
 ! The thread scan's serial fraction, and the share of the walk the push and the solve
 ! own. The share is 88.5, 87.5 and 85.9 percent over a factor of 16 in particles per
@@ -160,6 +169,69 @@ end subroutine fel_cost_count
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_cost_passes (run, n_int_kernel, n_int_slip)
+!
+! Routine to count the passes the spectral propagator makes outside the undulator
+! steps, as fel_track_line_mod makes them. An interlude element the walk tracks takes
+! one kernel pass a piece (fel_spectral_drift), the pieces fel_interlude_pieces cuts it
+! into under the bmad interlude model and one under Genesis's, and its slippage in slip
+! passes of at most one plane each (fel_spectral_slip). An undulator's steps take their
+! two passes a step, which fel_cost_estimate counts from nstep, and an undulator whose
+! last step carries a slippage of its own takes that slippage's passes, counted here.
+! An element the walk passes over (fel_element_inert) takes none.
+!
+! Input:
+!   run          -- fel_run_struct: The run, after fel_setup_schedule.
+!
+! Output:
+!   n_int_kernel -- integer: Kernel passes outside the undulator steps.
+!   n_int_slip   -- integer: Slip passes outside the undulator steps' own.
+!-
+
+subroutine fel_cost_passes (run, n_int_kernel, n_int_slip)
+
+type (fel_run_struct), target :: run
+type (branch_struct), pointer :: branch
+type (ele_struct), pointer :: ele, wake_src
+integer n_int_kernel, n_int_slip, ie, n_piece, sample
+
+!
+
+branch => run%lat%branch(0)
+sample = max(1, run%ffield(1)%slip%sample)
+n_int_kernel = 0;  n_int_slip = 0
+
+do ie = run%i_start, run%i_end
+  ele => branch%ele(ie)
+  if (run%is_fel(ie)) then
+    n_int_slip = n_int_slip + slip_passes(run%ele_slip(ie))
+    cycle
+  endif
+  wake_src => fel_interlude_wake (ele)
+  if (fel_element_inert (ele, wake_src)) cycle
+  n_piece = 1
+  if (run%global%interlude_model == 'bmad' .and. .not. associated(wake_src)) then
+    n_piece = fel_interlude_pieces(run%global%interlude_ds_step, ele%value(l$))
+  endif
+  n_int_kernel = n_int_kernel + n_piece
+  n_int_slip = n_int_slip + n_piece * slip_passes(run%ele_slip(ie) / n_piece)
+enddo
+
+!------------------------------
+contains
+
+function slip_passes (slippage) result (n)
+real(rp) slippage
+integer n
+n = 0
+if (slippage > 0) n = max(1, ceiling(slippage / sample - 1e-9_rp))
+end function slip_passes
+
+end subroutine fel_cost_passes
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_cost_estimate (run, secs, backend)
 !
 ! Routine to estimate the wall clock of a run's walk on the recording machine.
@@ -179,8 +251,8 @@ end subroutine fel_cost_count
 subroutine fel_cost_estimate (run, secs, backend)
 
 type (fel_run_struct), target :: run
-real(rp) secs, n_pstep, n_gpt, t_one, speedup
-integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff, n_t
+real(rp) secs, n_pstep, n_gpt, t_one, speedup, pts_plane
+integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff, n_t, n_pad, n_int_kernel, n_int_slip
 character(*) backend
 
 !
@@ -193,12 +265,20 @@ call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
 t_one = (fel_cost_push$ + fel_cost_deposit$) * n_pstep
 if (ngrid > 1) t_one = t_one + fel_cost_solve$ * n_gpt * log(real(ngrid, rp)) / log(2.0_rp) * nstep
 
-! The spectral propagator's passes along tau, over the window and its pad, which a
-! window of one slice does not have.
+! The spectral propagator, which a window of one slice does not run: the transverse
+! transform pair on the pad's planes at every step and on the window and the pad at every
+! interlude kernel pass, at the solve's rate, and the passes along tau, two a step and the
+! interludes' own, each a transform pair over every line of the window and the pad.
 
 if (run%spectral%on .and. run%nfield > 1) then
-  n_t = run%nfield + fel_cost_n_pad$
-  t_one = t_one + 2 * fel_cost_tau$ * n_gpt * (real(n_t, rp) / run%nfield) * log(real(n_t, rp)) / log(2.0_rp) * nstep
+  call fel_cost_passes (run, n_int_kernel, n_int_slip)
+  n_pad = run%spectral%n_pad
+  n_t = run%nfield + n_pad
+  pts_plane = n_gpt / run%nfield
+  t_one = t_one + fel_cost_solve$ * pts_plane * log(real(ngrid, rp)) / log(2.0_rp) * &
+                  (real(n_pad, rp) * nstep + real(n_t, rp) * n_int_kernel)
+  t_one = t_one + fel_cost_tau$ * pts_plane * n_t * log(real(n_t, rp)) / log(2.0_rp) * &
+                  (2.0_rp * nstep + n_int_kernel + n_int_slip)
 endif
 
 n_omp = 1

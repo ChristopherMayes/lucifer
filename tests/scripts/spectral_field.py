@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """
 Measure the spectral field propagator, field.propagator = "spectral", against the slice
-propagator, as docs/spectral-field.md records. The keystone's own check of the mode is
-check_spectral.py; nothing here runs in it, and the page is hand written from this
-script's report.
+propagator, and write the record docs/spectral-field.md is generated from. The keystone's
+own check of the mode is check_spectral.py; nothing here runs in it.
 
     spectral_field.py --exe <lucifer> --work-dir <dir> [--validation-dir <dir>]
-                      [--threads N] [--reuse] [vacuum] [null] [bank] [cost]
-                      [seeded] [chirped]
+                      [--threads N] [--cost-threads 1,8] [--exe-open <lucifer>]
+                      [--toolchain <text>] [--json <file>] [--reuse]
+                      [vacuum] [null] [bank] [cost] [seeded] [chirped] [sweep] [all]
 
-The six measurements, each a subcommand and the first four when none is named. With
---reuse a run whose log and final field exist in the work directory is not run again,
-so a set that takes hours is re-analyzed from its files.
+The seven measurements, each a subcommand and the first four when none is named. `all`
+runs every one, the cost first on the quiet machine and then the sweep and the two FEL
+cases, which take hours at 12 threads. With --json each measurement's result is written
+into that file as it finishes, under its own name, and a file already there keeps the
+measurements this run does not repeat. The committed record is
+docs/generated/spectral/measured.json, which tests/scripts/report_spectral.py turns into the
+page's tables and figures. With --reuse a run whose log and final field exist in the work
+directory is not run again, so a set that takes hours is re-analyzed from its files.
 
   vacuum    A chirped Gaussian pulse with no beam, drifted through a pipe under both
             propagators, against the exact paraxial solution with its spatio-temporal
@@ -30,8 +35,9 @@ so a set that takes hours is re-analyzed from its files.
             energy, the beam's energy loss, and what the pulse file holds. Needs
             --validation-dir.
   cost      The field phase of the SASE tier's walk per step, from the footer's timing
-            table, under both propagators, at the thread count given. Needs
-            --validation-dir.
+            table, under both propagators, at each thread count of --cost-threads, and
+            from the lowest the rate fel_cost_mod's fel_cost_tau$ holds, refit by the
+            count that module makes. Needs --validation-dir.
   seeded    A chirped Gaussian seed, the vacuum test's pulse at the tier's wavelength on
             the tier's grid, through the first Aramis segment and through the full line
             with the tier's beam continued over a 1280-slice window that holds the line's
@@ -51,17 +57,25 @@ so a set that takes hours is re-analyzed from its files.
             the SASE tier's beam over 1280 slices, and the sase, flash1 and lcls
             examples. For each run the window's and the pulse's energy, the peak power,
             the exit power per slice against the run at one slice a plane, the exit
-            spectrum's rms width and centroid, and the walk. Needs --validation-dir for
+            spectrum's rms width and centroid, and the walk. A sampling above the cliff,
+            fel_field_coop_cliff$ of the cooperation length, is refused by the tracker,
+            and such a row runs on --exe-open when it is given, a tracker built with that
+            constant raised, and is marked so in the record. Needs --validation-dir for
             the Aramis lattice.
 
 The tracker is run from the work directory, into which the validation directory's
-inputs are linked, so the validation directory is read and never written.
+inputs are linked, so the validation directory is read and never written. Every number
+in the record is written to six significant figures.
 """
 from __future__ import annotations
 
 import argparse
+import datetime
+import json
+import math
 import os
 import pathlib
+import platform
 import re
 import shutil
 import subprocess
@@ -133,6 +147,85 @@ def link_inputs(vdir, wdir):
             dst = pathlib.Path(wdir) / p.name
             if not dst.exists():
                 dst.symlink_to(p.resolve())
+
+
+Z0 = 376.730313668      # The impedance of free space [ohm], so a slice's power is sum |E|^2 dx^2 / 2 Z0.
+
+
+def spectral(n_wavelength):
+    """The overrides that select the spectral propagator at one plane a slice. Left unset,
+    field.n_wavelength derives a plane coarser than the slice under this propagator, and
+    a comparison against the slice run would measure that sampling and not the
+    propagator. The sweep states the sampling itself."""
+    return ["field.propagator=spectral", f"field.n_wavelength={n_wavelength}"]
+
+
+def window_n_wavelength(toml):
+    """window.n_wavelength of an input file."""
+    import tomllib
+    with open(toml, "rb") as fh:
+        return int(tomllib.load(fh)["window"]["n_wavelength"])
+
+
+def rounded(obj):
+    """obj with every float written to six significant figures, arrays as lists, so the
+    record is short and the same run writes the same bytes."""
+    if isinstance(obj, (bool, int, str)) or obj is None:
+        return obj
+    if isinstance(obj, (float, np.floating)):
+        x = float(obj)
+        return x if not math.isfinite(x) else float(f"{x:.6g}")
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.ndarray):
+        return rounded(obj.tolist())
+    if isinstance(obj, dict):
+        return {str(k): rounded(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [rounded(v) for v in obj]
+    return obj
+
+
+def field_curves(path):
+    """The exit curves a figure draws from a final field file: the power in each plane
+    [W], the power spectrum of the field summed over the grid against kappa / k0, with
+    the carrier at zero, and the plane spacing [m]."""
+    from lucifer.field import read_field
+    fld = read_field(path)
+    u, dz, lam = fld["u"], fld["dz"], fld["wavelength"]
+    power = (np.abs(u)**2).sum(axis=(1, 2)) * fld["dx"]**2 / (2 * Z0)
+    a = u.sum(axis=(1, 2))
+    spec = np.fft.fftshift(np.abs(np.fft.fft(a))**2)
+    kappa = np.fft.fftshift(2 * np.pi * np.fft.fftfreq(a.size, d=dz)) / (2 * np.pi / lam)
+    return dict(power=power, spectrum=spec, kappa_over_k0=kappa, dz=float(dz), wavelength=float(lam))
+
+
+def provenance(args):
+    """What ran: the tracker's version and Bmad's from --version, the build, the
+    toolchain stated on the command line, the machine, the day and the thread counts."""
+    out = subprocess.run([str(args.exe), "--version"], capture_output=True, text=True).stdout
+    versions = dict(re.findall(r"(Lucifer|Bmad) version (\S+)", out))
+    machine = platform.machine()
+    if platform.system() == "Darwin":
+        r = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True)
+        if r.returncode == 0 and r.stdout.strip():
+            machine = r.stdout.strip()
+    return dict(lucifer_version=versions.get("Lucifer", "unknown"), bmad_version=versions.get("Bmad", "unknown"),
+                toolchain=args.toolchain, machine=machine,
+                system=f"{platform.system()} {platform.release()}", day=datetime.date.today().isoformat(),
+                threads=args.threads, cost_threads=list(args.cost_threads),
+                exe_open=bool(args.exe_open))
+
+
+def write_record(path, name, value, args):
+    """Write value under name into the JSON record at path, keeping what is already
+    there, and the provenance of this run."""
+    record = {}
+    if path.exists():
+        record = json.loads(path.read_text())
+    record["provenance"] = provenance(args)
+    record[name] = rounded(value)
+    path.write_text(json.dumps(record, indent=1) + "\n")
 
 
 # --------------------------------------------------------------------------------------
@@ -247,7 +340,7 @@ def vacuum(args, wdir):
         (wdir / f"{tag}.toml").write_text(to_toml(flat))
 
         errors = {}
-        for name, over in (("slices", []), ("spectral", ["field.propagator=spectral"])):
+        for name, over in (("slices", []), ("spectral", spectral(1))):
             rc, text = run(args.exe, f"{tag}.toml", over, f"{tag}_{name}", wdir, args.threads)
             if rc != 0:
                 print(text[-2000:])
@@ -256,10 +349,12 @@ def vacuum(args, wdir):
             u = np.transpose(fld["u"], (2, 1, 0))          # (nx, ny, nz)
             exact = vacuum_exact(a, tau, tau_c, dtau, r2, k0, w0, length, shift=dtau)
             errors[name] = np.abs(u - exact).max() / np.abs(exact).max()
-        rows.append((target, b, errors["slices"], errors["spectral"]))
+        rows.append(dict(bandwidth=float(target), chirp=float(b), slices=float(errors["slices"]),
+                         spectral=float(errors["spectral"])))
         print(f"  {target:9.1e}   {b:13.4e}    {errors['slices']:.3e}     {errors['spectral']:.3e}")
     print()
-    return rows
+    return dict(wavelength=wavelength, n_slice=nz, sigma_slices=sigma / dtau, waist=w0, ngrid=ngrid, dx=dx,
+                half_width=half, length=length, rayleigh=z_r, threads=args.threads, rows=rows)
 
 
 def vacuum_exact(a, tau, tau_c, dtau, r2, k0, w0, z, shift):
@@ -314,17 +409,16 @@ def null(args, wdir):
         ("tier1", "Aramis1seg", 1, compare_fel.TOLERANCE["tier1"]),
         ("tdsase", "AramisTDSASE", nslice_sase, compare_fel.TOLERANCE["tdsase"]),
     )
-    results = {}
+    rows = []
+    curves = {}
     for tier, gen, nslice, tol in tiers:
-        slices_log = (vdir / f"fel-{tier}.log").read_text()
         recorded = compare_fel.compare_tier(f"{tier} slices (the validation pass's own run)",
                                             f"{vdir}/{tier}.diag.txt", f"{vdir}/{gen}.out.h5",
                                             f"{vdir}/{tier}-final.wf.h5", f"{vdir}/{gen}-final.fld.h5",
                                             f"{vdir}/{tier}-final.beam.h5", f"{vdir}/{gen}-final.par.h5",
                                             tol, nslice)[0]
-        results[(tier, "slices")] = recorded
         root = f"{tier}_spectral"
-        rc, text = run(args.exe, f"{tier}.toml", ["field.propagator=spectral"], root, wdir, args.threads)
+        rc, text = run(args.exe, f"{tier}.toml", spectral(window_n_wavelength(wdir / f"{tier}.toml")), root, wdir, args.threads)
         if rc != 0:
             print(text[-2000:])
             raise SystemExit(f"null: {root} failed")
@@ -333,9 +427,13 @@ def null(args, wdir):
                                          f"{wdir}/{root}-final.wf.h5", f"{vdir}/{gen}-final.fld.h5",
                                          f"{wdir}/{root}-final.beam.h5", f"{vdir}/{gen}-final.par.h5",
                                          tol, nslice)[0]
-        d = differences(read_curves(f"{wdir}/{root}.stats.h5"), read_curves(f"{vdir}/{tier}.stats.h5"))
+        a, b = read_curves(f"{wdir}/{root}.stats.h5"), read_curves(f"{vdir}/{tier}.stats.h5")
+        d = differences(a, b)
         own = {k: float(np.abs(np.asarray(v.values)).max()) for k, v in d.items()}
-        results[(tier, "spectral")] = (worst, own)
+        rows.append(dict(tier=tier, recorded=float(recorded), spectral=float(worst), tolerance=float(tol),
+                         n_slice=int(nslice), against_slices=own))
+        curves[tier] = dict(s=a.s, power_slices=b.power.sum(axis=1), power_spectral=a.power.sum(axis=1),
+                            exit_slices=b.power[-1], exit_spectral=a.power[-1])
         print(f"  {tier} spectral: against Genesis4 {worst:.6e} (tolerance {tol:.1e}), "
               f"against the slice run: " + ", ".join(f"{k} {v:.2e}" for k, v in own.items()))
         print()
@@ -349,18 +447,19 @@ def null(args, wdir):
         raise SystemExit("null: tdsase_filter_slices failed")
     ref = read_curves(f"{wdir}/tdsase_filter_slices.stats.h5")
     root = "tdsase_filter_spectral"
-    rc, text = run(args.exe, "tdsase.toml", ["run.source_filter=true", "field.propagator=spectral"],
+    rc, text = run(args.exe, "tdsase.toml", ["run.source_filter=true"] + spectral(window_n_wavelength(wdir / "tdsase.toml")),
                    root, wdir, args.threads)
     if rc != 0:
         print(text[-2000:])
         raise SystemExit(f"null: {root} failed")
-    d = differences(read_curves(f"{wdir}/{root}.stats.h5"), ref)
+    a = read_curves(f"{wdir}/{root}.stats.h5")
+    d = differences(a, ref)
     own = {k: float(np.abs(np.asarray(v.values)).max()) for k, v in d.items()}
-    results[("tdsase_filter", "spectral")] = own
+    curves["tdsase_filter"] = dict(s=a.s, power_slices=ref.power.sum(axis=1), power_spectral=a.power.sum(axis=1),
+                                   exit_slices=ref.power[-1], exit_spectral=a.power[-1])
     print(f"    spectral: " + ", ".join(f"{k} {v:.2e}" for k, v in own.items()))
     print()
-    return results
-
+    return dict(threads=args.threads, tiers=rows, filter_on=dict(against_slices=own), curves=curves)
 
 def bank(args, wdir):
     from lucifer.stats import read_stats
@@ -368,8 +467,9 @@ def bank(args, wdir):
     tier_inputs(args, wdir)
     print("--- bank: the SASE tier's 32-slice window with the escaped field kept, under both propagators")
     rows = {}
+    n_wl = window_n_wavelength(wdir / "tdsase.toml")
     for key, label, over in (("slices", "the slice propagator", []),
-                             ("spectral", "the spectral propagator", ["field.propagator=spectral"])):
+                             ("spectral", "the spectral propagator", spectral(n_wl))):
         root = f"bank_{key}"
         rc, text = run(args.exe, "tdsase.toml", over + ["run.keep_escaped_field=true"], root, wdir, args.threads)
         if rc != 0:
@@ -384,6 +484,9 @@ def bank(args, wdir):
             import h5py
             with h5py.File(pulse) as h:
                 row["pulse_planes"] = h["data/1/meshes/electricField/x"].shape[0]
+        if pulse.exists():
+            c = field_curves(pulse)
+            row["pulse_power"] = c["power"]
         rows[key] = row
         print(f"  {label}:")
         print(f"    exit window energy {row['window_energy']:.4e} J, escaped {row.get('escaped_energy', 0):.4e} J, "
@@ -391,7 +494,7 @@ def bank(args, wdir):
         print(f"    beam energy loss {row['beam_loss']:.4e} J, pulse file {row['pulse_planes']} planes")
         print(f"    tail slice's exit power share {row['tail_share']:.2e}, head slice's {row['head_share']:.2e}")
     print()
-    return rows
+    return dict(threads=args.threads, rows=rows)
 
 
 def closure(st):
@@ -412,23 +515,77 @@ def closure(st):
 
 def cost(args, wdir):
     tier_inputs(args, wdir)
-    print(f"--- cost: the SASE tier's field phase per step, {args.threads} thread(s)")
-    rows = {}
+    print(f"--- cost: the SASE tier's field phase per step at {', '.join(str(t) for t in args.cost_threads)} thread(s)")
+    rows = []
     # The full cost under spectral: the kernel pass and the slip pass, the bank off as the
     # tier runs it.
-    for key, over in (("slices", []), ("spectral", ["field.propagator=spectral"])):
-        root = f"cost_{key}"
-        rc, text = run(args.exe, "tdsase.toml", over, root, wdir, args.threads)
-        if rc != 0:
-            print(text[-2000:])
-            raise SystemExit(f"cost: {root} failed")
-        f = footer(text)
-        rows[key] = f
-        print(f"  {key:9s} field solve {f['solve_seconds']:.3f} s over {f['n_step']} steps = "
-              f"{1e3 * f['solve_seconds'] / f['n_step']:.2f} ms a step, walk {f['walk_seconds']:.3f} s")
+    n_wl = window_n_wavelength(wdir / "tdsase.toml")
+    for threads in args.cost_threads:
+        for key, over in (("slices", []), ("spectral", spectral(n_wl))):
+            root = f"cost_{key}_t{threads}"
+            rc, text = run(args.exe, "tdsase.toml", over, root, wdir, threads)
+            if rc != 0:
+                print(text[-2000:])
+                raise SystemExit(f"cost: {root} failed")
+            f = footer(text)
+            f.update(header_counts(text))
+            f.update(threads=threads, propagator=key)
+            rows.append(f)
+            print(f"  {threads:2d} threads {key:9s} field solve {f['solve_seconds']:.3f} s over {f['n_step']} steps = "
+                  f"{1e3 * f['solve_seconds'] / f['n_step']:.2f} ms a step, walk {f['walk_seconds']:.3f} s")
+    fit = tau_fit(rows)
+    print(f"  fel_cost_tau$ from the {fit['threads']}-thread rows: {fit['tau']:.3e} s per point per log2(n_t) per pass, "
+          f"the pad's transverse share {fit['pad_seconds']:.2f} s of the excess {fit['excess_seconds']:.2f} s")
     print()
-    return rows
+    return dict(rows=rows, fit=fit)
 
+
+def header_counts(text):
+    """The counts of a run the cost model takes, from its header: the slices, the grid,
+    the field's planes, the pad's slots and the FEL steps."""
+    out = {}
+    m = re.search(r"^ Beam\s+(\d+) slices? x (\d+) particles", text, re.M) or \
+        re.search(r"^ Beam\s+(\d+) slices?, (\d+) particles", text, re.M)
+    if m:
+        out["n_slice"], out["n_particle_slice"] = int(m.group(1)), int(m.group(2))
+    m = re.search(r"grid (\d+) points", text)
+    if m:
+        out["ngrid"] = int(m.group(1))
+    m = re.search(r"^ Field\s+(\d+) planes of", text, re.M)
+    out["n_field"] = int(m.group(1)) if m else out.get("n_slice")
+    m = re.search(r"a pad of (\d+) free and (\d+) sponge", text)
+    out["n_pad"] = int(m.group(1)) + int(m.group(2)) if m else 0
+    return out
+
+
+def cost_solve_rate():
+    """fel_cost_solve$ as src/fel_cost_mod.f90 holds it, the transverse transform's rate
+    per grid point per log2(ngrid) per step, read from the module so the fit and the
+    estimate share one number."""
+    src = pathlib.Path(__file__).resolve().parents[2] / "src" / "fel_cost_mod.f90"
+    m = re.search(r"fel_cost_solve\$ = ([0-9.eE+-]+)_rp", src.read_text())
+    if not m:
+        raise SystemExit(f"{src} holds no fel_cost_solve$")
+    return float(m.group(1))
+
+
+def tau_fit(rows):
+    """fel_cost_tau$ from the cost rows at their lowest thread count, by fel_cost_mod's
+    count of what the spectral propagator adds to a step: the transverse transform pair
+    on the pad's planes at fel_cost_solve$, and two passes along tau over every line of
+    the window and pad, each a transform pair of n_t = planes + pad. The excess of the
+    spectral row's field phase over the slice row's, less the pad's transverse share, over
+    the points the two passes transform, per log2(n_t)."""
+    threads = min(r["threads"] for r in rows)
+    by = {r["propagator"]: r for r in rows if r["threads"] == threads}
+    sp, sl = by["spectral"], by["slices"]
+    ngrid, n_field, n_pad, nstep = sp["ngrid"], sp["n_field"], sp["n_pad"], sp["n_step"]
+    n_t = n_field + n_pad
+    excess = sp["solve_seconds"] - sl["solve_seconds"]
+    pad = cost_solve_rate() * n_pad * ngrid**2 * math.log2(ngrid) * nstep
+    points = 2 * ngrid**2 * n_t * math.log2(n_t) * nstep
+    return dict(threads=threads, excess_seconds=excess, pad_seconds=pad, n_t=n_t, ngrid=ngrid, n_field=n_field,
+                n_pad=n_pad, n_step=nstep, tau=(excess - pad) / points)
 
 # --------------------------------------------------------------------------------------
 # The chirped cases: a long flat beam at the SASE tier's parameters, a seed with a chirp
@@ -485,6 +642,7 @@ field.file = "{field}"
 lambda0 = 1e-10
 """
 
+CHIRP_N_WAVELENGTH = 3           # The chirped cases' slice, PREP_INPUT's and CHIRP_RUN_INPUT's n_wavelength.
 SEED_SIGMA_WAVELENGTHS = 15      # The seed's rms length. Its unchirped rms bandwidth is 0.53 percent.
 SEED_SLICE = 30                  # Where the seed's center sits, from the tail.
 SEED_WAIST = 30e-6               # Its 1/e^2 intensity radius [m], near the mode's.
@@ -645,6 +803,8 @@ def seeded(args, wdir):
     print()
     print("  bandwidth  extent   offset   field diff raw / aligned   wavelength diff   lit    peak power slices / spectral")
     rows = []
+    curves = {}
+    kappa = None
     for i, bw in enumerate(BANDWIDTHS):
         tag = f"seed{i}"
         seed, b, bw_eff = chirp_seed(wdir, dark, tag, bw)
@@ -654,7 +814,7 @@ def seeded(args, wdir):
         for extent, over in (("quiet", ["run.track_end=UND##1"]), ("segment", ["run.track_end=UND##1"]), ("line", [])):
             toml = f"{tag}_quiet.toml" if extent == "quiet" else f"{tag}.toml"
             roots = {}
-            for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
+            for prop, more in (("slices", []), ("spectral", spectral(CHIRP_N_WAVELENGTH))):
                 root = f"{tag}_{extent}_{prop}"
                 rc, text = run(args.exe, toml, over + more, root, wdir, args.threads)
                 if rc != 0:
@@ -662,16 +822,22 @@ def seeded(args, wdir):
                     raise SystemExit(f"seeded: {root} failed")
                 roots[prop] = root
             r = chirp_compare(wdir, roots["slices"], roots["spectral"])
-            rows.append((bw_eff, extent, r))
+            rows.append(dict(bandwidth=float(bw_eff), chirp=float(b), extent=extent, **row_numbers(r)))
+            cs, cp = field_curves(wdir / f"{roots['slices']}-final.wf.h5"), field_curves(wdir / f"{roots['spectral']}-final.wf.h5")
+            curves[f"{tag}_{extent}"] = dict(bandwidth=float(bw_eff), extent=extent, power_slices=cs["power"],
+                                             power_spectral=cp["power"], spectrum_slices=cs["spectrum"],
+                                             spectrum_spectral=cp["spectrum"])
+            kappa = cp["kappa_over_k0"]
             print(f"  {bw_eff:8.3f}   {extent:7s}  {r['offset']:6.3f}   {r['field_raw']:.3e} / {r['field']:.3e}    "
                   f"{r['wavelength']:.3e}       {r['lit']:4d}   {r['power_a']:.3e} / {r['power_b']:.3e} W")
     # Convergence of the reference: the 2 percent seed with the undulator step cut from
     # three periods to one, through the segment and through the line.
     tag = "seed2"
+    convergence = []
     (wdir / f"{tag}_fine.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line-fine.bmad", beam=beam.name,
                                                                            field=f"{tag}-initial.wf.h5")))
     for extent, over in (("segment", ["run.track_end=UND##1"]), ("line", [])):
-        rc, text = run(args.exe, f"{tag}_fine.toml", over + ["field.propagator=spectral"],
+        rc, text = run(args.exe, f"{tag}_fine.toml", over + spectral(CHIRP_N_WAVELENGTH),
                        f"{tag}_{extent}_spectral_fine", wdir, args.threads)
         if rc != 0:
             print(text[-2000:])
@@ -679,10 +845,20 @@ def seeded(args, wdir):
         r = chirp_compare(wdir, f"{tag}_{extent}_spectral_fine", f"{tag}_{extent}_spectral")
         print(f"  convergence, {extent}: the 2 percent seed, spectral at ds_step 0.015 against 0.045: "
               f"field {r['field']:.3e}, wavelength {r['wavelength']:.3e}, peak power {r['power_a']:.3e} / {r['power_b']:.3e} W")
+        conv = dict(extent=extent, fine_against_spectral=row_numbers(r))
         r = chirp_compare(wdir, f"{tag}_{extent}_slices", f"{tag}_{extent}_spectral_fine")
         print(f"               and the slice run against that fine spectral run: field {r['field']:.3e} aligned by {r['offset']:.3f} slice")
+        conv["slices_against_fine"] = row_numbers(r)
+        convergence.append(conv)
     print()
-    return rows
+    return dict(threads=args.threads, sigma_wavelengths=SEED_SIGMA_WAVELENGTHS, seed_slice=SEED_SLICE,
+                waist=SEED_WAIST, peak_power=SEED_POWER, n_slice=int(kappa.size), kappa_over_k0=kappa,
+                rows=rows, convergence=convergence, curves=curves)
+
+
+def row_numbers(r):
+    """The scalar entries of a chirp_compare result, for the record."""
+    return {k: (float(v) if not isinstance(v, int) else v) for k, v in r.items() if not isinstance(v, np.ndarray)}
 
 
 def chirped(args, wdir):
@@ -693,13 +869,15 @@ def chirped(args, wdir):
     print()
     print("  chirp    field diff   wavelength diff   lit   exit peak power slices / spectral   fitted slope of the wavelengths slices / spectral")
     rows = []
+    curves = {}
+    kappa = None
     for i, chirp in enumerate(ENERGY_CHIRPS):
         tag = f"chirp{i}"
         chirp_beam(beam, wdir / f"{tag}-initial.beam.h5", chirp)
         (wdir / f"{tag}.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line.bmad",
                                                                           beam=f"{tag}-initial.beam.h5", field=dark.name)))
         roots = {}
-        for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
+        for prop, more in (("slices", []), ("spectral", spectral(CHIRP_N_WAVELENGTH))):
             root = f"{tag}_line_{prop}"
             rc, text = run(args.exe, f"{tag}.toml", more, root, wdir, args.threads)
             if rc != 0:
@@ -713,11 +891,20 @@ def chirped(args, wdir):
             idx = np.arange(lam_i.size)[ok]
             slope = np.polyfit(idx, lam_i[ok] / np.nanmean(lam_i), 1)[0] * (lam_i.size - 1)
             fits.append(slope)
-        rows.append((chirp, r, fits))
+        f = footer((wdir / f"{roots['spectral']}.log").read_text())
+        rows.append(dict(chirp=float(chirp), slope_slices=float(fits[0]), slope_spectral=float(fits[1]),
+                         expected_slope=-2 * chirp, pulse_energy_spectral=f.get("pulse_energy", float("nan")),
+                         pulse_energy_slices=footer((wdir / f"{roots['slices']}.log").read_text()).get("pulse_energy", float("nan")),
+                         **row_numbers(r)))
+        cs, cp = field_curves(wdir / f"{roots['slices']}-final.wf.h5"), field_curves(wdir / f"{roots['spectral']}-final.wf.h5")
+        curves[tag] = dict(chirp=float(chirp), power_slices=cs["power"], power_spectral=cp["power"],
+                           spectrum_slices=cs["spectrum"], spectrum_spectral=cp["spectrum"],
+                           wavelength_slices=r["lam_a"], wavelength_spectral=r["lam_b"])
+        kappa = cp["kappa_over_k0"]
         print(f"  {chirp:6.4f}   {r['field']:.3e}    {r['wavelength']:.3e}       {r['lit']:4d}  "
               f"{r['power_a']:.3e} / {r['power_b']:.3e} W   {fits[0]:+.4f} / {fits[1]:+.4f} (-2 x chirp {-2*chirp:+.4f})")
     print()
-    return rows
+    return dict(threads=args.threads, n_slice=int(kappa.size), kappa_over_k0=kappa, rows=rows, curves=curves)
 
 
 # --------------------------------------------------------------------------------------
@@ -748,7 +935,7 @@ def sweep_measure(wdir, root, ref=None):
     width = np.sqrt((spec * (kappa - mean)**2).sum() / tot) / k0 if tot > 0 else float("nan")
     out = dict(window_energy=f.get("window_energy", float("nan")), pulse_energy=f.get("pulse_energy", float("nan")),
                peak_power=float(power.max()), width=float(width), centroid=float(mean / k0),
-               walk=f.get("walk_seconds", float("nan")), planes=int(u.shape[0]), power=power)
+               walk=f.get("walk_seconds", float("nan")), planes=int(u.shape[0]), power=power, wavelength=float(lam))
     if ref is not None:
         out["exit_diff"] = float(np.abs(power - ref["power"]).max() / np.abs(ref["power"]).max())
     return out
@@ -758,7 +945,6 @@ def sweep_machines(args, wdir):
     """The four lines, each as (name, directory, input file, window n_wavelength, extra
     overrides): the SASE tier's beam over 1280 slices from noise, and the sase, flash1 and
     lcls examples as they ship."""
-    import shutil
     import tomllib
     here = pathlib.Path(__file__).resolve().parents[2]
     machines = []
@@ -780,6 +966,20 @@ def sweep_machines(args, wdir):
     return machines
 
 
+def sweep_derived(args, d, toml, extra):
+    """The line's rho, cooperation length [m] and derived sampling [wavelengths], from
+    the header of a run that loads the input file and stops (run.load_only)."""
+    rc, text = run(args.exe, toml, ["field.propagator=spectral", "run.load_only=true"] + extra, "sweep_derive", d, args.threads)
+    if rc != 0:
+        print(text[-2000:])
+        raise SystemExit("sweep: the load-only run failed")
+    m = re.search(r"Field sampling (\d+) wavelengths, (\d+) slices a plane, derived:.*?cooperation length\s+"
+                  r"([0-9.Ee+-]+)\s+m at rho =\s+([0-9.Ee+-]+)", text, re.S)
+    if not m:
+        raise SystemExit("sweep: the header states no derived field sampling")
+    return dict(derived_n_wavelength=int(m.group(1)), derived_slices_a_plane=int(m.group(2)),
+                l_coop=float(m.group(3)), rho=float(m.group(4)))
+
 def to_toml_text(flat):
     from lucifer.flat import to_toml
     return to_toml(flat)
@@ -789,60 +989,86 @@ def sweep(args, wdir):
     print("--- sweep: the field's sampling along tau on four lines, from noise, under the spectral propagator")
     print(f"  {args.threads} threads; each run against the same line at the window's slice")
     print()
-    results = {}
+    machines = {}
     for name, d, toml, n_wl, extra in sweep_machines(args, wdir):
-        print(f"  {name}: window.n_wavelength = {n_wl}")
+        derived = sweep_derived(args, d, toml, extra)
+        print(f"  {name}: window.n_wavelength = {n_wl}, rho {derived['rho']:.3e}, cooperation length {derived['l_coop']:.3e} m, "
+              f"derived sampling {derived['derived_n_wavelength']} wavelengths")
         print("    slices a plane   field.n_wavelength   planes   window energy   pulse energy   peak power   "
               "exit power vs finest   spectrum rms width   centroid   walk")
         ref = None
+        rows = []
+        wavelength = None
         for fac in SWEEP_FACTORS:
             root = f"sweep_{name}_{fac}"
             over = ["field.propagator=spectral", f"field.n_wavelength={fac * n_wl}", "run.keep_escaped_field=true"] + extra
-            rc, text = run(args.exe, toml, over, root, d, args.threads)
+            exe, cliff_open = args.exe, False
+            rc, text = run(exe, toml, over, root, d, args.threads)
+            if rc != 0 and args.exe_open and "ABOVE" in text and "COOPERATION" in text:
+                exe, cliff_open = args.exe_open, True
+                rc, text = run(exe, toml, over, root, d, args.threads)
+            row = dict(factor=fac, n_wavelength=fac * n_wl, cliff_open=cliff_open)
             if rc != 0:
-                m = re.search(r"\n\s*\[ERROR.*?\n(.*?)\n", text)
                 reason = text.strip().splitlines()[-1] if text.strip() else "no message"
                 for line in text.splitlines():
                     if "FIELD.N_WAVELENGTH" in line:
                         reason = line.strip()
                         break
                 print(f"    {fac:6d}   {fac * n_wl:8d}   refused: {reason[:110]}")
-                results[(name, fac)] = dict(refused=reason)
+                row["refused"] = reason
+                rows.append(row)
                 continue
             r = sweep_measure(d, root, ref)
             if ref is None:
                 ref = r
-            results[(name, fac)] = r
+            wavelength = r["wavelength"]
+            row.update({k: v for k, v in r.items() if k not in ("power", "wavelength")})
+            row["fraction"] = fac * n_wl * wavelength / derived["l_coop"]
+            rows.append(row)
             diff = r.get("exit_diff", 0.0)
             print(f"    {fac:6d}   {fac * n_wl:8d}   {r['planes']:6d}   {r['window_energy']:.4e} J   "
                   f"{r['pulse_energy']:.4e} J   {r['peak_power']:.4e} W   {diff:.3e}   {r['width']:.3e}   "
-                  f"{r['centroid']:+.2e}   {r['walk']:.1f} s")
+                  f"{r['centroid']:+.2e}   {r['walk']:.1f} s{'   (cliff open)' if cliff_open else ''}")
+        for row in rows:
+            if "fraction" not in row and wavelength:
+                row["fraction"] = row["n_wavelength"] * wavelength / derived["l_coop"]
+        machines[name] = dict(n_wavelength=n_wl, wavelength=wavelength, rows=rows, **derived)
         print()
-    return results
-
+    return dict(threads=args.threads, factors=list(SWEEP_FACTORS), machines=machines)
 
 # --------------------------------------------------------------------------------------
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--exe", required=True, help="the lucifer binary")
+    p.add_argument("--exe-open", help="a lucifer built with fel_field_coop_cliff$ raised, for the sweep's rows above the cliff")
     p.add_argument("--work-dir", required=True, help="where to run; made if absent")
     p.add_argument("--validation-dir", help="a completed validation pass's work directory")
-    p.add_argument("--threads", type=int, default=1, help="OMP_NUM_THREADS for every run")
+    p.add_argument("--threads", type=int, default=1, help="OMP_NUM_THREADS for every run but the cost's")
+    p.add_argument("--cost-threads", default="1,8", help="the thread counts the cost rows run at")
+    p.add_argument("--toolchain", default="unstated", help="the compiler the tracker was built with, for the record")
+    p.add_argument("--json", help="the record to write each measurement into as it finishes")
     p.add_argument("--reuse", action="store_true", help="keep a run whose log and final field exist")
-    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped", "sweep"],
+    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped", "sweep", "all"],
                    help="which measurements; the first four by default")
     args = p.parse_args()
     global REUSE
     REUSE = args.reuse
     args.exe = pathlib.Path(args.exe).resolve()
+    if args.exe_open:
+        args.exe_open = pathlib.Path(args.exe_open).resolve()
+    args.cost_threads = [int(t) for t in args.cost_threads.split(",")]
     wdir = pathlib.Path(args.work_dir).resolve()
     wdir.mkdir(parents=True, exist_ok=True)
     what = args.what or ["vacuum", "null", "bank", "cost"]
+    if "all" in what:
+        what = ["vacuum", "cost", "null", "bank", "sweep", "seeded", "chirped"]
     if any(w != "vacuum" for w in what) and not args.validation_dir:
-        raise SystemExit("null, bank and cost need --validation-dir")
+        raise SystemExit("every measurement but vacuum needs --validation-dir")
     for w in what:
-        globals()[w](args, wdir)
+        result = globals()[w](args, wdir)
+        if args.json:
+            write_record(pathlib.Path(args.json), w, result, args)
     return 0
 
 

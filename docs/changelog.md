@@ -30,6 +30,23 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-04 Changed: `docs/spectral-field.md` is written from one record. `tests/scripts/spectral_field.py all`
+  runs the seven measurements, the sweep and the two FEL cases included, and writes every number and curve
+  into `docs/generated/spectral/measured.json` as each finishes, with the tracker's version, the toolchain,
+  the machine, the day and the thread counts. `tests/scripts/report_spectral.py` writes the page's tables
+  and figure captions into `docs/generated/spectral-measured.md`, which the page includes between markers,
+  and draws the figures and three diagrams, the window with its pad and the bank, the rotation against the
+  ramp, and the field's planes over the beam's slices, into `docs/generated/spectral/` through
+  `lucifer.plot.save`. The keystone runs the report from the committed record and diffs the Markdown, so a
+  moved curve fails it through its caption, and the figures stay out of the diff as the example figures do.
+  The page is rewritten in a reader's order: when to select the propagator, the keys, how it works around
+  the diagrams, what it is measured to do, what it costs, what it does not cover and what is next. Every
+  spectral run of the script now states `field.n_wavelength` at the window's slice, where the key left unset
+  had measured the derived coarse field. The sweep's rows above the cliff run on a second tracker given as
+  `--exe-open`. `fel_cost_mod` counts what the spectral propagator runs, `fel_cost_passes`: the pad's planes
+  in the transverse transform pair and the passes along tau, two a step and the interludes' own, and
+  `fel_cost_tau$` is refit from the cost rows by that count, 6.72e-10 s per point per log2 of the transform's
+  length per pass where 1.76e-9 had carried the pad's transverse share. No recorded digit moved.
 - 2026-11-04 Added: `field.n_wavelength`, the field's plane along tau in wavelengths, a whole multiple
   of `window.n_wavelength`, so under the spectral propagator the field is sampled coarser than the
   beam's slices (`docs/spectral-field.md`). A beam slice reads the two planes around it by linear
