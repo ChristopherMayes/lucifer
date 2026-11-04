@@ -223,7 +223,33 @@ struct PushPar {
     float dz, ks, qres, gam0, p0_mc, kx, ky, ax, ay, cos_t, sin_t;
     float gridmax, dgrid, aw, qmut;
     uint  ngrid, npart, nslice, first, nf, npol;
+    uint  n_per, nplane, ntot;   // slices a plane, the window's planes, planes with the pad
 };
+
+// The bilinear read of one plane at the cell and weights the caller formed,
+// fel_fp32_mod's gather32.
+inline float2 gather4 (const device float2* F, ulong b, uint ngrid, float wx, float wy){
+    return F[b] * (wx * wy)
+         + F[b + 1u] * ((1.0f - wx) * wy)
+         + F[b + ngrid] * (wx * (1.0f - wy))
+         + F[b + ngrid + 1u] * ((1.0f - wx) * (1.0f - wy));
+}
+
+// The record planes a beam slice reads and the second's weight, fel_field_sample: with
+// one plane a slice the plane at the slice alone, else the plane at or below it and
+// the one above by the linear weight along tau. The ring offset applies to the
+// window's planes, which the pad follows unrotated.
+inline void slice_planes (uint is, uint n_per, uint nplane, uint first,
+                          thread uint& fs, thread uint& fs2, thread float& w2){
+    if (n_per == 1u) {
+        fs = (is + first) % nplane;  fs2 = fs;  w2 = 0.0f;
+    } else {
+        uint jp = is / n_per;
+        w2 = float(is - jp * n_per) / float(n_per);
+        fs = (jp + first) % nplane;
+        fs2 = (jp + 1u + first) % nplane;
+    }
+}
 
 // Per member of the field set: the harmonic number as a factor, the coupling
 // fc(h)/(sqrt(2) m_e) and the deposit scale. The polarization pair enters the
@@ -296,17 +322,19 @@ kernel void push (device float* G [[buffer(0)]], device long* U [[buffer(1)]],
         wy = 1.0f + fy - wy;
         int jx = int(fx), jy = int(fy);
         if (jx >= 0 && jy >= 0 && jx + 1 < int(P.ngrid) && jy + 1 < int(P.ngrid)) {
-            uint fs = (is + P.first) % P.nslice;
+            uint fs, fs2;
+            float w2;
+            slice_planes(is, P.n_per, P.nplane, P.first, fs, fs2, w2);
             uint nn = P.ngrid * P.ngrid;
             uint cell = uint(jy) * P.ngrid + uint(jx);
             for (uint m = 0; m < P.nf; m++) {
                 float2 cp[2] = { float2(0.0f), float2(0.0f) };
                 for (uint q = 0; q < P.npol; q++) {
-                    uint b = ((m * P.npol + q) * P.nslice + fs) * nn + cell;
-                    cp[q] = F[b] * (wx * wy)
-                          + F[b + 1u] * ((1.0f - wx) * wy)
-                          + F[b + P.ngrid] * (wx * (1.0f - wy))
-                          + F[b + P.ngrid + 1u] * ((1.0f - wx) * (1.0f - wy));
+                    ulong blk = (ulong) (m * P.npol + q) * P.ntot;
+                    cp[q] = gather4(F, (blk + fs) * nn + cell, P.ngrid, wx, wy);
+                    if (w2 > 0.0f)
+                        cp[q] = cp[q] * (1.0f - w2)
+                              + gather4(F, (blk + fs2) * nn + cell, P.ngrid, wx, wy) * w2;
                 }
                 float2 c = (P.npol == 2u) ? (cmul(S.polc[0], cp[0]) + cmul(S.polc[1], cp[1]))
                                           : cp[0];
@@ -358,7 +386,28 @@ kernel void push (device float* G [[buffer(0)]], device long* U [[buffer(1)]],
 struct DepPar {
     float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale, gam_floor;
     uint  ngrid, npart, nslice, first, mutate, nf;
+    uint  n_per, nplane;   // slices a plane and the window's planes (slice_planes)
 };
+
+// The four-cell scatter of one complex contribution into the accumulator of one
+// source plane, in fixed point.
+inline void scatter4 (device atomic_uint* S, ulong idx, uint ngrid, float wx, float wy,
+                      float2 cp, float scale){
+    float w;
+    ulong dcell;
+    w = wx * wy;                     dcell = 2u * idx;
+    acc_fixed(S, dcell,      w * cp.x, scale);
+    acc_fixed(S, dcell + 1u, w * cp.y, scale);
+    w = (1.0f - wx) * wy;            dcell = 2u * (idx + 1u);
+    acc_fixed(S, dcell,      w * cp.x, scale);
+    acc_fixed(S, dcell + 1u, w * cp.y, scale);
+    w = wx * (1.0f - wy);            dcell = 2u * (idx + ngrid);
+    acc_fixed(S, dcell,      w * cp.x, scale);
+    acc_fixed(S, dcell + 1u, w * cp.y, scale);
+    w = (1.0f - wx) * (1.0f - wy);   dcell = 2u * (idx + ngrid + 1u);
+    acc_fixed(S, dcell,      w * cp.x, scale);
+    acc_fixed(S, dcell + 1u, w * cp.y, scale);
+}
 
 // The accumulator's clear, four words a thread. It is a memory fill and nothing else, so
 // what it costs is the width of a store and the number of threads issued, not arithmetic.
@@ -415,7 +464,9 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
     // angle by eight mantissa bits, fel_fp32_mod's own hook transcribed.
     if (P.mutate != 0u) d = coarsen256(d);
 
-    uint fs = (is + P.first) % P.nslice;
+    uint fs, fs2;
+    float w2;
+    slice_planes(is, P.n_per, P.nplane, P.first, fs, fs2, w2);
     uint nn = P.ngrid * P.ngrid;
     uint cell = uint(jy) * P.ngrid + uint(jx);
     for (uint m = 0; m < P.nf; m++) {
@@ -430,21 +481,19 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
         float2 b = BASE[m * P.nslice + is];
         float2 cp = cmul(float2(-b.y, b.x), float2(c_d, -s_d)) * ppart;
 
-        ulong idx = (ulong) (m * P.nslice + fs) * nn + cell;
-        float w;
-        ulong dcell;
-        w = wx * wy;                     dcell = 2u * idx;
-        acc_fixed(S, dcell,      w * cp.x, P.dscale);
-        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
-        w = (1.0f - wx) * wy;            dcell = 2u * (idx + 1u);
-        acc_fixed(S, dcell,      w * cp.x, P.dscale);
-        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
-        w = wx * (1.0f - wy);            dcell = 2u * (idx + P.ngrid);
-        acc_fixed(S, dcell,      w * cp.x, P.dscale);
-        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
-        w = (1.0f - wx) * (1.0f - wy);   dcell = 2u * (idx + P.ngrid + 1u);
-        acc_fixed(S, dcell,      w * cp.x, P.dscale);
-        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
+        ulong idx = (ulong) (m * P.nplane + fs) * nn + cell;
+        if (P.n_per == 1u) {
+            scatter4(S, idx, P.ngrid, wx, wy, cp, P.dscale);
+        } else {
+            // A field coarser than the slices: the two planes about the slice take the
+            // linear weights divided by the slices a plane, fel_spectral_deposit_coarse.
+            float fac = 1.0f / float(P.n_per);
+            scatter4(S, idx, P.ngrid, wx, wy, cp * ((1.0f - w2) * fac), P.dscale);
+            if (w2 > 0.0f) {
+                ulong idx2 = (ulong) (m * P.nplane + fs2) * nn + cell;
+                scatter4(S, idx2, P.ngrid, wx, wy, cp * (w2 * fac), P.dscale);
+            }
+        }
     }
 }
 
@@ -808,8 +857,9 @@ kernel void unavg_gsave (device float* G0 [[buffer(0)]], const device float* G [
 // source. One member and one plane is the scalar solve with pol = 1.
 
 struct AddPar {
-    uint   ppm, nslice, npol, pad;   // planes per member = npol * nslice
+    uint   ppm, nslice, npol, pad;   // planes per member = npol * ntot
     float2 pol[2];
+    uint   nplane, ntot, pad2, pad3; // the window's planes and, with the pad, a plane set's
 };
 
 #define WSTRIDE(P) ((uint)(NG)/(uint)(P))
@@ -999,15 +1049,22 @@ kernel void fft_cols_add (device float2* d [[buffer(0)]], const device float2* W
     threadgroup float2 sh[CC_COLS * NG];
     uint c = t % CC_COLS, lane = t / CC_COLS;
     uint m = tg.y / A.ppm, rem = tg.y % A.ppm;
-    uint pl = rem / A.nslice, is = rem % A.nslice;
+    uint pl = rem / A.ntot, is = rem % A.ntot;
     ulong off = (ulong)tg.y * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
-    ulong soff = ((ulong)m * A.nslice + is) * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
+    ulong soff = ((ulong)m * A.nplane + is) * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
     device float2* b = d + off;
     const device float2* sb = src + soff;
     float2 a[REGS];
     for (uint n1 = 0; n1 < REGS; n1++) a[n1] = b[(ulong)(LANES*n1 + lane) * N];
     fftN(a, sh + c*NG, W, lane, sgn);
-    if (A.npol == 2u) {
+    if (is >= A.nplane) {
+        // A pad plane of the spectral propagator takes no source.
+        for (uint cc = 0; cc < CHUNK; cc++)
+            for (uint j = 0; j < LANES; j++){
+                ulong q = (ulong)OUTK(cc, j) * N;
+                b[q] = a[cc*LANES + j] * scale;
+            }
+    } else if (A.npol == 2u) {
         float2 pol = A.pol[pl];
         for (uint cc = 0; cc < CHUNK; cc++)
             for (uint j = 0; j < LANES; j++){
@@ -1037,14 +1094,20 @@ kernel void fft_cols_add_fix (device float2* d [[buffer(0)]], const device float
     threadgroup float2 sh[CC_COLS * NG];
     uint c = t % CC_COLS, lane = t / CC_COLS;
     uint m = tg.y / A.ppm, rem = tg.y % A.ppm;
-    uint pl = rem / A.nslice, is = rem % A.nslice;
+    uint pl = rem / A.ntot, is = rem % A.ntot;
     ulong off = (ulong)tg.y * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
-    ulong soff = ((ulong)m * A.nslice + is) * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
+    ulong soff = ((ulong)m * A.nplane + is) * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
     device float2* b = d + off;
     float2 a[REGS];
     for (uint n1 = 0; n1 < REGS; n1++) a[n1] = b[(ulong)(LANES*n1 + lane) * N];
     fftN(a, sh + c*NG, W, lane, sgn);
-    if (A.npol == 2u) {
+    if (is >= A.nplane) {
+        for (uint cc = 0; cc < CHUNK; cc++)
+            for (uint j = 0; j < LANES; j++){
+                ulong q = (ulong)OUTK(cc, j) * N;
+                b[q] = a[cc*LANES + j] * scale;
+            }
+    } else if (A.npol == 2u) {
         float2 pol = A.pol[pl];
         for (uint cc = 0; cc < CHUNK; cc++)
             for (uint j = 0; j < LANES; j++){
@@ -1059,6 +1122,142 @@ kernel void fft_cols_add_fix (device float2* d [[buffer(0)]], const device float
             }
     }
 }
+// ---------------- the spectral propagator's pass along tau ----------------
+// fel_spectral_apply's pass along tau on the resident record (fel_spectral_mod). On
+// every line (ix, iy) of one (member, polarization) block, the window's planes in ring
+// order followed by the pad's are transformed along tau, multiplied on a kernel pass by
+// the factors ax(ix, m) ay(iy, m), or on a slip pass by the ramp exp(-i kappa_m delta)
+// with the plane at the pad's first slot read by the direct sum at a whole-slice
+// crossing, transformed back, scaled by 1/n and, after a slip pass, attenuated by the
+// sponge on the pad. The transform is a mixed-radix Stockham DFT of any length n in
+// threadgroup memory, its radices chosen at init (tauPlan), every stage's butterfly a
+// direct R-point sum whose twiddles are entries of the table W_n[k] = e^{-2 pi i k/n} at
+// exact integer indices, so no angle is formed in single precision but the ramp's,
+// which is at most pi. TAU_B lines travel in one threadgroup so that a plane's TAU_B
+// cells are read contiguously, and 2 TAU_B n points fill the threadgroup memory.
+
+struct TauPar {
+    float s_a, s_b, inv_n;
+    uint  n, nplane, npad, nfree, nsponge, first, ntot, npol;
+    uint  transverse, n_cross, slot, sponge, nstage;
+    uint  radix[16];
+};
+
+// The stages of one transform, forward or inverse, on the B lines held in X, the
+// result left in the buffer returned, the other free.
+inline threadgroup float2* tau_stages (threadgroup float2* X, threadgroup float2* Y,
+                                       const device float2* W, constant TauPar& P,
+                                       uint t, uint T, uint B, bool inverse){
+    const uint n = P.n;
+    const uint total = n * B;
+    uint Ns = 1;
+    for (uint s = 0; s < P.nstage; s++) {
+        const uint R = P.radix[s];
+        const uint nR = n / R;
+        const uint stride = nR / Ns;
+        for (uint i = t; i < total; i += T) {
+            uint o = i / B, l = i - o * B;
+            uint oq = o / Ns;
+            uint k = oq % R;
+            uint jlo = o - oq * Ns;
+            uint j = (oq / R) * Ns + jlo;
+            float2 acc = float2(0.0f);
+            for (uint r = 0; r < R; r++) {
+                uint itw = (r * jlo * stride + r * k * nR) % n;
+                if (inverse && itw != 0u) itw = n - itw;
+                acc += cmul(X[(j + r * nR) * B + l], W[itw]);
+            }
+            Y[o * B + l] = acc;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        threadgroup float2* tmp = X;  X = Y;  Y = tmp;
+        Ns *= R;
+    }
+    return X;
+}
+
+// The ramp exp(-i kappa_m delta) with kappa_m delta = 2 pi m' s / n, m' the signed mode
+// index and s the shift in planes.
+inline void tau_ramp (threadgroup float2* X, constant TauPar& P, uint t, uint T, uint B, float s){
+    const uint n = P.n;
+    const float f = -2.0f * M_PI_F * s / float(n);
+    for (uint i = t; i < n * B; i += T) {
+        uint m = i / B;
+        int mp = (2u * m > n - 1u) ? int(m) - int(n) : int(m);
+        float a = f * float(mp);
+        X[i] = cmul(X[i], float2(cos(a), sin(a)));
+    }
+}
+
+kernel void tau_pass (device float2* F [[buffer(0)]], const device float2* W [[buffer(1)]],
+                      const device float2* AX [[buffer(2)]], device float2* BANK [[buffer(3)]],
+                      const device float* SPONGE [[buffer(4)]], constant TauPar& P [[buffer(5)]],
+                      uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                      uint2 Tn [[threads_per_threadgroup]]){
+    threadgroup float2 sh[2 * TAU_MEM];
+    const uint T = Tn.x;
+    threadgroup float2* X = sh;
+    threadgroup float2* Y = sh + TAU_MEM;
+    const uint B = TAU_B;
+    const uint n = P.n;
+    const uint nn = N * N;
+    const uint block = tg.y;
+    const uint member = block / P.npol;
+    const uint cell0 = tg.x * B;
+    const ulong pbase = (ulong) block * P.ntot;
+    const uint total = n * B;
+
+    for (uint i = t; i < total; i += T) {
+        uint j = i / B, l = i - j * B;
+        uint src = (j < P.nplane) ? ((j + P.first) % P.nplane) : j;
+        X[i] = F[(pbase + src) * nn + cell0 + l];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    X = tau_stages(X, Y, W, P, t, T, B, false);
+    Y = (X == sh) ? sh + TAU_MEM : sh;
+
+    // The spectrum, mode m of line l at X[m B + l]. The kernel factors are one table
+    // read twice, since the grid is square.
+    if (P.transverse) {
+        const device float2* ax = AX + (ulong) member * ((ulong) N * n);
+        for (uint i = t; i < total; i += T) {
+            uint m = i / B, l = i - m * B;
+            uint c = cell0 + l;
+            uint ix = c % N, iy = c / N;
+            X[i] = cmul(X[i], cmul(ax[ix * n + m], ax[iy * n + m]));
+        }
+    }
+    if (P.s_a != 0.0f) tau_ramp(X, P, t, T, B, P.s_a);
+    if (P.n_cross) {
+        // The plane at the pad's first slot, window index nplane, read from the
+        // unnormalized spectrum: sum_m X_m e^{+2 pi i m nplane / n} / n.
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint l = t; l < B; l += T) {
+            float2 acc = float2(0.0f);
+            for (uint m = 0; m < n; m++) {
+                uint iw = (m * P.nplane) % n;
+                if (iw != 0u) iw = n - iw;
+                acc += cmul(X[m * B + l], W[iw]);
+            }
+            BANK[((ulong) block * BANK_SLOTS + P.slot) * nn + cell0 + l] = acc * P.inv_n;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (P.s_b != 0.0f) tau_ramp(X, P, t, T, B, P.s_b);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    X = tau_stages(X, Y, W, P, t, T, B, true);
+
+    // Back in window order, scaled by 1/n as the CPU scales after its inverse, and the
+    // sponge's weight on the pad's last slots after a slip pass.
+    for (uint i = t; i < total; i += T) {
+        uint j = i / B, l = i - j * B;
+        uint dst = (j < P.nplane) ? ((j + P.first) % P.nplane) : j;
+        float2 v = X[i] * P.inv_n;
+        if (P.sponge && j >= P.nplane + P.nfree) v = v * SPONGE[j - P.nplane - P.nfree];
+        F[(pbase + dst) * nn + cell0 + l] = v;
+    }
+}
+
 kernel void wrap_shift (device long* u [[buffer(0)]], constant long& s [[buffer(1)]],
                         uint gid [[thread_position_in_grid]]){
     u[gid] += s;
@@ -1082,6 +1281,7 @@ struct PushPar {
     float dz, ks, qres, gam0, p0_mc, kx, ky, ax, ay, cos_t, sin_t;
     float gridmax, dgrid, aw, qmut;
     uint32_t ngrid, npart, nslice, first, nf, npol;
+    uint32_t n_per, nplane, ntot;
 };
 
 struct FieldPar { float h, rtmp, scl, pad; };
@@ -1094,11 +1294,20 @@ struct SetPar {
 struct DepPar {
     float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale, gam_floor;
     uint32_t ngrid, npart, nslice, first, mutate, nf;
+    uint32_t n_per, nplane;
 };
 
 struct AddPar {
     uint32_t ppm, nslice, npol, pad;
     float pol[4];     // float2 pol[2]
+    uint32_t nplane, ntot, pad2, pad3;
+};
+
+struct TauPar {
+    float s_a, s_b, inv_n;
+    uint32_t n, nplane, npad, nfree, nsponge, first, ntot, npol;
+    uint32_t transverse, n_cross, slot, sponge, nstage;
+    uint32_t radix[16];
 };
 
 struct UnavgPar {
@@ -1123,18 +1332,31 @@ struct Impl {
 
     int nslice {0}, npart {0}, ngrid {0}, nfield {1}, npol {1};
     int lanes {0}, regs {0}, rowsPerTG {0}, colsPerTG {0};
+    // The record along tau: nplane planes of the window, and under the spectral
+    // propagator the pad's nfree free and nsponge sponge planes after them, ntot in all
+    // per (member, polarization). With one plane a slice and no pad, nplane is nslice.
+    int nplane {0}, nfree {0}, nsponge {0}, ntot {0};
+    bool spectral {false};
+    // The transform along tau (tau_pass): its length, the lines a threadgroup carries
+    // and the radices of its stages.
+    int tauB {1}, tauStages {0};
+    uint32_t tauRadix[16] {0};
 
     // Buffer arithmetic for the member-major set. A plane is one slice of one
-    // member's one polarization, and the source is one slice of one member.
+    // member's one polarization, the pad's planes following the window's in each
+    // (member, polarization) block, and the source is one window plane of one member.
     size_t plane (int im, int ip, int is) const {
-        return ((size_t) im * npol + ip) * nslice + is;
+        return ((size_t) im * npol + ip) * ntot + is;
     }
-    size_t srcPlane (int im, int is) const { return (size_t) im * nslice + is; }
-    size_t nplanes () const { return (size_t) nfield * npol * nslice; }
+    size_t srcPlane (int im, int is) const { return (size_t) im * nplane + is; }
+    size_t nplanes () const { return (size_t) nfield * npol * ntot; }
 
     id<MTLBuffer> bX, bPX, bY, bPY, bG, bU, bW;
     id<MTLBuffer> bField, bSrc, bSrcI, bExpK, bSig, bTw, bBase, bBaseDep;
     id<MTLBuffer> bProbe, bPh, bFault;
+    // The spectral propagator's own: the twiddle table along tau, the kernel factors
+    // per member, the sponge's weights and the bank slots.
+    id<MTLBuffer> bTwT {nil}, bAxT {nil}, bSponge {nil}, bBank {nil};
     // The unaveraged mode's own buffers: the record step's baseline energies, the
     // per-substep stage factors and carrier rotators, and the ledger's partials.
     id<MTLBuffer> bG0 {nil}, bFQ {nil}, bCB {nil}, bSpont {nil};
@@ -1145,6 +1367,7 @@ struct Impl {
     id<MTLComputePipelineState> pRowAF;          // the unaveraged solve's first pass
     id<MTLComputePipelineState> pWShift, pWPhase;
     id<MTLComputePipelineState> pUPush, pUKick, pUSpont, pUGsave;
+    id<MTLComputePipelineState> pTau {nil};
 
     int64_t bytes {0};
     double busy {0};
@@ -1257,6 +1480,21 @@ bool pickFFTShape (int ng, int &lanes, int &regs, int &rows, int &cols)
     }
 }
 
+// The radices of the mixed-radix transform along tau (tau_pass), 4 first, then 2, 3,
+// 5 and 7, then the odd primes of what is left, each a direct R-point sum. The count
+// is at most 11 for the lengths the threadgroup memory admits.
+int tauPlan (int n, uint32_t *radix)
+{
+    int ns = 0, m = n;
+    while (m % 4 == 0 && ns < 16) { radix[ns++] = 4; m /= 4; }
+    while (m % 2 == 0 && ns < 16) { radix[ns++] = 2; m /= 2; }
+    for (int p = 3; p <= 7 && ns < 16; p += 2)
+        while (m % p == 0 && ns < 16) { radix[ns++] = (uint32_t) p; m /= p; }
+    for (int p = 11; m > 1 && ns < 16; p += 2)
+        while (m % p == 0 && ns < 16) { radix[ns++] = (uint32_t) p; m /= p; }
+    return (m == 1) ? ns : -1;
+}
+
 int nearestSupported (int ng)
 {
     static const int sizes[] = {64, 128, 256, 512, 1024};
@@ -1297,10 +1535,15 @@ int luc_dev_available (char *name, int name_len, char *reason, int reason_len)
 }
 
 int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
+                  int nplane, int nfree, int nsponge, int spectral,
                   char *reason, int reason_len)
 {
     @autoreleasepool {
         luc_dev_close();
+        if (nplane < 1 || nfree < 0 || nsponge < 0) {
+            put_str(reason, reason_len, "the record needs at least one plane and a pad of zero or more");
+            return 1;
+        }
         if (nfield < 1 || nfield > LUC_DEV_MAX_FIELD) {
             char msg[128];
             snprintf(msg, sizeof(msg), "the field set has %d members; the device carries 1 to %d",
@@ -1338,9 +1581,73 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->ngrid = ngrid;
         p->nfield = nfield;
         p->npol = npol;
+        p->nplane = nplane;
+        p->nfree = spectral ? nfree : 0;
+        p->nsponge = spectral ? nsponge : 0;
+        p->ntot = p->nplane + p->nfree + p->nsponge;
+        p->spectral = (spectral != 0);
 
         const size_t np = (size_t) nslice * npart;
         const size_t nn = (size_t) ngrid * ngrid;
+
+        // The transform along tau is planned for the one length the window and its pad
+        // have, and the lines a threadgroup carries are what its two buffers of that
+        // length leave room for in the threadgroup memory, which is read from the device
+        // and named in the refusal.
+        if (p->spectral) {
+            const size_t tgmem = (size_t) [p->dev maxThreadgroupMemoryLength];
+            const size_t nmax = tgmem / 16;
+            if ((size_t) p->ntot > nmax) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                         "the window and its pad span %d planes along tau, and the device "
+                         "transforms up to %zu in its %zu bytes of threadgroup memory",
+                         p->ntot, nmax, tgmem);
+                put_str(reason, reason_len, msg);
+                delete p;
+                return 1;
+            }
+            p->tauStages = tauPlan(p->ntot, p->tauRadix);
+            if (p->tauStages < 0) {
+                put_str(reason, reason_len, "the transform along tau could not be planned");
+                delete p;
+                return 1;
+            }
+            int b = 1;
+            while (2 * b <= 64 && (size_t) (2 * b) * p->ntot <= nmax && (size_t) (2 * b) <= nn) b *= 2;
+            p->tauB = b;
+        }
+
+        // Every resident byte, counted before anything is allocated, against the
+        // device's recommended working set. A record that does not fit is refused with
+        // both numbers rather than failing part way through the allocations.
+        {
+            int64_t want = 0;
+            want += (int64_t) np * (6 * 4 + 8);
+            want += (int64_t) p->nplanes() * nn * 8;
+            want += (int64_t) nfield * p->nplane * nn * 8;
+            want += (int64_t) p->nplanes() * nn * 16;
+            want += (int64_t) nfield * nn * 8 * 2;
+            want += (int64_t) ngrid * 8 + (int64_t) nfield * nslice * 8 * 2 + 4096 * 12 + 4;
+            if (p->spectral) {
+                want += (int64_t) p->ntot * 8;
+                want += (int64_t) nfield * ngrid * p->ntot * 8;
+                want += (int64_t) nfield * npol * LUC_DEV_BANK_SLOTS * nn * 8;
+                want += 16 * 4;
+            }
+            const int64_t have = (int64_t) [p->dev recommendedMaxWorkingSetSize];
+            if (have > 0 && want > have) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                         "the resident record needs %lld MB and the device offers %lld MB, "
+                         "its recommended working set",
+                         (long long) (want / (1 << 20)), (long long) (have / (1 << 20)));
+                put_str(reason, reason_len, msg);
+                delete p;
+                return 1;
+            }
+        }
+
         auto alloc = [&](size_t n) -> id<MTLBuffer> {
             id<MTLBuffer> b = [p->dev newBufferWithLength:n options:kShared];
             p->bytes += (int64_t) n;
@@ -1350,7 +1657,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bY = alloc(np * 4);  p->bPY = alloc(np * 4);
         p->bG = alloc(np * 4);  p->bU = alloc(np * 8);  p->bW = alloc(np * 4);
         p->bField = alloc(p->nplanes() * nn * 8);
-        p->bSrc = alloc((size_t) nfield * nslice * nn * 8);
+        p->bSrc = alloc((size_t) nfield * p->nplane * nn * 8);
         p->bSrcI = alloc(p->nplanes() * nn * 16);   // one source plane per field plane:
                                                    // the averaged deposit fills the
                                                    // member's own and projects it, the
@@ -1364,6 +1671,33 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bFault = alloc(4);
         if (p->bFault != nil) *((uint32_t *) [p->bFault contents]) = 0u;
         p->bPh = alloc(4096 * 4);
+        if (p->spectral) {
+            p->bTwT = alloc((size_t) p->ntot * 8);
+            p->bAxT = alloc((size_t) nfield * ngrid * p->ntot * 8);
+            p->bSponge = alloc(16 * 4);
+            p->bBank = alloc((size_t) nfield * npol * LUC_DEV_BANK_SLOTS * nn * 8);
+            if (p->bTwT == nil || p->bAxT == nil || p->bSponge == nil || p->bBank == nil) {
+                put_str(reason, reason_len, "the spectral propagator's buffers would not allocate");
+                delete p;
+                return 1;
+            }
+            // The twiddles along tau, W_n[k] = e^{-2 pi i k/n}, and the sponge's
+            // weights, cos^2 falling from just under 1 to 0 at the pad's end
+            // (fel_spectral_apply), FP64 host arithmetic rounded once.
+            float *tt = (float *) [p->bTwT contents];
+            for (int m = 0; m < p->ntot; m++) {
+                const double a = -2.0 * M_PI * m / p->ntot;
+                tt[2*m] = (float) cos(a);
+                tt[2*m + 1] = (float) sin(a);
+            }
+            float *sw = (float *) [p->bSponge contents];
+            for (int j = 0; j < 16; j++) sw[j] = 0.0f;
+            for (int j = 1; j <= p->nsponge && j <= 16; j++) {
+                const double w = cos(0.5 * M_PI * j / p->nsponge);
+                sw[j - 1] = (float) (w * w);
+            }
+            memset([p->bAxT contents], 0, (size_t) nfield * ngrid * p->ntot * 8);
+        }
         if (p->bX == nil || p->bU == nil || p->bField == nil || p->bSrc == nil ||
             p->bSrcI == nil) {
             char msg[256];
@@ -1396,6 +1730,9 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
             @"CHUNK"   : @(p->regs / p->lanes),
             @"RF_ROWS" : @(p->rowsPerTG),
             @"CC_COLS" : @(p->colsPerTG),
+            @"TAU_B"   : @(p->tauB),
+            @"TAU_MEM" : @(p->tauB * std::max(p->ntot, 1)),
+            @"BANK_SLOTS" : @(LUC_DEV_BANK_SLOTS),
         };
         // mathMode and mathFloatingPointFunctions are declared from the macOS 15 SDK
         // on. Against an older SDK, conda-forge's 11.0 among them, only
@@ -1448,6 +1785,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->pUKick = pso(@"unavg_kick");
         p->pUSpont = pso(@"unavg_spont");
         p->pUGsave = pso(@"unavg_gsave");
+        p->pTau = pso(@"tau_pass");
         if (!ok) {
             put_str(reason, reason_len, "compute pipeline creation failed");
             delete p;
@@ -1594,6 +1932,78 @@ void luc_dev_set_filter (int im, const float *sig)
     memcpy((float *) [p->bSig contents] + (size_t) im * nn * 2, sig, nn * 8);
 }
 
+void luc_dev_set_tau_kernel (int im, const float *ax)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || !p->spectral) return;
+    p->sync();
+    const size_t n = (size_t) p->ngrid * p->ntot;
+    memcpy((float *) [p->bAxT contents] + (size_t) im * n * 2, ax, n * 8);
+}
+
+int luc_dev_tau_slip (const luc_dev_slip_par *sp, char *reason, int reason_len)
+{
+    Impl *p = gImpl;
+    if (p == nullptr) {
+        put_str(reason, reason_len, "device not initialized");
+        return 1;
+    }
+    if (!p->spectral) {
+        put_str(reason, reason_len, "the device was not initialized for the spectral propagator");
+        return 1;
+    }
+    if (sp->slot < 0 || sp->slot >= LUC_DEV_BANK_SLOTS) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "bank slot %d is outside the %d the device holds",
+                 sp->slot, LUC_DEV_BANK_SLOTS);
+        put_str(reason, reason_len, msg);
+        return 1;
+    }
+    @autoreleasepool {
+        const size_t nn = (size_t) p->ngrid * p->ngrid;
+        TauPar Q;
+        memset(&Q, 0, sizeof(Q));
+        Q.s_a = (float) sp->s_a;
+        Q.s_b = (float) sp->s_b;
+        Q.inv_n = 1.0f / (float) p->ntot;
+        Q.n = (uint32_t) p->ntot;
+        Q.nplane = (uint32_t) p->nplane;
+        Q.npad = (uint32_t) (p->nfree + p->nsponge);
+        Q.nfree = (uint32_t) p->nfree;
+        Q.nsponge = (uint32_t) p->nsponge;
+        Q.first = 0;
+        Q.ntot = (uint32_t) p->ntot;
+        Q.npol = (uint32_t) p->npol;
+        Q.transverse = 0;
+        Q.n_cross = (uint32_t) (sp->n_cross > 0 ? 1 : 0);
+        Q.slot = (uint32_t) sp->slot;
+        Q.sponge = (uint32_t) (p->nsponge > 0 ? 1 : 0);
+        Q.nstage = (uint32_t) p->tauStages;
+        for (int i = 0; i < 16; i++) Q.radix[i] = p->tauRadix[i];
+        id<MTLComputeCommandEncoder> e = p->pass(LUC_DEV_PASS_TAU);
+        [e setComputePipelineState:p->pTau];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bTwT offset:0 atIndex:1];
+        [e setBuffer:p->bAxT offset:0 atIndex:2];
+        [e setBuffer:p->bBank offset:0 atIndex:3];
+        [e setBuffer:p->bSponge offset:0 atIndex:4];
+        [e setBytes:&Q length:sizeof(Q) atIndex:5];
+        [e dispatchThreadgroups:MTLSizeMake(nn / (size_t) p->tauB, (size_t) p->nfield * p->npol, 1)
+             threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
+    }
+    return 0;
+}
+
+void luc_dev_download_bank (int im, int ip, int slot, float *e)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || p->bBank == nil) return;
+    p->sync();
+    const size_t nn = (size_t) p->ngrid * p->ngrid;
+    const size_t blk = ((size_t) im * p->npol + ip) * LUC_DEV_BANK_SLOTS + (size_t) slot;
+    memcpy(e, (const float *) [p->bBank contents] + blk * nn * 2, nn * 8);
+}
+
 void luc_dev_set_slice_phases (const float *base, const float *base_dep)
 {
     Impl *p = gImpl;
@@ -1627,7 +2037,13 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         const float fwd = 1.0f, inv = -1.0f, one = 1.0f;
         const float nrm = 1.0f / (float) nn;
         const long long cret = (long long) cret_ticks;
-        const uint32_t ppm = (uint32_t) (p->npol * p->nslice);
+        const uint32_t ppm = (uint32_t) (p->npol * p->ntot);
+        if ((par->spectral != 0) != p->spectral) {
+            put_str(reason, reason_len, par->spectral
+                    ? "the step asks for the spectral propagator and the device was not initialized for it"
+                    : "the device was initialized for the spectral propagator and the step does not ask for it");
+            return 1;
+        }
 
         TrkPar T;
         T.delz = (float) (0.5 * par->dz);
@@ -1667,6 +2083,9 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         P.first = (uint32_t) par->first;
         P.nf = (uint32_t) par->nfield;
         P.npol = (uint32_t) par->npol;
+        P.n_per = (uint32_t) (par->n_per > 0 ? par->n_per : 1);
+        P.nplane = (uint32_t) p->nplane;
+        P.ntot = (uint32_t) p->ntot;
 
         // The set: per-member coupling, scale and harmonic factor, and the
         // polarization pair as the gather reads it (conjugated) and the add
@@ -1709,6 +2128,8 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         D.first = (uint32_t) par->first;
         D.mutate = (uint32_t) par->mutate;
         D.nf = (uint32_t) par->nfield;
+        D.n_per = P.n_per;
+        D.nplane = (uint32_t) p->nplane;
 
         AddPar A;
         A.ppm = ppm;
@@ -1716,6 +2137,9 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         A.npol = (uint32_t) p->npol;
         A.pad = 0;
         for (int i = 0; i < 4; i++) A.pol[i] = S.pol[i];
+        A.nplane = (uint32_t) p->nplane;
+        A.ntot = (uint32_t) p->ntot;
+        A.pad2 = 0;  A.pad3 = 0;
 
         id<MTLComputeCommandEncoder> e = nil;
 
@@ -1756,7 +2180,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBuffer:p->bSrcI offset:0 atIndex:0];
         // nn is a square of a power of two and every accumulator is four words, so the
         // fill divides by four exactly.
-        [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nslice * nn, 1, 1)
+        [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nplane * nn, 1, 1)
              threadsPerThreadgroup:tgp];
 
         e = p->pass(LUC_DEV_PASS_DEP);
@@ -1781,8 +2205,8 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         // source buffer with the kernels the field already uses. The source has no
         // polarization plane, so its planes are member-major over slices alone.
         if (par->source_filter) {
-            const uint32_t srcPPM = (uint32_t) p->nslice;
-            const size_t nsrcplane = (size_t) par->nfield * (size_t) p->nslice;
+            const uint32_t srcPPM = (uint32_t) p->nplane;
+            const size_t nsrcplane = (size_t) par->nfield * (size_t) p->nplane;
             const MTLSize sRowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), nsrcplane, 1);
             const MTLSize sRowT = MTLSizeMake((size_t) (p->rowsPerTG * p->lanes), 1, 1);
             const MTLSize sColTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nsrcplane, 1);
@@ -1844,14 +2268,52 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBytes:&one length:4 atIndex:3];
         [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
 
-        e = p->pass(LUC_DEV_PASS_SOLVE);
-        [e setComputePipelineState:p->pRowM];
-        [e setBuffer:p->bField offset:0 atIndex:0];
-        [e setBuffer:p->bTw offset:0 atIndex:1];
-        [e setBytes:&inv length:4 atIndex:2];
-        [e setBuffer:p->bExpK offset:0 atIndex:3];
-        [e setBytes:&ppm length:4 atIndex:4];
-        [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+        if (p->spectral) {
+            // The spectral propagator's kernel pass (fel_spectral_apply with transverse
+            // on): between the forward transverse transform and the inverse, the pass
+            // along tau carries the kernel at k0 + kappa, so the inverse rows pass
+            // multiplies by nothing.
+            TauPar Q;
+            memset(&Q, 0, sizeof(Q));
+            Q.inv_n = 1.0f / (float) p->ntot;
+            Q.n = (uint32_t) p->ntot;
+            Q.nplane = (uint32_t) p->nplane;
+            Q.npad = (uint32_t) (p->nfree + p->nsponge);
+            Q.nfree = (uint32_t) p->nfree;
+            Q.nsponge = (uint32_t) p->nsponge;
+            Q.first = (uint32_t) par->first;
+            Q.ntot = (uint32_t) p->ntot;
+            Q.npol = (uint32_t) p->npol;
+            Q.transverse = 1;
+            Q.nstage = (uint32_t) p->tauStages;
+            for (int i = 0; i < 16; i++) Q.radix[i] = p->tauRadix[i];
+            e = p->pass(LUC_DEV_PASS_TAU);
+            [e setComputePipelineState:p->pTau];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTwT offset:0 atIndex:1];
+            [e setBuffer:p->bAxT offset:0 atIndex:2];
+            [e setBuffer:p->bBank offset:0 atIndex:3];
+            [e setBuffer:p->bSponge offset:0 atIndex:4];
+            [e setBytes:&Q length:sizeof(Q) atIndex:5];
+            [e dispatchThreadgroups:MTLSizeMake(nn / (size_t) p->tauB, (size_t) p->nfield * p->npol, 1)
+                 threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
+
+            e = p->pass(LUC_DEV_PASS_SOLVE);
+            [e setComputePipelineState:p->pRow];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&inv length:4 atIndex:2];
+            [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+        } else {
+            e = p->pass(LUC_DEV_PASS_SOLVE);
+            [e setComputePipelineState:p->pRowM];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&inv length:4 atIndex:2];
+            [e setBuffer:p->bExpK offset:0 atIndex:3];
+            [e setBytes:&ppm length:4 atIndex:4];
+            [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+        }
 
         e = p->pass(LUC_DEV_PASS_SOLVE);
         [e setComputePipelineState:(par->source_filter ? p->pColA : p->pColAF)];

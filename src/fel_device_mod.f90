@@ -117,10 +117,15 @@ real(rp), parameter :: fel_dev_stage_loss$ = 0.17_rp / 16777216.0_rp   ! 0.17 * 
 ! The pass slots of lucifer_device.h, and their names for the report. The two mirrors
 ! move together, as the parameter struct's do.
 
-integer, parameter :: fel_dev_pass_n$ = 9
+integer, parameter :: fel_dev_pass_n$ = 10
 character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
         [character(10):: 'transverse', 'push', 'zero', 'deposit', 'filter', 'solve', &
-                         'quiver', 'kick', 'spont']
+                         'quiver', 'kick', 'spont', 'tau']
+
+! The bank slots the spectral propagator's crossed planes wait in on the device,
+! LUC_DEV_BANK_SLOTS in lucifer_device.h. The two mirrors move together.
+
+integer, parameter :: fel_dev_bank_slots$ = 8
 
 !+
 ! Struct fel_device_par_struct
@@ -142,6 +147,23 @@ type, bind(c) :: fel_device_par_struct
   real(c_double) :: dep_scale                   ! Deposit's fixed-point scale [ticks per V/m].
   real(c_double) :: dep_gam_floor               ! The gamma the deposit's bound assumes.
   integer(c_int) :: first, helical, mutate, source_filter, nfield, npol, pad
+  integer(c_int) :: spectral                    ! The spectral propagator's kernel pass (fel_spectral_mod).
+  integer(c_int) :: n_per                       ! Beam slices a field plane spans (fel_field_sample).
+  integer(c_int) :: pad2
+end type
+
+!+
+! Struct fel_device_slip_par_struct
+!
+! One slip pass of the spectral propagator for luc_dev_tau_slip, mirroring
+! luc_dev_slip_par of lucifer_device.h field for field: the ramp's two shifts in field
+! planes, the crossing count, 0 or 1, and the bank slot the crossed plane goes to.
+! Editing either mirror alone skews the layout silently.
+!-
+
+type, bind(c) :: fel_device_slip_par_struct
+  real(c_double) :: s_a = 0, s_b = 0
+  integer(c_int) :: n_cross = 0, slot = 0
 end type
 
 !+
@@ -193,6 +215,14 @@ type fel_device_struct
   logical :: twin_live = .false.        ! Instrument role: the freerun twin state carries.
   integer :: nslice = 0, npart = 0, ngrid = 0
   integer :: nfield = 1, npol = 1       ! The set: members, and planes per member.
+  ! The record along tau: the window's planes and, under the spectral propagator
+  ! (fel_spectral_mod), the pad's free and sponge planes after them, n_t in all.
+  logical :: spectral = .false.         ! The spectral propagator runs on the device.
+  integer :: nplane = 0, nfree = 0, nsponge = 0, n_t = 0
+  real(rp), allocatable :: tau_key(:,:) ! Kernel-factor upload key along tau, (4, nfield).
+  complex(c_float_complex), allocatable :: sax(:)   ! Staging for one member's factors along tau.
+  type (fel_device_par_struct) :: par_last   ! The last step's constants and its entry phase,
+  real(rp) :: phi0_last = 0                  !   for the twin's rows after the walk's spectral step.
   integer, allocatable :: harm(:)       ! Each member's harmonic number.
   real(rp), allocatable :: z_ref(:)     ! Static FP64 longitudinal reference per slice [m].
   real(rp), allocatable :: k_key(:,:)   ! Propagator upload key, (4, nfield).
@@ -234,10 +264,11 @@ interface
     integer(c_int) ok
   end function
 
-  function luc_dev_init (nslice, npart, ngrid, nfield, npol, reason, reason_len) &
-                         bind(c, name = 'luc_dev_init') result (ierr)
+  function luc_dev_init (nslice, npart, ngrid, nfield, npol, nplane, nfree, nsponge, spectral, &
+                         reason, reason_len) bind(c, name = 'luc_dev_init') result (ierr)
     import c_char, c_int
-    integer(c_int), value :: nslice, npart, ngrid, nfield, npol, reason_len
+    integer(c_int), value :: nslice, npart, ngrid, nfield, npol, nplane, nfree, nsponge, spectral
+    integer(c_int), value :: reason_len
     character(kind=c_char) :: reason(*)
     integer(c_int) ierr
   end function
@@ -299,6 +330,27 @@ interface
     import c_int, c_float_complex
     integer(c_int), value :: im
     complex(c_float_complex) :: sig(*)
+  end subroutine
+
+  subroutine luc_dev_set_tau_kernel (im, ax) bind(c, name = 'luc_dev_set_tau_kernel')
+    import c_int, c_float_complex
+    integer(c_int), value :: im
+    complex(c_float_complex) :: ax(*)
+  end subroutine
+
+  function luc_dev_tau_slip (sp, reason, reason_len) bind(c, name = 'luc_dev_tau_slip') result (ierr)
+    import c_char, c_int
+    import fel_device_slip_par_struct
+    type (fel_device_slip_par_struct) :: sp
+    character(kind=c_char) :: reason(*)
+    integer(c_int), value :: reason_len
+    integer(c_int) ierr
+  end function
+
+  subroutine luc_dev_download_bank (im, ip, slot, e) bind(c, name = 'luc_dev_download_bank')
+    import c_int, c_float_complex
+    integer(c_int), value :: im, ip, slot
+    complex(c_float_complex) :: e(*)
   end subroutine
 
   subroutine luc_dev_set_slice_phases (base, base_dep) bind(c, name = 'luc_dev_set_slice_phases')
@@ -479,8 +531,8 @@ end subroutine from_c
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu,
-!                                                                timing, dep_mutate, err_flag)
+! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, nplane, nfree,
+!                                          nsponge, spectral, fp32_iu, timing, dep_mutate, err_flag)
 !
 ! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal' asks
 ! for the one backend this tree knows. A build without it (the stub) refuses with the
@@ -491,7 +543,9 @@ end subroutine from_c
 ! The routine allocates the resident buffers for this run shape, runs the exact-wrap
 ! assertion on the device, and writes the device header lines into the instrument's stream
 ! when one is open. The backend refuses an unsupported grid and names the nearest
-! supported size.
+! supported size, a resident record larger than the device's working set with the bytes
+! it needs and the bytes the device offers, and under the spectral propagator a window
+! and pad longer along tau than its threadgroup memory transforms, with both counts.
 !
 ! Input:
 !   device_req -- character(*): run.device.
@@ -501,6 +555,10 @@ end subroutine from_c
 !   harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the
 !                   member count.
 !   npol       -- integer: Planes per member, 1 or 2.
+!   nplane     -- integer: The record's planes over the window, each member's.
+!   nfree      -- integer: The spectral propagator's free pad planes after the window.
+!   nsponge    -- integer: Its sponge planes after those.
+!   spectral   -- logical: The spectral propagator does the field half of the step.
 !   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
 !   timing     -- logical: Time each pass of a step separately, one encoder a pass?
 !                   A device that samples no counters at an encoder boundary refuses.
@@ -512,17 +570,17 @@ end subroutine from_c
 !   err_flag   -- logical: Set True on any refusal. False otherwise.
 !-
 
-subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, &
-                             timing, dep_mutate, err_flag)
+subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, nplane, nfree, &
+                             nsponge, spectral, fp32_iu, timing, dep_mutate, err_flag)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
 character(*) device_req
-integer ngrid, fp32_iu, npol
+integer ngrid, fp32_iu, npol, nplane, nfree, nsponge
 integer harm(:)
 integer sample
 integer dep_mutate
-logical timing, err_flag
+logical spectral, timing, err_flag
 
 character(kind=c_char) c_reason(256)
 character(256) reason
@@ -567,8 +625,14 @@ endif
 dev%nfield = size(harm)
 dev%npol = npol
 dev%harm = harm
+dev%spectral = spectral
+dev%nplane = nplane
+dev%nfree = merge(nfree, 0, spectral)
+dev%nsponge = merge(nsponge, 0, spectral)
+dev%n_t = dev%nplane + dev%nfree + dev%nsponge
 
-ierr = luc_dev_init(size(beam%slice), np, ngrid, dev%nfield, npol, c_reason, 256)
+ierr = luc_dev_init(size(beam%slice), np, ngrid, dev%nfield, npol, nplane, dev%nfree, dev%nsponge, &
+                    merge(1_c_int, 0_c_int, spectral), c_reason, 256)
 if (ierr /= 0) then
   call from_c (c_reason, reason)
   call out_io (s_error$, r_name, 'DEVICE = "metal" REFUSED: ' // trim(reason) // '.')
@@ -672,11 +736,22 @@ allocate (dev%su(np), dev%su0(np, dev%nslice))
 allocate (dev%se(ngrid, ngrid))
 allocate (dev%sbase(dev%nfield * dev%nslice), dev%sbdep(dev%nfield * dev%nslice))
 dev%su0 = 0
+if (spectral) then
+  allocate (dev%tau_key(4, dev%nfield), dev%sax(ngrid * dev%n_t))
+  dev%tau_key = -1
+endif
 
 dev%on = .true.
-call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
-             '\i0\ field member(s) of \i0\ plane(s).', &
-             i_array = [int(luc_dev_bytes() / 2**20), dev%nfield, npol])
+if (spectral) then
+  call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
+               '\i0\ field member(s) of \i0\ plane(s), \i0\ window planes and \i0\ pad planes ' // &
+               'under the spectral propagator.', &
+               i_array = [int(luc_dev_bytes() / 2**20), dev%nfield, npol, nplane, dev%nfree + dev%nsponge])
+else
+  call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
+               '\i0\ field member(s) of \i0\ plane(s).', &
+               i_array = [int(luc_dev_bytes() / 2**20), dev%nfield, npol])
+endif
 
 if (fp32_iu /= 0) then
   write (fp32_iu, '(a)') '# device = ' // trim(dev%name) // ' (the device holds the twin''s role;'
@@ -754,26 +829,36 @@ end subroutine fel_device_element_begin
 !
 ! Routine to round every plane of every member of the set to FP32 and upload it in
 ! ring order: plane 1 is Ex and plane 2 is Ey, present only when the run carries two
-! polarizations, in which case every member carries both.
+! polarizations, in which case every member carries both. Under the spectral
+! propagator the pad's planes follow the window's in each member's set.
 !-
 
 subroutine fel_device_upload_fields (dev, ff)
 
 type (fel_device_struct) dev
 type (fel_field_struct) ff(:)
-integer im, ip, is
+integer im, ip, is, nw
 
 !
 
 do im = 1, dev%nfield
+  nw = size(ff(im)%wf%Ex, 3)
   do ip = 1, dev%npol
-    do is = 1, size(ff(im)%wf%Ex, 3)
+    do is = 1, nw
       if (ip == 1) then
         dev%se = cmplx(ff(im)%wf%Ex(:,:,is), kind = c_float_complex)
       else
         dev%se = cmplx(ff(im)%wf%Ey(:,:,is), kind = c_float_complex)
       endif
       call luc_dev_upload_field_slice (im-1, ip-1, is-1, dev%se)
+    enddo
+    do is = 1, dev%nfree + dev%nsponge
+      if (ip == 1) then
+        dev%se = cmplx(ff(im)%pad(:,:,is), kind = c_float_complex)
+      else
+        dev%se = cmplx(ff(im)%pad_y(:,:,is), kind = c_float_complex)
+      endif
+      call luc_dev_upload_field_slice (im-1, ip-1, nw + is - 1, dev%se)
     enddo
   enddo
 enddo
@@ -1101,10 +1186,163 @@ do im = 1, dev%nfield
       end block
     enddo
     !$OMP end parallel do
+
+    ! The spectral propagator's pad comes back with the window, since the walk's
+    ! interludes slip it on the CPU.
+
+    do is = 1, dev%nfree + dev%nsponge
+      call luc_dev_download_field_slice (im-1, ip-1, size(ff(im)%wf%Ex, 3) + is - 1, dev%se)
+      if (ip == 1) then
+        ff(im)%pad(:,:,is) = cmplx(dev%se, kind = wf_rp)
+      else
+        ff(im)%pad_y(:,:,is) = cmplx(dev%se, kind = wf_rp)
+      endif
+    enddo
   enddo
 enddo
 
 end subroutine fel_device_readback
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_set_tau_kernel (dev, im, wf, dz)
+!
+! Routine to upload member im's kernel factors along tau for a step of dz,
+! ax(ix, m) = exp(-i dz (m_x dk)^2 / 2 k(kappa_m)) with k(kappa) = k0 + kappa over the
+! n_t modes of the window and its pad, as fel_spectral_apply builds them for the CPU,
+! in FP64 and rounded once, keyed on the step, the length and the member's wavenumbers
+! as fel_device_set_kernel keys the slice propagator's, so an unchanged table costs no
+! transfer. The same table serves the y factor, the grid being square.
+!
+! Input:
+!   im -- integer: The member, 1-based in set order.
+!   wf -- wavefront_struct: The member's record, for its wavelength, spacing and grid.
+!   dz -- real(rp): Step length [m].
+!-
+
+subroutine fel_device_set_tau_kernel (dev, im, wf, dz)
+
+type (fel_device_struct) dev
+type (wavefront_struct) wf
+integer im
+real(rp) dz
+
+real(rp) key(4), k0, dk, dtau, kappa, kt
+integer ngrid_arr(3), ngrid, nt, m, mt, ix, mx
+
+!
+
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+nt = dev%n_t
+k0 = twopi / wf%wavelength
+dk = twopi / (ngrid * wf%dx)
+dtau = wf%dz
+
+key = [dz, real(nt, rp), k0, dk]
+if (all(dev%tau_key(:, im) == key)) return
+
+do ix = 1, ngrid
+  mx = ix - 1;  if (2*mx > ngrid-1) mx = mx - ngrid
+  do m = 1, nt
+    mt = m - 1;  if (2*mt > nt-1) mt = mt - nt
+    kappa = twopi * mt / (nt * dtau)
+    kt = k0 + kappa
+    dev%sax((ix - 1) * nt + m) = cmplx(exp(cmplx(0.0_rp, -dz * (mx * dk)**2 / (2 * kt), rp)), &
+                                       kind = c_float_complex)
+  enddo
+enddo
+call luc_dev_set_tau_kernel (im-1, dev%sax)
+dev%tau_key(:, im) = key
+
+end subroutine fel_device_set_tau_kernel
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_slip_pass (dev, spar, err_flag)
+!
+! Routine to encode one slip pass of the spectral propagator on the resident record,
+! the crossings and shifts the caller formed (fel_spectral_device_slip).
+!
+! Input:
+!   spar     -- fel_device_slip_par_struct: The pass's shifts, crossing and bank slot.
+!
+! Output:
+!   err_flag -- logical: Set True if the backend refuses. False otherwise.
+!-
+
+subroutine fel_device_slip_pass (dev, spar, err_flag)
+
+type (fel_device_struct) dev
+type (fel_device_slip_par_struct) spar
+logical err_flag
+character(kind=c_char) c_reason(256)
+character(256) reason
+character(*), parameter :: r_name = 'fel_device_slip_pass'
+
+!
+
+err_flag = .false.
+if (luc_dev_tau_slip(spar, c_reason, 256) /= 0) then
+  call from_c (c_reason, reason)
+  call out_io (s_error$, r_name, 'DEVICE SLIP PASS REFUSED: ' // trim(reason) // '.')
+  err_flag = .true.
+endif
+
+end subroutine fel_device_slip_pass
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_bank_plane (dev, im, ip, slot, plane)
+!
+! Routine to download one plane the spectral propagator's slip pass read at the pad's
+! first slot, from bank slot slot of member im and polarization ip, into FP64. Drains
+! first, like every transfer.
+!
+! Output:
+!   plane(:,:) -- complex(wf_rp): The plane, the grid's shape.
+!-
+
+subroutine fel_device_bank_plane (dev, im, ip, slot, plane)
+
+type (fel_device_struct) dev
+integer im, ip, slot
+complex(wf_rp) plane(:,:)
+
+!
+
+call luc_dev_download_bank (im-1, ip-1, slot, dev%se)
+plane = cmplx(dev%se, kind = wf_rp)
+
+end subroutine fel_device_bank_plane
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_device_resident_bytes (dev) result (bytes)
+!
+! Routine to report the resident footprint in bytes, as the backend counts it, for the
+! run header.
+!-
+
+function fel_device_resident_bytes (dev) result (bytes)
+
+type (fel_device_struct) dev
+real(rp) bytes
+
+!
+
+bytes = 0
+if (dev%on) bytes = real(luc_dev_bytes(), rp)
+
+end function fel_device_resident_bytes
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1393,7 +1631,7 @@ real(rp) p0_mc, gamma0, gam, p_mc, beta, pzd, delta, theta_rel, phi_ref, h, th_h
 real(rp) x, y, awloc_d, awloc_c, wsum, enorm, w_s, w_f, tick_med, pw64, pw32, v
 real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$), d7, d8, d9
 integer(c_int64_t) cret
-integer is, ip, n, ng, ifld, ix, iy, im, ipl
+integer is, ip, n, ng, ifld, ix, iy, im, ipl, n_per, nplane_l, jp
 
 !
 
@@ -1404,10 +1642,19 @@ first = ff(1)%slip%first
 cret = nint((phi0_new - phi0) * fel_dev_ticks_per_rad$, c_int64_t)
 allocate (s64(ng, ng), e64(ng, ng), sdev(ng, ng), edev(ng, ng), incr(dev%npart))
 
+n_per = max(1, ff(1)%n_per)
+nplane_l = size(ff(1)%wf%Ex, 3)
+
 do is = 1, size(beam%slice)
   sl => beam%slice(is)
   n = sl%n
-  ifld = 1 + mod(is - 1 + first, size(ff(1)%wf%Ex, 3))   ! fel_field_index's mapping.
+
+  ! The slice's plane, fel_field_index's mapping, and under a field coarser than the
+  ! slices the plane at or below the slice (fel_field_sample), whose source is the
+  ! weighted sum of its slices' (coarse_source64).
+
+  jp = (is - 1) / n_per
+  ifld = 1 + mod(jp + first, nplane_l)
 
   call luc_dev_download_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
                                dev%sg, dev%su)
@@ -1508,15 +1755,19 @@ do is = 1, size(beam%slice)
     call luc_dev_download_source_slice (im-1, ifld-1, sdev)
 
     s64 = 0
-    do ip = 1, n
-      p_mc = p0_mc * (1 + sl%pz(ip))
-      gam = sqrt(p_mc**2 + 1)
-      beta = p_mc / gam
-      th_h = h * (beam%phi0 + ks * sl%z(ip) / beta)
-      call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), th_h, sl%weight(ip) / gam, &
-                               par%scl_w(im), par%gridmax, par%dgrid, &
-                               par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
-    enddo
+    if (n_per == 1) then
+      do ip = 1, n
+        p_mc = p0_mc * (1 + sl%pz(ip))
+        gam = sqrt(p_mc**2 + 1)
+        beta = p_mc / gam
+        th_h = h * (beam%phi0 + ks * sl%z(ip) / beta)
+        call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), th_h, sl%weight(ip) / gam, &
+                                 par%scl_w(im), par%gridmax, par%dgrid, &
+                                 par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
+      enddo
+    else
+      call coarse_source64 (jp, h, par%scl_w(im), s64)
+    endif
 
     w_s = 0
     do iy = 1, ng
@@ -1556,6 +1807,49 @@ do is = 1, size(beam%slice)
   fp32%pow64(is) = pw64
   fp32%pow32(is) = pw32
 enddo
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine coarse_source64 (jp, h, scl, s64)
+!
+! Routine to form the FP64 reference source of window plane jp (0-based) under a field
+! coarser than the slices, as fel_spectral_deposit_coarse forms it: the slices on or
+! above the plane with the weight 1 - w, those below it with the weight w, each over
+! the slices a plane, at the member's phase h theta.
+!-
+
+subroutine coarse_source64 (jp, h, scl, s64)
+
+complex(rp) s64(:,:)
+real(rp) h, scl, w_l, wgt, p_mc_l, gam_l, beta_l, th_l
+integer jp, is2, jq, ip2
+
+!
+
+do is2 = max(1, (jp - 1) * n_per + 1), min(size(beam%slice), (jp + 1) * n_per)
+  jq = (is2 - 1) / n_per
+  w_l = real(mod(is2 - 1, n_per), rp) / n_per
+  if (jq == jp) then
+    wgt = (1 - w_l) / n_per
+  elseif (jq == jp - 1 .and. w_l /= 0) then
+    wgt = w_l / n_per
+  else
+    cycle
+  endif
+  do ip2 = 1, beam%slice(is2)%n
+    p_mc_l = p0_mc * (1 + beam%slice(is2)%pz(ip2))
+    gam_l = sqrt(p_mc_l**2 + 1)
+    beta_l = p_mc_l / gam_l
+    th_l = h * (beam%phi0 + ks * beam%slice(is2)%z(ip2) / beta_l)
+    call fel_fp32_deposit64 (s64, beam%slice(is2)%x(ip2), beam%slice(is2)%y(ip2), th_l, &
+                             beam%slice(is2)%weight(ip2) / gam_l, scl * wgt, par%gridmax, par%dgrid, &
+                             par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
+  enddo
+enddo
+
+end subroutine coarse_source64
 
 end subroutine fel_device_twin_rows
 

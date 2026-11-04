@@ -1276,7 +1276,14 @@ call fel_toc (fel_t_solve$)
 ! step used. With the device as the twin, its step, encoded before the solve, is read
 ! back here instead and fills every row of the same stream.
 
-if (fp_on) then
+if (fp_on .and. dev_twin .and. und%spectral) then
+
+  ! The twin's field rows wait for the walk's spectral step, which the CPU runs after
+  ! this routine, and fel_track_und_twin_close reads them then.
+
+  dev%par_last = dpar
+  dev%phi0_last = phi0_old
+elseif (fp_on) then
   if (dev_twin) then
     call fel_tic (fel_t_device$)
     call fel_device_twin_rows (dev, fp32, beam, ff, dpar, phi0_old, phi0_new, ks)
@@ -1407,6 +1414,9 @@ par%source_filter = merge(1, 0, und%filter%on)
 par%nfield = size(ff)
 par%npol = merge(2, 1, allocated(ff(1)%wf%Ey))
 par%pad = 0
+par%spectral = merge(1, 0, und%spectral)
+par%n_per = ff(1)%n_per
+par%pad2 = 0
 
 end subroutine fill_device_par
 
@@ -1414,8 +1424,9 @@ end subroutine fill_device_par
 ! Subroutine set_device_kernels ()
 !
 ! Routine to hand the device every member's propagator for this step, each at its own
-! wavelength, from the cache fel_field_step reads. fel_device_set_kernel keys the
-! upload, so an unchanged kernel is not uploaded again.
+! wavelength, from the cache fel_field_step reads, or under the spectral propagator its
+! kernel factors along tau (fel_device_set_tau_kernel). Both key the upload, so an
+! unchanged kernel is not uploaded again.
 !-
 
 subroutine set_device_kernels ()
@@ -1426,13 +1437,59 @@ integer io, ik
 
 do io = 1, size(ff)
   ik = fel_kernel_index(size(ff(io)%wf%Ex, 1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz)
-  call fel_device_set_kernel (dev, io, fel_kernels(ik)%exp_k2)
+  if (und%spectral) then
+    call fel_device_set_tau_kernel (dev, io, ff(io)%wf, und%dz)
+  else
+    call fel_device_set_kernel (dev, io, fel_kernels(ik)%exp_k2)
+  endif
   if (und%filter%on) call fel_device_set_filter (dev, io, fel_kernels(ik)%sigmoid)
 enddo
 
 end subroutine set_device_kernels
 
 end subroutine fel_track_und_step
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_track_und_twin_close (beam, ff, fp32, dev, err_flag)
+!
+! Routine to close one step of the instrument with the device in the twin's role under
+! the spectral propagator. fel_track_und_step encoded the twin's step and kept its
+! constants, and the walk has since slipped the twin's record (fel_spectral_device_slip)
+! and run the CPU's own field half (fel_spectral_step), so the rows can now be read
+! against the FP64 record as fel_track_und_step reads them for the slice propagator.
+!
+! Input:
+!   beam     -- fel_beam_struct: The beam, after the step.
+!   ff(:)    -- fel_field_struct: The field set, after the CPU's spectral step.
+!   fp32     -- fel_fp32_struct: The instrument.
+!   dev      -- fel_device_struct: The device, holding the step's constants.
+!
+! Output:
+!   fp32     -- fel_fp32_struct: This step's rows recorded and the stream advanced.
+!   err_flag -- logical: Set True if the stream's close fails. False otherwise.
+!-
+
+subroutine fel_track_und_twin_close (beam, ff, fp32, dev, err_flag)
+
+type (fel_beam_struct) beam
+type (fel_field_struct) ff(:)
+type (fel_fp32_struct) fp32
+type (fel_device_struct) dev
+logical err_flag
+real(rp) ks
+
+!
+
+ks = twopi / ff(1)%wf%wavelength
+call fel_tic (fel_t_device$)
+call fel_device_twin_rows (dev, fp32, beam, ff, dev%par_last, dev%phi0_last, beam%phi0, ks)
+call fel_toc (fel_t_device$)
+call fel_fp32_step_close (fp32, err_flag)
+
+end subroutine fel_track_und_twin_close
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

@@ -488,6 +488,65 @@ where the two builds agree to every printed digit.
 | FP32 transform pair energy loss, two-plane input file | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
 | handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7341e-07 | same | <= 1.0000e-05 |
 | handedness on the device: (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
+| spectral lockstep steady worst_x | 1.4742e-07 | same | <= 1.0000e-06 |
+| spectral lockstep steady worst_px | 2.6274e-07 | same | <= 1.0000e-06 |
+| spectral lockstep steady worst_y | 1.6628e-07 | same | <= 1.0000e-06 |
+| spectral lockstep steady worst_py | 1.4070e-07 | same | <= 1.0000e-06 |
+| spectral lockstep steady worst_pz | 1.3836e-07 | same | <= 1.3000e-06 |
+| spectral lockstep steady worst_theta | 6.5786e-06 | same | <= 1.5000e-04 |
+| spectral lockstep steady worst_phasor | 7.5288e-08 | same | <= 2.2000e-05 |
+| spectral lockstep steady worst_source | 1.4673e-05 | same | <= 2.2000e-04 |
+| spectral lockstep steady worst_field | 1.4665e-05 | same | <= 2.2000e-04 |
+| spectral lockstep steady guard [ticks] | 8.8069e+06 | same | >= 1.0000e+06 |
+| spectral FP64 diag byte-identical, device twin on vs off |  | same | holds |
+| spectral mutation moves worst_theta | 4.6860e-03 | same | >= 6.5786e-05 |
+| spectral mutation moves worst_source | 7.7557e-04 | same | >= 7.3365e-05 |
+| spectral production exit power vs CPU | 5.9738e-04 | same | 0 to 1.6000e-03 |
+| spectral lockstep TD worst_x | 2.7493e-07 | same | <= 1.0000e-06 |
+| spectral lockstep TD worst_px | 2.6433e-07 | same | <= 1.0000e-06 |
+| spectral lockstep TD worst_y | 2.4632e-07 | same | <= 1.0000e-06 |
+| spectral lockstep TD worst_py | 2.3730e-07 | same | <= 1.0000e-06 |
+| spectral lockstep TD worst_pz | 1.4125e-07 | same | <= 1.3000e-06 |
+| spectral lockstep TD worst_theta | 6.7645e-06 | same | <= 1.5000e-04 |
+| spectral lockstep TD worst_phasor | 9.9422e-08 | same | <= 2.2000e-05 |
+| spectral lockstep TD worst_source | 6.3046e-06 | same | <= 2.2000e-04 |
+| spectral lockstep TD worst_field | 6.3121e-06 | same | <= 2.2000e-04 |
+| spectral lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
+| spectral TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
+| spectral production TD window power vs CPU | 2.1858e-05 | same | <= 1.6000e-03 |
+| spectral bank: the device's ledger closes at the CPU's level | 3.9661e-07 | same | <= 1.2000e-06 |
+| spectral bank: pulse planes, device against CPU | 97 | same | = 97 |
+| spectral bank: escaped energy, device against CPU | 3.9656e-07 | same | <= 1.2000e-06 |
+| spectral coarse field: slices a plane, device against CPU | 6 | same | = 6 |
+| spectral coarse production window power vs CPU | 5.5022e-05 | same | <= 1.6000e-03 |
+| spectral coarse production exit power per slice vs CPU, over the peak | 9.3822e-05 | same | <= 3.0000e-04 |
+| two spectral device runs, every stats array identical | 0 | same | = 0 |
+| spectral harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
+| spectral harmonic lockstep worst_px | 4.1970e-08 | same | <= 1.0000e-06 |
+| spectral harmonic lockstep worst_y | 1.8743e-07 | same | <= 1.0000e-06 |
+| spectral harmonic lockstep worst_py | 2.5511e-07 | same | <= 1.0000e-06 |
+| spectral harmonic lockstep worst_pz | 2.0099e-07 | same | <= 1.3000e-06 |
+| spectral harmonic lockstep worst_theta | 6.8653e-06 | same | <= 1.5000e-04 |
+| spectral harmonic lockstep worst_phasor | 1.2861e-07 | same | <= 2.2000e-05 |
+| spectral harmonic lockstep worst_source | 1.2388e-08 | same | <= 2.2000e-04 |
+| spectral harmonic lockstep worst_field | 1.9409e-07 | same | <= 2.2000e-04 |
+| spectral harmonic lockstep worst_phasor_h3 (per-member footer) | 9.1287e-08 | 9.1288e-08 | <= 6.0000e-07 |
+| spectral harmonic lockstep worst_source_h3 (per-member footer) | 3.4444e-09 | same | <= 8.0000e-06 |
+| spectral harmonic lockstep worst_field_h3 (per-member footer) | 3.4451e-09 | same | <= 8.0000e-06 |
+| spectral harmonic production P1 vs CPU | 1.0496e-06 | same | <= 1.6000e-03 |
+| spectral harmonic production P3 vs CPU | 6.8061e-04 | same | <= 1.8000e-03 |
+| spectral two-plane lockstep worst_x | 1.4621e-07 | same | <= 1.0000e-06 |
+| spectral two-plane lockstep worst_px | 1.5119e-07 | same | <= 1.0000e-06 |
+| spectral two-plane lockstep worst_y | 1.4834e-07 | same | <= 1.0000e-06 |
+| spectral two-plane lockstep worst_py | 1.4484e-07 | same | <= 1.0000e-06 |
+| spectral two-plane lockstep worst_pz | 1.3408e-07 | same | <= 1.3000e-06 |
+| spectral two-plane lockstep worst_theta | 2.3838e-06 | same | <= 1.5000e-04 |
+| spectral two-plane lockstep worst_phasor | 1.8669e-08 | same | <= 2.2000e-05 |
+| spectral two-plane lockstep worst_source | 6.3349e-06 | same | <= 2.2000e-04 |
+| spectral two-plane lockstep worst_field | 6.3377e-06 | same | <= 2.2000e-04 |
+| spectral crossed production Px vs CPU | 1.4011e-04 | same | <= 1.6000e-03 |
+| spectral crossed production Py vs CPU | 3.7773e-03 | same | <= 1.3000e-02 |
+| refused: the FP32 check's CPU twin under the spectral propagator |  | same | holds |
 
 (val-levels-unaveraged)=
 ### `unaveraged`

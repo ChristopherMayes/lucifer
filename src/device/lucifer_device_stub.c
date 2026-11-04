@@ -30,9 +30,11 @@ int luc_dev_available (char *name, int name_len, char *reason, int reason_len)
 }
 
 int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
+                  int nplane, int nfree, int nsponge, int spectral,
                   char *reason, int reason_len)
 {
   (void) nslice; (void) npart; (void) ngrid; (void) nfield; (void) npol;
+  (void) nplane; (void) nfree; (void) nsponge; (void) spectral;
   put_str (reason, reason_len, "no device backend in this build");
   return 1;
 }
@@ -67,6 +69,17 @@ void luc_dev_zero_field_slice (int im, int ip, int is) { (void) im; (void) ip; (
 void luc_dev_download_source_slice (int im, int is, float *s) { (void) im; (void) is; (void) s; }
 void luc_dev_set_kernel (int im, const float *expk) { (void) im; (void) expk; }
 void luc_dev_set_filter (int im, const float *sig) { (void) im; (void) sig; }
+void luc_dev_set_tau_kernel (int im, const float *ax) { (void) im; (void) ax; }
+int luc_dev_tau_slip (const luc_dev_slip_par *sp, char *reason, int reason_len)
+{
+  (void) sp;
+  put_str (reason, reason_len, "no device backend in this build");
+  return 1;
+}
+void luc_dev_download_bank (int im, int ip, int slot, float *e)
+{
+  (void) im; (void) ip; (void) slot; (void) e;
+}
 void luc_dev_set_slice_phases (const float *base, const float *base_dep)
 {
   (void) base; (void) base_dep;

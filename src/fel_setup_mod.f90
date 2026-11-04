@@ -1495,9 +1495,11 @@ if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
 endif
 
 ! The spectral propagator (fel_spectral_mod, docs/spectral-field.md) is the averaged
-! mode's field half on the CPU in double precision. The unaveraged step, the device, the
-! FP32 twin and the coherent source each carry a propagator or a deposit of their own,
-! which it does not reach, so each is refused with the reason.
+! mode's field half, on the CPU in double precision and on the device in single
+! (fel_device_mod). The unaveraged step, the FP32 twin on the CPU and the coherent
+! source each carry a propagator or a deposit of their own, which it does not reach, so
+! each is refused with the reason. The FP32 check with the device on puts the device in
+! the twin's role, which the device's spectral step covers.
 
 call fel_spectral_setup (run%spectral, run%winit%propagator)
 if (run%spectral%on) then
@@ -1506,14 +1508,10 @@ if (run%spectral%on) then
                                    'WHOSE FIELD IS ADVANCED BY ITS OWN SUBSTEP PROPAGATOR (fel_unavg_step).')
     err_flag = .true.;  return
   endif
-  if (run%global%device /= 'off') then
-    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE DEVICE,', &
-                                   'WHICH CARRIES THE SLICE PROPAGATOR ALONE (fel_device_mod).')
-    err_flag = .true.;  return
-  endif
-  if (run%global%fp32_check /= 'off') then
-    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE FP32 CHECK,', &
-                                   'WHOSE TWIN STEPS THE SLICE PROPAGATOR IN SINGLE PRECISION.')
+  if (run%global%fp32_check /= 'off' .and. run%global%device == 'off') then
+    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE FP32 CHECK WITHOUT THE DEVICE,', &
+                                   'WHOSE CPU TWIN STEPS THE SLICE PROPAGATOR IN SINGLE PRECISION.', &
+                                   'POSSIBLE SOLUTION: RUN.DEVICE = "metal", WHICH TAKES THE TWIN''S ROLE.')
     err_flag = .true.;  return
   endif
   if (run%global%source_model == 'coherent') then
@@ -1743,17 +1741,23 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SPONTANEOUS RADIATION.')
     err_flag = .true.;  return
   endif
-  ! The bank is on by default. A device run drops it unless the input asked for it, and
-  ! the escaped energy is still summed from the slice the device reads back. Asking for
-  ! the escaped file asks for the bank.
-  if (run%global%keep_escaped_field .and. (run%bank_set .or. run%global%write_escaped)) then
-    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE ESCAPED-FIELD BANK.')
-    err_flag = .true.;  return
-  elseif (run%global%keep_escaped_field) then
-    call out_io (s_info$, r_name, 'DEVICE = "' // trim(run%global%device) // &
-                 '" DOES NOT COVER THE ESCAPED-FIELD BANK, SO THIS RUN KEEPS NONE.', &
-                 'THE STATS FILE STILL RECORDS ESCAPED_ENERGY AND PULSE_ENERGY.')
-    run%global%keep_escaped_field = .false.
+  ! The bank is on by default. Under the slice propagator a device run drops it unless
+  ! the input asked for it, and the escaped energy is still summed from the slice the
+  ! device reads back. Asking for the escaped file asks for the bank. Under the spectral
+  ! propagator the bank runs on the device, fed by the planes its slip passes read at the
+  ! pad's first slot (fel_spectral_device_slip).
+  if (.not. run%spectral%on) then
+    if (run%global%keep_escaped_field .and. (run%bank_set .or. run%global%write_escaped)) then
+      call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // &
+                   '" DOES NOT COVER THE ESCAPED-FIELD BANK UNDER FIELD.PROPAGATOR = "slices".', &
+                   'POSSIBLE SOLUTION: FIELD.PROPAGATOR = "spectral", WHICH BANKS ON THE DEVICE.')
+      err_flag = .true.;  return
+    elseif (run%global%keep_escaped_field) then
+      call out_io (s_info$, r_name, 'DEVICE = "' // trim(run%global%device) // &
+                   '" DOES NOT COVER THE ESCAPED-FIELD BANK UNDER FIELD.PROPAGATOR = "slices", SO THIS RUN KEEPS NONE.', &
+                   'THE STATS FILE STILL RECORDS ESCAPED_ENERGY AND PULSE_ENERGY.')
+      run%global%keep_escaped_field = .false.
+    endif
   endif
   if (run%global%transport_model /= 'bmad') then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" CARRIES THE BMAD TRANSVERSE MAPS ONLY;', &
@@ -1765,7 +1769,8 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
     ngrid_dev = wavefront_shape(run%ffield(1)%wf)
     call fel_device_setup (run%dev, run%global%device, fbeam, ngrid_dev(1), &
                            run%ffield(1)%slip%sample, run%ffield(1:run%n_harm)%harm, &
-                           merge(2, 1, run%two_pol), run%fp32%iu, &
+                           merge(2, 1, run%two_pol), size(run%ffield(1)%wf%Ex, 3), &
+                           run%spectral%n_free, run%spectral%n_sponge, run%spectral%on, run%fp32%iu, &
                            run%global%device_timing, run%global%device_dep_mutate, err_flag)
   end block
   if (err_flag) return

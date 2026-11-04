@@ -30,6 +30,22 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-04 Added: the spectral propagator runs on the device, `run.device = "metal"` with
+  `field.propagator = "spectral"` ([](spectral-field.md), [](validation.md#val-device-spectral)). The
+  step's command buffer carries the pass along tau over the window and its pad with the kernel at
+  k0 + kappa, a mixed-radix transform of any length in threadgroup memory whose twiddles are read
+  from one table, and the slippage follows as slip passes of the ramp, the plane at the pad's first
+  slot read by the direct sum at each crossing and downloaded for the bank, so the pulse file is
+  written under the device. The field coarser than the slices rides too, the push gathering and the
+  deposit scattering on the two planes about a slice by `fel_field_sample`'s weights, and so do
+  harmonic members and two polarization planes at one plane a slice. A resident record larger than
+  the device's working set, or a window and pad longer along tau than the threadgroup memory
+  transforms, is refused with both numbers before any upload, and the header's `Device` line states
+  the resident bytes beside the bank's. The device section of the validation suite judges it as it
+  judges the slice propagator, with the lockstep rows read before either record slips, at the slice
+  path's own levels, the bank's ledger closing at the CPU's level and the coarse field against the
+  CPU's coarse run. The FP32 check without the device stays refused under the propagator, and the
+  device table of `docs/performance.md` gains the spectral rows. No recorded digit moved.
 - 2026-11-04 Changed: `.github/workflows/lucifer-linux.yml` removes the runner image's toolsets the job
   never uses before it builds, and prints the disk before and after the validations with the work
   directories' sizes. The validation suite leaves about 13 GB in its work directory on either build,

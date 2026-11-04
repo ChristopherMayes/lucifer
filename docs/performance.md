@@ -470,6 +470,27 @@ The Metal backend ([](validation.md#val-device)) is run against the CPU path on 
 
 The input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` in `tests/perf/`, and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-09-04, under gfortran 13.3 and the clang of 2025-06, when the CPU walks were 0.360, 0.873, 3.92 and 0.032 s and the device walls 0.049, 0.107, 0.316 and 0.037. The device walls are longer on the current toolchain, by 20 to 48 percent, and the busy seconds with them, which is the host side and the Metal library of the newer clang rather than the shaders, which are compiled at run time by the same Metal compiler. The source filter is on in these runs and was not the default then.
 
+(perf-device-spectral)=
+### The spectral propagator on the device
+
+The same four input files under `field.propagator = "spectral"` ([](spectral-field.md), [](validation.md#val-device-spectral)), the field's plane held at the window's slice so the rows compare plane for plane with the slice propagator's, and the 96-slice window once more with the plane left to derive, 20 planes of 5 slices. The slice rows are measured again on the same day, since the two tables are read against each other. The recipe is the same script, which prints both tables.
+
+*Measured 2026-11-04: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, machine otherwise idle.*
+
+| case | propagator | CPU, 12 threads | device wall | device busy | ratio |
+|---|---|---|---|---|---|
+| steady state, 1 x 8192 particles | slices | 0.414 s | 0.059 s | 0.017 s | 7.0x |
+| steady state, 1 x 8192 particles | spectral | 0.564 s | 0.056 s | 0.015 s | 10.1x |
+| SASE window, 24 x 4096, slippage live | slices | 1.049 s | 0.128 s | 0.064 s | 8.2x |
+| SASE window, 24 x 4096, slippage live | spectral, 24 planes | 2.436 s | 0.618 s | 0.219 s | 3.9x |
+| SASE window, 96 x 8192 | slices | 3.942 s | 0.395 s | 0.289 s | 10.0x |
+| SASE window, 96 x 8192 | spectral, 96 planes | 8.787 s | 1.300 s | 0.859 s | 6.8x |
+| SASE window, 96 x 8192 | spectral, 20 planes derived | 3.359 s | 0.410 s | 0.261 s | 8.2x |
+| dispatch floor: 1 x 1024, ngrid 64 | slices | 0.032 s | 0.047 s | 0.012 s | 0.7x |
+| dispatch floor: 1 x 1024, ngrid 64 | spectral | 0.048 s | 0.050 s | 0.013 s | 1.0x |
+
+The passes along $\tau$ cost the device 3.4 times the slice step's busy seconds on the 24-slice window and 3.0 times on the 96-slice one, where the CPU pays 2.3 and 2.2 times its slice walk. The device's transform along $\tau$ is a mixed-radix sum in threadgroup memory with an integer index per term, and the slice step it is added to is the four-pass transform the reference backend tuned, which is the ratio. The spectral device wall is further from its busy seconds than the slice wall is, by about 0.3 s on both windows: that is the pulse file the bank writes, 119 MB and 194 MB here, which the device run under the slice propagator keeps none of and the CPU spectral run pays the same, as the footer's slippage phase states on both. The coarse row is the propagator's point. On the 96-slice window the derived sampling leaves 20 planes and a pad of 16, the device's busy seconds fall below the slice propagator's 96 planes, and the wall is 0.41 s against 1.30 s at one plane a slice. A window of one slice is one plane with no pad, so its pass is a kernel multiply, and the steady rows agree. The cost estimate carries the device's rate for the passes, `fel_cost_tau_device$`, fitted from the two one-plane-a-slice SASE rows as the busy seconds above the slice rows over the passes the estimate counts, 6.2e-11 and 6.4e-11 seconds per point per log2 of the length per pass.
+
 This table says where a step's device seconds go, per pass. `run.device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU. Dispatch-boundary sampling would time each dispatch inside one encoder, and the M3 Max reports it absent. The input file is the full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, with the filter on and `comb_ds_save = -1`. The readbacks therefore fall at element ends, and each element's steps batch into one command buffer. Each row is the best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
 
 *Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*

@@ -72,6 +72,18 @@ physics alone, the check can fail, and everything the backend does not cover is 
    there too, so a frame is written from arrays the readback refreshed. What a frame
    must carry is the chart: the undulator quiver sits in px as a common offset, which
    the mean sees and an rms does not. See unaveraged() below.
+14. The spectral propagator (docs/spectral-field.md) on the device: the kernel pass
+   along tau over the window and its pad, the ramp as the slippage, the bank fed by the
+   planes the slip passes read at the pad's first slot, and the field coarser than the
+   slices. It is judged as the slice propagator is: the lockstep rows inside the same
+   ceilings on the steady state and on the time-dependent window, with the rows read
+   before either record slips, the read-only proof, the mutation moving the levels, and
+   the production run against the CPU's own spectral run. The bank's ledger closes on
+   the device at the CPU's level on a seeded chargeless window, with the pulse file's
+   planes the CPU's. The coarse field at its derived default lands against the CPU's
+   coarse run per slice. Harmonic members and two polarization planes ride under it at
+   one plane a slice. Two device runs agree bit for bit, and the FP32 check without the
+   device is refused, since the CPU twin steps the slice propagator. See spectral().
 
 The deposit accumulates in fixed point, so two device runs of one input file agree bit for
 bit, and checks 8, 9 and the unaveraged section assert that. Against the CPU the
@@ -453,9 +465,224 @@ def main():
     field_set(args, wd, exe)
     source_filter(args, wd, exe)
     unaveraged(args, wd, exe)
+    spectral(args, wd, exe)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0
+
+
+# The spectral propagator's own levels (section 14), each three times its first
+# measurement on both builds. The lockstep rows sit at the slice propagator's own levels,
+# since the deposit and the push are the same kernels and the rows are read before the
+# ramp, so they hold the ceilings above. The production bands are the slice path's too:
+# 6.0e-4 steady and 2.2e-5 on the time-dependent window against the CPU's spectral run.
+# The coarse field at its derived default, nine planes of six slices over 48, lands at
+# 5.5e-5 on the window power and 9.4e-5 per slice over the peak. The bank's ledger on a
+# seeded chargeless window of eight slices over the segment closes at 1.2e-4 on the CPU
+# and 1.2e-4 on the device, the two closures 4e-7 apart, and the escaped energies 3.7e-7
+# apart, both the FP32 transform pairs' own.
+
+SP_COARSE_CEIL = 3.0e-4
+SP_BANK_CEIL = 1.2e-6
+SP_ESCAPED_CEIL = 1.2e-6
+
+SPECTRAL = '  field.propagator = "spectral"\n'
+# The time-dependent window's own plane, so a spectral run compares with the slice run
+# plane for plane; the coarse run leaves the key to derive.
+SP_PLANE = '  field.n_wavelength = 3\n'
+# The bank's window: the time-dependent window seeded and without charge, so a drift
+# through the segment conserves the energy that entered and the ledger can close.
+SP_BANK_EXTRA = TD_EXTRA.replace("beam.bunch_charge = 1.601107656951e-14", "beam.bunch_charge = 1e-30").replace(
+    "seed_power = 0", "seed_power = 1e3") + "  write_initial = T\n"
+# The coarse window: 48 slices of 3 wavelengths, where the derived sampling of a tenth of
+# the cooperation length is 6 slices a plane and the window keeps 9 planes.
+SP_COARSE_EXTRA = TD_EXTRA.replace("z_min = -1.200000e-09", "z_min = -7.200000e-09").replace(
+    "z_max = 1.200000e-09", "z_max = 7.200000e-09").replace(
+    "window_length = 2.4e-9", "window_length = 1.44e-8").replace(
+    "1.601107656951e-14", "9.606645941706e-14")
+SP_Z0 = 376.730313668
+SP_C = 299792458.0
+
+
+def sp_field_energy(path):
+    """A field file's energy [J] as the tracker sums it: |E|^2 over the grid times dx^2 / 2 Z0
+    is a plane's power, times the plane's light time its energy."""
+    from lucifer.field import read_field
+    f = read_field(path)
+    return float((np.abs(f["u"])**2).sum() * f["dx"]**2 / (2 * SP_Z0) * f["dz"] / SP_C)
+
+
+def sp_escaped(wd, root):
+    """The escaped energy the footer states at full precision [J]."""
+    m = re.search(r"Escaped\s+h1\s+(\S+)\s+J", (wd / f"{root}.log").read_text())
+    return float(m.group(1)) if m else float("nan")
+
+
+def spectral(args, wd, exe):
+    """The spectral propagator on the device (validation.md, val-device-spectral)."""
+    print("== 14. the spectral propagator on the device ==")
+
+    def runlog(name, text, threads="4", expect_fail=False):
+        # The run's output, kept under its root for the footer's escaped energy.
+        r = run(args.exe, wd, name, text, threads=threads, expect_fail=expect_fail)
+        root = re.search(r'out_root = "(\w+)"', text).group(1)
+        (wd / f"{root}.log").write_text(r.stdout)
+        return r
+
+    # 1. Steady lockstep: the device's spectral step in the twin's role against the
+    # CPU's spectral run, the rows read before the slip.
+    runlog("devsp_ss.in", BASE.format(root="devspss", extra=SPECTRAL + DEV + '  run.fp32_check = "lockstep"\n'))
+    s = summary(wd, "devspss")
+    for q in CEIL:
+        ok(f"spectral lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
+    ok("spectral lockstep steady guard [ticks]", f"{s['guard']:.3e}", f">= {GUARD_FLOOR:.0e}",
+       s["guard"] >= GUARD_FLOOR, num=s["guard"], bound=GUARD_FLOOR, kind="min")
+
+    # 2. Read-only, against the CPU's own spectral run.
+    runlog("devsp_off.in", BASE.format(root="devspoff", extra=SPECTRAL))
+    same = (wd / "devspss.diag.txt").read_bytes() == (wd / "devspoff.diag.txt").read_bytes()
+    ok("spectral FP64 diag byte-identical, device twin on vs off", same, "True", same)
+
+    # 3. Falsifiable: the perturbed kernel constant must move the levels.
+    runlog("devsp_mut.in", BASE.format(root="devspmut",
+           extra=SPECTRAL + DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
+    m = summary(wd, "devspmut")
+    ok("spectral mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}", ">= 10x",
+       m["theta"] >= 10 * s["theta"], num=m["theta"], bound=10 * s["theta"], kind="min")
+    ok("spectral mutation moves worst_source", f"{m['source']:.3e} vs {s['source']:.3e}", ">= 5x",
+       m["source"] >= 5 * s["source"], num=m["source"], bound=5 * s["source"], kind="min")
+
+    # 4. The production role, steady, against the CPU's spectral run.
+    runlog("devsp_pr.in", BASE.format(root="devsppr", extra=SPECTRAL + DEV))
+    pc = diag_power(wd, "devspoff", 1)
+    pd = diag_power(wd, "devsppr", 1)
+    rel = abs(pd - pc) / pc
+    ok("spectral production exit power vs CPU", f"{rel:.3e}", f"in (0, {E2E_CEIL:.1e}]",
+       0 < rel <= E2E_CEIL, num=rel, bound=[0, E2E_CEIL], kind="range")
+
+    # 5. Time dependence under the ramp: the eight-slice window at one plane a slice,
+    # the lockstep rows, the read-only proof and the production band, at 8 threads.
+    td = TD_EXTRA + SPECTRAL + SP_PLANE
+    runlog("devsp_td.in", BASE.format(root="devsptd", extra=td + DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
+    t = summary(wd, "devsptd")
+    for q in CEIL:
+        ok(f"spectral lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
+           num=t[q], bound=CEIL[q], kind="max")
+    ok("spectral lockstep TD guard [ticks]", f"{t['guard']:.3e}", f">= {GUARD_FLOOR:.0e}",
+       t["guard"] >= GUARD_FLOOR, num=t["guard"], bound=GUARD_FLOOR, kind="min")
+    runlog("devsp_tdoff.in", BASE.format(root="devsptdoff", extra=td), threads="8")
+    same = (wd / "devsptd.diag.txt").read_bytes() == (wd / "devsptdoff.diag.txt").read_bytes()
+    ok("spectral TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    runlog("devsp_tdpr.in", BASE.format(root="devsptdpr", extra=td + DEV), threads="8")
+    pc = diag_power(wd, "devsptdoff", 8)
+    pd = diag_power(wd, "devsptdpr", 8)
+    rel = abs(pd - pc) / pc
+    ok("spectral production TD window power vs CPU", f"{rel:.3e}", f"<= {E2E_CEIL:.1e}", rel <= E2E_CEIL,
+       num=rel, bound=E2E_CEIL, kind="max")
+
+    # 6. The bank under the device: a seeded chargeless window through the segment. The
+    # window's energy at the exit plus the escaped energy against the energy that entered
+    # closes on the device at the CPU's level, the pulse file holds the planes the CPU's
+    # does, and the escaped energies agree.
+    closure, planes, escaped = {}, {}, {}
+    for key, extra in (("cpu", SP_BANK_EXTRA + SPECTRAL + SP_PLANE), ("dev", SP_BANK_EXTRA + SPECTRAL + SP_PLANE + DEV)):
+        root = f"devspbk{key}"
+        runlog(f"devsp_bk{key}.in", BASE.format(root=root, extra=extra), threads="8")
+        e0 = sp_field_energy(wd / f"{root}-initial.wf.h5")
+        e1 = sp_field_energy(wd / f"{root}-final.wf.h5")
+        escaped[key] = sp_escaped(wd, root)
+        closure[key] = (e1 + escaped[key]) / e0 - 1
+        with h5py.File(wd / f"{root}-pulse.wf.h5") as h5:
+            planes[key] = int(h5["data/1/meshes/electricField/x"].shape[0])
+    d = abs(closure["dev"] - closure["cpu"])
+    ok("spectral bank: the device's ledger closes at the CPU's level",
+       f"{closure['dev']:+.3e} against {closure['cpu']:+.3e}", f"within {SP_BANK_CEIL:.1e}", d <= SP_BANK_CEIL,
+       num=d, bound=SP_BANK_CEIL, kind="max")
+    ok("spectral bank: pulse planes, device against CPU", f"{planes['dev']} against {planes['cpu']}", "equal",
+       planes["dev"] == planes["cpu"] and planes["dev"] > 8, num=planes["dev"], bound=planes["cpu"], kind="equal")
+    rel = abs(escaped["dev"] - escaped["cpu"]) / escaped["cpu"]
+    ok("spectral bank: escaped energy, device against CPU", f"{rel:.3e}", f"<= {SP_ESCAPED_CEIL:.1e}",
+       rel <= SP_ESCAPED_CEIL, num=rel, bound=SP_ESCAPED_CEIL, kind="max")
+
+    # 7. The field coarser than the slices, at its derived default, against the CPU's
+    # coarse run: the exit power per slice, which the stats take from the plane each
+    # slice reads, and the window power.
+    n_per = {}
+    for key, extra in (("cpu", SP_COARSE_EXTRA + SPECTRAL), ("dev", SP_COARSE_EXTRA + SPECTRAL + DEV)):
+        root = f"devspco{key}"
+        r = runlog(f"devsp_co{key}.in", BASE.format(root=root, extra=extra), threads="8")
+        mm = re.search(r"Field\s+(\d+) planes of (\d+) wavelengths over the window, (\d+) slices a plane", r.stdout)
+        n_per[key] = int(mm.group(3)) if mm else 0
+    ok("spectral coarse field: slices a plane, device against CPU", f"{n_per['dev']} against {n_per['cpu']}",
+       "equal and above 1", n_per["dev"] == n_per["cpu"] and n_per["dev"] > 1,
+       num=n_per["dev"], bound=n_per["cpu"], kind="equal")
+    rows_c = [l.split() for l in (wd / "devspcocpu.diag.txt").read_text().splitlines() if not l.startswith("#")]
+    rows_d = [l.split() for l in (wd / "devspcodev.diag.txt").read_text().splitlines() if not l.startswith("#")]
+    pc = np.array([float(r[2]) for r in rows_c[-48:]])
+    pd = np.array([float(r[2]) for r in rows_d[-48:]])
+    rel = abs(pd.sum() - pc.sum()) / pc.sum()
+    ok("spectral coarse production window power vs CPU", f"{rel:.3e}", f"<= {E2E_CEIL:.1e}", rel <= E2E_CEIL,
+       num=rel, bound=E2E_CEIL, kind="max")
+    rel = float(np.abs(pd - pc).max() / pc.max())
+    ok("spectral coarse production exit power per slice vs CPU, over the peak", f"{rel:.3e}",
+       f"<= {SP_COARSE_CEIL:.1e}", rel <= SP_COARSE_CEIL, num=rel, bound=SP_COARSE_CEIL, kind="max")
+
+    # 8. Two device runs of one spectral input file, every array of the statistics file.
+    runlog("devsp_r2.in", BASE.format(root="devspr2", extra=td + DEV), threads="8")
+    a = stats_arrays(wd / "devsptdpr.stats.h5")
+    b = stats_arrays(wd / "devspr2.stats.h5")
+    diff = [k for k in a if a[k] != b.get(k)]
+    ok("two spectral device runs, every stats array identical", f"{len(diff)} of {len(a)} differ", "0",
+       len(diff) == 0 and len(a) > 0, num=len(diff), bound=0, kind="equal")
+
+    # 9. Harmonic members under the spectral propagator at one plane a slice, on the
+    # planar segment of check_harmonics: the lockstep rows with the per-member footer,
+    # and the production P1 and P3 against the CPU's spectral run.
+    (wd / "devsp_planar.bmad").write_text(PLANAR_LAT.format(length="1.98"))
+    hb = HARM_BASE.replace('lattice = "{lat}"', 'lattice = "devsp_planar.bmad"')
+    runlog("devsph_ss.in", hb.format(root="devsphss", extra=SPECTRAL + DEV + '  run.fp32_check = "lockstep"\n'))
+    sh = summary(wd, "devsphss")
+    for q in CEIL:
+        ok(f"spectral harmonic lockstep worst_{q}", f"{sh[q]:.3e}", f"<= {CEIL[q]:.1e}", sh[q] <= CEIL[q],
+           num=sh[q], bound=CEIL[q], kind="max")
+    for q in CEIL_H:
+        ok(f"spectral harmonic lockstep worst_{q} (per-member footer)", f"{sh.get(q, float('nan')):.3e}",
+           f"<= {CEIL_H[q]:.1e}", q in sh and sh[q] <= CEIL_H[q], num=sh.get(q), bound=CEIL_H[q], kind="max")
+    runlog("devsph_off.in", hb.format(root="devsphoff", extra=SPECTRAL))
+    runlog("devsph_pr.in", hb.format(root="devsphpr", extra=SPECTRAL + DEV))
+    c1, c3 = harm_powers(wd, "devsphoff")
+    d1, d3 = harm_powers(wd, "devsphpr")
+    for tag, c, dd, band in (("P1", c1, d1, E2E_CEIL), ("P3", c3, d3, H_E2E_CEIL)):
+        rel = abs(dd - c) / c
+        ok(f"spectral harmonic production {tag} vs CPU", f"{rel:.3e}", f"<= {band:.1e}", rel <= band,
+           num=rel, bound=band, kind="max")
+
+    # 10. Two polarization planes under the spectral propagator, on the crossed probe:
+    # the lockstep rows and the production Px and Py against the CPU's spectral run.
+    (wd / "crossed_probe.bmad").write_bytes((pathlib.Path(args.latdir) / "crossed_probe.bmad").read_bytes())
+    (wd / "devsp_c.bmad").write_text("call, file = crossed_probe.bmad\nuse, CROSSED\n")
+    pn = tp.ss(tp.NML)
+    runlog("devspp_ss.in", pn.format(lat="devsp_c.bmad", root="devsppss", extra=SPECTRAL + DEV + '  run.fp32_check = "lockstep"\n'))
+    sp = summary(wd, "devsppss")
+    for q in CEIL:
+        ok(f"spectral two-plane lockstep worst_{q}", f"{sp[q]:.3e}", f"<= {CEIL[q]:.1e}", sp[q] <= CEIL[q],
+           num=sp[q], bound=CEIL[q], kind="max")
+    runlog("devspp_off.in", pn.format(lat="devsp_c.bmad", root="devsppoff", extra=SPECTRAL))
+    runlog("devspp_pr.in", pn.format(lat="devsp_c.bmad", root="devspppr", extra=SPECTRAL + DEV))
+    for comp, band in (("x", E2E_CEIL), ("y", PY_E2E_CEIL)):
+        pc = tp.dump_power(wd, "devsppoff-final.wf.h5", comp)
+        pd = tp.dump_power(wd, "devspppr-final.wf.h5", comp)
+        rel = abs(pd - pc) / pc
+        ok(f"spectral crossed production P{comp} vs CPU", f"{rel:.3e}", f"<= {band:.1e}", rel <= band,
+           num=rel, bound=band, kind="max")
+
+    # 11. The FP32 check without the device is refused under the spectral propagator,
+    # since the CPU twin steps the slice propagator.
+    r = runlog("devsp_rt.in", BASE.format(root="devsprt", extra=SPECTRAL + '  run.fp32_check = "lockstep"\n'),
+               expect_fail=True)
+    refused = r.returncode != 0 and "DOES NOT COVER THE FP32 CHECK WITHOUT THE DEVICE" in r.stdout
+    ok("refused: the FP32 check's CPU twin under the spectral propagator", refused, "True", refused)
 
 
 
