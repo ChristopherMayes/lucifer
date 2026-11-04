@@ -30,6 +30,26 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-03 Changed: the spectral propagator, `field.propagator = "spectral"`, is a mode of the
+  program, checked in the keystone, and its slippage is the phase ramp alone with the escaped-field
+  bank under it (`docs/spectral-field.md`). The window is followed along tau by a pad of 4 free
+  slots and a cos^2 sponge of 12, every transform runs over both, and `fel_spectral_apply` banks a
+  plane from the pad's first slot each time the accumulated slippage crosses a whole slice, the
+  pass split there in the transform domain, so the escaped and pulse files are what the slice
+  propagator writes and the window's energy plus the escaped energy is conserved. A pass slips at
+  most one slice, since a pass of several was measured to carry 2e-3 of the exit peak power round
+  the periodic transform to the tail slice. The keys `field.spectral_slippage`,
+  `field.spectral_boundary`, `field.spectral_sponge_slices` and `field.spectral_head_tolerance`
+  are removed with the forms they selected, and an input file that sets one is refused as an
+  unknown key. The validation suite gains the section `spectral`, `tests/scripts/check_spectral.py`:
+  the steady-state tier under `spectral` against the slice run at 1e-12, the SASE tier with the
+  source filter on under both propagators at 8.7e-3 of the exit power against a bound of 2e-2, a
+  pulse through a pipe for the ramp by one slice against the rotation at 1e-9, and the bank's
+  ledger, which closes to 7e-11 under the rotation and 1.2e-6 under the ramp with the tail slice
+  dark. The field phase costs 2.2 times the slice propagator's at one thread and 2.4 at eight on
+  the SASE tier, and the header's estimate carries the passes along tau through `fel_cost_mod`.
+  The unaveraged mode, the device, the FP32 check and the coherent source stay refused with the
+  key, each message naming the reason. No recorded digit of the slice propagator moved.
 - 2026-11-03 Added: the two FEL cases on `docs/spectral-field.md`, `seeded` and `chirped` in
   `tests/scripts/spectral_field.py`. A chirped Gaussian seed at 1 Å, 0.53 to 5 percent relative
   bandwidth, through the first Aramis segment and the full line under both propagators with the

@@ -723,20 +723,13 @@ call out_io (s_blank$, r_name, trim(line))
 ! The spectral propagator, when the input file selects it (fel_spectral_mod).
 
 if (run%spectral%on) then
-  line = ' Propagator  spectral, a research prototype: slippage as the '
-  if (run%spectral%ramp) then
-    line = trim(line) // ' phase ramp, boundary '
+  if (run%spectral%n_pad > 0) then
+    write (line, '(a, i0, a, i0, a)') ' Propagator  spectral: the kernel at k0 + kappa, the slippage as the phase ' // &
+          'ramp, a pad of ', run%spectral%n_free, ' free and ', run%spectral%n_sponge, &
+          ' sponge slices beyond the head feeding the bank'
   else
-    line = trim(line) // ' whole-slice rotation, boundary '
+    line = ' Propagator  spectral: the kernel at k0 + kappa, a window of one slice that never slips'
   endif
-  select case (run%spectral%boundary)
-  case (fel_spectral_sponge$)
-    write (line, '(2a, i0, a)') trim(line), ' cos^2 sponge over ', run%spectral%n_sponge, ' slices'
-  case (fel_spectral_pad$)
-    write (line, '(2a, i0, a)') trim(line), ' zero padding of ', run%spectral%n_pad, ' slices'
-  case default
-    write (line, '(2a, es9.2)') trim(line), ' headroom, head tolerance', run%spectral%head_tolerance
-  end select
   call out_io (s_blank$, r_name, trim(line))
 endif
 
@@ -935,6 +928,15 @@ if (.not. allocated(run%und_slip)) return
 s_line = run%ffield(1)%slip%accuslip + sum(run%und_slip(run%i_start:run%i_end)) + &
          sum(run%ele_slip(run%i_start:run%i_end))
 n_rot = max(0, ceiling(s_line / run%fbeam%n_wavelength - 0.8_rp))
+
+! The spectral propagator banks a plane at each whole slice the ramp crosses
+! (fel_spectral_apply), and its count starts from the ramp's own residual.
+
+if (run%spectral%on) then
+  s_line = run%ffield(1)%slip%ramp_slip + sum(run%und_slip(run%i_start:run%i_end)) + &
+           sum(run%ele_slip(run%i_start:run%i_end))
+  n_rot = max(0, floor(s_line / run%fbeam%n_wavelength + 1e-9_rp))
+endif
 if (n_rot == 0) return
 is1 = max(1, run%nslice - n_rot + 1)
 
@@ -1150,20 +1152,7 @@ if (run%ffield(1)%slip%timerun) then
           run%ffield(ih)%slip%u_escaped, ' J'
     if (ih < run%n_harm) line = trim(line) // ','
   enddo
-  if (run%spectral%on .and. run%spectral%boundary /= fel_spectral_headroom$) then
-    call out_io (s_blank$, r_name, trim(line) // ' removed at the window head by the spectral boundary')
-  else
-    call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
-  endif
-endif
-
-! What the spectral propagator's headroom check saw (fel_spectral_mod).
-
-if (run%spectral%on .and. run%spectral%ramp .and. run%spectral%boundary == fel_spectral_headroom$ .and. &
-    run%ffield(1)%slip%timerun) then
-  write (line, '(a, es10.3, a, f0.3, a)') ' Spectral    head slice held at most ', run%spectral%head_max, &
-        ' of the window energy, at s = ', run%spectral%z_head_max, ' m'
-  call out_io (s_blank$, r_name, trim(line))
+  call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
 endif
 
 ! The dumps, each listed when the switch that writes it was on in this run and the file is

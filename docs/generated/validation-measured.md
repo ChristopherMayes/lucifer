@@ -24,7 +24,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 29 in all.
+Every section below ran and passed on both builds, 30 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -40,6 +40,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `migration`
 - `collective`
 - `source-filter`
+- `spectral`
 - `fp32-lockstep`
 - `device`
 - `unaveraged`
@@ -231,6 +232,21 @@ where the two builds agree to every printed digit.
 | the filter is untouched on an unaveraged line | 0.0000e+00 | same | <= 1.0000e-09 |
 | the filter is untouched on a coherent source | 0.0000e+00 | same | <= 1.0000e-09 |
 | the filter moves on a mixed line, two averaged segments of three | 1.1535e-03 | same | >= 1.0000e-09 |
+
+(val-levels-spectral)=
+### `spectral`
+
+| Check | Debug | Production | Bound |
+|---|---|---|---|
+| steady state, spectral against the slice run | 8.0147e-15 | 2.3261e-14 | <= 1.0000e-11 |
+| SASE tier with the source filter on, spectral against slices | 8.6540e-03 | same | <= 2.0000e-02 |
+| one slice by the ramp against one by the rotation | 1.0729e-09 | same | <= 1.0000e-08 |
+| the ledger closes, slices | 6.7968e-11 | same | <= 1.0000e-09 |
+| the tail slice stays dark, slices | 0.0000e+00 | same | <= 1.0000e-09 |
+| the pulse file holds the planes slipped, slices | 41 | same | = 41 |
+| the ledger closes, spectral | 1.1486e-06 | same | <= 1.0000e-05 |
+| the tail slice stays dark, spectral | 4.9134e-35 | 5.4767e-35 | <= 1.0000e-09 |
+| the pulse file holds the planes slipped, spectral | 41 | same | = 41 |
 
 (val-levels-fp32-lockstep)=
 ### `fp32-lockstep`
@@ -762,8 +778,6 @@ where the two builds agree to every printed digit.
 | a name outside the set is refused with the set, beam.z_distribution = "gauss" |  | same | holds |
 | a name outside the set is refused with the set, field.propagator = "spectra" |  | same | holds |
 | a name outside the set is refused with the set, field.seed_polarization = "z" |  | same | holds |
-| a name outside the set is refused with the set, field.spectral_boundary = "wall" |  | same | holds |
-| a name outside the set is refused with the set, field.spectral_slippage = "rotation" |  | same | holds |
 | a name outside the set is refused with the set, run.device = "metl" |  | same | holds |
 | a name outside the set is refused with the set, run.fp32_check = "on" |  | same | holds |
 | a name outside the set is refused with the set, run.interlude_model = "bamd" |  | same | holds |

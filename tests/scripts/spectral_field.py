@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Measure the spectral field propagator, field.propagator = "spectral", against the slice
-propagator, as docs/spectral-field.md records. Nothing here runs in the keystone: the
-prototype is outside it, and the page is hand written from this script's report.
+propagator, as docs/spectral-field.md records. The keystone's own check of the mode is
+check_spectral.py; nothing here runs in it, and the page is hand written from this
+script's report.
 
     spectral_field.py --exe <lucifer> --work-dir <dir> [--validation-dir <dir>]
-                      [--threads N] [--reuse] [vacuum] [null] [boundary] [cost]
+                      [--threads N] [--reuse] [vacuum] [null] [bank] [cost]
                       [seeded] [chirped]
 
 The six measurements, each a subcommand and the first four when none is named. With
@@ -18,18 +19,16 @@ so a set that takes hours is re-analyzed from its files.
             range, and the solution is the superposition over the pulse's spectrum. The
             error of each propagator as a function of the pulse's relative bandwidth.
             Needs the tracker alone.
-  null      The steady-state tier and the SASE tier under "spectral" with whole-slice
-            rotation, compared against Genesis4 at the tier tolerances as
-            compare_fel.py compares them, and the same under the continuous slippage,
-            with the difference from the slice run placed against rho. Needs the work
-            directory of a completed validation pass (--validation-dir), which holds
-            the tier inputs, the imported dumps and the Genesis4 references.
-  boundary  The SASE tier's window, 32 slices under a line that slips 1184, under
-            each boundary form: the headroom alone, which refuses the run where the head
-            fills; the headroom with the refusal disabled, to see what wraps; the cos^2
-            sponge; and the hybrid of whole-slice rotation with zero padding. For each,
-            the exit energies, the escaped energy, the beam's energy loss, and what
-            the pulse file holds. Needs --validation-dir.
+  null      The steady-state tier and the SASE tier under "spectral", compared against
+            Genesis4 at the tier tolerances as compare_fel.py compares them and against
+            the slice run, with the SASE tier again under both propagators with the
+            source filter on. Needs the work directory of a completed validation pass
+            (--validation-dir), which holds the tier inputs, the imported dumps and the
+            Genesis4 references.
+  bank      The SASE tier's window, 32 slices under a line that slips 1184, with the
+            escaped field kept under both propagators: the exit energies, the escaped
+            energy, the beam's energy loss, and what the pulse file holds. Needs
+            --validation-dir.
   cost      The field phase of the SASE tier's walk per step, from the footer's timing
             table, under both propagators, at the thread count given. Needs
             --validation-dir.
@@ -106,12 +105,6 @@ def footer(text):
     m = re.search(r"Work\s+(\d+) FEL steps", text)
     if m:
         out["n_step"] = int(m.group(1))
-    m = re.search(r"head slice held at most\s+(\S+)\s+of the window energy, at s =\s+(\S+)\s+m", text)
-    if m:
-        out["head_max"], out["z_head_max"] = float(m.group(1)), float(m.group(2))
-    m = re.search(r"HEAD SLICE HOLDS\s+(\S+)\s+OF THE WINDOW'S ENERGY AT s =\s+(\S+)\s+m", text)
-    if m:
-        out["refused_share"], out["refused_at"] = float(m.group(1)), float(m.group(2))
     return out
 
 
@@ -293,7 +286,7 @@ def vacuum_exact(a, tau, tau_c, dtau, r2, k0, w0, z, shift):
 
 
 # --------------------------------------------------------------------------------------
-# The null test, the boundary and the cost, on the validation directory's tiers.
+# The null test, the bank and the cost, on the validation directory's tiers.
 
 def tier_inputs(args, wdir):
     vdir = pathlib.Path(args.validation_dir).resolve()
@@ -323,29 +316,22 @@ def null(args, wdir):
                                             f"{vdir}/{tier}-final.beam.h5", f"{vdir}/{gen}-final.par.h5",
                                             tol, nslice)[0]
         results[(tier, "slices")] = recorded
-        # The ramp on the SASE tier's window, 32 slices under a line that slips 1184, needs
-        # a boundary at the head, and the padding is the one that discards what crosses as
-        # the rotation's zero fill does, with its energy counted.
-        for form, boundary in (("slices", "headroom"), ("ramp", "pad")):
-            root = f"{tier}_spectral_{form}"
-            rc, text = run(args.exe, f"{tier}.toml",
-                           ["field.propagator=spectral", f"field.spectral_slippage={form}",
-                            f"field.spectral_boundary={boundary}"],
-                           root, wdir, args.threads)
-            if rc != 0:
-                print(text[-2000:])
-                raise SystemExit(f"null: {root} failed")
-            worst = compare_fel.compare_tier(f"{tier} spectral, slippage {form}",
-                                             f"{wdir}/{root}.diag.txt", f"{vdir}/{gen}.out.h5",
-                                             f"{wdir}/{root}-final.wf.h5", f"{vdir}/{gen}-final.fld.h5",
-                                             f"{wdir}/{root}-final.beam.h5", f"{vdir}/{gen}-final.par.h5",
-                                             tol, nslice)[0]
-            d = differences(read_curves(f"{wdir}/{root}.stats.h5"), read_curves(f"{vdir}/{tier}.stats.h5"))
-            own = {k: float(np.abs(np.asarray(v.values)).max()) for k, v in d.items()}
-            results[(tier, form)] = (worst, own)
-            print(f"  {tier} spectral {form}: against Genesis4 {worst:.6e} (tolerance {tol:.1e}), "
-                  f"against the slice run: " + ", ".join(f"{k} {v:.2e}" for k, v in own.items()))
-            print()
+        root = f"{tier}_spectral"
+        rc, text = run(args.exe, f"{tier}.toml", ["field.propagator=spectral"], root, wdir, args.threads)
+        if rc != 0:
+            print(text[-2000:])
+            raise SystemExit(f"null: {root} failed")
+        worst = compare_fel.compare_tier(f"{tier} spectral",
+                                         f"{wdir}/{root}.diag.txt", f"{vdir}/{gen}.out.h5",
+                                         f"{wdir}/{root}-final.wf.h5", f"{vdir}/{gen}-final.fld.h5",
+                                         f"{wdir}/{root}-final.beam.h5", f"{vdir}/{gen}-final.par.h5",
+                                         tol, nslice)[0]
+        d = differences(read_curves(f"{wdir}/{root}.stats.h5"), read_curves(f"{vdir}/{tier}.stats.h5"))
+        own = {k: float(np.abs(np.asarray(v.values)).max()) for k, v in d.items()}
+        results[(tier, "spectral")] = (worst, own)
+        print(f"  {tier} spectral: against Genesis4 {worst:.6e} (tolerance {tol:.1e}), "
+              f"against the slice run: " + ", ".join(f"{k} {v:.2e}" for k, v in own.items()))
+        print()
     # The tiers run with the source filter off, since Genesis4 is compared with it off.
     # The filter is the production default, and it removes the wide-angle source, so the
     # SASE tier reruns with it on under both propagators, Lucifer against Lucifer.
@@ -355,65 +341,47 @@ def null(args, wdir):
         print(text[-2000:])
         raise SystemExit("null: tdsase_filter_slices failed")
     ref = read_curves(f"{wdir}/tdsase_filter_slices.stats.h5")
-    for form, boundary in (("slices", "headroom"), ("ramp", "pad")):
-        root = f"tdsase_filter_spectral_{form}"
-        rc, text = run(args.exe, "tdsase.toml",
-                       ["run.source_filter=true", "field.propagator=spectral",
-                        f"field.spectral_slippage={form}", f"field.spectral_boundary={boundary}"],
-                       root, wdir, args.threads)
-        if rc != 0:
-            print(text[-2000:])
-            raise SystemExit(f"null: {root} failed")
-        d = differences(read_curves(f"{wdir}/{root}.stats.h5"), ref)
-        own = {k: float(np.abs(np.asarray(v.values)).max()) for k, v in d.items()}
-        results[("tdsase_filter", form)] = own
-        print(f"    spectral {form}: " + ", ".join(f"{k} {v:.2e}" for k, v in own.items()))
+    root = "tdsase_filter_spectral"
+    rc, text = run(args.exe, "tdsase.toml", ["run.source_filter=true", "field.propagator=spectral"],
+                   root, wdir, args.threads)
+    if rc != 0:
+        print(text[-2000:])
+        raise SystemExit(f"null: {root} failed")
+    d = differences(read_curves(f"{wdir}/{root}.stats.h5"), ref)
+    own = {k: float(np.abs(np.asarray(v.values)).max()) for k, v in d.items()}
+    results[("tdsase_filter", "spectral")] = own
+    print(f"    spectral: " + ", ".join(f"{k} {v:.2e}" for k, v in own.items()))
     print()
     return results
 
 
-def boundary(args, wdir):
+def bank(args, wdir):
     from lucifer.stats import read_stats
 
-    vdir = tier_inputs(args, wdir)
-    print("--- boundary: the SASE tier's 32-slice window under each form at the head")
-    forms = (
-        ("slices", "the slice propagator", []),
-        ("headroom", "spectral, ramp, headroom", ["field.propagator=spectral"]),
-        ("headroom-open", "spectral, ramp, headroom, refusal off",
-         ["field.propagator=spectral", "field.spectral_head_tolerance=2"]),
-        ("sponge", "spectral, ramp, cos^2 sponge",
-         ["field.propagator=spectral", "field.spectral_boundary=sponge"]),
-        ("hybrid", "spectral, whole-slice rotation, zero padding",
-         ["field.propagator=spectral", "field.spectral_slippage=slices", "field.spectral_boundary=pad"]),
-    )
+    tier_inputs(args, wdir)
+    print("--- bank: the SASE tier's 32-slice window with the escaped field kept, under both propagators")
     rows = {}
-    for key, label, over in forms:
-        root = f"boundary_{key}"
+    for key, label, over in (("slices", "the slice propagator", []),
+                             ("spectral", "the spectral propagator", ["field.propagator=spectral"])):
+        root = f"bank_{key}"
         rc, text = run(args.exe, "tdsase.toml", over + ["run.keep_escaped_field=true"], root, wdir, args.threads)
-        f = footer(text)
-        row = dict(label=label, rc=rc, **f)
-        if rc == 0:
-            st = read_stats(wdir / f"{root}.stats.h5")
-            row.update(closure(st))
-            pulse = wdir / f"{root}-pulse.wf.h5"
-            row["pulse_file"] = pulse.exists()
-            if pulse.exists():
-                import h5py
-                with h5py.File(pulse) as h:
-                    row["pulse_planes"] = h["data/1/meshes/electricField/x"].shape[0]
+        if rc != 0:
+            print(text[-2000:])
+            raise SystemExit(f"bank: {root} failed")
+        row = dict(label=label, **footer(text))
+        st = read_stats(wdir / f"{root}.stats.h5")
+        row.update(closure(st))
+        pulse = wdir / f"{root}-pulse.wf.h5"
+        row["pulse_planes"] = 0
+        if pulse.exists():
+            import h5py
+            with h5py.File(pulse) as h:
+                row["pulse_planes"] = h["data/1/meshes/electricField/x"].shape[0]
         rows[key] = row
         print(f"  {label}:")
-        if rc != 0:
-            print(f"    refused: head slice held {f.get('refused_share', float('nan')):.2e} at s = "
-                  f"{f.get('refused_at', float('nan')):.3f} m")
-            continue
         print(f"    exit window energy {row['window_energy']:.4e} J, escaped {row.get('escaped_energy', 0):.4e} J, "
               f"their sum {row['window_energy'] + row.get('escaped_energy', 0):.4e} J, pulse {row['pulse_energy']:.4e} J")
-        print(f"    beam energy loss {row['beam_loss']:.4e} J")
-        if "head_max" in row:
-            print(f"    head slice held at most {row['head_max']:.2e} of the window energy, at s = {row['z_head_max']:.3f} m")
-        print(f"    pulse file: {'%d planes' % row['pulse_planes'] if row['pulse_file'] else 'none written'}")
+        print(f"    beam energy loss {row['beam_loss']:.4e} J, pulse file {row['pulse_planes']} planes")
         print(f"    tail slice's exit power share {row['tail_share']:.2e}, head slice's {row['head_share']:.2e}")
     print()
     return rows
@@ -439,9 +407,9 @@ def cost(args, wdir):
     tier_inputs(args, wdir)
     print(f"--- cost: the SASE tier's field phase per step, {args.threads} thread(s)")
     rows = {}
-    # The ramp with the padding, the full cost: the kernel pass and the ramp pass. The
-    # SASE tier's window needs the padding under the ramp (see null).
-    for key, over in (("slices", []), ("spectral", ["field.propagator=spectral", "field.spectral_boundary=pad"])):
+    # The full cost under spectral: the kernel pass and the slip pass, the bank off as the
+    # tier runs it.
+    for key, over in (("slices", []), ("spectral", ["field.propagator=spectral"])):
         root = f"cost_{key}"
         rc, text = run(args.exe, "tdsase.toml", over, root, wdir, args.threads)
         if rc != 0:
@@ -679,9 +647,7 @@ def seeded(args, wdir):
         for extent, over in (("quiet", ["run.track_end=UND##1"]), ("segment", ["run.track_end=UND##1"]), ("line", [])):
             toml = f"{tag}_quiet.toml" if extent == "quiet" else f"{tag}.toml"
             roots = {}
-            # The flat beam fills the window, so its noise sits in the head slice and the
-            # headroom check would refuse the ramp: the padding meets the head, as in null.
-            for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral", "field.spectral_boundary=pad"])):
+            for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
                 root = f"{tag}_{extent}_{prop}"
                 rc, text = run(args.exe, toml, over + more, root, wdir, args.threads)
                 if rc != 0:
@@ -698,7 +664,7 @@ def seeded(args, wdir):
     (wdir / f"{tag}_fine.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line-fine.bmad", beam=beam.name,
                                                                            field=f"{tag}-initial.wf.h5")))
     for extent, over in (("segment", ["run.track_end=UND##1"]), ("line", [])):
-        rc, text = run(args.exe, f"{tag}_fine.toml", over + ["field.propagator=spectral", "field.spectral_boundary=pad"],
+        rc, text = run(args.exe, f"{tag}_fine.toml", over + ["field.propagator=spectral"],
                        f"{tag}_{extent}_spectral_fine", wdir, args.threads)
         if rc != 0:
             print(text[-2000:])
@@ -726,7 +692,7 @@ def chirped(args, wdir):
         (wdir / f"{tag}.toml").write_text(to_toml(CHIRP_RUN_INPUT.format(lattice="chirp-line.bmad",
                                                                           beam=f"{tag}-initial.beam.h5", field=dark.name)))
         roots = {}
-        for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral", "field.spectral_boundary=pad"])):
+        for prop, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
             root = f"{tag}_line_{prop}"
             rc, text = run(args.exe, f"{tag}.toml", more, root, wdir, args.threads)
             if rc != 0:
@@ -756,7 +722,7 @@ def main():
     p.add_argument("--validation-dir", help="a completed validation pass's work directory")
     p.add_argument("--threads", type=int, default=1, help="OMP_NUM_THREADS for every run")
     p.add_argument("--reuse", action="store_true", help="keep a run whose log and final field exist")
-    p.add_argument("what", nargs="*", choices=["vacuum", "null", "boundary", "cost", "seeded", "chirped"],
+    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped"],
                    help="which measurements; the first four by default")
     args = p.parse_args()
     global REUSE
@@ -764,9 +730,9 @@ def main():
     args.exe = pathlib.Path(args.exe).resolve()
     wdir = pathlib.Path(args.work_dir).resolve()
     wdir.mkdir(parents=True, exist_ok=True)
-    what = args.what or ["vacuum", "null", "boundary", "cost"]
+    what = args.what or ["vacuum", "null", "bank", "cost"]
     if any(w != "vacuum" for w in what) and not args.validation_dir:
-        raise SystemExit("null, boundary and cost need --validation-dir")
+        raise SystemExit("null, bank and cost need --validation-dir")
     for w in what:
         globals()[w](args, wdir)
     return 0

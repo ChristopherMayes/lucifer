@@ -4607,8 +4607,8 @@ Output:
 *Module*
 
 ```
-The spectral field propagator, a research prototype (docs/spectral-field.md). The
-slice propagator (fel_field_step, fel_field_diffract) advances every slice of the
+The spectral field propagator, field.propagator = "spectral" (docs/spectral-field.md).
+The slice propagator (fel_field_step, fel_field_diffract) advances every slice of the
 window by the paraxial kernel exp(-i dz k_perp^2 / 2 k0) at the one reference
 wavenumber k0, and the slippage moves the record by whole slices once 0.8 of a slice
 has accumulated (fel_apply_slippage). This module transforms a member's whole window
@@ -4617,9 +4617,9 @@ exp(-i dz k_perp^2 / 2 k(kappa)) with k(kappa) = k0 + kappa, where kappa is the
 wavenumber conjugate to the window coordinate tau and c kappa is the frequency offset
 from the carrier. That is the term a chirped or short pulse gets wrong at relative
 order dOmega/omega under one k0. And the slippage becomes the phase ramp
-exp(-i kappa delta), delta the step's slippage as a length, exact and continuous, or
-stays the whole-slice rotation under field.spectral_slippage = "slices". The push, the
-deposit and the averaged equations are untouched.
+exp(-i kappa delta), delta the step's slippage as a length, exact and continuous, so
+a step may slip a fraction of a slice and the field is never a fraction of a slice
+behind the beam. The push, the deposit and the averaged equations are untouched.
 
 The window coordinate. Window slice i (fel-physics.md sec-window) sits at
 tau = (i - 1) * slice_spacing, so tau grows toward the head, the end light slips
@@ -4629,20 +4629,31 @@ frequency plus c kappa and the wavenumber k0 + kappa. The discrete transform of 
 window carries kappa_m = 2 pi m / (n_t slice_spacing) for m up to half of n_t and
 negative beyond, as the transverse table does (fel_field_kernel_init).
 
-The transform along tau is periodic, so light the ramp moves past the head would
-reappear at the tail. A derived window holds the line's slippage ahead of the bunch
-and nothing reaches the tail. Three forms meet the head on a shorter window
-(field.spectral_boundary): the headroom alone, with the run refused once the head
-slice holds more than field.spectral_head_tolerance of the window's energy; a cos^2
-sponge over the last field.spectral_sponge_slices slices, applied before each shift
-of at most a slice, the slippage taken in such chunks, whose removed energy joins the
-member's escaped energy; and zero padding of the transform along tau, eight slices
-beyond the largest shift one pass applies, with what crosses into the padding removed
-and its energy joined the same way. Under "slices"
-slippage the rotation zero-fills the slice it transmits and the slice propagator's
-bank (fel_apply_slippage) keeps the light itself, so nothing wraps and the headroom
-form checks nothing, while the padding then meets the kernel's own spread alone,
-which is below one wavelength a step.
+The head and the bank. The transform along tau is periodic, so light the ramp moves
+past the head would reappear at the tail. The window is followed along tau by a pad of
+fel_spectral_n_free$ free slots and a cos^2 sponge of fel_spectral_n_sponge$ slots
+that falls to zero at the pad's end, and every transform runs over the window and the
+pad together. Light the ramp carries past the head enters the pad, diffracts there
+under the kernel as escaped light does in vacuum, and is attenuated by the sponge
+after every slip pass, so the field is smooth at the periodic seam and nothing reaches
+the tail. The escape bank takes its planes from the pad's first slot. The slippage
+accumulates in slip%ramp_slip, and each time it crosses a whole slice the pass is
+split there in the transform domain, the field at that slot is read by a direct sum
+over the modes, and the plane goes to the bank as fel_apply_slippage's transmitted
+slice does, its energy added to u_escaped. Between two crossings the ramp moves the
+field by exactly one slot, which the transform does exactly, so the bank receives the
+window's samples one slice apart, each once, and the pulse file is assembled as
+before. The sponge removes light the bank already holds and counts nothing. One pass
+slips at most one slice, so light walks through every slot of the sponge and reaches
+its end at the product of the weights, below 1e-5 of its amplitude two slots before
+the seam, and a larger slippage, an interlude's, is taken in such passes. A pass of
+several slices was measured to jump light into the sponge's last slots, where the
+next pass's interpolation carried 2e-3 of the exit peak power round to the tail slice
+of the SASE tier's window.
+
+Note: A dump carries the window and not the pad. A continuation starts with an empty
+pad, and every plane that had entered it was banked when it crossed, so the ledger
+loses nothing.
 
 The kernel factors. exp(-i dz (m_x^2 + m_y^2) dk^2 / 2 k(kappa)) is the product of a
 table in (m_x, kappa) and one in (m_y, kappa), each n_grid by n_t, so the whole kernel
@@ -4661,240 +4672,191 @@ and executed inside it.
 *Struct*
 
 ```
-The spectral propagator's switches, resolved at setup from the [field] keys, and what
-it measured on the way: the largest share of the window's energy the head slice held,
-and where.
+The spectral propagator's switch and the pad it sized for the window.
 ```
 
 (api-fel-spectral-setup)=
 ### `fel_spectral_setup`
 
-*Subroutine* `(sp, propagator, slippage, boundary, n_sponge, head_tolerance)`
+*Subroutine* `(sp, propagator)`
 
 ```
-Routine to resolve the [field] keys of the spectral propagator into its switches. The
-key table has already refused a name outside each key's set. fel_spectral_size then
-sizes the sponge and the padding from the window and the schedule.
+Routine to resolve field.propagator into the switch. The key table has already
+refused a name outside the key's set. fel_spectral_size then sizes the pad.
 ```
 
 ```
 Input:
-  propagator     -- character(*): field.propagator, "slices" or "spectral".
-  slippage       -- character(*): field.spectral_slippage, "ramp" or "slices".
-  boundary       -- character(*): field.spectral_boundary, "headroom", "sponge" or "pad".
-  n_sponge       -- integer: field.spectral_sponge_slices, 0 derived.
-  head_tolerance -- real(rp): field.spectral_head_tolerance.
+  propagator -- character(*): field.propagator, "slices" or "spectral".
 
 Output:
-  sp             -- fel_spectral_struct: The resolved switches.
+  sp         -- fel_spectral_struct: The switch set.
 ```
 
 (api-fel-spectral-size)=
 ### `fel_spectral_size`
 
-*Subroutine* `(sp, shift_max, nslice, err_flag)`
+*Subroutine* `(sp, nslice)`
 
 ```
-Routine to size the sponge and the padding. The padding is eight slices beyond the
-largest shift one pass applies, an element's end slippage with its last step's, in
-slices, since the ramp takes it in one pass. The sponge takes the slippage in chunks
-of a slice (fel_spectral_shift), so its width is the window's alone: a count of 0
-derives an eighth of the window, at least 4 slices, and a count not below the window
-is refused. A window of one slice, the steady state, takes no boundary, since
-nothing slips.
+Routine to size the pad (module header). A window of one slice, the steady state,
+takes none, since nothing slips.
 ```
 
 ```
 Input:
-  shift_max -- real(rp): The largest shift one pass applies [slices].
-  nslice    -- integer: The window's slices.
+  nslice -- integer: The window's slices.
 
 Output:
-  sp        -- fel_spectral_struct: n_sponge and n_pad set.
-  err_flag  -- logical: Set True on a sponge not below the window.
+  sp     -- fel_spectral_struct: n_free, n_sponge and n_pad set.
 ```
 
 (api-fel-spectral-step)=
 ### `fel_spectral_step`
 
-*Subroutine* `(sp, und, beam, ff, dz, slippage, err_flag)`
+*Subroutine* `(sp, und, beam, ff, dz, slippage, keep, err_flag)`
 
 ```
 Routine to do the field half of one undulator step under the spectral propagator,
 in the slice propagator's order (fel_field_step, then fel_apply_slippage): each
 member's window is propagated over the step by the kernel, the source is deposited
 slice by slice from the just-advanced particles (fel_spectral_deposit), and the
-slippage then moves the field and the fresh source together, as the phase ramp with
-the boundary (fel_spectral_shift), or by the caller's rotation under "slices"
-slippage. fel_track_und_step has pushed the particles and skipped its own field solve.
+slippage then moves the field and the fresh source together as the ramp, with the
+planes that cross a slice banked (fel_spectral_slip). fel_track_und_step has pushed
+the particles and skipped its own field solve. The caller drains each member's bank
+afterwards (fel_drain_bank).
 ```
 
 ```
 Input:
-  sp       -- fel_spectral_struct: The propagator's switches.
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
   und      -- fel_und_struct: The segment.
   beam     -- fel_beam_struct: The beam, pushed over the step.
   ff(:)    -- fel_field_struct: The field set.
   dz       -- real(rp): Step length [m].
   slippage -- real(rp): The step's slippage [fundamental wavelengths].
+  keep     -- logical: Bank the planes that cross? False adds their energy alone.
 
 Output:
-  ff(:)    -- fel_field_struct: Every member advanced.
+  ff(:)    -- fel_field_struct: Every member advanced, its bank holding the planes.
   err_flag -- logical: Set True if there is an error. False otherwise.
 ```
 
 (api-fel-spectral-drift)=
 ### `fel_spectral_drift`
 
-*Subroutine* `(sp, ff, dz, slippage, err_flag)`
+*Subroutine* `(sp, ff, dz, slippage, keep, err_flag)`
 
 ```
 Routine to propagate every member of the field set through an interlude under the
 spectral propagator: the kernel over the interlude's length with no source, then
-the slippage the schedule charges it with the boundary (fel_spectral_shift). This is
-what wavefront_drift does for the slice propagator, with the kernel at k(kappa) and
-the slippage as the ramp.
+the slippage the schedule charges it, as the ramp with the bank (fel_spectral_slip).
+This is what wavefront_drift and fel_apply_slippage do for the slice propagator, with
+the kernel at k(kappa) and the slippage continuous. The caller drains each member's
+bank afterwards (fel_drain_bank).
 ```
 
 ```
 Input:
-  sp       -- fel_spectral_struct: The propagator's switches.
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
   ff(:)    -- fel_field_struct: The field set.
   dz       -- real(rp): The light's path [m].
   slippage -- real(rp): The interlude's slippage [fundamental wavelengths].
+  keep     -- logical: Bank the planes that cross? False adds their energy alone.
 
 Output:
-  ff(:)    -- fel_field_struct: Every member advanced.
+  ff(:)    -- fel_field_struct: Every member advanced, its bank holding the planes.
   err_flag -- logical: Set True if there is an error. False otherwise.
 ```
 
-(api-fel-spectral-shift)=
-### `fel_spectral_shift`
+(api-fel-spectral-slip)=
+### `fel_spectral_slip`
 
-*Subroutine* `(sp, fs, slippage, err_flag)`
+*Subroutine* `(sp, fs, slippage, keep, err_flag)`
 
 ```
-Routine to slip one member by the ramp with the boundary form in force, in passes
-along tau alone. Under the sponge the slippage is taken in chunks of at most one
-slice with the sponge applied before each, so what a chunk carries past the head is
-the sponge's zero on the head slice and nothing else; an interlude's whole slippage,
-tens of slices on a line like Aramis, would otherwise carry its unsponged slices
-round to the tail. The other forms take the slippage in one pass, the padding sized
-to hold it, and the headroom check follows. Under "slices" slippage the sponge alone
-runs, before the caller's rotation, and nothing else.
+Routine to slip one member by the ramp, in passes along tau alone of at most one
+slice each (module header), the plane that crosses a slice banked by the pass that
+crosses it. The member's bank is emptied first and holds every plane of the call on
+return, in transmission order, for the caller to drain. A steady-state record never
+slips.
+
+Note: Backward slippage is refused, as fel_apply_slippage refuses it with the bank:
+a plane that leaves at the tail has no place ahead of the window in the pulse file,
+and the pad is at the head.
 ```
 
 ```
 Input:
-  sp       -- fel_spectral_struct: The propagator's switches.
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
   fs       -- fel_field_struct: The member.
   slippage -- real(rp): The slippage to apply [fundamental wavelengths].
+  keep     -- logical: Bank the planes that cross? False adds their energy alone.
 
 Output:
-  fs       -- fel_field_struct: The window slipped, u_escaped grown by what the
-                boundary removed.
-  err_flag -- logical: Set True on a transform failure or the headroom refusal.
+  fs       -- fel_field_struct: The window slipped, the bank filled, u_escaped and
+                slip%ramp_slip advanced.
+  err_flag -- logical: Set True on a transform failure or backward slippage.
 ```
 
 (api-fel-spectral-apply)=
 ### `fel_spectral_apply`
 
-*Subroutine* `(sp, fs, dz, slippage, transverse, err_flag)`
+*Subroutine* `(sp, fs, dz, slippage, transverse, keep, err_flag)`
 
 ```
-Routine to apply the kernel over dz and the ramp for the slippage to one member's
-whole window, under sp%ramp, or the ramp alone when transverse is False, which is the
-step's pass after the deposit (fel_spectral_step). The record is read and written
-in window order through fel_field_index, so a rotated record is handled as the slice
-propagator handles it, and under "slices" slippage the caller rotates it afterwards
-(fel_apply_slippage) as before.
+Routine to apply the kernel over dz to one member's whole window and pad, when
+transverse is True, or the ramp for the slippage alone when it is False, which is the
+slip pass (fel_spectral_slip). The record is read and written in window order through
+fel_field_index, so a rotated record is handled as the slice propagator handles it,
+and the pad follows it.
 
-The passes, per polarization: the forward transverse transform of every slice; on
+The passes, per polarization: the forward transverse transform of every plane; on
 every line of the transverse spectrum the forward transform along tau, the kernel
-and ramp factors, and the inverse; the inverse transverse transform of every slice.
-The transforms are unnormalized, so the result is scaled by n_t and by n_grid^2. The
+factors, and the inverse; the inverse transverse transform of every plane. The
+transforms are unnormalized, so the result is scaled by n_t and by n_grid^2. The
 ramp alone is diagonal in tau's conjugate and needs no transverse pass, so it runs
-on the lines of the field itself.
+on the lines of the field itself. A slip pass is split at each whole slice the
+accumulated slippage crosses: the ramp to the crossing, the field at the pad's first
+slot read by a direct sum over the modes into a plane for the bank, then the ramp on,
+and the sponge on the pad afterwards (module header).
 ```
 
 ```
 Input:
-  sp         -- fel_spectral_struct: The propagator's switches.
-  fs         -- fel_field_struct: The member: its wavefront, slippage state and harmonic.
+  sp         -- fel_spectral_struct: The propagator's switch and pad.
+  fs         -- fel_field_struct: The member: its wavefront, pad, slippage state and bank.
   dz         -- real(rp): Step length [m].
-  slippage   -- real(rp): The slippage to apply [fundamental wavelengths].
+  slippage   -- real(rp): The slippage to apply [fundamental wavelengths], 0 with
+                  transverse True.
   transverse -- logical: Apply the kernel, with the transverse passes. False applies
                   the ramp alone.
+  keep       -- logical: Bank the planes that cross? False adds their energy alone.
 
 Output:
-  fs         -- fel_field_struct: The window advanced, u_escaped grown by what the
-                  padding removed.
+  fs         -- fel_field_struct: The window and pad advanced, the bank grown by the
+                  planes that crossed, u_escaped and slip%ramp_slip advanced.
   err_flag   -- logical: Set True on a transform failure. False otherwise.
 ```
 
 (api-apply-component)=
 ### `apply_component`
 
-*Subroutine* `(e, err)`
+*Subroutine* `(e, pad, pl, err)`
 
 ```
-Routine to put one polarization's planes through the passes of the header. The
-padding's energy is summed into e_pad over the lines, in the units of the pass.
+Routine to put one polarization's planes, the window's and the pad's, through the
+passes of the header, reading the plane at each crossing into pl.
 ```
 
-(api-fel-spectral-sponge)=
-### `fel_spectral_sponge`
+(api-bank-append)=
+### `bank_append`
 
-*Subroutine* `(sp, fs)`
-
-```
-Routine to apply the cos^2 sponge at the window's head when it is the boundary
-(module header), before each shift of at most a slice, so what the shift carries
-past the head is the sponge's zero. The weight falls from just under 1 on the sponge's
-first slice to 0 on the head slice, in window order, and the field is multiplied by
-it, so a slice keeps w^2 of its energy and the rest joins u_escaped. A window of one
-slice takes no sponge.
-```
+*Subroutine* `(bank, plane, plane_y)`
 
 ```
-Input:
-  sp       -- fel_spectral_struct: The propagator's switches.
-  fs       -- fel_field_struct: The member.
-
-Output:
-  fs       -- fel_field_struct: The sponge applied, u_escaped grown by what it removed.
-```
-
-(api-fel-spectral-head-check)=
-### `fel_spectral_head_check`
-
-*Subroutine* `(sp, fs, err_flag)`
-
-```
-Routine to hold the window's head after a pass under the headroom form (module
-header): the run is refused once the head slice holds more than sp%head_tolerance of
-the window's energy, and the largest share seen is recorded with its position. The
-check is the ramp's alone, since the whole-slice rotation banks and zero-fills what
-reaches the head, and a window of one slice takes none.
-```
-
-```
-Input:
-  sp       -- fel_spectral_struct: The propagator's switches.
-  fs       -- fel_field_struct: The member.
-
-Output:
-  sp       -- fel_spectral_struct: head_max and z_head_max updated.
-  err_flag -- logical: Set True on the refusal. False otherwise.
-```
-
-(api-plane-energy)=
-### `plane_energy`
-
-*Function* `(wf, ifld) result (e_sum)`
-
-```
-Routine to sum |E|^2 over one record plane, both polarizations, in grid units.
+Routine to append one transmitted plane to a member's escape bank, growing it as
+fel_apply_slippage grows it: four planes at first, then doubling.
 ```
 
 (api-fel-spectral-deposit)=
@@ -6097,6 +6059,18 @@ the escaped field is kept.
 Every field slips by the same amount in fundamental wavelengths (one window, lockstep
 rotation). The harm argument only sets the escape bank's slice light-time for a
 harmonic field.
+```
+
+(api-drain-spectral-banks)=
+### `drain_spectral_banks`
+
+*Subroutine* `()`
+
+```
+Routine to drain every member's escape bank to the pulse file after the spectral
+propagator has filled it (fel_spectral_step, fel_spectral_drift), when the escaped
+field is kept. It runs where apply_slippage_banked runs for the slice propagator, after
+z_now has moved, so each plane's z is the step's end as it is there.
 ```
 
 (api-set-field-position)=

@@ -30,6 +30,10 @@ type fel_slip_struct
   logical :: timerun = .false.  ! Time-dependent run? False: slippage is a no-op.
   integer :: first = 0          ! Rotation offset of the field record, 0-based (Field::first).
   real(rp) :: accuslip = 0      ! Accumulated slippage [radiation wavelengths] (Field::accuslip).
+  real(rp) :: ramp_slip = 0     ! Under the spectral propagator, the slippage applied since
+                                !   the last whole slice crossed [radiation wavelengths], the
+                                !   ramp's own count (fel_spectral_apply). The field is never
+                                !   behind the beam, so accuslip stays 0 there.
   integer :: sample = 1         ! Wavelengths per slice (Control::sample), the beam's
                                 !   n_wavelength. An integer by construction.
   real(rp) :: u_escaped = 0     ! Energy [J] slippage carried out of the window, summed
@@ -75,6 +79,8 @@ type fel_field_struct
   type (wavefront_struct) :: wf
   type (fel_slip_struct) :: slip
   type (fel_bank_struct) :: bank
+  complex(wf_rp), allocatable :: pad(:,:,:)    ! The spectral propagator's pad beyond the
+  complex(wf_rp), allocatable :: pad_y(:,:,:)  !   head, one plane a slot (fel_spectral_mod).
 end type
 
 end module fel_field_mod

@@ -589,8 +589,7 @@ def main():
     bad = {"run.interlude_model": "bamd", "run.transport_model": "genesys", "run.source_model": "deposits",
            "run.fp32_check": "on", "run.device": "metl", "beam.z_distribution": "gauss",
            "beam.load_mode": "all", "field.seed_polarization": "z", "wake.model": "mine",
-           "wake.material": "FE", "space_charge.model": "mine", "field.propagator": "spectra",
-           "field.spectral_slippage": "rotation", "field.spectral_boundary": "wall"}
+           "wake.material": "FE", "space_charge.model": "mine", "field.propagator": "spectra"}
     check("every key with a set of names has a refusal check here", sorted(bad) == sorted(names),
           note=f"[{len(names)} keys with a set]")
     for key in sorted(names):
