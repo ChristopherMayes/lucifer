@@ -1255,7 +1255,8 @@ nslice = run%nslice
 
 ! The field's plane along tau, field.n_wavelength (fel_field_sample): the window's
 ! slice under the slice propagator, and under the spectral one a stated whole multiple
-! of it below the cliff, or one derived from the built beam's rho. Then the planes over
+! of it, below the cliff when it is coarser than the slice, or one derived from the
+! built beam's rho. Then the planes over
 ! the window (fel_field_planes). A derived sampling is cut so the window keeps
 ! fel_field_planes_min$ planes, a stated one below that is refused, and the steady
 ! state's one slice is one plane.
@@ -1380,7 +1381,9 @@ contains
 ! Under the slice propagator it is the window's slice and nothing else, since that
 ! propagator holds one plane a slice. Under the spectral propagator a stated value is a
 ! whole multiple of the slice, held below the cliff the sweep found,
-! fel_field_coop_cliff$ of the cooperation length lambda/(4 pi rho), and an unstated one
+! fel_field_coop_cliff$ of the cooperation length lambda/(4 pi rho), when it is coarser
+! than the slice, since a stated slice is what the derivation returns on a line whose
+! slice is above the cliff. An unstated one
 ! is derived as fel_field_coop_fraction$ of the cooperation length in whole slices from
 ! the built beam's rho (fel_pierce_of_beam), described or loaded, and is the slice where
 ! there is no rho or one slice.
@@ -1438,14 +1441,27 @@ if (mod(run%winit%n_wavelength, n_wl) /= 0) then
   err_flag = .true.
   return
 endif
+! The cliff bounds a field coarser than the beam's slices. A stated value equal to the
+! window's slice is one plane a slice, which is what the derived path returns on a line
+! whose slice is itself above the cliff, so it runs at the slice as the derived one does,
+! and the line says where the slice sits.
+
 if (rho > 0) then
   if (run%winit%n_wavelength * fbeam%wavelength > fel_field_coop_cliff$ * l_coop) then
-    call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ WAVELENGTHS IS ABOVE \f0.2\ OF THE COOPERATION', &
-                 'LENGTH \es10.3\ m AT rho = \es10.3\ , WHERE THE SWEEP ON docs/spectral-field.md FOUND THE', &
-                 'OUTPUT MOVE. POSSIBLE SOLUTION: A SMALLER FIELD.N_WAVELENGTH, OR LEAVE IT UNSET.', &
-                 i_array = [run%winit%n_wavelength], r_array = [fel_field_coop_cliff$, l_coop, rho])
-    err_flag = .true.
-    return
+    if (run%winit%n_wavelength == n_wl) then
+      call out_io (s_info$, r_name, 'Field sampling the window''s slice, \i0\ wavelengths, stated: the slice is ' // &
+                   '\f0.2\ of the cooperation length \es10.3\ m at rho = \es10.3\ ,', &
+                   'above the \f0.2\ a coarser field is refused at, so the field is sampled at the slice.', &
+                   i_array = [n_wl], &
+                   r_array = [n_wl * fbeam%wavelength / l_coop, l_coop, rho, fel_field_coop_cliff$])
+    else
+      call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ WAVELENGTHS IS ABOVE \f0.2\ OF THE COOPERATION', &
+                   'LENGTH \es10.3\ m AT rho = \es10.3\ , WHERE THE SWEEP ON docs/spectral-field.md FOUND THE', &
+                   'OUTPUT MOVE. POSSIBLE SOLUTION: A SMALLER FIELD.N_WAVELENGTH, OR LEAVE IT UNSET.', &
+                   i_array = [run%winit%n_wavelength], r_array = [fel_field_coop_cliff$, l_coop, rho])
+      err_flag = .true.
+      return
+    endif
   endif
 endif
 

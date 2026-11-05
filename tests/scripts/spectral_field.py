@@ -57,11 +57,13 @@ directory is not run again, so a set that takes hours is re-analyzed from its fi
             the SASE tier's beam over 1280 slices, and the sase, flash1 and lcls
             examples. For each run the window's and the pulse's energy, the peak power,
             the exit power per slice against the run at one slice a plane, the exit
-            spectrum's rms width and centroid, and the walk. A sampling above the cliff,
-            fel_field_coop_cliff$ of the cooperation length, is refused by the tracker,
-            and such a row runs on --exe-open when it is given, a tracker built with that
-            constant raised, and is marked so in the record. Needs --validation-dir for
-            the Aramis lattice.
+            spectrum's rms width and centroid, and the walk. A sampling coarser than the
+            slice and above the cliff, fel_field_coop_cliff$ of the cooperation length, is
+            refused by the tracker, and such a row runs on --exe-open when it is given, a
+            tracker built with that constant raised, and is marked so in the record. The
+            first row, one plane a slice, runs on --exe on every line, since the tracker
+            takes the window's slice whatever its share of the cooperation length. Needs
+            --validation-dir for the Aramis lattice.
 
 The tracker is run from the work directory, into which the validation directory's
 inputs are linked, so the validation directory is read and never written. Every number
@@ -1002,6 +1004,8 @@ def sweep(args, wdir):
         for fac in SWEEP_FACTORS:
             root = f"sweep_{name}_{fac}"
             over = ["field.propagator=spectral", f"field.n_wavelength={fac * n_wl}", "run.keep_escaped_field=true"] + extra
+            # Every row runs on --exe first. The tracker refuses only a sampling coarser
+            # than the slice above the cliff, and that row alone moves to --exe-open.
             exe, cliff_open = args.exe, False
             rc, text = run(exe, toml, over, root, d, args.threads)
             if rc != 0 and args.exe_open and "ABOVE" in text and "COOPERATION" in text:

@@ -3318,7 +3318,9 @@ Routine to settle field.n_wavelength (fel_field_sample, docs/spectral-field.md).
 Under the slice propagator it is the window's slice and nothing else, since that
 propagator holds one plane a slice. Under the spectral propagator a stated value is a
 whole multiple of the slice, held below the cliff the sweep found,
-fel_field_coop_cliff$ of the cooperation length lambda/(4 pi rho), and an unstated one
+fel_field_coop_cliff$ of the cooperation length lambda/(4 pi rho), when it is coarser
+than the slice, since a stated slice is what the derivation returns on a line whose
+slice is above the cliff. An unstated one
 is derived as fel_field_coop_fraction$ of the cooperation length in whole slices from
 the built beam's rho (fel_pierce_of_beam), described or loaded, and is the slice where
 there is no rho or one slice.
