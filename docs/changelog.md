@@ -30,6 +30,18 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-05 Fixed: a stated `field.n_wavelength` equal to the window's slice runs on every line
+  under the spectral propagator, as the key left unset does. The cliff at a quarter of the
+  cooperation length had refused any stated value above it, so on a line whose slice is itself
+  above the cliff, the `flash1` example at 0.30 and `lcls` at 0.50, the slice was refused when
+  stated and derived when left unset. The cliff now refuses a field coarser than the slice
+  alone, and a stated slice above it runs with a `Field sampling` line that says where the
+  slice sits. The `spectral` section of the validation suite checks it on the SASE tier set up
+  with its slice raised to 192 wavelengths, 0.31 of the cooperation length: the stated slice
+  runs, the unset key derives the same value, and twice the slice is refused.
+  `tests/scripts/spectral_field.py` runs each line's first row of the sweep on the tracker
+  itself, and the record's first rows on `flash1` and `lcls`, measured on the tracker built
+  with the cliff raised, stand as measured. No recorded digit moved.
 - 2026-11-04 Added: the spectral propagator runs on the device, `run.device = "metal"` with
   `field.propagator = "spectral"` ([](spectral-field.md), [](validation.md#val-device-spectral)). The
   step's command buffer carries the pass along tau over the window and its pad with the kernel at
