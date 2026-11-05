@@ -30,7 +30,13 @@ The device table runs as:
 ./tests/perf/device_table.sh
 ```
 
-Its four input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` beside it. The estimate-against-the-clock table reads the footers of runs made one at a time:
+Its four input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` beside it. The pass along $\tau$ is priced per pass ([](#perf-device-tau)) with:
+
+```
+./tests/perf/tau_pass_table.sh
+```
+
+It runs the two SASE windows and `sase_1280x1024.toml` on the device with `run.device_timing = true`, three times each, and prints the run with the fewest busy seconds. The estimate-against-the-clock table reads the footers of runs made one at a time:
 
 ```
 ./tests/scripts/estimate_vs_clock.py tier1=<log> tier1_unavg=<log> ...
@@ -477,21 +483,41 @@ The input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.tom
 
 The same four input files under `field.propagator = "spectral"` ([](spectral-field.md), [](validation.md#val-device-spectral)), the field's plane held at the window's slice so the rows compare plane for plane with the slice propagator's, and the 96-slice window once more with the plane left to derive, 20 planes of 5 slices. The slice rows are measured again on the same day, since the two tables are read against each other. The recipe is the same script, which prints both tables.
 
-*Measured 2026-11-04: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, machine otherwise idle.*
+*Measured 2026-11-05: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, machine otherwise idle.*
 
 | case | propagator | CPU, 12 threads | device wall | device busy | ratio |
 |---|---|---|---|---|---|
-| steady state, 1 x 8192 particles | slices | 0.414 s | 0.059 s | 0.017 s | 7.0x |
-| steady state, 1 x 8192 particles | spectral | 0.564 s | 0.056 s | 0.015 s | 10.1x |
-| SASE window, 24 x 4096, slippage live | slices | 1.049 s | 0.128 s | 0.064 s | 8.2x |
-| SASE window, 24 x 4096, slippage live | spectral, 24 planes | 2.436 s | 0.618 s | 0.219 s | 3.9x |
-| SASE window, 96 x 8192 | slices | 3.942 s | 0.395 s | 0.289 s | 10.0x |
-| SASE window, 96 x 8192 | spectral, 96 planes | 8.787 s | 1.300 s | 0.859 s | 6.8x |
-| SASE window, 96 x 8192 | spectral, 20 planes derived | 3.359 s | 0.410 s | 0.261 s | 8.2x |
-| dispatch floor: 1 x 1024, ngrid 64 | slices | 0.032 s | 0.047 s | 0.012 s | 0.7x |
-| dispatch floor: 1 x 1024, ngrid 64 | spectral | 0.048 s | 0.050 s | 0.013 s | 1.0x |
+| steady state, 1 x 8192 particles | slices | 0.436 s | 0.053 s | 0.016 s | 8.2x |
+| steady state, 1 x 8192 particles | spectral | 0.565 s | 0.055 s | 0.018 s | 10.3x |
+| SASE window, 24 x 4096, slippage live | slices | 1.083 s | 0.111 s | 0.053 s | 9.8x |
+| SASE window, 24 x 4096, slippage live | spectral, 24 planes | 2.390 s | 0.495 s | 0.100 s | 4.8x |
+| SASE window, 96 x 8192 | slices | 3.803 s | 0.357 s | 0.264 s | 10.7x |
+| SASE window, 96 x 8192 | spectral, 96 planes | 8.192 s | 0.796 s | 0.367 s | 10.3x |
+| SASE window, 96 x 8192 | spectral, 20 planes derived | 3.305 s | 0.310 s | 0.161 s | 10.7x |
+| dispatch floor: 1 x 1024, ngrid 64 | slices | 0.032 s | 0.038 s | 0.012 s | 0.8x |
+| dispatch floor: 1 x 1024, ngrid 64 | spectral | 0.048 s | 0.038 s | 0.010 s | 1.3x |
 
-The passes along $\tau$ cost the device 3.4 times the slice step's busy seconds on the 24-slice window and 3.0 times on the 96-slice one, where the CPU pays 2.3 and 2.2 times its slice walk. The device's transform along $\tau$ is a mixed-radix sum in threadgroup memory with an integer index per term, and the slice step it is added to is the four-pass transform the reference backend tuned, which is the ratio. The spectral device wall is further from its busy seconds than the slice wall is, by about 0.3 s on both windows: that is the pulse file the bank writes, 119 MB and 194 MB here, which the device run under the slice propagator keeps none of and the CPU spectral run pays the same, as the footer's slippage phase states on both. The coarse row is the propagator's point. On the 96-slice window the derived sampling leaves 20 planes and a pad of 16, the device's busy seconds fall below the slice propagator's 96 planes, and the wall is 0.41 s against 1.30 s at one plane a slice. A window of one slice is one plane with no pad, so its pass is a kernel multiply, and the steady rows agree. The cost estimate carries the device's rate for the passes, `fel_cost_tau_device$`, fitted from the two one-plane-a-slice SASE rows as the busy seconds above the slice rows over the passes the estimate counts, 6.2e-11 and 6.4e-11 seconds per point per log2 of the length per pass.
+The passes along $\tau$ cost the device 1.9 times the slice step's busy seconds on the 24-slice window and 1.4 times on the 96-slice one, where the CPU pays 2.2 and 2.2 times its slice walk. On 2026-11-04 the device paid 3.4 and 3.0, with the pass's indices formed by integer division and a modulus per term and its stages in two buffers that filled the threadgroup memory. [](#perf-device-tau) prices that pass and the one that replaced it. The spectral device wall is further from its busy seconds than the slice wall is, by about 0.4 s on the 24-slice window: that is the pulse file the bank writes, 119 MB and 194 MB here, which the device run under the slice propagator keeps none of and the CPU spectral run pays the same, as the footer's slippage phase states on both. The coarse row is the propagator's point. On the 96-slice window the derived sampling leaves 20 planes and a pad of 16, the device's busy seconds fall below the slice propagator's 96 planes, and the wall is 0.31 s against 0.80 s at one plane a slice. A window of one slice is one plane with no pad, so its pass is a kernel multiply, and the steady rows agree. The cost estimate carries the device's rate for the passes, `fel_cost_tau_device$`, fitted from the two one-plane-a-slice SASE rows as the busy seconds above the slice rows over the passes the estimate counts, 1.9e-11 and 1.2e-11 seconds per point per log2 of the length per pass, the constant their mean. The 24-slice window's difference holds the pad's 16 transverse transforms beside its 24 planes' where the 96-slice window's holds them beside 96, which is the spread.
+
+(perf-device-tau)=
+### The pass along tau, priced
+
+This table prices the pass along $\tau$ per pass, with `run.device_timing = true`, on three windows at one plane a slice: the two SASE windows above and a 1280-slice one, `sase_1280x1024.toml`, each one Aramis segment of 89 steps at `ngrid` 256. The planes are the window's and its pad of 16, and the lines are what one threadgroup carries through the pass. The pass runs twice a step, the kernel's and the slip's, each a transform pair, and once more at the interlude, 179 encoders over the segment. The seconds are the instrument's, since every pass pays an encoder boundary the production path does not, and the share is the pass's seconds over the sum of the passes. Each row is the run with the fewest busy seconds of three. The first block is the pass as it was measured before any line of it changed, the second the pass that replaced it the same day.
+
+*Measured 2026-11-05: Apple M3 Max, production build, gfortran 15.3 and clang 21.1 from conda-forge, machine otherwise idle.*
+
+| window | planes | lines | walk | busy | pass along tau | share | passes a step |
+|---|---|---|---|---|---|---|---|
+| 24 x 4096, before | 40 | 32 | 0.634 s | 0.212 s | 0.1445 s | 60.0% | 2 |
+| 96 x 8192, before | 112 | 16 | 1.308 s | 0.877 s | 0.5681 s | 57.8% | 2 |
+| 1280 x 1024, before | 1296 | 1 | 18.983 s | 18.057 s | 14.539 s | 73.4% | 2 |
+| 24 x 4096, after | 40 | 32 | 0.477 s | 0.096 s | 0.0305 s | 24.5% | 2 |
+| 96 x 8192, after | 112 | 16 | 0.791 s | 0.368 s | 0.0781 s | 16.8% | 2 |
+| 1280 x 1024, after | 1296 | 1 | 5.669 s | 4.793 s | 1.3290 s | 20.4% | 2 |
+
+The pass before formed every term's indices at run time, two integer divisions and a modulus per term and a modulus for the twiddle, and summed each output of each stage over its radix as a direct sum, so a radix-4 stage cost 16 complex multiplies an output. Its two buffers filled the threadgroup memory. The pass after compiles the plan into the kernel, so every index is a literal, runs a stage of radix 2, 3, 4, 5 or 7 as a butterfly, three complex multiplies and eight additions for radix 4, keeps the direct sum for a larger prime, and runs the stages in place in one buffer held to half the threadgroup memory. The crossing's direct sum, which one thread a line took over the length, is split over all 256 threads and reduced. The pass is 4.7, 7.3 and 10.9 times faster on the three windows, and its share of the step falls from three fifths to a fifth. On the 1280-slice window the pass is 1.33 s of the step's 4.79, and the rest is the slice step at 1296 planes.
+
+The line count and the footprint were measured on the way, best of three, the pass's seconds with the instrument on. The compiled plan alone, in two buffers as before, gave 0.0348 s, 0.1231 s and 2.072 s on the three windows. In one buffer the footprint decides: on the 96-slice window 8 and 16 lines, 7 and 14 KB, run in 0.0795 s and 0.0786 s, and 32 lines at 28 KB in 0.135 s. On the 24-slice window 32 lines at 10 KB run in 0.0301 s and 64 at 20 KB in 0.0340 s. On the 1280-slice window two lines at 20 KB run in 1.341 s and one line at 10 KB in 1.326 s, so carrying two lines through a long window, which coalesces the read of a plane's two cells, buys nothing, and the long window's pass is priced by its footprint. The rule is therefore one buffer of at most half the threadgroup memory, 16 KB on an M3 Max, and the lines a threadgroup carries are what that leaves room for, which the header's `Device` line states.
 
 This table says where a step's device seconds go, per pass. `run.device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU. Dispatch-boundary sampling would time each dispatch inside one encoder, and the M3 Max reports it absent. The input file is the full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, with the filter on and `comb_ds_save = -1`. The readbacks therefore fall at element ends, and each element's steps batch into one command buffer. Each row is the best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
 

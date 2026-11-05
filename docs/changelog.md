@@ -30,6 +30,23 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-05 Changed: the device's pass along tau under the spectral propagator (`tau_pass` in
+  `src/device/lucifer_metal.mm`) compiles its plan into the kernel and runs its stages as butterflies
+  in place ([](performance.md#perf-device-tau)). The pass had formed every term's indices at run time,
+  two integer divisions and a modulus per term, summed each output over its radix as a direct sum,
+  and filled the threadgroup memory with two buffers. The pass is 4.7, 7.3 and 10.9 times faster on
+  the 24-slice, 96-slice and 1280-slice windows at one plane a slice, and the spectral step on the
+  device costs 1.9 and 1.4 times its slice step's busy seconds on the two SASE windows, from 3.4
+  and 3.0, where the CPU pays 2.2 and 2.2. The device's rate for the pass in the cost estimate,
+  `fel_cost_tau_device$`, is 1.5e-11 from 6.3e-11. `tests/perf/tau_pass_table.sh` prices the pass
+  per pass with `run.device_timing = true`, and the header's `Device` line states the lines a
+  threadgroup carries through it. The `device` section of the validation suite holds the device's
+  spectral step to the CPU's inside its ceilings as before, and six of its recorded levels moved
+  in their last digits, since the pass's sums run in another order: the time-dependent lockstep
+  field row from 6.3121e-6 to 6.3133e-6, the window power from 2.1858e-5 to 2.1853e-5, the bank's
+  closure and escaped energy from 3.97e-7 to 4.07e-7 apart, and the coarse field's window power
+  and exit power per slice from 5.50e-5 and 9.38e-5 to 5.40e-5 and 9.19e-5. No other recorded
+  digit moved.
 - 2026-11-05 Added: the unaveraged mode runs under the spectral propagator, `fel_method = unaveraged`
   with `field.propagator = "spectral"` ([](spectral-field.md#spectral-unaveraged)). The record step's
   substeps diffract each slice at k0 as they do, and after them the kernel's remainder at k0 + kappa

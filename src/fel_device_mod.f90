@@ -424,6 +424,11 @@ interface
     integer(c_int64_t) b
   end function
 
+  function luc_dev_tau_lines () bind(c, name = 'luc_dev_tau_lines') result (n)
+    import c_int
+    integer(c_int) n
+  end function
+
   function luc_dev_timing (on, reason, reason_len) bind(c, name = 'luc_dev_timing') result (ierr)
     import c_int, c_char
     integer(c_int), value :: on, reason_len
@@ -745,8 +750,9 @@ dev%on = .true.
 if (spectral) then
   call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
                '\i0\ field member(s) of \i0\ plane(s), \i0\ window planes and \i0\ pad planes ' // &
-               'under the spectral propagator.', &
-               i_array = [int(luc_dev_bytes() / 2**20), dev%nfield, npol, nplane, dev%nfree + dev%nsponge])
+               'under the spectral propagator, \i0\ lines a threadgroup along tau.', &
+               i_array = [int(luc_dev_bytes() / 2**20), dev%nfield, npol, nplane, dev%nfree + dev%nsponge, &
+                          int(luc_dev_tau_lines())])
 else
   call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
                '\i0\ field member(s) of \i0\ plane(s).', &
