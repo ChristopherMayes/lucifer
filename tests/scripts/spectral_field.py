@@ -52,6 +52,12 @@ directory is not run again, so a set that takes hours is re-analyzed from its fi
             through the full line under both propagators, unchirped and at three chirps.
             The same three numbers and the slope the exit wavelengths carry against minus
             twice the energy chirp. Needs --validation-dir for the lattice.
+  unavg     The unaveraged mode under the spectral propagator, on the sandwich probe of
+            check_unaveraged.py over 200 slices of one wavelength from shot noise: the
+            mixed line under both propagators and the all-averaged twin under both. For
+            each run the ledger's closure where the mode runs, the exit power, the
+            window's and the pulse's energy and the walk, and the exit fields of the
+            pairs compared as the seeded case compares them. Needs the tracker alone.
   sweep     The field's sampling along tau, field.n_wavelength, at 1, 2, 5, 10, 20 and
             40 slices a plane on four lines from noise under the spectral propagator:
             the SASE tier's beam over 1280 slices, and the sase, flash1 and lcls
@@ -912,6 +918,93 @@ def chirped(args, wdir):
 
 SWEEP_FACTORS = (1, 2, 5, 10, 20, 40)   # Slices a plane.
 
+# The unaveraged mode's window on the sandwich probe (tests/bmad/unavg_sandwich.bmad): the
+# time-dependent input file of check_unaveraged.py's thread and ledger checks over 200
+# slices of one wavelength, so the light the unaveraged segment emits stays in the window
+# through the pipes and the trailing segment, the line slipping 139 wavelengths.
+UNAVG_INPUT = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
+  lattice = "{lattice}"
+  out_root = "{root}"
+  source_filter = T
+  lambda0 = 1e-10
+  beam.n_particle = 512
+  beam.bunch_charge = 2.0e-13
+  beam.z_distribution = "GRID"
+  beam.z_min = -1e-8
+  beam.z_max = 1e-8
+  beam.sig_pz = 8.8045e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 1e4
+  seed_waist_size = 30e-6
+  grid_n_pts = 64
+  grid_half_width = 2e-4
+  window_length = 2e-8
+  n_wavelength = 1
+  shot_noise = T
+  ran_seed = 999
+  write_diag = T
+&end
+"""
+UNAVG_SEGMENT = (0.81, 1.41)   # The unaveraged segment's span on the sandwich [m].
+
+
+def unavg_closure(path):
+    """The unaveraged ledger's closure over its rows: the largest excursion of
+    E_beam + U_field + U_escaped - U_spont + E_radiated over the turnover."""
+    led = np.loadtxt(path)
+    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
+    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
+    return float(np.abs(etot - etot[0]).max() / max(turn, 1e-300))
+
+
+def unavg(args, wdir):
+    """The unaveraged mode under the spectral propagator on the sandwich probe: the
+    mixed line under both propagators, and the all-averaged twin under both as the level
+    the mode's own propagator difference is read against."""
+    from lucifer.flat import to_toml
+    lat = pathlib.Path(__file__).resolve().parent.parent / "bmad" / "unavg_sandwich.bmad"
+    (wdir / "unavg_sandwich.bmad").write_bytes(lat.read_bytes())
+    (wdir / "sandwich_avg.bmad").write_text("call, file = unavg_sandwich.bmad\nUNDB[FEL_METHOD] = averaged\n")
+    print("--- unavg: the unaveraged mode under the spectral propagator, the sandwich probe over 200 slices")
+    print(f"  512 particles a slice, shot noise, a 10 kW seed, {args.threads} threads")
+    print()
+    print("  run                      closure      exit power    window energy   pulse energy   walk")
+    cases = [("unavg_slices", "unavg_sandwich.bmad", []), ("unavg_spectral", "unavg_sandwich.bmad", spectral(1)),
+             ("avg_slices", "sandwich_avg.bmad", []), ("avg_spectral", "sandwich_avg.bmad", spectral(1))]
+    rows, curves = [], {}
+    kappa = None
+    for root, lattice, over in cases:
+        (wdir / f"{root}.toml").write_text(to_toml(UNAVG_INPUT.format(lattice=lattice, root=root)))
+        rc, text = run(args.exe, f"{root}.toml", over, root, wdir, args.threads)
+        if rc != 0:
+            print(text[-2000:])
+            raise SystemExit(f"unavg: {root} failed")
+        f = footer(text)
+        closure = unavg_closure(wdir / f"{root}.ledger.txt") if root.startswith("unavg") else None
+        rows.append(dict(run=root, mode="unaveraged" if root.startswith("unavg") else "averaged",
+                         propagator="slices" if root.endswith("slices") else "spectral",
+                         closure=closure, **f))
+        c = field_curves(wdir / f"{root}-final.wf.h5")
+        curves[root] = dict(power=c["power"], spectrum=c["spectrum"])
+        kappa = c["kappa_over_k0"]
+        print(f"  {root:22s}  {closure if closure is not None else float('nan'):.2e}   {f['exit_power']:.4e} W  "
+              f"{f['window_energy']:.4e} J  {f['pulse_energy']:.4e} J  {f['walk_seconds']:.1f} s")
+    print()
+    print("  comparison                                offset   field diff raw / aligned   wavelength diff   lit   peak power a / b")
+    compare = []
+    pairs = [("unavg_spectral", "unavg_slices"), ("avg_spectral", "avg_slices"), ("unavg_slices", "avg_slices")]
+    for a, b in pairs:
+        r = chirp_compare(wdir, a, b)
+        compare.append(dict(a=a, b=b, **row_numbers(r)))
+        print(f"  {a:>14s} against {b:<14s}  {r['offset']:6.3f}   {r['field_raw']:.3e} / {r['field']:.3e}    "
+              f"{r['wavelength']:.3e}       {r['lit']:4d}   {r['power_a']:.3e} / {r['power_b']:.3e} W")
+    print()
+    # This measurement's own provenance, since it was taken after the record's others.
+    return dict(threads=args.threads, n_slice=int(kappa.size), segment=list(UNAVG_SEGMENT), kappa_over_k0=kappa,
+                measured=provenance(args), rows=rows, compare=compare, curves=curves)
+
 
 def sweep_measure(wdir, root, ref=None):
     """What one run of the sweep is judged on: the window's and the pulse's energy, the
@@ -1049,7 +1142,7 @@ def main():
     p.add_argument("--toolchain", default="unstated", help="the compiler the tracker was built with, for the record")
     p.add_argument("--json", help="the record to write each measurement into as it finishes")
     p.add_argument("--reuse", action="store_true", help="keep a run whose log and final field exist")
-    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped", "sweep", "all"],
+    p.add_argument("what", nargs="*", choices=["vacuum", "null", "bank", "cost", "seeded", "chirped", "sweep", "unavg", "all"],
                    help="which measurements; the first four by default")
     args = p.parse_args()
     global REUSE
@@ -1062,8 +1155,8 @@ def main():
     wdir.mkdir(parents=True, exist_ok=True)
     what = args.what or ["vacuum", "null", "bank", "cost"]
     if "all" in what:
-        what = ["vacuum", "cost", "null", "bank", "sweep", "seeded", "chirped"]
-    if any(w != "vacuum" for w in what) and not args.validation_dir:
+        what = ["vacuum", "cost", "null", "bank", "sweep", "seeded", "chirped", "unavg"]
+    if any(w not in ("vacuum", "unavg") for w in what) and not args.validation_dir:
         raise SystemExit("every measurement but vacuum needs --validation-dir")
     for w in what:
         result = globals()[w](args, wdir)

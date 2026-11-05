@@ -713,6 +713,206 @@ end subroutine fel_spectral_apply
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_spectral_correct (sp, fs, dz, err_flag)
+!
+! Routine to apply, over dz, the part of the spectral kernel the kernel at k0 leaves
+! out, exp(-i dz k_perp^2 (1 / 2 k(kappa) - 1 / 2 k0)), to one member's window and pad
+! through fel_spectral_apply's passes. A record whose planes have each diffracted at k0
+! over dz then carries the kernel at k0 + kappa on the whole, since the two factors are
+! diagonal in the same basis and commute. The unaveraged mode's record step under the
+! spectral propagator takes it (fel_unavg_step): its substeps diffract each slice at k0
+! as they do, and this pass carries the kernel's frequency dependence once a record
+! step, before the ramp.
+!
+! Input:
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
+!   fs       -- fel_field_struct: The member.
+!   dz       -- real(rp): The length the planes diffracted at k0 over [m].
+!
+! Output:
+!   fs       -- fel_field_struct: The window and pad corrected.
+!   err_flag -- logical: Set True on a transform failure. False otherwise.
+!-
+
+subroutine fel_spectral_correct (sp, fs, dz, err_flag)
+
+type (fel_spectral_struct) sp
+type (fel_field_struct), target :: fs
+type (wavefront_struct), pointer :: wf
+real(rp) dz
+logical err_flag
+
+complex(rp), allocatable :: ax(:,:)
+integer, allocatable :: idx(:)
+real(rp) k0, dk, dtau, kappa, kt
+integer ngrid_arr(3), ngrid, nz, nt, ix, m, mx, mt, j
+logical err
+character(*), parameter :: r_name = 'fel_spectral_correct'
+
+!
+
+err_flag = .true.
+wf => fs%wf
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+nz = ngrid_arr(3)
+nt = nz + sp%n_pad
+k0 = twopi / wf%wavelength
+dk = twopi / (ngrid * wf%dx)
+dtau = wf%dz
+
+if (sp%n_pad > 0 .and. .not. allocated(fs%pad)) then
+  call out_io (s_error$, r_name, 'THE PAD WAS NOT ALLOCATED. PLEASE REPORT THIS!')
+  return
+endif
+
+! The remainder's table, each column one kappa and each row one transverse mode, as
+! fel_spectral_apply builds the kernel's, with the k0 part divided out.
+
+allocate (ax(ngrid, nt), idx(nz))
+do m = 1, nt
+  mt = m - 1;  if (2*mt > nt-1) mt = mt - nt
+  kappa = twopi * mt / (nt * dtau)
+  kt = k0 + kappa
+  do ix = 1, ngrid
+    mx = ix - 1;  if (2*mx > ngrid-1) mx = mx - ngrid
+    ax(ix, m) = exp(cmplx(0.0_rp, -dz * (mx * dk)**2 * (1 / (2 * kt) - 1 / (2 * k0)), rp))
+  enddo
+enddo
+do j = 1, nz
+  idx(j) = fel_field_index(fs%slip, j, nz)
+enddo
+
+call wavefront_fft2_plan_threads (ngrid, ngrid, err);  if (err) return
+call spectral_fft1_plan_threads (nt, err);  if (err) return
+
+call correct_component (wf%Ex, fs%pad, err);  if (err) return
+if (allocated(wf%Ey)) then
+  call correct_component (wf%Ey, fs%pad_y, err);  if (err) return
+endif
+
+err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine correct_component (e, pad, err)
+!
+! Routine to put one polarization's planes through the three passes with the
+! remainder's factors, fel_spectral_apply's apply_component without the crossings.
+!-
+
+subroutine correct_component (e, pad, err)
+
+complex(wf_rp) e(:,:,:)
+complex(wf_rp), allocatable :: pad(:,:,:)
+logical err
+integer is_l, ix_l, iy_l, m_l, j_l
+logical err_l, any_err
+
+!
+
+err = .true.
+any_err = .false.
+!$OMP parallel do private(err_l) reduction(.or.: any_err)
+do is_l = 1, nt
+  if (is_l <= nz) then
+    call wavefront_fft2 (e(:,:,is_l), wf_fft_forward$, err_l)
+  else
+    call wavefront_fft2 (pad(:,:,is_l-nz), wf_fft_forward$, err_l)
+  endif
+  any_err = any_err .or. err_l
+enddo
+!$OMP end parallel do
+if (any_err) return
+
+!$OMP parallel do private(ix_l, j_l, m_l, err_l) reduction(.or.: any_err)
+do iy_l = 1, ngrid
+  do ix_l = 1, ngrid
+    do j_l = 1, nz
+      sp_buf(j_l) = e(ix_l, iy_l, idx(j_l))
+    enddo
+    do j_l = nz + 1, nt
+      sp_buf(j_l) = pad(ix_l, iy_l, j_l - nz)
+    enddo
+    call spectral_fft1 (wf_fft_forward$, err_l)
+    any_err = any_err .or. err_l
+    do m_l = 1, nt
+      sp_buf(m_l) = sp_buf(m_l) * (ax(ix_l, m_l) * ax(iy_l, m_l))
+    enddo
+    call spectral_fft1 (wf_fft_backward$, err_l)
+    any_err = any_err .or. err_l
+    do j_l = 1, nz
+      e(ix_l, iy_l, idx(j_l)) = sp_buf(j_l) / real(nt, rp)
+    enddo
+    do j_l = nz + 1, nt
+      pad(ix_l, iy_l, j_l - nz) = sp_buf(j_l) / real(nt, rp)
+    enddo
+  enddo
+enddo
+!$OMP end parallel do
+if (any_err) return
+
+!$OMP parallel do private(err_l) reduction(.or.: any_err)
+do is_l = 1, nt
+  if (is_l <= nz) then
+    call wavefront_fft2 (e(:,:,is_l), wf_fft_backward$, err_l)
+    e(:,:,is_l) = e(:,:,is_l) / real(ngrid*ngrid, rp)
+  else
+    call wavefront_fft2 (pad(:,:,is_l-nz), wf_fft_backward$, err_l)
+    pad(:,:,is_l-nz) = pad(:,:,is_l-nz) / real(ngrid*ngrid, rp)
+  endif
+  any_err = any_err .or. err_l
+enddo
+!$OMP end parallel do
+if (any_err) return
+
+err = .false.
+
+end subroutine correct_component
+
+end subroutine fel_spectral_correct
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_bank_merge (dst, src)
+!
+! Routine to append every plane of one bank to another, in transmission order, for a
+! step that slips in several calls of fel_spectral_slip, each of which empties the
+! member's bank first (fel_unavg_step under the spectral propagator). dst grows as
+! bank_append grows it.
+!
+! Input:
+!   src -- fel_bank_struct: The planes to append.
+!
+! Output:
+!   dst -- fel_bank_struct: Grown by src's planes.
+!-
+
+subroutine fel_spectral_bank_merge (dst, src)
+
+type (fel_bank_struct) dst, src
+integer k
+
+!
+
+do k = 1, src%n
+  if (allocated(src%plane_y)) then
+    call bank_append (dst, src%plane(:,:,k), src%plane_y(:,:,k))
+  else
+    call bank_append (dst, src%plane(:,:,k))
+  endif
+enddo
+
+end subroutine fel_spectral_bank_merge
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_spectral_device_slip (sp, dev, ff, slippage, keep, twin, err_flag)
 !
 ! Routine to slip every member of the resident field set by the ramp on the device, as

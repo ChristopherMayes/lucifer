@@ -587,6 +587,11 @@ where the two builds agree to every printed digit.
 | twin: the FP64 stream is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | twin: the ledger is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | twin: freerun refused in the unaveraged mode (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| spectral: TD ledger on the sandwich, max\|d(E_beam+U_field+U_escaped-U_spont+E_rad)\| / turnover | 8.2436e-09 | 8.2447e-09 | <= 1.0000e-04 |
+| spectral: ledger rows confined to the unaveraged segment (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| spectral: \|ln(P_spectral/P_slices)\| at exit, unaveraged sandwich | 3.6431e-02 | same | <= 5.0000e-02 |
+| spectral: the device with the unaveraged mode refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| spectral: a field coarser than the slice with the unaveraged mode refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 
 (val-levels-spontaneous)=
 ### `spontaneous`

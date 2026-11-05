@@ -142,6 +142,19 @@
 ```
 <!-- end tab-sp-sweep -->
 
+<!-- begin tab-sp-unavg -->
+```{table} The unaveraged mode under the spectral propagator at 12 threads: the sandwich probe, an averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment, over 200 slices of one wavelength from shot noise with a 10 kW seed, under both propagators, and its all-averaged twin under both. The closure is the unaveraged ledger's largest excursion over its turnover, the exit power the window's, and the walk the run's. Measured on 2026-11-05 with the tracker v0.2.0-9-g3e39764-dirty, after the record's other measurements.
+:name: tab-sp-unavg
+
+| Run | Ledger closure | Exit power | Window energy | Pulse energy | Walk |
+|---|---|---|---|---|---|
+| unaveraged sandwich, slice propagator | 5.9e-10 | 16.2 MW | 5.41 pJ | 8.63 pJ | 2.0 s |
+| unaveraged sandwich, spectral | 5.0e-10 | 16.2 MW | 5.42 pJ | 8.64 pJ | 2.8 s |
+| all-averaged twin, slice propagator |  | 9.31 MW | 3.11 pJ | 4.89 pJ | 0.8 s |
+| all-averaged twin, spectral |  | 9.32 MW | 3.11 pJ | 4.89 pJ | 1.5 s |
+```
+<!-- end tab-sp-unavg -->
+
 <!-- begin fig-sp-diagram-pad -->
 :::{figure} generated/spectral/diagram-pad.svg
 :label: fig-sp-diagram-pad
@@ -231,3 +244,12 @@ An energy-chirped beam from noise through the Aramis line under both propagators
 The sweep: the pulse energy at the exit (left) and the walk (right) against the field's plane as a fraction of the cooperation length, each over the same line's run at one plane a slice, from [](#tab-sp-sweep). The dotted line is the derived sampling, 0.1 of the cooperation length, and the dashed line the cliff at 0.25, above which a stated sampling is refused. A hollow point ran with the cliff raised. On the Aramis line of 1280 slices the pulse energy moves by 0.55 percent at 0.039, 1.3 percent at 0.097, 3.2 percent at 0.19, 11 percent at 0.39, 30 percent at 0.77 of the cooperation length, and the walk is 690, 501, 198, 148, 114, 96 s over the samplings.
 :::
 <!-- end fig-sp-sweep -->
+
+<!-- begin fig-sp-unavg -->
+:::{figure} generated/spectral/unavg.svg
+:label: fig-sp-unavg
+:class: col-body-outset-right
+
+The unaveraged mode under the spectral propagator on the sandwich probe, from [](#tab-sp-unavg): the power across the window at the exit (left) and the exit spectrum about the carrier (right). The mode's two runs differ by 5.4e-2 of the peak field over the lit slices, 0.2 percent in exit power and 7.8e-4 in the slice wavelengths, where the all-averaged twin's two runs differ by 4.5e-2, 0.02 percent and 1.2e-3. The mode itself moves the exit field by 1.1 times the peak against the all-averaged twin. The ledger closes at 5e-10 under the ramp and 6e-10 under the rotation.
+:::
+<!-- end fig-sp-unavg -->
