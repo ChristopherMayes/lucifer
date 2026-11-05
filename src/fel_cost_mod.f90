@@ -95,14 +95,17 @@ integer, parameter :: fel_cost_device_threads$ = 12    ! The CPU thread count th
 ! The device's own rate for the passes along tau under the spectral propagator, seconds
 ! of device time per point per log2 of the transform's length per pass, in place of the
 ! CPU model's fel_cost_tau$ divided by the ratio above, since the pass is a different
-! kernel there (tau_pass in lucifer_metal.mm). Fitted on 2026-11-04 from the spectral
+! kernel there (tau_pass in lucifer_metal.mm). Fitted on 2026-11-05 from the spectral
 ! rows of the device table of docs/performance.md: the device busy seconds of the
 ! 24-slice and the 96-slice SASE windows under the spectral propagator at one plane a
 ! slice, less the same windows' under the slice propagator, over the count
-! fel_cost_estimate takes, 6.2e-11 and 6.4e-11. The pulse file's writing is outside the
-! estimate on either backend.
+! fel_cost_estimate takes, 1.9e-11 and 1.2e-11, the constant their mean. The two differ
+! by the pad's transverse transforms, 16 planes beside 24 and beside 96, which the
+! difference of busy seconds holds with the pass. The fit of 2026-11-04, 6.2e-11 and
+! 6.4e-11, was of the pass whose indices were formed at run time. The pulse file's
+! writing is outside the estimate on either backend.
 
-real(rp), parameter :: fel_cost_tau_device$ = 6.3e-11_rp
+real(rp), parameter :: fel_cost_tau_device$ = 1.5e-11_rp
 
 contains
 

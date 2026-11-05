@@ -513,16 +513,16 @@ where the two builds agree to every printed digit.
 | spectral lockstep TD worst_theta | 6.7645e-06 | same | <= 1.5000e-04 |
 | spectral lockstep TD worst_phasor | 9.9422e-08 | same | <= 2.2000e-05 |
 | spectral lockstep TD worst_source | 6.3046e-06 | same | <= 2.2000e-04 |
-| spectral lockstep TD worst_field | 6.3121e-06 | same | <= 2.2000e-04 |
+| spectral lockstep TD worst_field | 6.3133e-06 | same | <= 2.2000e-04 |
 | spectral lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | spectral TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| spectral production TD window power vs CPU | 2.1858e-05 | same | <= 1.6000e-03 |
-| spectral bank: the device's ledger closes at the CPU's level | 3.9661e-07 | same | <= 1.2000e-06 |
+| spectral production TD window power vs CPU | 2.1853e-05 | same | <= 1.6000e-03 |
+| spectral bank: the device's ledger closes at the CPU's level | 4.0690e-07 | same | <= 1.2000e-06 |
 | spectral bank: pulse planes, device against CPU | 97 | same | = 97 |
-| spectral bank: escaped energy, device against CPU | 3.9656e-07 | same | <= 1.2000e-06 |
+| spectral bank: escaped energy, device against CPU | 4.0686e-07 | same | <= 1.2000e-06 |
 | spectral coarse field: slices a plane, device against CPU | 6 | same | = 6 |
-| spectral coarse production window power vs CPU | 5.5022e-05 | same | <= 1.6000e-03 |
-| spectral coarse production exit power per slice vs CPU, over the peak | 9.3822e-05 | same | <= 3.0000e-04 |
+| spectral coarse production window power vs CPU | 5.4004e-05 | same | <= 1.6000e-03 |
+| spectral coarse production exit power per slice vs CPU, over the peak | 9.1889e-05 | same | <= 3.0000e-04 |
 | two spectral device runs, every stats array identical | 0 | same | = 0 |
 | spectral harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
 | spectral harmonic lockstep worst_px | 4.1970e-08 | same | <= 1.0000e-06 |

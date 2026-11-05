@@ -477,10 +477,12 @@ def main():
 # ramp, so they hold the ceilings above. The production bands are the slice path's too:
 # 6.0e-4 steady and 2.2e-5 on the time-dependent window against the CPU's spectral run.
 # The coarse field at its derived default, nine planes of six slices over 48, lands at
-# 5.5e-5 on the window power and 9.4e-5 per slice over the peak. The bank's ledger on a
+# 5.4e-5 on the window power and 9.2e-5 per slice over the peak. The bank's ledger on a
 # seeded chargeless window of eight slices over the segment closes at 1.2e-4 on the CPU
-# and 1.2e-4 on the device, the two closures 4e-7 apart, and the escaped energies 3.7e-7
-# apart, both the FP32 transform pairs' own.
+# and 1.2e-4 on the device, the two closures 4.1e-7 apart, and the escaped energies 4.1e-7
+# apart, both the FP32 transform pairs' own. The levels moved in their last digits when
+# the pass along tau was rewritten (docs/performance.md, perf-device-tau), since its
+# sums run in another order, and every one stayed inside its ceiling.
 
 SP_COARSE_CEIL = 3.0e-4
 SP_BANK_CEIL = 1.2e-6

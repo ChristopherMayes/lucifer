@@ -310,6 +310,10 @@ int luc_dev_dep_fault (void);
 double luc_dev_seconds (void);
 int64_t luc_dev_bytes (void);
 
+/* The lines a threadgroup carries through the pass along tau (tau_pass), 1 when
+ * no transform along tau is planned. */
+int luc_dev_tau_lines (void);
+
 /* Per-pass timing. luc_dev_seconds above is a whole command buffer, and a command
  * buffer holds every step between two host touches, so it cannot say what a pass
  * costs. With timing on, each pass of luc_dev_step is encoded into its own compute

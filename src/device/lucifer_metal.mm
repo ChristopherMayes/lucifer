@@ -1129,60 +1129,140 @@ kernel void fft_cols_add_fix (device float2* d [[buffer(0)]], const device float
 // the factors ax(ix, m) ay(iy, m), or on a slip pass by the ramp exp(-i kappa_m delta)
 // with the plane at the pad's first slot read by the direct sum at a whole-slice
 // crossing, transformed back, scaled by 1/n and, after a slip pass, attenuated by the
-// sponge on the pad. The transform is a mixed-radix Stockham DFT of any length n in
-// threadgroup memory, its radices chosen at init (tauPlan), every stage's butterfly a
-// direct R-point sum whose twiddles are entries of the table W_n[k] = e^{-2 pi i k/n} at
-// exact integer indices, so no angle is formed in single precision but the ramp's,
-// which is at most pi. TAU_B lines travel in one threadgroup so that a plane's TAU_B
-// cells are read contiguously, and 2 TAU_B n points fill the threadgroup memory.
+// sponge on the pad. The transform is a mixed-radix Stockham DFT of the length TAU_N in
+// threadgroup memory, its stages planned at init (tauPlan) and compiled in as the
+// macro TAU_STAGES, one TAU_STAGE(R, NS) a stage with R the radix and NS the product of
+// the radices before it, so every index is formed from literals. A stage of radix 2, 3,
+// 4, 5 or 7 is a butterfly: a thread takes the R inputs of one butterfly, multiplies
+// all but the first by the stage twiddle W_n[r jlo stride], and writes the R outputs of
+// the R-point DFT, whose own factors W_R^{rk} are entries of W_n at integer indices.
+// A larger prime is TAU_STAGE_DIRECT(R, NS), each output its own R-term sum, so a
+// length of any factorization transforms. The inverse transform is the forward one on
+// the conjugate, conjugated again at the write, so there is one set of stages. TAU_B
+// lines travel in one threadgroup so that a plane's TAU_B cells are read contiguously,
+// and the stages run in place in one buffer of TAU_B TAU_N points: a thread's
+// butterflies, one a round, keep their outputs in registers until a barrier lets any of
+// them write. The buffer is held to half the threadgroup memory, which a line-count
+// study found the footprint that runs fastest (docs/performance.md, perf-device-tau).
 
 struct TauPar {
     float s_a, s_b, inv_n;
     uint  n, nplane, npad, nfree, nsponge, first, ntot, npol;
-    uint  transverse, n_cross, slot, sponge, nstage;
-    uint  radix[16];
+    uint  transverse, n_cross, slot, sponge;
 };
 
-// The stages of one transform, forward or inverse, on the B lines held in X, the
-// result left in the buffer returned, the other free.
-inline threadgroup float2* tau_stages (threadgroup float2* X, threadgroup float2* Y,
-                                       const device float2* W, constant TauPar& P,
-                                       uint t, uint T, uint B, bool inverse){
-    const uint n = P.n;
-    const uint total = n * B;
-    uint Ns = 1;
-    for (uint s = 0; s < P.nstage; s++) {
-        const uint R = P.radix[s];
-        const uint nR = n / R;
-        const uint stride = nR / Ns;
-        for (uint i = t; i < total; i += T) {
-            uint o = i / B, l = i - o * B;
-            uint oq = o / Ns;
-            uint k = oq % R;
-            uint jlo = o - oq * Ns;
-            uint j = (oq / R) * Ns + jlo;
-            float2 acc = float2(0.0f);
-            for (uint r = 0; r < R; r++) {
-                uint itw = (r * jlo * stride + r * k * nR) % n;
-                if (inverse && itw != 0u) itw = n - itw;
-                acc += cmul(X[(j + r * nR) * B + l], W[itw]);
-            }
-            Y[o * B + l] = acc;
-        }
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-        threadgroup float2* tmp = X;  X = Y;  Y = tmp;
-        Ns *= R;
+// The threads a threadgroup of tau_pass, the dispatch's own count.
+#define TAU_T 256u
+
+// The R-point DFT of a in place, y_k = sum_r a_r W_R^{rk}, with W_R^{rk} = W_n[(r k mod R)
+// n / R]. Radices 2, 3 and 4 need no table.
+template <uint R>
+inline void tau_dft (thread float2* a, const device float2* W){
+    float2 y[R];
+    for (uint k = 0; k < R; k++) {
+        y[k] = a[0];
+        for (uint r = 1; r < R; r++) y[k] += cmul(a[r], W[((r * k) % R) * (TAU_N / R)]);
     }
-    return X;
+    for (uint k = 0; k < R; k++) a[k] = y[k];
+}
+template <>
+inline void tau_dft<2> (thread float2* a, const device float2* W){
+    const float2 t = a[0];
+    a[0] = t + a[1];
+    a[1] = t - a[1];
+}
+template <>
+inline void tau_dft<3> (thread float2* a, const device float2* W){
+    // W_3 = -1/2 - i sqrt(3)/2: y1 = a0 - t/2 - i s u and y2 = a0 - t/2 + i s u with
+    // t = a1 + a2 and u = a1 - a2.
+    const float2 t = a[1] + a[2], u = a[1] - a[2];
+    const float2 m = a[0] - 0.5f * t;
+    const float2 v = 0.86602540378443865f * float2(u.y, -u.x);
+    a[0] = a[0] + t;
+    a[1] = m + v;
+    a[2] = m - v;
+}
+template <>
+inline void tau_dft<4> (thread float2* a, const device float2* W){
+    // W_4 = -i.
+    const float2 t0 = a[0] + a[2], t1 = a[0] - a[2], t2 = a[1] + a[3], t3 = a[1] - a[3];
+    const float2 s = float2(t3.y, -t3.x);
+    a[0] = t0 + t2;
+    a[2] = t0 - t2;
+    a[1] = t1 + s;
+    a[3] = t1 - s;
+}
+
+// One butterfly stage, Stockham autosort: butterfly q of line l reads the inputs
+// j + r n/R, j = (q / NS) NS + q mod NS, and writes the outputs ((q / NS) R + k) NS +
+// q mod NS. The stage twiddle on input r is W_n[r (q mod NS) stride], stride = n / (R NS),
+// below n for every r.
+template <uint R, uint NS>
+inline void tau_stage (threadgroup float2* X, const device float2* W, uint t){
+    constexpr uint nR = TAU_N / R, stride = nR / NS, total = nR * TAU_B;
+    // Every read of the stage before any write: a thread's butterflies, one a round,
+    // keep their outputs in registers across the one barrier.
+    constexpr uint rounds = (total + TAU_T - 1) / TAU_T;
+    float2 a[rounds][R];
+    for (uint rd = 0; rd < rounds; rd++) {
+        const uint i = rd * TAU_T + t;
+        if (i >= total) continue;
+        const uint q = i / TAU_B, l = i - q * TAU_B;
+        const uint oq = q / NS, jlo = q - oq * NS, j = oq * NS + jlo;
+        a[rd][0] = X[j * TAU_B + l];
+        for (uint r = 1; r < R; r++) a[rd][r] = cmul(X[(j + r * nR) * TAU_B + l], W[r * jlo * stride]);
+        tau_dft<R>(a[rd], W);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint rd = 0; rd < rounds; rd++) {
+        const uint i = rd * TAU_T + t;
+        if (i >= total) continue;
+        const uint q = i / TAU_B, l = i - q * TAU_B;
+        const uint oq = q / NS, jlo = q - oq * NS;
+        for (uint k = 0; k < R; k++) X[((oq * R + k) * NS + jlo) * TAU_B + l] = a[rd][k];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+}
+
+// One stage as a direct sum, output o of line l the R terms X[j + r n/R] W_n[(r jlo
+// stride + r k n/R) mod n], for a radix the butterflies do not cover.
+template <uint R, uint NS>
+inline void tau_stage_direct (threadgroup float2* X, const device float2* W, uint t){
+    constexpr uint nR = TAU_N / R, stride = nR / NS, total = TAU_N * TAU_B;
+    constexpr uint rounds = (total + TAU_T - 1) / TAU_T;
+    float2 acc[rounds];
+    for (uint rd = 0; rd < rounds; rd++) {
+        const uint i = rd * TAU_T + t;
+        acc[rd] = float2(0.0f);
+        if (i >= total) continue;
+        const uint o = i / TAU_B, l = i - o * TAU_B;
+        const uint oq = o / NS, k = oq % R, jlo = o - oq * NS, j = (oq / R) * NS + jlo;
+        for (uint r = 0; r < R; r++)
+            acc[rd] += cmul(X[(j + r * nR) * TAU_B + l], W[(r * jlo * stride + r * k * nR) % TAU_N]);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint rd = 0; rd < rounds; rd++) {
+        const uint i = rd * TAU_T + t;
+        if (i < total) X[i] = acc[rd];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+}
+
+// The stages of one forward transform on the TAU_B lines held in X, in place.
+// TAU_STAGES is the plan's sequence of these.
+#define TAU_STAGE(R, NS)        tau_stage<R, NS>(X, W, t);
+#define TAU_STAGE_DIRECT(R, NS) tau_stage_direct<R, NS>(X, W, t);
+inline void tau_stages (threadgroup float2* X, const device float2* W, uint t){
+    TAU_STAGES
 }
 
 // The ramp exp(-i kappa_m delta) with kappa_m delta = 2 pi m' s / n, m' the signed mode
 // index and s the shift in planes.
-inline void tau_ramp (threadgroup float2* X, constant TauPar& P, uint t, uint T, uint B, float s){
-    const uint n = P.n;
+inline void tau_ramp (threadgroup float2* X, uint t, uint T, float s){
+    const uint n = TAU_N;
     const float f = -2.0f * M_PI_F * s / float(n);
-    for (uint i = t; i < n * B; i += T) {
-        uint m = i / B;
+    for (uint i = t; i < n * TAU_B; i += T) {
+        uint m = i / TAU_B;
         int mp = (2u * m > n - 1u) ? int(m) - int(n) : int(m);
         float a = f * float(mp);
         X[i] = cmul(X[i], float2(cos(a), sin(a)));
@@ -1192,14 +1272,13 @@ inline void tau_ramp (threadgroup float2* X, constant TauPar& P, uint t, uint T,
 kernel void tau_pass (device float2* F [[buffer(0)]], const device float2* W [[buffer(1)]],
                       const device float2* AX [[buffer(2)]], device float2* BANK [[buffer(3)]],
                       const device float* SPONGE [[buffer(4)]], constant TauPar& P [[buffer(5)]],
-                      uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
-                      uint2 Tn [[threads_per_threadgroup]]){
-    threadgroup float2 sh[2 * TAU_MEM];
-    const uint T = Tn.x;
+                      uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]]){
+    threadgroup float2 sh[TAU_MEM];
+    threadgroup float2 red[TAU_T];
+    const uint T = TAU_T;
     threadgroup float2* X = sh;
-    threadgroup float2* Y = sh + TAU_MEM;
     const uint B = TAU_B;
-    const uint n = P.n;
+    const uint n = TAU_N;
     const uint nn = N * N;
     const uint block = tg.y;
     const uint member = block / P.npol;
@@ -1213,8 +1292,7 @@ kernel void tau_pass (device float2* F [[buffer(0)]], const device float2* W [[b
         X[i] = F[(pbase + src) * nn + cell0 + l];
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    X = tau_stages(X, Y, W, P, t, T, B, false);
-    Y = (X == sh) ? sh + TAU_MEM : sh;
+    tau_stages(X, W, t);
 
     // The spectrum, mode m of line l at X[m B + l]. The kernel factors are one table
     // read twice, since the grid is square.
@@ -1227,32 +1305,46 @@ kernel void tau_pass (device float2* F [[buffer(0)]], const device float2* W [[b
             X[i] = cmul(X[i], cmul(ax[ix * n + m], ax[iy * n + m]));
         }
     }
-    if (P.s_a != 0.0f) tau_ramp(X, P, t, T, B, P.s_a);
+    if (P.s_a != 0.0f) tau_ramp(X, t, T, P.s_a);
     if (P.n_cross) {
         // The plane at the pad's first slot, window index nplane, read from the
-        // unnormalized spectrum: sum_m X_m e^{+2 pi i m nplane / n} / n.
+        // unnormalized spectrum: sum_m X_m e^{+2 pi i m nplane / n} / n. The T threads
+        // split each line's n terms into T / B partial sums, reduced through red.
         threadgroup_barrier(mem_flags::mem_threadgroup);
-        for (uint l = t; l < B; l += T) {
+        {
+            const uint parts = T / B;
+            const uint l = t % B, p = t / B;
+            const uint dw = (parts * P.nplane) % n;
+            uint iw = (p * P.nplane) % n;
             float2 acc = float2(0.0f);
-            for (uint m = 0; m < n; m++) {
-                uint iw = (m * P.nplane) % n;
-                if (iw != 0u) iw = n - iw;
-                acc += cmul(X[m * B + l], W[iw]);
+            for (uint m = p; m < n; m += parts) {
+                acc += cmul(X[m * B + l], W[iw ? n - iw : 0u]);
+                iw += dw;
+                if (iw >= n) iw -= n;
             }
-            BANK[((ulong) block * BANK_SLOTS + P.slot) * nn + cell0 + l] = acc * P.inv_n;
+            red[t] = acc;
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
-        if (P.s_b != 0.0f) tau_ramp(X, P, t, T, B, P.s_b);
+        if (t < B) {
+            float2 acc = float2(0.0f);
+            for (uint p = 0; p < T / B; p++) acc += red[p * B + t];
+            BANK[((ulong) block * BANK_SLOTS + P.slot) * nn + cell0 + t] = acc * P.inv_n;
+        }
+        if (P.s_b != 0.0f) tau_ramp(X, t, T, P.s_b);
     }
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    X = tau_stages(X, Y, W, P, t, T, B, true);
 
-    // Back in window order, scaled by 1/n as the CPU scales after its inverse, and the
-    // sponge's weight on the pad's last slots after a slip pass.
+    // The inverse transform as the forward one on the conjugate spectrum.
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint i = t; i < total; i += T) X[i] = float2(X[i].x, -X[i].y);
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    tau_stages(X, W, t);
+
+    // Back in window order, conjugated and scaled by 1/n as the CPU scales after its
+    // inverse, and the sponge's weight on the pad's last slots after a slip pass.
     for (uint i = t; i < total; i += T) {
         uint j = i / B, l = i - j * B;
         uint dst = (j < P.nplane) ? ((j + P.first) % P.nplane) : j;
-        float2 v = X[i] * P.inv_n;
+        float2 v = float2(X[i].x, -X[i].y) * P.inv_n;
         if (P.sponge && j >= P.nplane + P.nfree) v = v * SPONGE[j - P.nplane - P.nfree];
         F[(pbase + dst) * nn + cell0 + l] = v;
     }
@@ -1306,8 +1398,7 @@ struct AddPar {
 struct TauPar {
     float s_a, s_b, inv_n;
     uint32_t n, nplane, npad, nfree, nsponge, first, ntot, npol;
-    uint32_t transverse, n_cross, slot, sponge, nstage;
-    uint32_t radix[16];
+    uint32_t transverse, n_cross, slot, sponge;
 };
 
 struct UnavgPar {
@@ -1341,6 +1432,7 @@ struct Impl {
     // and the radices of its stages.
     int tauB {1}, tauStages {0};
     uint32_t tauRadix[16] {0};
+    std::string tauStageMacro;
 
     // Buffer arithmetic for the member-major set. A plane is one slice of one
     // member's one polarization, the pad's planes following the window's in each
@@ -1591,9 +1683,10 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         const size_t nn = (size_t) ngrid * ngrid;
 
         // The transform along tau is planned for the one length the window and its pad
-        // have, and the lines a threadgroup carries are what its two buffers of that
-        // length leave room for in the threadgroup memory, which is read from the device
-        // and named in the refusal.
+        // have, its stages compiled in (TAU_STAGES, tau_pass), and the lines a
+        // threadgroup carries are what its buffer of that length leaves room for in half
+        // the threadgroup memory, which is read from the device and named in the
+        // refusal.
         if (p->spectral) {
             const size_t tgmem = (size_t) [p->dev maxThreadgroupMemoryLength];
             const size_t nmax = tgmem / 16;
@@ -1616,6 +1709,16 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
             int b = 1;
             while (2 * b <= 64 && (size_t) (2 * b) * p->ntot <= nmax && (size_t) (2 * b) <= nn) b *= 2;
             p->tauB = b;
+            uint32_t ns = 1;
+            for (int s = 0; s < p->tauStages; s++) {
+                const uint32_t r = p->tauRadix[s];
+                const bool bfly = (r == 2 || r == 3 || r == 4 || r == 5 || r == 7);
+                // No space in the macro's text: the compiler takes a define's value as
+                // one word.
+                p->tauStageMacro += std::string(bfly ? "TAU_STAGE(" : "TAU_STAGE_DIRECT(") +
+                                    std::to_string(r) + "," + std::to_string(ns) + ")";
+                ns *= r;
+            }
         }
 
         // Every resident byte, counted before anything is allocated, against the
@@ -1731,7 +1834,9 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
             @"RF_ROWS" : @(p->rowsPerTG),
             @"CC_COLS" : @(p->colsPerTG),
             @"TAU_B"   : @(p->tauB),
+            @"TAU_N"   : @(std::max(p->ntot, 1)),
             @"TAU_MEM" : @(p->tauB * std::max(p->ntot, 1)),
+            @"TAU_STAGES" : [NSString stringWithUTF8String:p->tauStageMacro.c_str()],
             @"BANK_SLOTS" : @(LUC_DEV_BANK_SLOTS),
         };
         // mathMode and mathFloatingPointFunctions are declared from the macOS 15 SDK
@@ -1978,8 +2083,6 @@ int luc_dev_tau_slip (const luc_dev_slip_par *sp, char *reason, int reason_len)
         Q.n_cross = (uint32_t) (sp->n_cross > 0 ? 1 : 0);
         Q.slot = (uint32_t) sp->slot;
         Q.sponge = (uint32_t) (p->nsponge > 0 ? 1 : 0);
-        Q.nstage = (uint32_t) p->tauStages;
-        for (int i = 0; i < 16; i++) Q.radix[i] = p->tauRadix[i];
         id<MTLComputeCommandEncoder> e = p->pass(LUC_DEV_PASS_TAU);
         [e setComputePipelineState:p->pTau];
         [e setBuffer:p->bField offset:0 atIndex:0];
@@ -2285,8 +2388,6 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
             Q.ntot = (uint32_t) p->ntot;
             Q.npol = (uint32_t) p->npol;
             Q.transverse = 1;
-            Q.nstage = (uint32_t) p->tauStages;
-            for (int i = 0; i < 16; i++) Q.radix[i] = p->tauRadix[i];
             e = p->pass(LUC_DEV_PASS_TAU);
             [e setComputePipelineState:p->pTau];
             [e setBuffer:p->bField offset:0 atIndex:0];
@@ -2699,6 +2800,11 @@ int luc_dev_pass_seconds (double *sec, int64_t *count, int n)
 int64_t luc_dev_bytes (void)
 {
     return (gImpl != nullptr) ? gImpl->bytes : 0;
+}
+
+int luc_dev_tau_lines (void)
+{
+    return (gImpl != nullptr) ? gImpl->tauB : 1;
 }
 
 }   // extern "C"
