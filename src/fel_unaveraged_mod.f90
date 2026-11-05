@@ -90,6 +90,7 @@
 module fel_unaveraged_mod
 
 use fel_track_mod
+use fel_spectral_mod
 
 implicit none
 
@@ -109,6 +110,15 @@ type fel_unavg_struct
   integer :: nsub = 1              ! Substeps per record step.
   real(rp) :: dsub = 0             ! Substep length [m].
   logical :: active = .false.      ! Between entry and exit handoff.
+  ! The ledger's field columns under the spectral propagator (write_ledger_row): the
+  ! energy of the pad's planes at the last record [J], which the window's own sum leaves
+  ! out, and the energy the pad's sponge has removed since the run began [J], which is
+  ! the light that has left for good where the bank's reads count planes at their
+  ! crossings. Light between the window's head and its next crossing sits in the pad
+  ! and in neither of the ledger's other columns, up to a plane's worth at a time, so
+  ! the ledger closes on these two and not on the bank's count.
+  real(rp) :: u_pad = 0
+  real(rp) :: u_sponged = 0
 end type
 
 contains
@@ -336,7 +346,7 @@ end subroutine fel_unavg_bfield_general
 !------------------------------------------------------------------------------
 !+
 ! Subroutine fel_unavg_step (und, ustate, beam, ff, dz_record, first, last, dE_beam, dU_spont,
-!                                                                         fp32, dev, err_flag)
+!                                                      fp32, dev, err_flag, spec, slippage, keep)
 !
 ! Routine to advance the beam and field one record step of the unaveraged mode: nsub
 ! Strang substeps of (half B push, radiation kick + deposit, half B push, field diffract
@@ -360,6 +370,15 @@ end subroutine fel_unavg_bfield_general
 !   fp32      -- fel_fp32_struct: The lockstep instrument, dark when it is off.
 !   dev       -- fel_device_struct: The device backend, dark when it is off. With the
 !                  instrument off it runs the step. With it on it is the twin.
+!   spec      -- fel_spectral_struct, optional: The spectral propagator's switch and pad
+!                  (fel_spectral_mod). With it on, the kernel's remainder at k0 + kappa and
+!                  the ramp run once over the window and its pad after the substeps, the
+!                  slippage inside the step, and the member's bank holds the planes that
+!                  crossed for the caller to drain. Absent or off, the slice propagator's
+!                  record step runs and the caller slips the record by rotation.
+!   slippage  -- real(rp), optional: The record step's slippage [fundamental
+!                  wavelengths], read with spec.
+!   keep      -- logical, optional: Bank the planes that cross? Read with spec.
 !
 ! Output:
 !   beam      -- fel_beam_struct: Advanced by Newton-Lorentz RK4 through the field.
@@ -369,7 +388,8 @@ end subroutine fel_unavg_bfield_general
 !   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
-subroutine fel_unavg_step (und, ustate, beam, ff, dz_record, first, last, dE_beam, dU_spont, fp32, dev, err_flag)
+subroutine fel_unavg_step (und, ustate, beam, ff, dz_record, first, last, dE_beam, dU_spont, fp32, dev, err_flag, &
+                           spec, slippage, keep)
 
 type (fel_und_struct) und
 type (fel_unavg_struct) ustate
@@ -380,9 +400,14 @@ type (wavefront_struct), pointer :: wf
 type (fel_slip_struct), pointer :: slip
 type (fel_fp32_struct), target :: fp32
 type (fel_device_struct) dev
+type (fel_spectral_struct), optional :: spec
 
 real(rp) dz_record, dE_beam, dU_spont
+real(rp), optional :: slippage
 logical first, last, err_flag
+logical, optional :: keep
+logical spectral_on, keep_l
+real(rp) slippage_l, u_before
 
 real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:), dU_sp_slice(:)
 real(rp), allocatable :: dEturn_slice(:), dev_s0(:,:,:)
@@ -459,6 +484,31 @@ phi0_rate_avg = fel_phi0_rate(ks, und%ku, p0_mc)
 ! and the 1/2 period-average projection undone (fel-physics.md sec-unaveraged).
 
 scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_spacing)
+
+! The spectral propagator (fel_spectral_mod, docs/spectral-field.md). The substeps
+! diffract each slice at k0 as they do below, and after the record step the kernel's
+! remainder at k0 + kappa and the ramp run once over the whole window and its pad
+! (fel_spectral_correct, fel_spectral_slip), where the slice propagator's walk rotates
+! the record. The form with the kernel and the ramp at every substep was measured
+! against this one on the sandwich probe and not taken: it departs from the slice
+! propagator by 1.3e-1 of the peak field where this form and the averaged line's own
+! propagator difference sit at 5e-2, and it costs 3.5 times the walk. Setup refuses the
+! instrument and the device with the propagator, so the record step is the FP64 path
+! alone.
+
+spectral_on = .false.
+slippage_l = 0
+keep_l = .false.
+if (present(spec)) spectral_on = spec%on
+if (spectral_on) then
+  if (fp32%on .or. dev%on) then
+    call out_io (s_error$, r_name, 'THE UNAVERAGED MODE UNDER THE SPECTRAL PROPAGATOR REACHED THE INSTRUMENT OR THE DEVICE.', &
+                                   'PLEASE REPORT THIS!')
+    return
+  endif
+  if (present(slippage)) slippage_l = slippage
+  if (present(keep)) keep_l = keep
+endif
 
 ! Entry handoff: the ramp makes a = 0 here, so the stored (averaged-convention) px is
 ! the kinetic momentum. The flag records that px now carries the quiver.
@@ -753,10 +803,69 @@ if (fp32%on) then
   endif
 endif
 
+! The spectral propagator: the kernel's remainder over the record step on the whole
+! window and its pad, then the ramp, where the slice propagator's walk rotates the
+! record, with the pad's energy and the sponge's removal read for the ledger.
+
+if (spectral_on) then
+  u_before = unavg_pad_energy (.true.)
+  call fel_spectral_correct (spec, ff(1), dz_record, err)
+  if (err) return
+  call fel_spectral_slip (spec, ff(1), slippage_l, keep_l, err)
+  if (err) return
+  call unavg_ledger_pad (u_before)
+endif
+
 err_flag = .false.
 
 !------------------------------------------------------------------------------
 contains
+
+!+
+! Function unavg_pad_energy (with_window) result (u)
+!
+! Routine to sum the field's energy over the pad's planes, and over the window's too
+! when with_window is True, as the ledger sums the window's: sum|E|^2 over the grid
+! times dx^2 / 2 Z0 is a plane's power, times the slice's light time its energy.
+!-
+
+function unavg_pad_energy (with_window) result (u)
+
+real(rp) u, e_scale
+logical with_window
+
+!
+
+e_scale = dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
+u = 0
+if (allocated(ff(1)%pad)) u = u + sum(real(ff(1)%pad, rp)**2 + aimag(ff(1)%pad)**2)
+if (allocated(ff(1)%pad_y)) u = u + sum(real(ff(1)%pad_y, rp)**2 + aimag(ff(1)%pad_y)**2)
+if (with_window) then
+  u = u + sum(real(wf%Ex, rp)**2 + aimag(wf%Ex)**2)
+  if (two_pol) u = u + sum(real(wf%Ey, rp)**2 + aimag(wf%Ey)**2)
+endif
+u = u * e_scale
+
+end function unavg_pad_energy
+
+!+
+! Subroutine unavg_ledger_pad (u_before)
+!
+! Routine to charge the ledger's pad columns after a pass over the window and the pad:
+! the kernel and the ramp are unitary on the two together, so what the pair lost is
+! what the sponge removed, and the pad's own energy is read afresh.
+!-
+
+subroutine unavg_ledger_pad (u_before)
+
+real(rp) u_before
+
+!
+
+ustate%u_sponged = ustate%u_sponged + (u_before - unavg_pad_energy (.true.))
+ustate%u_pad = unavg_pad_energy (.false.)
+
+end subroutine unavg_ledger_pad
 
 ! One record step on the device. The quantities that do not depend on the particle are
 ! built here in FP64 and uploaded once a substep and not once a particle (the hoist of

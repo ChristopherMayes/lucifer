@@ -276,6 +276,28 @@ def table_chirped(rec):
                   "Pulse energy, slices / spectral", "Slope, slices / spectral", "$-2\\epsilon$"], rows)
 
 
+UNAVG_LABELS = {"unavg_slices": "unaveraged sandwich, slice propagator", "unavg_spectral": "unaveraged sandwich, spectral",
+                "avg_slices": "all-averaged twin, slice propagator", "avg_spectral": "all-averaged twin, spectral"}
+
+
+def table_unavg(rec):
+    u = rec["unavg"]
+    rows = []
+    for r in u["rows"]:
+        rows.append([UNAVG_LABELS[r["run"]], sci(r["closure"], 2) if r.get("closure") is not None else "",
+                     si(r["exit_power"], "W"), si(r["window_energy"], "J"), si(r["pulse_energy"], "J"),
+                     f"{r['walk_seconds']:.1f} s"])
+    return table("tab-sp-unavg",
+                 f"The unaveraged mode under the spectral propagator at {u['threads']} threads: the sandwich probe, an "
+                 f"averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment, over "
+                 f"{u['n_slice']} slices of one wavelength from shot noise with a 10 kW seed, under both propagators, "
+                 f"and its all-averaged twin under both. The closure is the unaveraged ledger's largest excursion over "
+                 f"its turnover, the exit power the window's, and the walk the run's. Measured on "
+                 f"{u['measured']['day']} with the tracker {u['measured']['lucifer_version']}, after the record's "
+                 f"other measurements.",
+                 ["Run", "Ledger closure", "Exit power", "Window energy", "Pulse energy", "Walk"], rows)
+
+
 def table_sweep(rec):
     sw = rec["sweep"]
     rows = []
@@ -503,6 +525,42 @@ def fig_chirped(rec, plt):
     return fig, cap
 
 
+def fig_unavg(rec, plt):
+    u = rec["unavg"]
+    c = colors()
+    fig, (ax, bx) = plt.subplots(1, 2, figsize=(9.6, 3.6), layout="constrained")
+    styles = {"unavg_slices": ("-", c[0], 1.6), "unavg_spectral": ("--", c[1], 1.2),
+              "avg_slices": ("-", c[2], 1.2), "avg_spectral": ("--", c[3], 1.0)}
+    k = np.array(u["kappa_over_k0"])
+    sel = np.abs(k) <= 0.1
+    scale = max(np.array(u["curves"][r]["spectrum"])[sel].max() for r in u["curves"])
+    for run, cv in u["curves"].items():
+        ls, col, lw = styles[run]
+        p = np.array(cv["power"])
+        ax.plot(np.arange(1, p.size + 1), p / 1e6, ls, color=col, lw=lw, label=UNAVG_LABELS[run])
+        bx.plot(k[sel], np.array(cv["spectrum"])[sel] / scale, ls, color=col, lw=lw)
+    ax.set_xlabel("slice")
+    ax.set_ylabel("power at the exit [MW]")
+    ax.legend(frameon=False, fontsize=8)
+    bx.set_xlabel(r"$\kappa / k_0$")
+    bx.set_ylabel("exit spectrum over the largest peak")
+    cmp = {(r["a"], r["b"]): r for r in u["compare"]}
+    us = cmp[("unavg_spectral", "unavg_slices")]
+    av = cmp[("avg_spectral", "avg_slices")]
+    ua = cmp[("unavg_slices", "avg_slices")]
+    rows = {r["run"]: r for r in u["rows"]}
+    cap = (f"The unaveraged mode under the spectral propagator on the sandwich probe, from [](#tab-sp-unavg): the "
+           f"power across the window at the exit (left) and the exit spectrum about the carrier (right). The "
+           f"mode's two runs differ by {sci(us['field'], 2)} of the peak field over the lit slices, "
+           f"{pct(abs(rows['unavg_spectral']['exit_power'] / rows['unavg_slices']['exit_power'] - 1), 1)} in exit "
+           f"power and {sci(us['wavelength'], 2)} in the slice wavelengths, where the all-averaged twin's two "
+           f"runs differ by {sci(av['field'], 2)}, {pct(abs(rows['avg_spectral']['exit_power'] / rows['avg_slices']['exit_power'] - 1), 1)} "
+           f"and {sci(av['wavelength'], 2)}. The mode itself moves the exit field by {sig(ua['field'], 2)} times the "
+           f"peak against the all-averaged twin. The ledger closes at {sci(rows['unavg_spectral']['closure'], 1)} "
+           f"under the ramp and {sci(rows['unavg_slices']['closure'], 1)} under the rotation.")
+    return fig, cap
+
+
 def fig_sweep(rec, plt):
     sw = rec["sweep"]
     c = colors()
@@ -710,13 +768,13 @@ def main():
              "     the same run, and the captions' numbers come from the record the figures draw. -->", ""]
     tables = [("provenance", table_provenance), ("vacuum", table_vacuum), ("null", table_null), ("bank", table_bank),
               ("cost", table_cost), ("seeded", table_seeded), ("convergence", table_convergence),
-              ("chirped", table_chirped), ("sweep", table_sweep)]
+              ("chirped", table_chirped), ("sweep", table_sweep), ("unavg", table_unavg)]
     needs = {"provenance": "provenance", "convergence": "seeded"}
     for name, fn in tables:
         if needs.get(name, name) in rec:
             lines += fn(rec)
     figures = [("vacuum", fig_vacuum), ("null", fig_null), ("bank", fig_bank), ("cost", fig_cost),
-               ("seeded", fig_seeded), ("chirped", fig_chirped), ("sweep", fig_sweep)]
+               ("seeded", fig_seeded), ("chirped", fig_chirped), ("sweep", fig_sweep), ("unavg", fig_unavg)]
     diagrams = [("diagram-pad", diagram_pad), ("diagram-slippage", diagram_slippage), ("diagram-planes", diagram_planes)]
     with style():
         for name, fn in diagrams:

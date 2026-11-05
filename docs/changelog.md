@@ -30,6 +30,21 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-05 Added: the unaveraged mode runs under the spectral propagator, `fel_method = unaveraged`
+  with `field.propagator = "spectral"` ([](spectral-field.md#spectral-unaveraged)). The record step's
+  substeps diffract each slice at k0 as they do, and after them the kernel's remainder at k0 + kappa
+  and the ramp run once over the window and its pad (`fel_spectral_correct`, `fel_spectral_slip`),
+  where the walk rotated the record. On the sandwich probe over 200 slices from shot noise the mode's
+  two runs differ by 5.4e-2 of the peak field and 0.2 percent of the exit power, the level the
+  all-averaged twin's own two runs sit at, 4.5e-2 and 0.02 percent. A second form, the kernel and
+  the ramp at every substep, was measured on the same probe and not taken: 1.3e-1 of the peak field
+  from the slice propagator's run and 3.5 times the walk. The ledger under the ramp counts the pad's
+  planes in its field column and the sponge's removal in its escaped column, since light between
+  the window's head and its next crossing sits in neither, and closes at 5e-10 on the probe. The
+  `unaveraged` section of the validation suite runs the sandwich under the propagator: the ledger,
+  the exit power against the slice propagator's run, and the refusals of the device and of a field
+  coarser than the slice with the mode. `spectral_field.py unavg` measures the probe into the record.
+  No recorded digit moved.
 - 2026-11-04 Added: the spectral propagator runs on the device, `run.device = "metal"` with
   `field.propagator = "spectral"` ([](spectral-field.md), [](validation.md#val-device-spectral)). The
   step's command buffer carries the pass along tau over the window and its pad with the kernel at

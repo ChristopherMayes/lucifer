@@ -80,7 +80,7 @@ python tests/scripts/spectral_field.py --exe build-release/bin/lucifer \
         --json docs/generated/spectral/measured.json all
 ```
 
-The script runs the seven measurements below and writes every number and curve into the record as each finishes. It takes the tier inputs, the imported dumps and the Genesis4 references from a validation pass's work directory, which it reads and never writes. The vacuum test needs the tracker alone. The two FEL cases and the sweep take hours at 12 threads, and the cost rows need an otherwise idle machine. So the record is re-measured by hand as [](performance.md) is, and never in the keystone. The tracker refuses the sweep's rows above the cliff, so they run on a second tracker built with `fel_field_coop_cliff$` raised, given as `--exe-open`. Each measurement can be run alone by its name, and `--reuse` re-analyzes a finished set from its files. `report_spectral.py` then writes the tables and draws the figures, and the keystone runs it and diffs the tables and the captions.
+The script runs the eight measurements below and writes every number and curve into the record as each finishes. It takes the tier inputs, the imported dumps and the Genesis4 references from a validation pass's work directory, which it reads and never writes. The vacuum test needs the tracker alone. The two FEL cases and the sweep take hours at 12 threads, and the cost rows need an otherwise idle machine. So the record is re-measured by hand as [](performance.md) is, and never in the keystone. The tracker refuses the sweep's rows above the cliff, so they run on a second tracker built with `fel_field_coop_cliff$` raised, given as `--exe-open`. Each measurement can be run alone by its name, and `--reuse` re-analyzes a finished set from its files. `report_spectral.py` then writes the tables and draws the figures, and the keystone runs it and diffs the tables and the captions.
 
 ```{include} generated/spectral-measured.md
 :start-after: <!-- begin tab-sp-provenance -->
@@ -202,6 +202,25 @@ The long Aramis window is the measurement. Its 1280 slices hold enough spikes fo
 
 From that curve the derived sampling is a tenth of the cooperation length, `fel_field_coop_fraction$`, and the cliff is a quarter, `fel_field_coop_cliff$`, past which the energy falls by percent and a stated `field.n_wavelength` is refused. On the SASE tier's window of 32 slices the derived sampling is cut to 4 slices a plane so the window keeps 9 planes, and the `spectral` section of the validation suite holds that run against one plane a slice ([](validation.md#val-spectral)).
 
+(spectral-unaveraged)=
+### The unaveraged mode
+
+The unaveraged mode ([](fel-physics.md#sec-unaveraged)) advances a record step as substeps that resolve the quiver, each slice diffracting at $k_0$ after its own substep, and the walk slips the record by rotation after the step. Under the spectral propagator the substeps run as they do, and after them the kernel's remainder at $k_0 + \kappa$ and the ramp run once over the window and its pad (`fel_spectral_correct`, `fel_spectral_slip`), the remainder being the kernel with its $k_0$ part divided out, which commutes with the substeps' diffraction. The sandwich probe measures it: an averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment, over 200 slices of one wavelength from shot noise, so the unaveraged segment's light reaches the trailing segment, under both propagators, with the all-averaged twin under both as the level to read against.
+
+```{include} generated/spectral-measured.md
+:start-after: <!-- begin tab-sp-unavg -->
+:end-before: <!-- end tab-sp-unavg -->
+```
+
+```{include} generated/spectral-measured.md
+:start-after: <!-- begin fig-sp-unavg -->
+:end-before: <!-- end fig-sp-unavg -->
+```
+
+The mode under the ramp sits where the averaged line sits between the propagators. A second form was measured on the same probe and not taken: the kernel at $k_0 + \kappa$ and the ramp at every substep, the whole window transformed twenty times a record step. It departed from the slice propagator's run by 1.3e-1 of the peak field and 0.8 percent of the exit power, from the form above by 1.1e-1, and cost 3.5 times the walk, 6.4 s against 1.8 s under the slice propagator, with its ledger at 2.4e-7. The field holds one plane a slice, so a ramp by a twentieth of a slice at a time moves the band-limited interpolant of that sampling, which is the departure, and the mode's own emission is white to the slice's Nyquist and feels it most.
+
+The ledger needs one thing under the ramp. Light between the window's head and its next crossing sits in the pad, and so does light the kernel's own transport along $\tau$ carries past the head, in neither the window's column nor the bank's, up to a plane's energy at a time. On the eight-slice window of the validation suite that is 12 percent of the field at a record, and it is recovered at the next crossing, so a ledger on the bank's count reads 1e-2 while nothing is lost, which a seeded window without charge shows conserving its energy to 2e-8. Under the spectral propagator the ledger's field column therefore counts the pad's planes with the window's and its escaped column the energy the sponge has removed for good, both read from the field before and after the step's passes, since the kernel and the ramp are unitary on the window and pad together. The ledger then closes as the table shows.
+
 (spectral-cost)=
 ## What it costs
 
@@ -222,10 +241,11 @@ The header's cost estimate counts what the mode runs ([](performance.md)): the p
 (spectral-limits)=
 ## What it does not cover
 
-- The unaveraged mode, which advances its field by its own substep propagator (`fel_unavg_step`).
+- The unaveraged mode on the device, whose unaveraged kernels step the slice propagator (`fel_device_mod`), and the FP32 check with the unaveraged mode under the propagator, since the device would be its twin.
 - The FP32 check without the device, whose CPU twin steps the slice propagator in single precision. With `run.device = "metal"` the device takes the twin's role ([](validation.md#val-device-spectral)).
 - The coherent source model, whose deposit is `fel_field_step`'s own.
 - Harmonic fields and `run.dump_reduced` with a field coarser than the slices. The coarse field is carried for the fundamental alone, and the field reductions are taken plane by plane of the record and not on a slice's interpolated plane.
+- A field coarser than the slices in a line with an unaveraged segment, whose source resolves structure below a slice. The message names the slice as the sampling to state.
 - Backward slippage, since the pad that feeds the bank is at the window's head.
 
 Each is refused at setup with the reason in the message. The spectral propagator keeps the envelope and its carrier, so the SVEA stands and the bandwidth the window carries is bounded by the slice spacing at $\lambda_s / 2\Delta$. A field without an envelope, Puffin's model, is a different propagator and is not this one.
@@ -235,4 +255,4 @@ The device carries the propagator ([](validation.md#val-device-spectral)). Its s
 (spectral-next)=
 ## What is next
 
-The unaveraged mode under the ramp, which is measured on the sandwich probe before it is wired, since that mode resolves structure the averaged mode does not. And the pass along $\tau$ on the device at one plane a slice on a long window, whose threadgroup carries one line at a time there and reads each plane's cells apart, which [](performance.md#perf-device) prices.
+The pass along $\tau$ on the device at one plane a slice on a long window, whose threadgroup carries one line at a time there and reads each plane's cells apart, which [](performance.md#perf-device) prices. And the unaveraged mode on the device under the propagator, which needs that pass inside the mode's own command buffer.

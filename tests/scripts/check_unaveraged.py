@@ -54,6 +54,16 @@ point is measuring the inputs of the averaged mode (the coupling factor fc).
 10. The single-precision twin: its rows within their tolerances, and the FP64 stream
     and the ledger byte-identical with the twin on and off.
 
+11. The spectral propagator (docs/spectral-field.md): the sandwich of check 7 again on the
+    time-dependent window of check 8 under field.propagator = "spectral", where the
+    unaveraged record step's substeps diffract at k0 as they do and the kernel's
+    remainder at k0 + kappa and the ramp run once a record step over the window and its
+    pad. The ledger closes with the pad's planes in its field column and the sponge's
+    removal in its escaped column, since light between the window's head and its next
+    crossing sits in neither, and the exit power is compared with the slice propagator's
+    unaveraged run. The device and a field coarser than the slice are refused with the
+    mode, and the FP32 twin without the device is refused as under the averaged mode.
+
 Usage: check_unaveraged.py --exe <lucifer> --latdir <tests/bmad> --workdir <dir>
 """
 
@@ -570,6 +580,45 @@ def main():
     check("twin: freerun refused in the unaveraged mode (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
+
+    # 11. The spectral propagator with the mode. The sandwich carries the time-dependent
+    # window of check 8, so the unaveraged segment slips one slice a record step and the
+    # ramp crosses once a step, and the light it emits reaches the trailing segment. The
+    # ledger closes with the pad accounted (fel_unavg_struct), and the exit power sits
+    # against the slice propagator's unaveraged run at the level the averaged line's own
+    # propagator difference sets, 2e-3 of the exit power measured on this window.
+    print("--- the spectral propagator with the unaveraged mode:")
+    sp = TDID.replace('lattice = "{lat}"', 'lattice = "unavg_sandwich.bmad"').replace(
+        "&end", '  field.propagator = "spectral"\n  field.n_wavelength = 1\n&end')
+    run(exe, wd, "uv_spsand", sp.format(root="uv_spsand", lat=""), threads="8")
+    run(exe, wd, "uv_slsand", TDID.replace('lattice = "{lat}"', 'lattice = "unavg_sandwich.bmad"').format(
+        root="uv_slsand", lat=""), threads="8")
+    led = np.loadtxt(wd / "uv_spsand.ledger.txt")
+    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
+    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
+    check("spectral: TD ledger on the sandwich, max|d(E_beam+U_field+U_escaped-U_spont+E_rad)| / turnover",
+          np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-4)
+    confined = float(((led[:, 0] > 0.81 - 1e-9) & (led[:, 0] < 1.41 + 1e-9)).all())
+    check("spectral: ledger rows confined to the unaveraged segment (0 = yes)", 1.0 - confined, 0.5)
+    pu = np.loadtxt(wd / "uv_spsand.diag.txt")
+    ps = np.loadtxt(wd / "uv_slsand.diag.txt")
+    ns = int(re.search(r"nslice = (\d+)", (wd / "uv_spsand.diag.txt").open().read(400)).group(1))
+    p_sp, p_sl = pu[-ns:, 2].sum(), ps[-ns:, 2].sum()
+    check(f"spectral: |ln(P_spectral/P_slices)| at exit, unaveraged sandwich  [{p_sp:.4e} vs {p_sl:.4e}]",
+          abs(math.log(p_sp / p_sl)), 5e-2, note="(the propagators' own difference)")
+    refused = run_expect_refusal(exe, wd, "uv_spdev", sp.format(root="uv_spdev", lat="")
+                                 .replace("&end", '  run.device = "metal"\n&end'),
+                                 "DOES NOT COVER THE UNAVERAGED MODE ON THE DEVICE")
+    check("spectral: the device with the unaveraged mode refused (0 = yes)", 0.0 if refused else 1.0, 0.5)
+    # A window of 32 slices, so two slices a plane leaves the 8 planes a stated sampling
+    # must, and the mode's own refusal is the one that fires.
+    coarse = (sp.format(root="uv_spcoarse", lat="")
+              .replace("field.n_wavelength = 1", "field.n_wavelength = 2")
+              .replace("beam.z_min = -4e-10", "beam.z_min = -1.6e-9").replace("beam.z_max = 4e-10", "beam.z_max = 1.6e-9")
+              .replace("window_length = 8e-10", "window_length = 3.2e-9").replace("bunch_charge = 8.0e-15", "bunch_charge = 3.2e-14"))
+    refused = run_expect_refusal(exe, wd, "uv_spcoarse", coarse, "WHICH THE UNAVERAGED MODE DOES NOT COVER")
+    check("spectral: a field coarser than the slice with the unaveraged mode refused (0 = yes)",
+          0.0 if refused else 1.0, 0.5)
 
     if FAILED:
         print("unaveraged checks: FAIL")

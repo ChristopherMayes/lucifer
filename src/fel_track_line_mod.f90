@@ -305,10 +305,18 @@ do ie = run%i_start, run%i_end
     endif
 
     do istep = 1, und%nstep
+
+      ! The step's slippage, which the spectral propagator takes with the step, inside
+      ! an unaveraged record step, and the slice propagator applies by rotation below.
+
+      slip_step = und%dz * und_slip_step
+      if (istep == und%nstep) slip_step = slip_step + ele_slip(ie)
+
       if (fel_mode(ie) == unaveraged$) then
         call fel_tic (fel_t_unavg$)
         call fel_unavg_step (und, run%ustate, fbeam, run%ffield(1:1), und%dz, istep == 1, &
-                             istep == und%nstep, dE_step, dU_step, run%fp32, run%dev, err)
+                             istep == und%nstep, dE_step, dU_step, run%fp32, run%dev, err, &
+                             spec = run%spectral, slippage = slip_step, keep = keep_escaped_field)
         call fel_toc (fel_t_unavg$)
         u_spont_cum = u_spont_cum + dU_step
       else
@@ -318,12 +326,7 @@ do ie = run%i_start, run%i_end
         err_flag = .true.;  return
       endif
 
-      ! The step's slippage, which the spectral propagator takes with the step and the
-      ! slice propagator applies by rotation below.
-
-      slip_step = und%dz * und_slip_step
-      if (istep == und%nstep) slip_step = slip_step + ele_slip(ie)
-      if (spectral) then
+      if (spectral .and. fel_mode(ie) /= unaveraged$) then
         call fel_tic (fel_t_solve$)
         err = .false.
         if (run%dev%resident) then
@@ -870,7 +873,10 @@ end subroutine write_diag_rows
 !   U_field     Total window field energy, sum(P_is)*slice_spacing/c [J].
 !   dE_kick     Kick-side change dE_step returned by fel_unavg_step.
 !   U_escaped   Cumulative energy slippage carried out of the window, banked at the zero
-!                 fill in fel_apply_slippage.
+!                 fill in fel_apply_slippage. Under the spectral propagator, the energy the
+!                 pad's sponge has removed (fel_unavg_struct), since light between the
+!                 window's head and its next crossing sits in the pad, and the field
+!                 column then counts the pad's planes with the window's.
 !   U_spont     Cumulative spontaneous deposit energy sum|dE_src|^2. This is the one
 !                 field-energy term the kick/deposit duality does not charge to the beam.
 !   E_radiated  Cumulative energy the beam radiated under bmad_com's radiation switches.
@@ -902,7 +908,12 @@ do is = 1, nslice
   u_field = u_field + fpow_arr(is) * fbeam%slice_spacing / c_light
 enddo
 
-write (iu_ledger, '(7es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum, e_rad_cum
+if (spectral) then
+  write (iu_ledger, '(7es24.16)') z_now, e_beam, u_field + run%ustate%u_pad, dE_step, run%ustate%u_sponged, &
+                                  u_spont_cum, e_rad_cum
+else
+  write (iu_ledger, '(7es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum, e_rad_cum
+endif
 call fel_toc (fel_t_stats$)
 
 end subroutine write_ledger_row

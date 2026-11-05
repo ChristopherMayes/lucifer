@@ -5076,6 +5076,63 @@ Routine to put one polarization's planes, the window's and the pad's, through th
 passes of the header, reading the plane at each crossing into pl.
 ```
 
+(api-fel-spectral-correct)=
+### `fel_spectral_correct`
+
+*Subroutine* `(sp, fs, dz, err_flag)`
+
+```
+Routine to apply, over dz, the part of the spectral kernel the kernel at k0 leaves
+out, exp(-i dz k_perp^2 (1 / 2 k(kappa) - 1 / 2 k0)), to one member's window and pad
+through fel_spectral_apply's passes. A record whose planes have each diffracted at k0
+over dz then carries the kernel at k0 + kappa on the whole, since the two factors are
+diagonal in the same basis and commute. The unaveraged mode's record step under the
+spectral propagator takes it (fel_unavg_step): its substeps diffract each slice at k0
+as they do, and this pass carries the kernel's frequency dependence once a record
+step, before the ramp.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
+  fs       -- fel_field_struct: The member.
+  dz       -- real(rp): The length the planes diffracted at k0 over [m].
+
+Output:
+  fs       -- fel_field_struct: The window and pad corrected.
+  err_flag -- logical: Set True on a transform failure. False otherwise.
+```
+
+(api-correct-component)=
+### `correct_component`
+
+*Subroutine* `(e, pad, err)`
+
+```
+Routine to put one polarization's planes through the three passes with the
+remainder's factors, fel_spectral_apply's apply_component without the crossings.
+```
+
+(api-fel-spectral-bank-merge)=
+### `fel_spectral_bank_merge`
+
+*Subroutine* `(dst, src)`
+
+```
+Routine to append every plane of one bank to another, in transmission order, for a
+step that slips in several calls of fel_spectral_slip, each of which empties the
+member's bank first (fel_unavg_step under the spectral propagator). dst grows as
+bank_append grows it.
+```
+
+```
+Input:
+  src -- fel_bank_struct: The planes to append.
+
+Output:
+  dst -- fel_bank_struct: Grown by src's planes.
+```
+
 (api-fel-spectral-device-slip)=
 ### `fel_spectral_device_slip`
 
@@ -6277,7 +6334,10 @@ Routine to write one energy-ledger row (unaveraged mode). The columns:
   U_field     Total window field energy, sum(P_is)*slice_spacing/c [J].
   dE_kick     Kick-side change dE_step returned by fel_unavg_step.
   U_escaped   Cumulative energy slippage carried out of the window, banked at the zero
-                fill in fel_apply_slippage.
+                fill in fel_apply_slippage. Under the spectral propagator, the energy the
+                pad's sponge has removed (fel_unavg_struct), since light between the
+                window's head and its next crossing sits in the pad, and the field
+                column then counts the pad's planes with the window's.
   U_spont     Cumulative spontaneous deposit energy sum|dE_src|^2. This is the one
                 field-energy term the kick/deposit duality does not charge to the beam.
   E_radiated  Cumulative energy the beam radiated under bmad_com's radiation switches.
@@ -7899,7 +7959,7 @@ Output:
 *Subroutine* `(und, ustate, beam, ff, dz_record, first, last, dE_beam, dU_spont,`
 
 ```
-                                                                        fp32, dev, err_flag)
+                                                     fp32, dev, err_flag, spec, slippage, keep)
 
 Routine to advance the beam and field one record step of the unaveraged mode: nsub
 Strang substeps of (half B push, radiation kick + deposit, half B push, field diffract
@@ -7925,6 +7985,15 @@ Input:
   fp32      -- fel_fp32_struct: The lockstep instrument, dark when it is off.
   dev       -- fel_device_struct: The device backend, dark when it is off. With the
                  instrument off it runs the step. With it on it is the twin.
+  spec      -- fel_spectral_struct, optional: The spectral propagator's switch and pad
+                 (fel_spectral_mod). With it on, the kernel's remainder at k0 + kappa and
+                 the ramp run once over the window and its pad after the substeps, the
+                 slippage inside the step, and the member's bank holds the planes that
+                 crossed for the caller to drain. Absent or off, the slice propagator's
+                 record step runs and the caller slips the record by rotation.
+  slippage  -- real(rp), optional: The record step's slippage [fundamental
+                 wavelengths], read with spec.
+  keep      -- logical, optional: Bank the planes that cross? Read with spec.
 
 Output:
   beam      -- fel_beam_struct: Advanced by Newton-Lorentz RK4 through the field.
@@ -7932,6 +8001,28 @@ Output:
   dE_beam   -- real(rp): The step's kick-side beam energy change [J] (ledger).
   dU_spont  -- real(rp): The step's spontaneous source energy [J] (ledger).
   err_flag  -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-unavg-pad-energy)=
+### `unavg_pad_energy`
+
+*Function* `(with_window) result (u)`
+
+```
+Routine to sum the field's energy over the pad's planes, and over the window's too
+when with_window is True, as the ledger sums the window's: sum|E|^2 over the grid
+times dx^2 / 2 Z0 is a plane's power, times the slice's light time its energy.
+```
+
+(api-unavg-ledger-pad)=
+### `unavg_ledger_pad`
+
+*Subroutine* `(u_before)`
+
+```
+Routine to charge the ledger's pad columns after a pass over the window and the pad:
+the kernel and the ramp are unitary on the two together, so what the pair lost is
+what the sponge removed, and the pad's own energy is read afresh.
 ```
 
 (api-unavg-twin-slice)=

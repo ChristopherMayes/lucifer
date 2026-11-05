@@ -221,6 +221,8 @@ The share row hides how much moved, because the denominator moved too. In absolu
 
 The before column's label covers every libm transcendental the run entered, `exp` and `cexp` and the shared reduction helper included. Only 13.9% of the run was `sin` and `cos` proper. The hoist recovers most of it either way, because the envelope's own trig was per particle for the same reason.
 
+Under the spectral propagator the mode pays what the averaged step pays for the passes along $\tau$ and no more, since the kernel's remainder and the ramp run once a record step ([](spectral-field.md#spectral-unaveraged)), and the cost estimate counts an unaveraged record step as it counts an averaged step. On the sandwich probe of 200 slices of one wavelength at grid 64 and 512 particles a slice, 12 threads, the unaveraged line walks 2.0 s under the slice propagator and 2.8 s under the spectral one, and the all-averaged twin 0.8 s and 1.5 s, measured 2026-11-05. The form that ran the passes at every substep walked 6.4 s on the same probe and was not taken.
+
 (perf-the-hoist-measured)=
 ## The hoist, measured
 
