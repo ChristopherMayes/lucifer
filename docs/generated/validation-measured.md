@@ -242,6 +242,9 @@ where the two builds agree to every printed digit.
 | SASE tier with the source filter on, spectral against slices | 8.6540e-03 | same | <= 2.0000e-02 |
 | the derived coarse field against one plane a slice, SASE tier | 8.0345e-02 | same | <= 1.5000e-01 |
 | the derived coarse field's slices a plane, SASE tier | 4 | same | >= 1 |
+| a stated sampling equal to a slice above the cliff runs, the slice over the cooperation length | 3.1000e-01 | same | >= 2.5000e-01 |
+| the key unset derives the same slice above the cliff | 192 | same | = 192 |
+| a stated sampling coarser than a slice above the cliff is refused |  | same | holds |
 | one slice by the ramp against one by the rotation | 1.0729e-09 | same | <= 1.0000e-08 |
 | the ledger closes, slices | 6.7968e-11 | same | <= 1.0000e-09 |
 | the tail slice stays dark, slices | 0.0000e+00 | same | <= 1.0000e-09 |
