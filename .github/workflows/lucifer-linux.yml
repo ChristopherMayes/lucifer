@@ -87,13 +87,17 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # The dispatch input sets how many check sections run at once, in place of the
-  # validation suite's own rule, so the rule can be measured on this runner without a
-  # commit per trial (docs/validation.md, val-linux-ci).
+  # The dispatch inputs set how many check sections run at once and the cores they share,
+  # in place of the validation suite's own rule, so the rule can be measured on this
+  # runner without a commit per trial (docs/validation.md, val-linux-ci).
   workflow_dispatch:
     inputs:
       section_workers:
         description: "Check sections at once (empty: the validation suite's rule)"
+        required: false
+        default: ""
+      cpus:
+        description: "Cores the check sections share, --cpus (empty: the runner's)"
         required: false
         default: ""
   schedule:
@@ -102,7 +106,7 @@ on:
 # The group carries the dispatch input, so two dispatches that measure different section
 # counts on one ref run side by side rather than one cancelling the other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}-${{ inputs.cpus }}
   cancel-in-progress: true
 
 jobs:
@@ -309,6 +313,7 @@ jobs:
         shell: bash -o pipefail {0}
         env:
           SECTION_WORKERS: ${{ inputs.section_workers }}
+          SECTION_CPUS: ${{ inputs.cpus }}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
@@ -316,6 +321,7 @@ jobs:
           export LUCIFER_GENESIS_CACHE="${{ steps.refkey.outputs.dir }}"
           workers=()
           if [ -n "$SECTION_WORKERS" ]; then workers=(--section-workers "$SECTION_WORKERS"); fi
+          if [ -n "$SECTION_CPUS" ]; then workers+=(--cpus "$SECTION_CPUS"); fi
           ./tests/run_fel_validation.sh \
               --exe "$PWD/${{ matrix.dir }}/bin/lucifer" --build ${{ matrix.flavor }} \
               "${workers[@]}" \
