@@ -1,15 +1,17 @@
 #!/bin/bash
 #
-# tau_pass_table.sh prices the Metal backend's pass along tau under the spectral
-# propagator, per pass, with run.device_timing = true, on three windows at one plane a
-# slice: the 24-slice and 96-slice SASE windows of the device table and the 1280-slice
-# one, each one Aramis segment at ngrid 256 with comb_ds_save = -1. Each input file runs
-# on the device three times and the table takes the run with the fewest busy seconds. A
-# row gives the window's planes along tau with its pad, the lines a threadgroup carries
-# through the pass, the walk, the busy seconds the command buffers clock, the pass's own
-# seconds and encoders, the pass's share of the sum over the passes, and the passes and
-# transforms a step. The seconds are the instrument's, since every pass pays an encoder
-# boundary that the production path does not (docs/performance.md, perf-device).
+# tau_pass_table.sh measures the GPU time of the Metal backend's transform along tau
+# under the spectral propagator, pass by pass, with run.device_timing = true, on three
+# windows at one field plane a slice: the 24-slice and 96-slice SASE windows of the device
+# table and the 1280-slice one, each one Aramis segment at ngrid 256 with comb_ds_save =
+# -1. Each input file runs on the device three times and the table takes the run with
+# the least GPU time. A row gives the transform's length (the window's planes and the
+# pad's), the lines (transverse grid points) one threadgroup transforms together, the
+# walk, the GPU time the command buffers record, the transform's own GPU time and its
+# encoders, its share of the sum over all passes, and the passes and transforms a step.
+# The timing instrument adds a timestamped encoder boundary at every pass, which the
+# production path does not have, so the seconds are longer than a production run's
+# (docs/performance.md, perf-device).
 #
 # Usage:
 #   ./tau_pass_table.sh [--exe <path>] [--workers N] [--work-dir <path>]

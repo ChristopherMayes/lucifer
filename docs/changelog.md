@@ -30,23 +30,35 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
-- 2026-11-05 Changed: the device's pass along tau under the spectral propagator (`tau_pass` in
-  `src/device/lucifer_metal.mm`) compiles its plan into the kernel and runs its stages as butterflies
-  in place ([](performance.md#perf-device-tau)). The pass had formed every term's indices at run time,
-  two integer divisions and a modulus per term, summed each output over its radix as a direct sum,
-  and filled the threadgroup memory with two buffers. The pass is 4.7, 7.3 and 10.9 times faster on
-  the 24-slice, 96-slice and 1280-slice windows at one plane a slice, and the spectral step on the
-  device costs 1.9 and 1.4 times its slice step's busy seconds on the two SASE windows, from 3.4
-  and 3.0, where the CPU pays 2.2 and 2.2. The device's rate for the pass in the cost estimate,
-  `fel_cost_tau_device$`, is 1.5e-11 from 6.3e-11. `tests/perf/tau_pass_table.sh` prices the pass
-  per pass with `run.device_timing = true`, and the header's `Device` line states the lines a
-  threadgroup carries through it. The `device` section of the validation suite holds the device's
-  spectral step to the CPU's inside its ceilings as before, and six of its recorded levels moved
-  in their last digits, since the pass's sums run in another order: the time-dependent lockstep
-  field row from 6.3121e-6 to 6.3133e-6, the window power from 2.1858e-5 to 2.1853e-5, the bank's
-  closure and escaped energy from 3.97e-7 to 4.07e-7 apart, and the coarse field's window power
-  and exit power per slice from 5.50e-5 and 9.38e-5 to 5.40e-5 and 9.19e-5. No other recorded
-  digit moved.
+- 2026-11-05 Changed: the Metal backend's Fourier transform along tau under the spectral propagator
+  (`tau_pass` in `src/device/lucifer_metal.mm`) is rewritten, and the device's spectral step takes
+  less than half the GPU time it did, 0.100 s against 0.219 s on the 24-slice SASE window and 0.367
+  s against 0.859 s on the 96-slice one ([](performance.md#perf-device-tau)). Each step of the
+  spectral propagator transforms the field along tau at every transverse grid point, multiplies each
+  mode by the paraxial kernel at k0 + kappa or by the phase ramp that carries the slippage, and
+  transforms back. The device evaluates that transform as a mixed-radix Stockham FFT in threadgroup
+  memory, the on-chip memory the threads of one threadgroup share. The earlier version computed each
+  term's array indices with integer division at run time, evaluated a radix-R stage as R separate
+  R-term sums, 16 complex multiplications per four outputs for radix 4, and filled the threadgroup
+  memory with two buffers. The new version compiles the sequence of stages into the kernel when the
+  run starts, so the indices are constants. It evaluates radices 2, 3, 4, 5 and 7 as butterflies,
+  three complex multiplications and eight additions per four outputs for radix 4, and keeps the
+  direct sum for larger primes, so any length still transforms. It runs the stages in place in one
+  buffer of at most half the threadgroup memory, which measured fastest. The transform takes 4.7,
+  7.3 and 10.9 times less GPU time on windows of 24, 96 and 1280 slices at one field plane a slice.
+  The device's spectral step now takes 1.9 and 1.4 times the GPU time of its slice-propagator step
+  on the two SASE windows, against 3.4 and 3.0 before, where the CPU's ratio is 2.2 on both. The
+  header's run-time estimate uses the new GPU rate for the transform, `fel_cost_tau_device$` =
+  1.5e-11 s per grid point, per log2 of the length and per pass, from 6.3e-11 s.
+  `tests/perf/tau_pass_table.sh` measures the transform's GPU time pass by pass with
+  `run.device_timing = true`, and the header's `Device` line states how many transverse grid points
+  one threadgroup transforms together. The `device` section of the validation suite holds the
+  device's spectral runs to the CPU's within its tolerances as before. Six of its recorded levels
+  changed in their last digits, because the single-precision sums are accumulated in a different
+  order: the time-dependent lockstep field row from 6.3121e-6 to 6.3133e-6, the window power from
+  2.1858e-5 to 2.1853e-5, the difference between the device's and the CPU's escaped-field ledgers
+  and escaped energies from 3.97e-7 to 4.07e-7, and the coarse field's window power and exit power
+  per slice from 5.50e-5 and 9.38e-5 to 5.40e-5 and 9.19e-5. No other recorded digit moved.
 - 2026-11-05 Added: the unaveraged mode runs under the spectral propagator, `fel_method = unaveraged`
   with `field.propagator = "spectral"` ([](spectral-field.md#spectral-unaveraged)). The record step's
   substeps diffract each slice at k0 as they do, and after them the kernel's remainder at k0 + kappa
