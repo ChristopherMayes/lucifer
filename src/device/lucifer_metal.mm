@@ -1142,8 +1142,9 @@ kernel void fft_cols_add_fix (device float2* d [[buffer(0)]], const device float
 // lines travel in one threadgroup so that a plane's TAU_B cells are read contiguously,
 // and the stages run in place in one buffer of TAU_B TAU_N points: a thread's
 // butterflies, one a round, keep their outputs in registers until a barrier lets any of
-// them write. The buffer is held to half the threadgroup memory, which a line-count
-// study found the footprint that runs fastest (docs/performance.md, perf-device-tau).
+// them write. The buffer is held to half the threadgroup memory, which the measurement
+// of the lines a threadgroup transforms found the fastest (docs/performance.md,
+// perf-device-tau).
 
 struct TauPar {
     float s_a, s_b, inv_n;
