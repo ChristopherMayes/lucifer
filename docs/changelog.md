@@ -30,6 +30,24 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-06 Added: the unaveraged mode runs on the device under the spectral propagator,
+  `run.device = "metal"` with `fel_method = unaveraged` and `field.propagator = "spectral"`
+  ([](spectral-field.md#spectral-unaveraged), [](validation.md#val-device-unaveraged)). The device's
+  record step keeps the form the CPU takes: the substeps diffract each slice at k0 on the window's
+  planes, and after the last substep the kernel's remainder at k0 + kappa and the slippage ramp run
+  once over the window and its pad on the resident record, as a transverse transform pair about
+  the transform along tau with the remainder's factors (`luc_dev_unavg_remainder`) and the slip
+  passes the averaged step takes. The energy ledger's pad and sponge columns come from a reduction
+  of |E|^2 over every resident plane before and after the two passes (`field_energy`), summed on
+  the host in FP64 in index order. With the FP32 check on, the device is the twin and its rows are
+  read after the substeps, as the mode's twin reads them. On the sandwich probe the exit power
+  agrees with the CPU's run to 1.9e-5, the pulse file holds the same 147 planes, the ledger closes
+  at 3.7e-4 of the turnover, the FP32 transform pairs' own level, and the twin's rows sit at the
+  probe's own levels under either propagator. The `device` section of the validation suite holds
+  it with recorded levels on both builds. The run-time estimate counts an unaveraged segment's
+  two passes along tau once a record step and not once a substep, which it had counted since the
+  mode ran under the propagator on the CPU. `tests/perf/unavg_spectral_table.sh` measures the
+  probe under both propagators on both sides. No recorded digit moved.
 - 2026-11-05 Changed: the Metal backend's Fourier transform along tau under the spectral propagator
   (`tau_pass` in `src/device/lucifer_metal.mm`) is rewritten, and the device's spectral step takes
   less than half the GPU time it did, 0.100 s against 0.219 s on the 24-slice SASE window and 0.367

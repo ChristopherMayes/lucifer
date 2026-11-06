@@ -109,6 +109,24 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
 }
 
 double luc_dev_unavg_spont (void) { return 0; }
+int luc_dev_unavg_remainder (int first, char *reason, int reason_len)
+{
+  (void) first;
+  put_str (reason, reason_len, "no device backend in this build");
+  return 1;
+}
+int luc_dev_field_energy_mark (int which, char *reason, int reason_len)
+{
+  (void) which;
+  put_str (reason, reason_len, "no device backend in this build");
+  return 1;
+}
+void luc_dev_field_energy (int which, double *u_window, double *u_pad)
+{
+  (void) which;
+  *u_window = 0;
+  *u_pad = 0;
+}
 void luc_dev_download_g0 (int is, int n, float *g0) { (void) is; (void) n; (void) g0; }
 
 void luc_dev_sync (void) {}

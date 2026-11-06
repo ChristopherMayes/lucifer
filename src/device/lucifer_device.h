@@ -140,7 +140,7 @@ typedef struct {
   int32_t first;         /* field ring offset, constant across the record step */
   int32_t helical;       /* the undulator's helicity */
   int32_t mutate;        /* falsifiability hook: coarsen the lag's residual angle */
-  int32_t pad;
+  int32_t pstride;       /* planes a polarization block spans: the window's and the pad's */
   int32_t field_general; /* an offset, a kx or a kick: the field's general form */
 } luc_dev_unavg_par;
 
@@ -281,6 +281,25 @@ int luc_dev_unavg_begin (int nsub, char *reason, int reason_len);
  * record step and nothing is waited on. */
 int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
                         const float *cbase, char *reason, int reason_len);
+
+/* The spectral propagator's remainder pass on the resident record after an unaveraged
+ * record step's substeps (fel_spectral_correct): the forward transverse transform of
+ * every plane, the window's and the pad's, the pass along tau with the factors the
+ * host uploaded through luc_dev_set_tau_kernel, the remainder's here, and the inverse
+ * transverse transform with nothing added. first is the window's ring offset. The slip
+ * passes follow through luc_dev_tau_slip. Refuses (nonzero, reason filled) a run with
+ * no transform along tau. */
+int luc_dev_unavg_remainder (int first, char *reason, int reason_len);
+
+/* The field's energy for the unaveraged ledger under the spectral propagator. The mark
+ * encodes sum|E|^2 over every plane of the set into slot set which, 0 or 1, as partial
+ * sums one threadgroup each (field_energy), inside the open command buffer. The read
+ * drains and sums the partials in FP64 in index order, the window's planes into
+ * u_window and the pad's into u_pad, unscaled: the caller applies the energy per
+ * |E|^2. Two marks a record step, before and after the passes, give the energy the
+ * sponge removed and the pad's own. */
+int luc_dev_field_energy_mark (int which, char *reason, int reason_len);
+void luc_dev_field_energy (int which, double *u_window, double *u_pad);
 
 /* The element's banked spontaneous energy, sum over slices and substeps of
  * 4 sum|src|^2 scaled by the caller's factor, in FP64 over the per-threadgroup

@@ -606,10 +606,8 @@ def main():
     p_sp, p_sl = pu[-ns:, 2].sum(), ps[-ns:, 2].sum()
     check(f"spectral: |ln(P_spectral/P_slices)| at exit, unaveraged sandwich  [{p_sp:.4e} vs {p_sl:.4e}]",
           abs(math.log(p_sp / p_sl)), 5e-2, note="(the propagators' own difference)")
-    refused = run_expect_refusal(exe, wd, "uv_spdev", sp.format(root="uv_spdev", lat="")
-                                 .replace("&end", '  run.device = "metal"\n&end'),
-                                 "DOES NOT COVER THE UNAVERAGED MODE ON THE DEVICE")
-    check("spectral: the device with the unaveraged mode refused (0 = yes)", 0.0 if refused else 1.0, 0.5)
+    # The device runs the mode under the propagator (check_device.py, validation.md
+    # val-device-unaveraged), so no refusal is checked here.
     # A window of 32 slices, so two slices a plane leaves the 8 planes a stated sampling
     # must, and the mode's own refusal is the one that fires.
     coarse = (sp.format(root="uv_spcoarse", lat="")

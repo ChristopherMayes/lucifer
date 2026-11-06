@@ -489,6 +489,25 @@ where the two builds agree to every printed digit.
 | two-plane unaveraged production power y vs CPU | 3.4956e-02 | 3.5013e-02 | <= 1.0000e-01 |
 | two-plane unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
 | FP32 transform pair energy loss, two-plane input file | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
+| unaveraged spectral lockstep worst_x | 7.1415e-07 | same | <= 3.5000e-06 |
+| unaveraged spectral lockstep worst_px | 1.8827e-06 | same | <= 2.5000e-05 |
+| unaveraged spectral lockstep worst_y | 9.3288e-07 | same | <= 3.0000e-06 |
+| unaveraged spectral lockstep worst_py | 5.9352e-06 | same | <= 2.1000e-05 |
+| unaveraged spectral lockstep worst_pz | 8.9232e-07 | same | <= 6.5000e-06 |
+| unaveraged spectral lockstep worst_theta | 2.3687e-06 | same | <= 1.1000e-05 |
+| unaveraged spectral lockstep worst_phasor | 5.1785e-08 | same | <= 2.5000e-07 |
+| unaveraged spectral lockstep worst_source | 3.4974e-02 | same | <= 1.1000e-01 |
+| unaveraged spectral lockstep worst_field | 5.7714e-06 | same | <= 2.0000e-05 |
+| unaveraged spectral lockstep guard [ticks] | 2.7017e+06 | same | >= 9.0000e+05 |
+| unaveraged spectral mutation moves worst_theta | 1.6316e-03 | same | >= 2.3687e-05 |
+| unaveraged spectral mutation moves worst_phasor | 5.2399e-05 | same | >= 2.5892e-06 |
+| unaveraged spectral mutation moves worst_field | 1.6774e-03 | same | >= 1.1543e-04 |
+| unaveraged spectral FP64 diag byte-identical, device twin on vs off |  | same | holds |
+| unaveraged spectral FP64 ledger byte-identical, device twin on vs off |  | same | holds |
+| unaveraged spectral production exit power vs CPU | 1.8635e-05 | same | <= 5.0000e-03 |
+| unaveraged spectral ledger on the device, closure over the turnover | 3.7452e-04 | same | <= 1.1000e-03 |
+| unaveraged spectral pulse planes, device against CPU | 147 | same | = 147 |
+| two unaveraged spectral device runs, every stats array identical | 0 | same | = 0 |
 | handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7341e-07 | same | <= 1.0000e-05 |
 | handedness on the device: (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
 | spectral lockstep steady worst_x | 1.4742e-07 | same | <= 1.0000e-06 |
@@ -593,7 +612,6 @@ where the two builds agree to every printed digit.
 | spectral: TD ledger on the sandwich, max\|d(E_beam+U_field+U_escaped-U_spont+E_rad)\| / turnover | 8.2436e-09 | 8.2447e-09 | <= 1.0000e-04 |
 | spectral: ledger rows confined to the unaveraged segment (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | spectral: \|ln(P_spectral/P_slices)\| at exit, unaveraged sandwich | 3.6431e-02 | same | <= 5.0000e-02 |
-| spectral: the device with the unaveraged mode refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | spectral: a field coarser than the slice with the unaveraged mode refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 
 (val-levels-spontaneous)=

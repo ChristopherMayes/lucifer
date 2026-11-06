@@ -1340,7 +1340,7 @@ line can differ.
 (api-fel-cost-count)=
 ### `fel_cost_count`
 
-*Subroutine* `(run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)`
+*Subroutine* `(run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg, nrec_unavg)`
 
 ```
 Routine to count the work of a run from the state the setup pass built.
@@ -1363,6 +1363,8 @@ Output:
                    polarization of the field set.
   ngrid       -- integer: Transverse points on a side of one grid.
   nstep_unavg -- integer: How many of nstep are unaveraged substeps.
+  nrec_unavg  -- integer, optional: The record steps those substeps make up, which is
+                   how often an unaveraged segment runs the spectral propagator's passes.
 ```
 
 (api-fel-cost-passes)=
@@ -1798,6 +1800,88 @@ Input:
   im -- integer: The member, 1-based in set order.
   wf -- wavefront_struct: The member's record, for its wavelength, spacing and grid.
   dz -- real(rp): Step length [m].
+```
+
+(api-fel-device-set-tau-remainder)=
+### `fel_device_set_tau_remainder`
+
+*Subroutine* `(dev, im, wf, dz)`
+
+```
+Routine to upload member im's factors along tau for the kernel's remainder over a
+record step of dz, ax(ix, m) = exp(-i dz (m_x dk)^2 (1 / 2 k(kappa_m) - 1 / 2 k0)),
+as fel_spectral_correct builds them for the CPU, into the one table the pass along
+tau reads (fel_device_set_tau_kernel), keyed apart from the kernel's own so that an
+averaged segment of the same step after an unaveraged one uploads the kernel again.
+```
+
+```
+Input:
+  im -- integer: The member, 1-based in set order.
+  wf -- wavefront_struct: The member's record, for its wavelength, spacing and grid.
+  dz -- real(rp): The record step the planes diffracted at k0 over [m].
+```
+
+(api-fel-device-unavg-remainder)=
+### `fel_device_unavg_remainder`
+
+*Subroutine* `(dev, ff, dz, err_flag)`
+
+```
+Routine to encode the spectral propagator's remainder pass after an unaveraged record
+step's substeps, fel_spectral_correct on the resident record: the remainder's factors
+are uploaded for the one member the mode carries and the backend runs the transverse
+transform pair about the pass along tau over the window and its pad. The slip passes
+follow through fel_spectral_device_slip.
+```
+
+```
+Input:
+  ff(:) -- fel_field_struct: The field set, one member.
+  dz    -- real(rp): The record step [m].
+
+Output:
+  err_flag -- logical: Set True if the backend refuses. False otherwise.
+```
+
+(api-fel-device-field-energy-mark)=
+### `fel_device_field_energy_mark`
+
+*Subroutine* `(dev, which, err_flag)`
+
+```
+Routine to encode a reduction of the resident field's energy, sum|E|^2 over every
+plane of the set, into slot set which, 0 or 1, inside the open command buffer, for the
+unaveraged ledger under the spectral propagator. fel_device_field_energy reads it.
+```
+
+```
+Input:
+  which -- integer: The slot set, 0 before the record step's passes and 1 after.
+
+Output:
+  err_flag -- logical: Set True if the backend refuses. False otherwise.
+```
+
+(api-fel-device-field-energy)=
+### `fel_device_field_energy`
+
+*Subroutine* `(dev, which, s_window, s_pad)`
+
+```
+Routine to read a field-energy reduction fel_device_field_energy_mark encoded: the
+partial sums drain and add in FP64 in index order, so two runs give one answer. The
+sums are of |E|^2 over the grid, the window's planes and the pad's apart, and the
+caller scales them to joules as fel_unavg_step scales the pad's.
+```
+
+```
+Input:
+  which -- integer: The slot set, 0 or 1.
+
+Output:
+  s_window -- real(rp): sum|E|^2 over the window's planes.
+  s_pad    -- real(rp): sum|E|^2 over the pad's planes.
 ```
 
 (api-fel-device-slip-pass)=

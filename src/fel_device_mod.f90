@@ -186,7 +186,8 @@ type, bind(c) :: fel_device_unavg_par_struct
   real(c_double) :: dep_scale
   real(c_double) :: dep_u_bound                 ! The largest |j|/u_s the bound assumes.
   real(c_double) :: spont_fac                   ! Joules per unit sum|src|^2.
-  integer(c_int) :: nsub, first, helical, mutate, pad
+  integer(c_int) :: nsub, first, helical, mutate
+  integer(c_int) :: pstride                     ! Planes a polarization block spans, pad included.
   integer(c_int) :: field_general               ! An offset, a kx or a kick: the general field.
 end type
 
@@ -219,7 +220,9 @@ type fel_device_struct
   ! (fel_spectral_mod), the pad's free and sponge planes after them, n_t in all.
   logical :: spectral = .false.         ! The spectral propagator runs on the device.
   integer :: nplane = 0, nfree = 0, nsponge = 0, n_t = 0
-  real(rp), allocatable :: tau_key(:,:) ! Kernel-factor upload key along tau, (4, nfield).
+  real(rp), allocatable :: tau_key(:,:) ! Factor-table upload key along tau, (5, nfield): the
+                                        !   step, the length, k0, dk and 0 for the kernel's
+                                        !   table or 1 for the remainder's.
   complex(c_float_complex), allocatable :: sax(:)   ! Staging for one member's factors along tau.
   type (fel_device_par_struct) :: par_last   ! The last step's constants and its entry phase,
   real(rp) :: phi0_last = 0                  !   for the twin's rows after the walk's spectral step.
@@ -396,6 +399,28 @@ interface
     import c_double
     real(c_double) u
   end function
+
+  function luc_dev_unavg_remainder (first, reason, reason_len) bind(c, name = 'luc_dev_unavg_remainder') &
+                                   result (ierr)
+    import c_int, c_char
+    integer(c_int), value :: first, reason_len
+    character(kind=c_char) :: reason(*)
+    integer(c_int) ierr
+  end function
+
+  function luc_dev_field_energy_mark (which, reason, reason_len) bind(c, name = 'luc_dev_field_energy_mark') &
+                                     result (ierr)
+    import c_int, c_char
+    integer(c_int), value :: which, reason_len
+    character(kind=c_char) :: reason(*)
+    integer(c_int) ierr
+  end function
+
+  subroutine luc_dev_field_energy (which, u_window, u_pad) bind(c, name = 'luc_dev_field_energy')
+    import c_int, c_double
+    integer(c_int), value :: which
+    real(c_double) u_window, u_pad
+  end subroutine
 
   subroutine luc_dev_download_g0 (is, n, g0) bind(c, name = 'luc_dev_download_g0')
     import c_int, c_float
@@ -742,7 +767,7 @@ allocate (dev%se(ngrid, ngrid))
 allocate (dev%sbase(dev%nfield * dev%nslice), dev%sbdep(dev%nfield * dev%nslice))
 dev%su0 = 0
 if (spectral) then
-  allocate (dev%tau_key(4, dev%nfield), dev%sax(ngrid * dev%n_t))
+  allocate (dev%tau_key(5, dev%nfield), dev%sax(ngrid * dev%n_t))
   dev%tau_key = -1
 endif
 
@@ -1235,7 +1260,7 @@ type (wavefront_struct) wf
 integer im
 real(rp) dz
 
-real(rp) key(4), k0, dk, dtau, kappa, kt
+real(rp) key(5), k0, dk, dtau, kappa, kt
 integer ngrid_arr(3), ngrid, nt, m, mt, ix, mx
 
 !
@@ -1247,7 +1272,7 @@ k0 = twopi / wf%wavelength
 dk = twopi / (ngrid * wf%dx)
 dtau = wf%dz
 
-key = [dz, real(nt, rp), k0, dk]
+key = [dz, real(nt, rp), k0, dk, 0.0_rp]
 if (all(dev%tau_key(:, im) == key)) return
 
 do ix = 1, ngrid
@@ -1264,6 +1289,177 @@ call luc_dev_set_tau_kernel (im-1, dev%sax)
 dev%tau_key(:, im) = key
 
 end subroutine fel_device_set_tau_kernel
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_set_tau_remainder (dev, im, wf, dz)
+!
+! Routine to upload member im's factors along tau for the kernel's remainder over a
+! record step of dz, ax(ix, m) = exp(-i dz (m_x dk)^2 (1 / 2 k(kappa_m) - 1 / 2 k0)),
+! as fel_spectral_correct builds them for the CPU, into the one table the pass along
+! tau reads (fel_device_set_tau_kernel), keyed apart from the kernel's own so that an
+! averaged segment of the same step after an unaveraged one uploads the kernel again.
+!
+! Input:
+!   im -- integer: The member, 1-based in set order.
+!   wf -- wavefront_struct: The member's record, for its wavelength, spacing and grid.
+!   dz -- real(rp): The record step the planes diffracted at k0 over [m].
+!-
+
+subroutine fel_device_set_tau_remainder (dev, im, wf, dz)
+
+type (fel_device_struct) dev
+type (wavefront_struct) wf
+integer im
+real(rp) dz
+
+real(rp) key(5), k0, dk, dtau, kappa, kt
+integer ngrid_arr(3), ngrid, nt, m, mt, ix, mx
+
+!
+
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+nt = dev%n_t
+k0 = twopi / wf%wavelength
+dk = twopi / (ngrid * wf%dx)
+dtau = wf%dz
+
+key = [dz, real(nt, rp), k0, dk, 1.0_rp]
+if (all(dev%tau_key(:, im) == key)) return
+
+do ix = 1, ngrid
+  mx = ix - 1;  if (2*mx > ngrid-1) mx = mx - ngrid
+  do m = 1, nt
+    mt = m - 1;  if (2*mt > nt-1) mt = mt - nt
+    kappa = twopi * mt / (nt * dtau)
+    kt = k0 + kappa
+    dev%sax((ix - 1) * nt + m) = cmplx(exp(cmplx(0.0_rp, -dz * (mx * dk)**2 * (1 / (2 * kt) - 1 / (2 * k0)), rp)), &
+                                       kind = c_float_complex)
+  enddo
+enddo
+call luc_dev_set_tau_kernel (im-1, dev%sax)
+dev%tau_key(:, im) = key
+
+end subroutine fel_device_set_tau_remainder
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_unavg_remainder (dev, ff, dz, err_flag)
+!
+! Routine to encode the spectral propagator's remainder pass after an unaveraged record
+! step's substeps, fel_spectral_correct on the resident record: the remainder's factors
+! are uploaded for the one member the mode carries and the backend runs the transverse
+! transform pair about the pass along tau over the window and its pad. The slip passes
+! follow through fel_spectral_device_slip.
+!
+! Input:
+!   ff(:) -- fel_field_struct: The field set, one member.
+!   dz    -- real(rp): The record step [m].
+!
+! Output:
+!   err_flag -- logical: Set True if the backend refuses. False otherwise.
+!-
+
+subroutine fel_device_unavg_remainder (dev, ff, dz, err_flag)
+
+type (fel_device_struct) dev
+type (fel_field_struct) ff(:)
+real(rp) dz
+logical err_flag
+
+character(kind=c_char) c_reason(256)
+character(256) reason
+character(*), parameter :: r_name = 'fel_device_unavg_remainder'
+
+!
+
+err_flag = .false.
+call fel_device_set_tau_remainder (dev, 1, ff(1)%wf, dz)
+if (luc_dev_unavg_remainder(int(ff(1)%slip%first, c_int), c_reason, 256) /= 0) then
+  call from_c (c_reason, reason)
+  call out_io (s_error$, r_name, 'DEVICE REMAINDER PASS REFUSED: ' // trim(reason) // '.')
+  err_flag = .true.
+endif
+
+end subroutine fel_device_unavg_remainder
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_field_energy_mark (dev, which, err_flag)
+!
+! Routine to encode a reduction of the resident field's energy, sum|E|^2 over every
+! plane of the set, into slot set which, 0 or 1, inside the open command buffer, for the
+! unaveraged ledger under the spectral propagator. fel_device_field_energy reads it.
+!
+! Input:
+!   which -- integer: The slot set, 0 before the record step's passes and 1 after.
+!
+! Output:
+!   err_flag -- logical: Set True if the backend refuses. False otherwise.
+!-
+
+subroutine fel_device_field_energy_mark (dev, which, err_flag)
+
+type (fel_device_struct) dev
+integer which
+logical err_flag
+
+character(kind=c_char) c_reason(256)
+character(256) reason
+character(*), parameter :: r_name = 'fel_device_field_energy_mark'
+
+!
+
+err_flag = .false.
+if (luc_dev_field_energy_mark(int(which, c_int), c_reason, 256) /= 0) then
+  call from_c (c_reason, reason)
+  call out_io (s_error$, r_name, 'DEVICE ENERGY REDUCTION REFUSED: ' // trim(reason) // '.')
+  err_flag = .true.
+endif
+
+end subroutine fel_device_field_energy_mark
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_field_energy (dev, which, s_window, s_pad)
+!
+! Routine to read a field-energy reduction fel_device_field_energy_mark encoded: the
+! partial sums drain and add in FP64 in index order, so two runs give one answer. The
+! sums are of |E|^2 over the grid, the window's planes and the pad's apart, and the
+! caller scales them to joules as fel_unavg_step scales the pad's.
+!
+! Input:
+!   which -- integer: The slot set, 0 or 1.
+!
+! Output:
+!   s_window -- real(rp): sum|E|^2 over the window's planes.
+!   s_pad    -- real(rp): sum|E|^2 over the pad's planes.
+!-
+
+subroutine fel_device_field_energy (dev, which, s_window, s_pad)
+
+type (fel_device_struct) dev
+integer which
+real(rp) s_window, s_pad
+
+real(c_double) uw, up
+
+!
+
+call luc_dev_field_energy (int(which, c_int), uw, up)
+s_window = real(uw, rp)
+s_pad = real(up, rp)
+
+end subroutine fel_device_field_energy
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

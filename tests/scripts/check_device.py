@@ -709,6 +709,12 @@ def unaveraged(args, wd, exe):
     is what sets these ceilings: a run with no charge leaves the repeated diffract as the
     only thing acting on the field, and what the field then loses is the pair's own
     arithmetic.
+
+    Under the spectral propagator the record step adds the kernel's remainder and the
+    ramp on the resident record once a record step, and the sandwich probe holds it:
+    the twin's rows, the exit power against the CPU's run, the ledger's closure with the
+    pad and the sponge counted on the device, the pulse file's planes and two runs
+    identical.
     """
     print("== the unaveraged mode on the device ==")
     latdir = pathlib.Path(args.latdir)
@@ -968,13 +974,130 @@ def unaveraged(args, wd, exe):
        f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good,
        num=loss, bound=list(PAIR_LOSS), kind="range")
 
-    # 9. The handedness the mode selects, on the device. A helical element radiates one
+    # 9. The spectral propagator with the mode, on the sandwich probe of check_unaveraged.py:
+    # an averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment
+    # over 8 slices of one wavelength. The device's unaveraged record step runs the CPU's
+    # form, the substeps and then the kernel's remainder and the ramp once a record step
+    # on the resident record (fel_unavg_step, docs/spectral-field.md). The twin's rows are
+    # read after the substeps, where the unaveraged twin reads them, since its record is
+    # rebuilt from FP64 each record step. The rows sit at the sandwich's own levels under
+    # either propagator, the source row at 3.5e-2 since the probe's short unaveraged
+    # segment turns over little energy a record step, and the guard at 2.7e6 ticks.
+    unavg_spectral(args, wd, exe)
+
+    # 10. The handedness the mode selects, on the device. A helical element radiates one
     # circular polarization and couples to it, and which one is the electron's own. A
     # total power cannot tell the two apart, so the control is seeded:
     # a cold beam driven by a uniform seed as the scalar envelope and as each circular
     # pair of the same total intensity, and the rms energy modulation says which pair the
     # device couples to. It must be the CPU's answer, and the CPU's is check_two_polarization's.
     unavg_handedness(args, wd, exe)
+
+
+# The sandwich probe's own levels under the propagator, on the device, each three times
+# its first measurement. The source row and the guard are the probe's and not the mode's:
+# under the slice propagator the same twin reads 3.7e-2 and 2.7e6 on this input file. The
+# ledger on the device closes at 3.7e-4 of the turnover under the propagator and at
+# 4.2e-4 under the slice propagator, the FP32 transform pairs' own loss (validation.md,
+# val-device-unaveraged), where the CPU closes at 8e-9 and 1e-9.
+USP_SOURCE_CEIL = 1.1e-1
+USP_GUARD_FLOOR = 9e5
+USP_LEDGER_CEIL = 1.1e-3
+
+USAND = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
+  lattice = "unavg_sandwich.bmad"
+  out_root = "{root}"
+  source_filter = F
+  lambda0 = 1e-10
+  beam.n_particle = 512
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.8045e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 1e4
+  seed_waist_size = 30e-6
+  grid_n_pts = 64
+  grid_half_width = 2e-4
+  window_length = 8e-10
+  n_wavelength = 1
+  shot_noise = T
+  ran_seed = 999
+  write_diag = T
+  field.propagator = "spectral"
+  field.n_wavelength = 1
+{extra}&end
+"""
+
+
+def ledger_closure(wd, root):
+    """The unaveraged ledger's closure, max |d(E_beam + U_field + U_escaped - U_spont +
+    E_rad)| over the energy the record steps turned over, as check_unaveraged.py reads it."""
+    led = np.loadtxt(wd / f"{root}.ledger.txt")
+    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
+    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
+    return float(np.abs(etot - etot[0]).max() / max(turn, 1e-300))
+
+
+def unavg_spectral(args, wd, exe):
+    """The unaveraged mode under the spectral propagator on the device, on the sandwich."""
+    print("--- the spectral propagator with the unaveraged mode, on the device:")
+    (wd / "unavg_sandwich.bmad").write_bytes((pathlib.Path(args.latdir) / "unavg_sandwich.bmad").read_bytes())
+
+    # The lockstep rows, the device in the twin's role, and the mutation.
+    run(exe, wd, "dvus_ss.in", USAND.format(root="dvusss", extra=DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
+    s = summary(wd, "dvusss")
+    for q in CEIL_U:
+        ceil = USP_SOURCE_CEIL if q == "source" else CEIL_U[q]
+        ok(f"unaveraged spectral lockstep worst_{q}", f"{s[q]:.3e}", f"<= {ceil:.1e}", s[q] <= ceil,
+           num=s[q], bound=ceil, kind="max")
+    ok("unaveraged spectral lockstep guard [ticks]", f"{s['guard']:.3e}", f">= {USP_GUARD_FLOOR:.0e}",
+       s["guard"] >= USP_GUARD_FLOOR, num=s["guard"], bound=USP_GUARD_FLOOR, kind="min")
+    run(exe, wd, "dvus_mut.in", USAND.format(root="dvusmut",
+        extra=DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'), threads="8")
+    m = summary(wd, "dvusmut")
+    for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
+        ok(f"unaveraged spectral mutation moves worst_{q}", f"{m[q]:.3e} vs {s[q]:.3e}", f">= {factor}x",
+           m[q] >= factor * s[q], num=m[q], bound=factor * s[q], kind="min")
+
+    # Read-only, against the CPU's own unaveraged spectral run.
+    run(exe, wd, "dvus_off.in", USAND.format(root="dvusoff", extra=""), threads="8")
+    same = (wd / "dvusss.diag.txt").read_bytes() == (wd / "dvusoff.diag.txt").read_bytes()
+    ok("unaveraged spectral FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    same = (wd / "dvusss.ledger.txt").read_bytes() == (wd / "dvusoff.ledger.txt").read_bytes()
+    ok("unaveraged spectral FP64 ledger byte-identical, device twin on vs off", same, "True", same)
+
+    # The production role: the exit power against the CPU's unaveraged spectral run, the
+    # ledger's closure with the pad and the sponge counted on the device, and the pulse
+    # file holding the CPU's planes.
+    run(exe, wd, "dvus_pr.in", USAND.format(root="dvuspr", extra=DEV), threads="8")
+    pc = diag_power(wd, "dvusoff", 8)
+    pd = diag_power(wd, "dvuspr", 8)
+    rel = abs(pd - pc) / pc
+    ok("unaveraged spectral production exit power vs CPU", f"{rel:.3e}", f"<= {U_E2E_CEIL:.1e}",
+       rel <= U_E2E_CEIL, num=rel, bound=U_E2E_CEIL, kind="max")
+    c = ledger_closure(wd, "dvuspr")
+    ok("unaveraged spectral ledger on the device, closure over the turnover", f"{c:.3e}",
+       f"<= {USP_LEDGER_CEIL:.1e}", c <= USP_LEDGER_CEIL, num=c, bound=USP_LEDGER_CEIL, kind="max")
+    planes = {}
+    for key, root in (("cpu", "dvusoff"), ("dev", "dvuspr")):
+        with h5py.File(wd / f"{root}-pulse.wf.h5") as h5:
+            planes[key] = int(h5["data/1/meshes/electricField/x"].shape[0])
+    ok("unaveraged spectral pulse planes, device against CPU", f"{planes['dev']} against {planes['cpu']}",
+       "equal", planes["dev"] == planes["cpu"] and planes["dev"] > 8,
+       num=planes["dev"], bound=planes["cpu"], kind="equal")
+
+    # Two device runs of the input file, every array of the statistics file, at 4
+    # threads against 8.
+    run(exe, wd, "dvus_r2.in", USAND.format(root="dvusr2", extra=DEV), threads="4")
+    a = stats_arrays(wd / "dvuspr.stats.h5")
+    b = stats_arrays(wd / "dvusr2.stats.h5")
+    diff = [k for k in a if a[k] != b.get(k)]
+    ok("two unaveraged spectral device runs, every stats array identical", f"{len(diff)} of {len(a)} differ",
+       "0", len(diff) == 0 and len(a) > 0, num=len(diff), bound=0, kind="equal")
 
 
 def unavg_handedness(args, wd, exe):
