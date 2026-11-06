@@ -87,12 +87,22 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The dispatch input sets how many check sections run at once, in place of the
+  # validation suite's own rule, so the rule can be measured on this runner without a
+  # commit per trial (docs/validation.md, val-linux-ci).
   workflow_dispatch:
+    inputs:
+      section_workers:
+        description: "Check sections at once (empty: the validation suite's rule)"
+        required: false
+        default: ""
   schedule:
     - cron: "17 9 * * 1"
 
+# The group carries the dispatch input, so two dispatches that measure different section
+# counts on one ref run side by side rather than one cancelling the other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}
   cancel-in-progress: true
 
 jobs:
@@ -263,21 +273,65 @@ jobs:
           conda run -n bmad-fel-validate python -c \
               "import beamphysics; print('openPMD-beamphysics', beamphysics.__version__)"
 
-      # The validation suite prints the reference version and the electron rest energy it carries,
-      # every section's name and wall time, and every tier's level against its tolerance.
-      # Its header names the build --build declares, debug or production. Its exit status
-      # is zero only if every tier passed. Run from the validate environment, which is how
-      # the recording machine runs it.
-      - name: Validation suite against Genesis4, ${{ matrix.build }} build
+      # The Genesis4 reference set is a pure function of the reference binary, its pinned
+      # version and the input files, and the validation suite caches it under a key of
+      # those three, which --reference-key prints without running anything. The runner's
+      # cache is empty on every run, so the set is restored from the repository's cache
+      # under that key, and saved under it after a run that had to generate it. The two
+      # builds share the set, since the reference does not depend on Lucifer's build.
+      - name: Find the Genesis4 reference set's cache key, ${{ matrix.build }} build
+        id: refkey
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
           set -e
+          key="$(./tests/run_fel_validation.sh --exe "$PWD/${{ matrix.dir }}/bin/lucifer" --reference-key \
+                 | sed -n 's/^reference key //p')"
+          test -n "$key"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          echo "dir=$HOME/.cache/lucifer/genesis-refs" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Genesis4 reference set, ${{ matrix.build }} build
+        id: refcache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.refkey.outputs.dir }}
+          key: genesis-refs-${{ steps.refkey.outputs.key }}
+
+      # The validation suite prints the reference version and the electron rest energy it carries,
+      # whether the reference set came from the cache, every section's name and wall time,
+      # and every tier's level against its tolerance. Its header names the build --build
+      # declares, debug or production, and how many check sections run at once. Its exit
+      # status is zero only if every tier passed. Run from the validate environment, which
+      # is how the recording machine runs it.
+      - name: Validation suite against Genesis4, ${{ matrix.build }} build
+        shell: bash -o pipefail {0}
+        env:
+          SECTION_WORKERS: ${{ inputs.section_workers }}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          conda activate bmad-fel-validate
+          set -e
+          export LUCIFER_GENESIS_CACHE="${{ steps.refkey.outputs.dir }}"
+          workers=()
+          if [ -n "$SECTION_WORKERS" ]; then workers=(--section-workers "$SECTION_WORKERS"); fi
           ./tests/run_fel_validation.sh \
               --exe "$PWD/${{ matrix.dir }}/bin/lucifer" --build ${{ matrix.flavor }} \
+              "${workers[@]}" \
               --results "$RUNNER_TEMP/fel-${{ matrix.build }}.txt" \
               --work-dir "$RUNNER_TEMP/wd-${{ matrix.build }}"
+
+      # Saved only after a run that generated the set. The two builds race to save one key,
+      # and the loser's save is refused by the cache service, which is not a failure of this
+      # job.
+      - name: Save the Genesis4 reference set, ${{ matrix.build }} build
+        if: always() && steps.refcache.outputs.cache-hit != 'true' && steps.refkey.outputs.key != ''
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.refkey.outputs.dir }}
+          key: genesis-refs-${{ steps.refkey.outputs.key }}
 
       # The propagator this job's build compiled, named, since the script's default tries
       # the debug build first.
@@ -307,11 +361,21 @@ jobs:
       - name: Summarize the validation suite's levels, ${{ matrix.build }} build
         if: always()
         shell: bash
+        env:
+          REF_KEY: ${{ steps.refkey.outputs.key }}
+          REF_HIT: ${{ steps.refcache.outputs.cache-hit }}
+          SECTION_WORKERS: ${{ inputs.section_workers }}
         run: |
+          {
+            echo '## Lucifer validation suite, Linux ${{ matrix.build }} build'
+            echo
+            echo "Genesis4 reference set: key \`${REF_KEY:-none}\`, restored from the cache: \`${REF_HIT:-false}\`."
+            echo
+            echo "Check sections at once: \`${SECTION_WORKERS:-set by the validation suite}\`."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
           if [ -f "$RUNNER_TEMP/fel-${{ matrix.build }}.txt" ]; then
             {
-              echo '## Lucifer validation suite, Linux ${{ matrix.build }} build'
-              echo
               echo 'Levels are this platform'"'"'s own. The recorded digits belong to the'
               echo 'machine that recorded them, and this job asserts the tolerances.'
               echo

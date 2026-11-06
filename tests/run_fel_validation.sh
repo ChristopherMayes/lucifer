@@ -50,6 +50,13 @@
 #                       Default: the machine's performance cores. A check run takes
 #                       four threads, so n/4 sections run at once, each with n over
 #                       that count for the pools inside its check script.
+#   --section-workers <n>
+#                       The check sections run at once, in place of n/4. The cores a
+#                       section hands its pools are then the allocation over this count,
+#                       at least one. The Linux CI job sets it (docs/validation.md).
+#   --reference-key     Print the key the Genesis reference set is cached under, as
+#                       "reference key <key>", and exit having run nothing. The Linux CI
+#                       job restores its cache under this key before the run.
 #
 # Two of these may run at once, which is how the keystone runs them: one pass per
 # build, each with its own --work-dir and its share of the cores in --cpus. They share
@@ -92,6 +99,8 @@ PYTHON=""
 WORK_DIR=""
 RESULTS=""
 CPUS=""
+SECTION_WORKERS=""
+KEY_ONLY=0
 TIERS_MARKER=""
 WAIT_TIERS=""
 
@@ -104,9 +113,11 @@ while [[ $# -gt 0 ]]; do
     --work-dir) WORK_DIR="$2"; shift 2 ;;
     --results)  RESULTS="$2";  shift 2 ;;
     --cpus)     CPUS="$2";     shift 2 ;;
+    --section-workers) SECTION_WORKERS="$2"; shift 2 ;;
+    --reference-key)   KEY_ONLY=1; shift ;;
     --tiers-marker) TIERS_MARKER="$2"; shift 2 ;;
     --wait-tiers)   WAIT_TIERS="$2";   shift 2 ;;
-    -h|--help)  sed -n '2,51p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,59p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -118,6 +129,31 @@ if [[ ! -x "$GENESIS" ]]; then
   echo "Error: genesis4 binary not found at: $GENESIS" >&2
   echo "Point at one with --genesis <path>." >&2
   exit 1
+fi
+
+# The reference's version, from the binary's own banner, which it prints before
+# complaining about the missing input file.
+GENESIS_VERSION_WANTED=4.6.15
+GENESIS_VERSION="$("$GENESIS" 2>&1 | sed -n 's/.*Version \([0-9][0-9.]*\).*/\1/p' | head -1)"
+
+# The key the reference set is cached under, from the directory holding the input files
+# genesis reads: the pinned version, the binary's own bytes and every input file.
+if command -v shasum >/dev/null 2>&1; then SHA="shasum -a 256"; else SHA="sha256sum"; fi
+reference_key () {   # <dir>
+  ( cd "$1" && { echo "genesis $GENESIS_VERSION"
+                 $SHA "$GENESIS"
+                 ls -1 *.lat *.in | sort | while read -r f; do $SHA "$f"; done
+               } | $SHA | cut -c1-16 )
+}
+
+# The key alone, for a cache outside this script to restore under: the input files are
+# staged as the run stages them, so the key is the one the run computes.
+if [[ $KEY_ONLY -eq 1 ]]; then
+  KEY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fel_reference_key.XXXXXX")"
+  cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/genesis4/*/*.in "$KEY_DIR/"
+  echo "reference key $(reference_key "$KEY_DIR")"
+  rm -rf "$KEY_DIR"
+  exit 0
 fi
 
 case "$BUILD" in
@@ -186,9 +222,15 @@ if ! [[ "$CPUS" =~ ^[1-9][0-9]*$ ]]; then
   echo "Error: --cpus takes a whole number of cores. Got: $CPUS" >&2
   exit 2
 fi
-SECTION_WORKERS=$((CPUS / 4))
-[[ $SECTION_WORKERS -lt 1 ]] && SECTION_WORKERS=1
+if [[ -z "$SECTION_WORKERS" ]]; then
+  SECTION_WORKERS=$((CPUS / 4))
+  [[ $SECTION_WORKERS -lt 1 ]] && SECTION_WORKERS=1
+elif ! [[ "$SECTION_WORKERS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Error: --section-workers takes a whole number of sections. Got: $SECTION_WORKERS" >&2
+  exit 2
+fi
 SECTION_CPUS=$((CPUS / SECTION_WORKERS))
+[[ $SECTION_CPUS -lt 1 ]] && SECTION_CPUS=1
 
 KEEP_WORK_DIR=1
 if [[ -z "$WORK_DIR" ]]; then
@@ -210,8 +252,6 @@ echo "  genesis4:    $GENESIS"
 # do not compare. The version comes from the binary's own banner, which it prints before
 # complaining about the missing input file, so a binary named by --genesis identifies
 # itself the same way a packaged one does.
-GENESIS_VERSION_WANTED=4.6.15
-GENESIS_VERSION="$("$GENESIS" 2>&1 | sed -n 's/.*Version \([0-9][0-9.]*\).*/\1/p' | head -1)"
 echo "               version $GENESIS_VERSION"
 if [[ "$GENESIS_VERSION" != "$GENESIS_VERSION_WANTED" ]]; then
   echo "Error: the recorded levels belong to genesis4 $GENESIS_VERSION_WANTED, and this reference reports" >&2
@@ -231,7 +271,7 @@ echo "               $GENESIS_EEV"
 echo "  python:      $PYTHON"
 echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"
-echo "  cores:       $CPUS for the check sections, $SECTION_WORKERS at once"
+echo "  cores:       $CPUS for the check sections, $SECTION_WORKERS at once, $SECTION_CPUS for the pools in each"
 echo
 
 # The results file is for doc generation, so it records what is reproducible: which
@@ -304,11 +344,7 @@ run_genesis () {   # <input> ...: the input files of one chain, in order
 # private name with its marker written last and moved into place whole, so a half-filled
 # directory is never mistaken for a reference set.
 GEN_CACHE_ROOT="${LUCIFER_GENESIS_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/genesis-refs}"
-if command -v shasum >/dev/null 2>&1; then SHA="shasum -a 256"; else SHA="sha256sum"; fi
-GEN_KEY="$( { echo "genesis $GENESIS_VERSION"
-              $SHA "$GENESIS"
-              ls -1 *.lat *.in | sort | while read -r f; do $SHA "$f"; done
-            } | $SHA | cut -c1-16 )"
+GEN_KEY="$(reference_key .)"
 GEN_CACHE="$GEN_CACHE_ROOT/$GEN_KEY"
 
 if [[ -f "$GEN_CACHE/.complete" ]]; then
