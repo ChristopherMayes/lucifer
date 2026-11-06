@@ -26,6 +26,26 @@ No test in the keystone or in the Linux CI job judges a wall clock. The validati
 
 The Linux CI job builds both configurations, each in a job of its own on its own runner, and neither stops the other when it fails. The debug build is there because `-fbounds-check` turns an out-of-bounds read into a failure instead of a wrong number. Five wake cases once failed on Linux by reading past the end of a one-element vector, which the macOS allocator had answered with a number that happened to work. The release build is there because it is the build the conda-forge package ships, and it differs in what the debug build cannot reach: every file at `-O2` where the debug build has `-O0`, with the floating-point contraction an optimizing compiler does. Both builds compile `fel_track_mod` at `-O3` with the paired-sincos shim. The CI job asserts tolerances and not the recorded digits, since a different FFTW and HDF5 change the last digits by construction ([](#val-second-toolchain)). A check that fails on the release build and not on the debug build is a defect of the release build, and its tolerance is not widened to pass it.
 
+(val-linux-ci)=
+### The Linux CI job's time
+
+A runner has four cores and starts with an empty home directory. On the run of 2026-11-06 the validation suite took 3130 s on the debug build and 2120 s on the release build, about an hour end to end for the debug job. The suite's own timing lines put the debug build's time at 378 s for the Genesis4 reference set, generated cold on every run, 351 s for the eleven tiers at once, and 2370 s for the 23 check sections, run one at a time. Two changes shorten it, and neither changes what is checked: every section runs on both builds and asserts its tolerance as before.
+
+The reference set is a pure function of the reference binary, its pinned version and the input files, and the suite caches it under a key of those three. `tests/run_fel_validation.sh --reference-key` prints that key without running anything, and the job restores the set from the repository's cache under it before the suite and saves it after a run that had to generate it. The set is 196 MiB, the two builds share it, and a restored set takes the reference phase from 300 to 380 s to under a second. The step summary states the key and whether it was restored.
+
+The check sections ran one at a time because a check run is written for four threads and the suite runs the allocation over four sections at once. On four cores that is one. The job's dispatch inputs set the sections at once and the allocation, so the rule was measured on the runner with every other setting fixed, in one round of runs made side by side, the reference set restored in all of them:
+
+| sections at once, threads each | debug suite | debug sections | release suite | release sections |
+|---|---|---|---|---|
+| 1, 4 (the earlier rule) | 2318 s | 1975 s | 1725 s | 1455 s |
+| 2, 4 | 1642 s | 1410 s | 1174 s | 959 s |
+| 4, 4 | 1602 s | 1341 s | 1418 s | 1187 s |
+| 4, 2 | 2466 s | 2081 s | 1314 s | 1091 s |
+
+Two sections at once with four threads each, eight threads on four cores, takes 0.71 of the earlier rule's suite on the debug build and 0.68 on the release build. Four at once does no better, and four at once with two threads each does worse on the debug build. A section is mostly many short tracker runs, which keep four threads busy only part of the time, so a second section fills the idle cores. The spectral section is the longest whatever the rule, 697 to 1146 s at two at once, since it runs its tracker runs one after another, and the sections cannot finish before it. So the suite allocates eight cores on a machine with fewer than eight, and the rule of the allocation over four gives two sections at once with four threads each. A machine of eight cores or more, and the keystone, which hands each pass its share, are unchanged. The header states the allocation, the machine's own count where they differ, the sections at once and the cores each hands its pools.
+
+A runner's speed moves by a third between runs: the same settings took 1680 s and 2318 s on the debug build in two rounds an hour apart, and the spectral section 506 s and 846 s. So a change is measured against a baseline run beside it and not against an earlier day's run. Against the earlier rule in the same round, with the reference set restored, the two changes take the suite to about 0.6 of what it was on both builds, 1642 s against about 2670 s on the debug build and 1174 s against about 2060 s on the release build, the earlier runs' 300 to 380 s for the reference set added back to that round's baseline. The debug job's suite still takes 1.4 times the release job's, more than a third longer, since its build is `-O0` with bounds checks. Moving the debug build's check sections to pushes to main and the weekly schedule, while its tiers and refusals stay on every pull request, would leave the job's time to the release build, and it is a choice about where a bounds error is caught and not a measurement, so it is left for its own decision.
+
 (val-the-keystone-rule)=
 ## The keystone rule
 

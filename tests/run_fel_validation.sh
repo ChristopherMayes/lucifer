@@ -47,9 +47,10 @@
 #   --wait-tiers <p>    Wait for this file before the tier block, at most 900 s
 #                       (LUCIFER_TIER_WAIT_MAX overrides, which the bound's own check uses).
 #   --cpus <n>          The cores this pass may spend on its check sections at once.
-#                       Default: the machine's performance cores. A check run takes
-#                       four threads, so n/4 sections run at once, each with n over
-#                       that count for the pools inside its check script.
+#                       Default: the machine's performance cores, and eight on a machine
+#                       with fewer. A check run takes four threads, so n/4 sections run
+#                       at once, each with n over that count for the pools inside its
+#                       check script.
 #   --section-workers <n>
 #                       The check sections run at once, in place of n/4. The cores a
 #                       section hands its pools are then the allocation over this count,
@@ -212,11 +213,23 @@ fi
 # (scripts/pool.py). The allocation is spent once between the sections of a pass and
 # never once each. Run by hand, a pass takes the machine's performance cores. In a
 # keystone the suite hands each pass its share (tests/test_keystone.py).
+#
+# A machine with fewer than eight cores is allocated eight, so two sections run at once
+# with four threads each. Most sections are many short tracker runs that keep four threads
+# busy part of the time, and on the Linux job's four-core runner two at once took 0.71 of
+# the debug build's suite and 0.68 of the release build's against one at a time, where
+# four at once with one or two threads each did no better (docs/validation.md,
+# val-linux-ci). MACHINE_CPUS keeps the count the machine reported, for the header.
+MACHINE_CPUS=""
 if [[ -z "$CPUS" ]]; then
   CPUS="$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || true)"
   [[ -n "${CPUS:-}" ]] || CPUS="$(sysctl -n hw.ncpu 2>/dev/null || true)"
   [[ -n "${CPUS:-}" ]] || CPUS="$(nproc 2>/dev/null || true)"
   [[ -n "${CPUS:-}" ]] || CPUS=4
+  if [[ "$CPUS" =~ ^[0-9]+$ && $CPUS -lt 8 ]]; then
+    MACHINE_CPUS=$CPUS
+    CPUS=8
+  fi
 fi
 if ! [[ "$CPUS" =~ ^[1-9][0-9]*$ ]]; then
   echo "Error: --cpus takes a whole number of cores. Got: $CPUS" >&2
@@ -271,7 +284,7 @@ echo "               $GENESIS_EEV"
 echo "  python:      $PYTHON"
 echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"
-echo "  cores:       $CPUS for the check sections, $SECTION_WORKERS at once, $SECTION_CPUS for the pools in each"
+echo "  cores:       $CPUS for the check sections${MACHINE_CPUS:+ on a machine of $MACHINE_CPUS}, $SECTION_WORKERS at once, $SECTION_CPUS for the pools in each"
 echo
 
 # The results file is for doc generation, so it records what is reproducible: which
