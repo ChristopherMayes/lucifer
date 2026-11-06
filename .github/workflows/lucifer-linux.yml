@@ -61,9 +61,10 @@
 # on a runner with no Metal device and skips with its reason recorded in both jobs, the
 # one section allowed to.
 #
-# `workflow_dispatch` and `schedule` read this file from the repository's default branch,
-# main, rather than from the ref they name, which is GitHub's rule for both. `push` is the
-# trigger that reads the pushed ref.
+# `schedule` reads this file from the repository's default branch, main. `push` and
+# `workflow_dispatch` read it from the ref they name, so a dispatch on a branch runs that
+# branch's steps and inputs, provided the file also exists on main, which is GitHub's
+# condition for the workflow to be dispatchable at all.
 #
 # On every pull request against main, on every push to it, and weekly besides. Every
 # commit here is validated before it is merged, and the keystone that does it runs on
@@ -128,15 +129,12 @@ jobs:
             config: Release
             dir: build-release
             flavor: production
-    # Measured on this runner on 2026-10-30, the first run of both jobs, against the
-    # conda-forge package. The debug job took 23.7 minutes end to end, of which the
-    # validation suite is 21.8 and the Lucifer build 0.6. The release job took 31.6 minutes,
-    # of which the validation suite is 28.9 and the Lucifer build 1.0. The two run at once,
-    # so the run took 31.6 minutes. The debug job alone took 36.0 minutes on 2026-10-24,
-    # with 33.9 in the validation suite, so a runner's minutes move by a third between runs
-    # and say nothing about which build is faster. The validation suite costs three to four
-    # times its local 7.7 minutes because a runner has four cores against the recording
-    # machine's sixteen and its Genesis references are always cold.
+    # Measured on this runner on 2026-11-06 (docs/validation.md, val-linux-ci): with the
+    # Genesis4 references restored from the cache and two check sections at once, the
+    # debug job took 30.8 minutes end to end, 27.4 of them in the validation suite, and the
+    # release job 24.8 minutes, 19.6 in the suite. Before either change the debug job took
+    # 57.8 minutes and the release job 39.8. A runner's speed moves by a third between
+    # runs, so the page compares runs made side by side in one round.
     timeout-minutes: 120
 
     steps:

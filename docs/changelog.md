@@ -30,6 +30,18 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-06 Changed: the Linux CI job's validation suite takes about 0.6 of its time on both
+  builds, with every check section still run on both builds
+  ([](validation.md#val-linux-ci)). The Genesis4 reference set, which a runner generated cold on
+  every run in 300 to 380 s, is restored from the repository's cache under the key the suite
+  computes, `tests/run_fel_validation.sh --reference-key`, and saved after a run that had to
+  generate it. And the suite allocates eight cores on a machine with fewer, so the runner's four
+  cores run two check sections at once with four threads each where they ran one: two at once
+  took 0.71 of the debug suite and 0.68 of the release suite against one at a time on the runner,
+  and four at once did no better. `--section-workers` sets the sections at once, the workflow's
+  dispatch inputs set it and the allocation for a measurement, and the suite's header states the
+  allocation and the machine's own count where they differ. A machine of eight cores or more and
+  the keystone are unchanged.
 - 2026-11-06 Added: the unaveraged mode runs on the device under the spectral propagator,
   `run.device = "metal"` with `fel_method = unaveraged` and `field.propagator = "spectral"`
   ([](spectral-field.md#spectral-unaveraged), [](validation.md#val-device-unaveraged)). The device's
