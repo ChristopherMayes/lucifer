@@ -1498,17 +1498,12 @@ endif
 ! mode's field half, on the CPU in double precision and on the device in single
 ! (fel_device_mod), and the unaveraged mode's on the CPU (fel_unavg_step). The FP32 twin
 ! on the CPU and the coherent source each carry a propagator or a deposit of their own,
-! which it does not reach, so each is refused with the reason, and so are the device
-! and the field coarser than the slices in the unaveraged mode. The FP32 check with the
-! device on puts the device in the twin's role, which the device's spectral step covers.
+! which it does not reach, so each is refused with the reason, and so is the field
+! coarser than the slices in the unaveraged mode. The FP32 check with the device on puts
+! the device in the twin's role, which the device's spectral step covers.
 
 call fel_spectral_setup (run%spectral, run%winit%propagator)
 if (run%spectral%on) then
-  if (run%any_unavg .and. run%global%device /= 'off') then
-    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE UNAVERAGED MODE ON THE DEVICE,', &
-                                   'WHOSE UNAVERAGED KERNELS STEP THE SLICE PROPAGATOR (fel_device_mod).')
-    err_flag = .true.;  return
-  endif
   if (run%any_unavg .and. run%ffield(1)%n_per > 1) then
     call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ IS COARSER THAN THE WINDOW''S SLICE OF \i0\ WAVELENGTHS,', &
                                    'WHICH THE UNAVERAGED MODE DOES NOT COVER: ITS SOURCE RESOLVES STRUCTURE BELOW A SLICE.', &

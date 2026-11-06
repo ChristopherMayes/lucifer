@@ -1,0 +1,29 @@
+lattice = "unavg_sandwich.bmad"
+
+[run]
+out_root = "unavg_sandwich_8x512"
+source_filter = false
+ran_seed = 999
+
+[window]
+window_length = 8e-10
+n_wavelength = 1
+
+[beam]
+n_particle = 512
+bunch_charge = 8.0e-15
+sig_pz = 8.8045e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -4e-10
+z_max = 4e-10
+beamlet_size = 8
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 64
+grid_half_width = 2e-4
+seed_power = 1e4
+seed_waist_size = 30e-6

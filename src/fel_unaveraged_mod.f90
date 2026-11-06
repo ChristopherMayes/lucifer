@@ -492,17 +492,19 @@ scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_
 ! the record. The form with the kernel and the ramp at every substep was measured
 ! against this one on the sandwich probe and not taken: it departs from the slice
 ! propagator by 1.3e-1 of the peak field where this form and the averaged line's own
-! propagator difference sit at 5e-2, and it costs 3.5 times the walk. Setup refuses the
-! instrument and the device with the propagator, so the record step is the FP64 path
-! alone.
+! propagator difference sit at 5e-2, and it takes 3.5 times the walk. On the device the
+! record step runs the same form, the remainder pass and the slip passes on the resident
+! record after the substeps (unavg_device_step). Setup refuses the instrument's CPU twin
+! with the propagator, so with the instrument on the device is the twin, whose rows are
+! read after the substeps and whose record is rebuilt from FP64 each record step.
 
 spectral_on = .false.
 slippage_l = 0
 keep_l = .false.
 if (present(spec)) spectral_on = spec%on
 if (spectral_on) then
-  if (fp32%on .or. dev%on) then
-    call out_io (s_error$, r_name, 'THE UNAVERAGED MODE UNDER THE SPECTRAL PROPAGATOR REACHED THE INSTRUMENT OR THE DEVICE.', &
+  if (fp32%on .and. .not. dev%on) then
+    call out_io (s_error$, r_name, 'THE UNAVERAGED MODE UNDER THE SPECTRAL PROPAGATOR REACHED THE INSTRUMENT''S CPU TWIN.', &
                                    'PLEASE REPORT THIS!')
     return
   endif
@@ -874,7 +876,7 @@ end subroutine unavg_ledger_pad
 
 subroutine unavg_device_step (uerr)
 
-real(rp) du_now
+real(rp) du_now, s0w, s0p, s1w, s1p, e_scale
 logical uerr
 
 uerr = .true.
@@ -890,6 +892,23 @@ endif
 call unavg_dev_encode (err)
 if (err) return
 
+! The spectral propagator on the resident record, the CPU path's order below: the
+! kernel's remainder over the record step on the window and its pad, then the ramp with
+! the crossed planes banked, with the field's energy reduced before and after the two
+! passes for the ledger's pad and sponge terms. On the segment's last record step the
+! two passes run on the host instead, after the exit handoff, as they run there.
+
+if (spectral_on .and. .not. last) then
+  call fel_device_field_energy_mark (dev, 0, err)
+  if (err) return
+  call fel_device_unavg_remainder (dev, ff, dz_record, err)
+  if (err) return
+  call fel_spectral_device_slip (spec, dev, ff, slippage_l, keep_l, .false., err)
+  if (err) return
+  call fel_device_field_energy_mark (dev, 1, err)
+  if (err) return
+endif
+
 ! The ledger's two device-side terms. The command buffer has to drain before the next
 ! record step's stage factors can be written anyway, so reading them here costs the
 ! step nothing it was not already paying.
@@ -897,6 +916,14 @@ if (err) return
 call fel_device_unavg_ledger (dev, beam, dE_beam, du_now)
 dU_spont = du_now - dev%spont_prev
 dev%spont_prev = du_now
+
+if (spectral_on .and. .not. last) then
+  e_scale = dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
+  call fel_device_field_energy (dev, 0, s0w, s0p)
+  call fel_device_field_energy (dev, 1, s1w, s1p)
+  ustate%u_sponged = ustate%u_sponged + (s0w + s0p - s1w - s1p) * e_scale
+  ustate%u_pad = s1p * e_scale
+endif
 
 beam%phi0 = beam%phi0 + dz_record * phi0_rate_avg
 ustate%s = ustate%s + dz_record
@@ -915,6 +942,15 @@ if (last) then
   beam%quiver_in_px = .false.
   ustate%active = .false.
   call unavg_ramp_phase_jump ()
+
+  if (spectral_on) then
+    u_before = unavg_pad_energy (.true.)
+    call fel_spectral_correct (spec, ff(1), dz_record, err)
+    if (err) return
+    call fel_spectral_slip (spec, ff(1), slippage_l, keep_l, err)
+    if (err) return
+    call unavg_ledger_pad (u_before)
+  endif
 endif
 
 uerr = .false.
@@ -994,7 +1030,7 @@ upar%spont_fac = 4 * dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing
 upar%nsub = ustate%nsub
 upar%first = slip%first
 upar%helical = merge(1, 0, und%helical)
-upar%pad = 0
+upar%pstride = dev%n_t
 
 ! The deposit's bound. A contribution here carries |j|/u_s where the averaged deposit
 ! carries a roll-off over gamma. So the bound is the run's whole charge times the largest

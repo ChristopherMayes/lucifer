@@ -537,6 +537,7 @@ struct UnavgPar {
     float gam0, beta0, g0inv2, me;
     float gridmax, dgrid, scl_u, dscale, u_bound;
     uint  ngrid, npart, nslice, first, helical, mutate, npol, field_general;
+    uint  pstride;   // planes a polarization block spans: the window's, plus the pad's
 };
 
 struct U5 { float x, y, ux, uy, tau; };
@@ -727,9 +728,10 @@ kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
     float2 ehat = E[b] * w00 + E[b + 1u] * w10
                 + E[b + P.ngrid] * w01 + E[b + P.ngrid + 1u] * w11;
 
-    // The second plane sits one slice block further on in the member-major set, and it
-    // is gathered with the same four weights, as the host's branch gathers it.
-    uint by = b + P.nslice * nn;
+    // The second plane sits one polarization block further on in the member-major set,
+    // the window's planes and the pad's, and it is gathered with the same four weights,
+    // as the host's branch gathers it.
+    uint by = b + P.pstride * nn;
     float2 ehat_y = float2(0.0f);
     if (P.npol == 2u) ehat_y = E[by] * w00 + E[by + 1u] * w10
                             + E[by + P.ngrid] * w01 + E[by + P.ngrid + 1u] * w11;
@@ -755,14 +757,14 @@ kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
     // src += i e^{-i Psi} j scl_u w / u_s. The /u_s where the averaged deposit has
     // Genesis's /gamma is what makes the pair exact duals (sec-unaveraged). With two
     // planes the rotator is the same and the two real momenta scale it, each into its
-    // own source plane, which sits one slice block on as the field's does.
+    // own source plane, which sits one polarization block on as the field's does.
     float2 cj = cmul(float2(cph.x, -cph.y), (P.npol == 2u) ? float2(1.0f, 0.0f) : jhat);
     float2 cdep = float2(-cj.y, cj.x) * (P.scl_u * W[gid] / us);
     float2 cdep_y = cdep * uy;
     if (P.npol == 2u) cdep = cdep * ux;
 
     ulong idx = (ulong) b;
-    ulong sy = (ulong) P.nslice * (ulong) nn;
+    ulong sy = (ulong) P.pstride * (ulong) nn;
     float w;
     ulong dcell;
     w = w00;   dcell = 2u * idx;
@@ -845,6 +847,32 @@ kernel void unavg_spont (const device uint* SI [[buffer(0)]],
 kernel void unavg_gsave (device float* G0 [[buffer(0)]], const device float* G [[buffer(1)]],
                          uint gid [[thread_position_in_grid]]){
     G0[gid] = G[gid];
+}
+
+// The field's energy for the unaveraged ledger under the spectral propagator: sum|E|^2
+// over one chunk of one plane, reduced in threadgroup memory over a fixed pairing and
+// written to the chunk's own slot, as unavg_spont reduces the source. The host sums
+// the slots in FP64 in index order, the window's planes and the pad's apart, so two
+// runs give one answer.
+kernel void field_energy (const device float2* F [[buffer(0)]], device float* ACC [[buffer(1)]],
+                          constant uint& nn [[buffer(2)]],
+                          uint2 tg [[threadgroup_position_in_grid]],
+                          uint t [[thread_index_in_threadgroup]],
+                          uint2 ng [[threadgroups_per_grid]]){
+    threadgroup float sh[SPONT_T];
+    ulong base = (ulong) tg.y * (ulong) nn;
+    float acc = 0.0f;
+    for (uint i = tg.x * SPONT_T + t; i < nn; i += ng.x * SPONT_T) {
+        float2 v = F[base + (ulong) i];
+        acc += v.x * v.x + v.y * v.y;
+    }
+    sh[t] = acc;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint s = SPONT_T / 2u; s > 0u; s >>= 1u) {
+        if (t < s) sh[t] += sh[t + s];
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (t == 0u) ACC[tg.y * ng.x + tg.x] = sh[0];
 }
 
 // ---------------- the transform ----------------
@@ -1408,6 +1436,7 @@ struct UnavgPar {
     float gam0, beta0, g0inv2, me;
     float gridmax, dgrid, scl_u, dscale, u_bound;
     uint32_t ngrid, npart, nslice, first, helical, mutate, npol, field_general;
+    uint32_t pstride;
 };
 
 // The spontaneous reduction's shape, mirroring SPONT_T in the shader. One
@@ -1453,13 +1482,16 @@ struct Impl {
     // The unaveraged mode's own buffers: the record step's baseline energies, the
     // per-substep stage factors and carrier rotators, and the ledger's partials.
     id<MTLBuffer> bG0 {nil}, bFQ {nil}, bCB {nil}, bSpont {nil};
+    // The field's energy per plane, two sets of partial sums (field_energy), for the
+    // unaveraged ledger under the spectral propagator.
+    id<MTLBuffer> bUE {nil};
     int nsub {0};
 
     id<MTLComputePipelineState> pTrk, pPush, pZero, pDep, pRow, pRowM, pCol, pColA;
     id<MTLComputePipelineState> pRowF, pColAF;   // the two that convert where they read
     id<MTLComputePipelineState> pRowAF;          // the unaveraged solve's first pass
     id<MTLComputePipelineState> pWShift, pWPhase;
-    id<MTLComputePipelineState> pUPush, pUKick, pUSpont, pUGsave;
+    id<MTLComputePipelineState> pUPush, pUKick, pUSpont, pUGsave, pUE;
     id<MTLComputePipelineState> pTau {nil};
 
     int64_t bytes {0};
@@ -1780,7 +1812,8 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
             p->bAxT = alloc((size_t) nfield * ngrid * p->ntot * 8);
             p->bSponge = alloc(16 * 4);
             p->bBank = alloc((size_t) nfield * npol * LUC_DEV_BANK_SLOTS * nn * 8);
-            if (p->bTwT == nil || p->bAxT == nil || p->bSponge == nil || p->bBank == nil) {
+            p->bUE = alloc(2 * p->nplanes() * kSpontGroups * 4);
+            if (p->bTwT == nil || p->bAxT == nil || p->bSponge == nil || p->bBank == nil || p->bUE == nil) {
                 put_str(reason, reason_len, "the spectral propagator's buffers would not allocate");
                 delete p;
                 return 1;
@@ -1891,6 +1924,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->pUKick = pso(@"unavg_kick");
         p->pUSpont = pso(@"unavg_spont");
         p->pUGsave = pso(@"unavg_gsave");
+        p->pUE = pso(@"field_energy");
         p->pTau = pso(@"tau_pass");
         if (!ok) {
             put_str(reason, reason_len, "compute pipeline creation failed");
@@ -2539,6 +2573,7 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
         P.mutate = (uint32_t) par->mutate;
         P.npol = (uint32_t) p->npol;
         P.field_general = (uint32_t) par->field_general;
+        P.pstride = (uint32_t) p->ntot;
 
         // The planes each member carries, which is what the propagator pass maps a plane
         // to its member with. The source needs no map here: the unaveraged first pass
@@ -2617,43 +2652,182 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             // The slice's own source add and diffract, four passes, the first landing the
             // substep's source on the record the kick read and the rest the transform
             // kernels unchanged: field = IFFT(FFT(field + 2 src) exp(K2 dsub))/N^2, the
-            // order the CPU's step takes (fel_unaveraged_mod).
-            e = p->pass(LUC_DEV_PASS_SOLVE);
-            [e setComputePipelineState:p->pRowAF];
-            [e setBuffer:p->bField offset:0 atIndex:0];
-            [e setBuffer:p->bTw offset:0 atIndex:1];
-            [e setBytes:&fwd length:4 atIndex:2];
-            [e setBuffer:p->bSrcI offset:0 atIndex:3];
-            [e setBytes:&sinv length:4 atIndex:4];
-            [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+            // order the CPU's step takes (fel_unaveraged_mod). Under the spectral
+            // propagator the passes run on the window's planes of each polarization
+            // block alone, as fel_unavg_step diffracts each slice and not the pad: the
+            // block's planes start at its offset, and the pad's planes after the window's
+            // wait for the remainder pass (luc_dev_unavg_remainder).
+            const int nblk = p->spectral ? p->nfield * p->npol : 1;
+            const size_t bplanes = p->spectral ? (size_t) p->nplane : nplane;
+            const MTLSize bRowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), bplanes, 1);
+            const MTLSize bColTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), bplanes, 1);
+            for (int blk = 0; blk < nblk; blk++) {
+                const NSUInteger foff = (NSUInteger) ((size_t) blk * p->ntot * nn * 8);
+                const NSUInteger soff = (NSUInteger) ((size_t) blk * p->ntot * nn * 16);
+                e = p->pass(LUC_DEV_PASS_SOLVE);
+                [e setComputePipelineState:p->pRowAF];
+                [e setBuffer:p->bField offset:foff atIndex:0];
+                [e setBuffer:p->bTw offset:0 atIndex:1];
+                [e setBytes:&fwd length:4 atIndex:2];
+                [e setBuffer:p->bSrcI offset:soff atIndex:3];
+                [e setBytes:&sinv length:4 atIndex:4];
+                [e dispatchThreadgroups:bRowTG threadsPerThreadgroup:rowT];
 
-            e = p->pass(LUC_DEV_PASS_SOLVE);
-            [e setComputePipelineState:p->pCol];
-            [e setBuffer:p->bField offset:0 atIndex:0];
-            [e setBuffer:p->bTw offset:0 atIndex:1];
-            [e setBytes:&fwd length:4 atIndex:2];
-            [e setBytes:&one length:4 atIndex:3];
-            [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
+                e = p->pass(LUC_DEV_PASS_SOLVE);
+                [e setComputePipelineState:p->pCol];
+                [e setBuffer:p->bField offset:foff atIndex:0];
+                [e setBuffer:p->bTw offset:0 atIndex:1];
+                [e setBytes:&fwd length:4 atIndex:2];
+                [e setBytes:&one length:4 atIndex:3];
+                [e dispatchThreadgroups:bColTG threadsPerThreadgroup:colT];
 
-            e = p->pass(LUC_DEV_PASS_SOLVE);
-            [e setComputePipelineState:p->pRowM];
-            [e setBuffer:p->bField offset:0 atIndex:0];
-            [e setBuffer:p->bTw offset:0 atIndex:1];
-            [e setBytes:&inv length:4 atIndex:2];
-            [e setBuffer:p->bExpK offset:0 atIndex:3];
-            [e setBytes:&uppm length:4 atIndex:4];
-            [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+                e = p->pass(LUC_DEV_PASS_SOLVE);
+                [e setComputePipelineState:p->pRowM];
+                [e setBuffer:p->bField offset:foff atIndex:0];
+                [e setBuffer:p->bTw offset:0 atIndex:1];
+                [e setBytes:&inv length:4 atIndex:2];
+                [e setBuffer:p->bExpK offset:0 atIndex:3];
+                [e setBytes:&uppm length:4 atIndex:4];
+                [e dispatchThreadgroups:bRowTG threadsPerThreadgroup:rowT];
 
-            e = p->pass(LUC_DEV_PASS_SOLVE);
-            [e setComputePipelineState:p->pCol];
-            [e setBuffer:p->bField offset:0 atIndex:0];
-            [e setBuffer:p->bTw offset:0 atIndex:1];
-            [e setBytes:&inv length:4 atIndex:2];
-            [e setBytes:&nrm length:4 atIndex:3];
-            [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
+                e = p->pass(LUC_DEV_PASS_SOLVE);
+                [e setComputePipelineState:p->pCol];
+                [e setBuffer:p->bField offset:foff atIndex:0];
+                [e setBuffer:p->bTw offset:0 atIndex:1];
+                [e setBytes:&inv length:4 atIndex:2];
+                [e setBytes:&nrm length:4 atIndex:3];
+                [e dispatchThreadgroups:bColTG threadsPerThreadgroup:colT];
+            }
         }
     }
     return 0;
+}
+
+int luc_dev_unavg_remainder (int first, char *reason, int reason_len)
+{
+    Impl *p = gImpl;
+    if (p == nullptr) {
+        put_str(reason, reason_len, "device not initialized");
+        return 1;
+    }
+    if (!p->spectral) {
+        put_str(reason, reason_len, "no transform along tau was planned for this run");
+        return 1;
+    }
+    @autoreleasepool {
+        // fel_spectral_correct's passes on the resident record: the forward transverse
+        // transform of every plane, the window's and the pad's, the pass along tau with
+        // the remainder's factors in the table the host uploaded, and the inverse
+        // transverse transform with nothing added.
+        const size_t nn = (size_t) p->ngrid * p->ngrid;
+        const size_t nplane = p->nplanes();
+        const float inv = -1.0f, fwd = 1.0f, one = 1.0f;
+        const float nrm = 1.0f / (float) nn;
+        const MTLSize rowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), nplane, 1);
+        const MTLSize rowT = MTLSizeMake((size_t) (p->rowsPerTG * p->lanes), 1, 1);
+        const MTLSize colTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nplane, 1);
+        const MTLSize colT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
+
+        id<MTLComputeCommandEncoder> e = p->pass(LUC_DEV_PASS_SOLVE);
+        [e setComputePipelineState:p->pRow];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bTw offset:0 atIndex:1];
+        [e setBytes:&fwd length:4 atIndex:2];
+        [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+
+        e = p->pass(LUC_DEV_PASS_SOLVE);
+        [e setComputePipelineState:p->pCol];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bTw offset:0 atIndex:1];
+        [e setBytes:&fwd length:4 atIndex:2];
+        [e setBytes:&one length:4 atIndex:3];
+        [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
+
+        TauPar Q;
+        memset(&Q, 0, sizeof(Q));
+        Q.inv_n = 1.0f / (float) p->ntot;
+        Q.n = (uint32_t) p->ntot;
+        Q.nplane = (uint32_t) p->nplane;
+        Q.npad = (uint32_t) (p->nfree + p->nsponge);
+        Q.nfree = (uint32_t) p->nfree;
+        Q.nsponge = (uint32_t) p->nsponge;
+        Q.first = (uint32_t) first;
+        Q.ntot = (uint32_t) p->ntot;
+        Q.npol = (uint32_t) p->npol;
+        Q.transverse = 1;
+        e = p->pass(LUC_DEV_PASS_TAU);
+        [e setComputePipelineState:p->pTau];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bTwT offset:0 atIndex:1];
+        [e setBuffer:p->bAxT offset:0 atIndex:2];
+        [e setBuffer:p->bBank offset:0 atIndex:3];
+        [e setBuffer:p->bSponge offset:0 atIndex:4];
+        [e setBytes:&Q length:sizeof(Q) atIndex:5];
+        [e dispatchThreadgroups:MTLSizeMake(nn / (size_t) p->tauB, (size_t) p->nfield * p->npol, 1)
+             threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
+
+        e = p->pass(LUC_DEV_PASS_SOLVE);
+        [e setComputePipelineState:p->pRow];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bTw offset:0 atIndex:1];
+        [e setBytes:&inv length:4 atIndex:2];
+        [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+
+        e = p->pass(LUC_DEV_PASS_SOLVE);
+        [e setComputePipelineState:p->pCol];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bTw offset:0 atIndex:1];
+        [e setBytes:&inv length:4 atIndex:2];
+        [e setBytes:&nrm length:4 atIndex:3];
+        [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
+    }
+    return 0;
+}
+
+int luc_dev_field_energy_mark (int which, char *reason, int reason_len)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || p->bUE == nil) {
+        put_str(reason, reason_len, "no energy slots were allocated for this run");
+        return 1;
+    }
+    if (which < 0 || which > 1) {
+        put_str(reason, reason_len, "the energy mark is 0 or 1");
+        return 1;
+    }
+    @autoreleasepool {
+        const uint32_t unn = (uint32_t) ((size_t) p->ngrid * p->ngrid);
+        const size_t nplane = p->nplanes();
+        const NSUInteger off = (NSUInteger) ((size_t) which * nplane * kSpontGroups * 4);
+        id<MTLComputeCommandEncoder> e = p->pass(LUC_DEV_PASS_USPONT);
+        [e setComputePipelineState:p->pUE];
+        [e setBuffer:p->bField offset:0 atIndex:0];
+        [e setBuffer:p->bUE offset:off atIndex:1];
+        [e setBytes:&unn length:4 atIndex:2];
+        [e dispatchThreadgroups:MTLSizeMake((size_t) kSpontGroups, nplane, 1)
+             threadsPerThreadgroup:MTLSizeMake((size_t) kSpontThreads, 1, 1)];
+    }
+    return 0;
+}
+
+void luc_dev_field_energy (int which, double *u_window, double *u_pad)
+{
+    Impl *p = gImpl;
+    *u_window = 0;
+    *u_pad = 0;
+    if (p == nullptr || p->bUE == nil || which < 0 || which > 1) return;
+    p->sync();
+    // FP64 over the partials in index order, the window's planes and the pad's apart:
+    // plane j of the set sits at j mod ntot within its polarization block, the pad's
+    // from nplane on.
+    const size_t nplane = p->nplanes();
+    const float *a = (const float *) [p->bUE contents] + (size_t) which * nplane * kSpontGroups;
+    for (size_t j = 0; j < nplane; j++) {
+        double tot = 0;
+        for (int g = 0; g < kSpontGroups; g++) tot += (double) a[j * kSpontGroups + g];
+        if ((int) (j % (size_t) p->ntot) < p->nplane) *u_window += tot;
+        else *u_pad += tot;
+    }
 }
 
 void luc_dev_download_g0 (int is, int n, float *g0)

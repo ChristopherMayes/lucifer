@@ -112,7 +112,7 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
+! Subroutine fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg, nrec_unavg)
 !
 ! Routine to count the work of a run from the state the setup pass built.
 ! The count is exact since every number is known before the first step.
@@ -132,14 +132,17 @@ contains
 !                    polarization of the field set.
 !   ngrid       -- integer: Transverse points on a side of one grid.
 !   nstep_unavg -- integer: How many of nstep are unaveraged substeps.
+!   nrec_unavg  -- integer, optional: The record steps those substeps make up, which is
+!                    how often an unaveraged segment runs the spectral propagator's passes.
 !-
 
-subroutine fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
+subroutine fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg, nrec_unavg)
 
 type (fel_run_struct), target :: run
 type (branch_struct), pointer :: branch
 type (ele_struct), pointer :: ele
 real(rp) n_pstep, n_gpt, lambda_w
+integer, optional :: nrec_unavg
 integer nstep, n_particle, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
 
 !
@@ -149,6 +152,7 @@ integer nstep, n_particle, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
 
 branch => run%lat%branch(0)
 nstep = 0;  nstep_unavg = 0
+if (present(nrec_unavg)) nrec_unavg = 0
 do ie = run%i_start, run%i_end
   if (.not. run%is_fel(ie)) cycle
   ele => branch%ele(ie)
@@ -165,6 +169,7 @@ do ie = run%i_start, run%i_end
                                          run%global%unaveraged_steps_per_period / lambda_w))
     nstep_unavg = nstep_unavg + n_ele * nsub
     nstep = nstep + n_ele * nsub
+    if (present(nrec_unavg)) nrec_unavg = nrec_unavg + n_ele
   else
     nstep = nstep + n_ele
   endif
@@ -267,12 +272,13 @@ subroutine fel_cost_estimate (run, secs, backend)
 
 type (fel_run_struct), target :: run
 real(rp) secs, n_pstep, n_gpt, t_one, speedup, pts_plane, n_tau, t_tau
-integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff, n_t, n_pad, n_int_kernel, n_int_slip
+integer nstep, n_particle, ngrid, nstep_unavg, nrec_unavg, n_rec, n_omp, n_eff, n_t, n_pad
+integer n_int_kernel, n_int_slip
 character(*) backend
 
 !
 
-call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
+call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg, nrec_unavg)
 
 ! One thread, the two terms. Every member and plane of the field set is already in n_gpt,
 ! and each has the same log2(ngrid).
@@ -283,7 +289,10 @@ if (ngrid > 1) t_one = t_one + fel_cost_solve$ * n_gpt * log(real(ngrid, rp)) / 
 ! The spectral propagator, which a window of one slice does not run: the transverse
 ! transform pair on the pad's planes at every step and on the window and the pad at every
 ! interlude kernel pass, at the solve's rate, and the passes along tau, two a step and the
-! interludes' own, each a transform pair over every line of the window and the pad.
+! interludes' own, each a transform pair over every line of the window and the pad. An
+! unaveraged segment runs its two passes once a record step and not once a substep
+! (fel_unavg_step), and its remainder pass transforms the window and the pad transversely
+! as an interlude's kernel pass does.
 
 n_tau = 0
 t_tau = 0
@@ -291,10 +300,11 @@ if (run%spectral%on .and. run%nfield > 1) then
   call fel_cost_passes (run, n_int_kernel, n_int_slip)
   n_pad = run%spectral%n_pad
   n_t = run%nfield + n_pad
+  n_rec = nstep - nstep_unavg + nrec_unavg
   pts_plane = n_gpt / run%nfield
   t_one = t_one + fel_cost_solve$ * pts_plane * log(real(ngrid, rp)) / log(2.0_rp) * &
-                  (real(n_pad, rp) * nstep + real(n_t, rp) * n_int_kernel)
-  n_tau = pts_plane * n_t * log(real(n_t, rp)) / log(2.0_rp) * (2.0_rp * nstep + n_int_kernel + n_int_slip)
+                  (real(n_pad, rp) * (nstep - nstep_unavg) + real(n_t, rp) * (n_int_kernel + nrec_unavg))
+  n_tau = pts_plane * n_t * log(real(n_t, rp)) / log(2.0_rp) * (2.0_rp * n_rec + n_int_kernel + n_int_slip)
   t_tau = fel_cost_tau$ * n_tau
   t_one = t_one + t_tau
 endif

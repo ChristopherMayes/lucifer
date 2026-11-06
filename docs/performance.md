@@ -36,7 +36,13 @@ Its four input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x819
 ./tests/perf/tau_pass_table.sh
 ```
 
-It runs the two SASE windows and `sase_1280x1024.toml` on the device with `run.device_timing = true`, three times each, and prints the run with the fewest busy seconds. The estimate-against-the-clock table reads the footers of runs made one at a time:
+It runs the two SASE windows and `sase_1280x1024.toml` on the device with `run.device_timing = true`, three times each, and prints the run with the fewest busy seconds. The unaveraged sandwich under the two propagators ([](#perf-device-unaveraged-spectral)) runs as:
+
+```
+./tests/perf/unavg_spectral_table.sh
+```
+
+The estimate-against-the-clock table reads the footers of runs made one at a time:
 
 ```
 ./tests/scripts/estimate_vs_clock.py tier1=<log> tier1_unavg=<log> ...
@@ -655,6 +661,22 @@ What the fixed-point deposit costs is re-measured here. This mode deposits twent
 | 1 x 16384 | 0.427 s | 0.488 s | 1.14x | 0.300 s | 0.353 s | 1.18x |
 
 The price is zero to fourteen percent on the walk and six to eighteen on device time, the range the averaged path measured for the same change. The load per deposit sets the price rather than the rate. An input file with few particles a slice pays almost nothing, because it is paying for the clear rather than the atomics. What the price buys is in [](validation.md#val-device-unaveraged): two device runs of one unaveraged input file agree on their diag and ledger files bit for bit, at 4 threads against 8.
+
+(perf-device-unaveraged-spectral)=
+### The unaveraged mode under the spectral propagator
+
+The sandwich probe of the validation suite, an averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment over 8 slices of one wavelength with 512 macroparticles a slice at `ngrid` 64 ([](validation.md#val-device-unaveraged)), under the slice propagator and under the spectral propagator, on the CPU and on the device. The input file is `tests/perf/unavg_sandwich_8x512.toml`, the propagator and the device go on the command line, and `tests/perf/unavg_spectral_table.sh` prints the table, the best walk of three a case. The probe is small, so the device's walk is the host's dispatch and readback and the GPU time is a third of it.
+
+*Measured 2026-11-06: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, machine otherwise idle.*
+
+| side | propagator | walk | GPU time |
+|---|---|---|---|
+| CPU, 12 threads | slices | 0.126 s | |
+| CPU, 12 threads | spectral | 0.235 s | |
+| device | slices | 0.117 s | 0.051 s |
+| device | spectral | 0.156 s | 0.058 s |
+
+On the device the propagator adds 14 percent to the GPU time of the probe, the remainder pass and the slip pass once a record step beside the 20 substeps' own passes, and 33 percent to the walk, the host's own passes on the segment's last record step and the pad's planes in every readback. On the CPU it adds 87 percent to the walk, since the two passes transform every line of the window and the pad through FFTW in FP64 and the probe's record step is short.
 
 The field set is measured on the planar segment of the harmonics check (3.96 m, 88 steps), since a helical segment couples only the fundamental and the set has nothing to carry there. The window is the same 96 x 8192 at `ngrid` 256 and `comb_ds_save = -1`:
 
