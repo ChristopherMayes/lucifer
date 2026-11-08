@@ -62,6 +62,16 @@ The two forms were measured in one round on 2026-11-08: the pull request's own r
 
 The debug job in the pull request's form took 7.0 and 8.4 minutes, and the pull request took as long as its release job, 30.2 minutes. The full debug job beside them took 46.2 minutes, 2115 s of it in the check sections, of which the spectral section took 1753 s. Earlier rounds gave the full debug job 29 to 39 minutes, so the gain is read inside this round: the pull request waited 30.2 minutes where the full debug job took 46.2. A pull request now waits on the release job's check sections, 1155 to 1326 s here, the longest of them spectral at 790 to 966 s and spontaneous at 460 to 593 s.
 
+The spectral and spontaneous sections' shorter inputs ([](#val-spectral), [](#val-spontaneous-emission-the-two)) were measured on 2026-11-08 in one round: a dispatch of `main` as the baseline, a dispatch of the branch and the pull request's own run, created within 6 s, the reference set restored in all three.
+
+| run | debug sections | debug job | release sections | release job |
+|---|---|---|---|---|
+| dispatch of `main`, the baseline | 2128 s: spectral 1773, spontaneous 816, source-filter 506 | 46.5 min | 1135 s: spectral 768, spontaneous 508, source-filter 318 | 28.4 min |
+| dispatch of the branch | 887 s: spectral 282, spontaneous 381, source-filter 296 | 22.8 min | 879 s: spectral 242, spontaneous 358, source-filter 400 | 22.9 min |
+| the pull request | none, 11.1 min | | 957 s: spectral 224, spontaneous 450, source-filter 362 | 25.3 min |
+
+The debug build's section block took 0.42 of the baseline's and the release build's 0.77 in the dispatch pair and 0.84 on the pull request's own runner, which is the pull request's time, 25.3 minutes against 28.4 for the baseline's release job. On the release build the block is the sections' work over two at once, and the spectral section was 768 s of the baseline's 2232 and is 224 to 282 s after, so the block fell by a quarter and not by half. The spontaneous section is then the longest at 358 to 450 s, its remaining runs the unaveraged mode at the reference grid and the three `runge_kutta` references, and the source-filter section is next at 296 to 400 s, whose long run is the filter's cross-code check against Genesis4 over the whole line.
+
 (val-the-keystone-rule)=
 ## The keystone rule
 
