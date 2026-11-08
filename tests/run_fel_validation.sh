@@ -58,6 +58,11 @@
 #   --reference-key     Print the key the Genesis reference set is cached under, as
 #                       "reference key <key>", and exit having run nothing. The Linux CI
 #                       job restores its cache under this key before the run.
+#   --no-sections       Run the references, the refusals, the tiers, thread independence
+#                       and the tier comparison, and no check section. The Linux CI job's
+#                       debug build takes it on a pull request and nothing else does. The
+#                       header and the results file say no section ran, and
+#                       report_validation.py refuses that results file.
 #
 # Two of these may run at once, which is how the keystone runs them: one pass per
 # build, each with its own --work-dir and its share of the cores in --cpus. They share
@@ -69,12 +74,17 @@
 # bytes, every input file genesis reads and the pinned reference version. Each run prints
 # whether it hit or missed. Deleting the cache is always safe and costs one cold run.
 #
-# Every section runs on every invocation. There is no quicker mode, on purpose: a
-# cheap run that checks less is what this validation suite exists to prevent. The device
-# section is the one section that can skip, and only where the build carries no
-# usable device backend, which it establishes from lucifer's own banner rather than
-# from the platform. A results file recording that skip cannot write the generated
-# table, which report_validation.py refuses.
+# Every section runs on every invocation but one. The exception is --no-sections, which
+# the Linux CI job's debug build takes on a pull request, where the job's four cores spend
+# about 22 minutes on the sections (docs/validation.md, val-linux-ci). The same job runs
+# them in full on every push to main and weekly, and the keystone runs every section on
+# both builds and never passes the option (tests/test_keystone.py). A cheap run that
+# checks less must never stand for a full one, so a run under --no-sections says so in its
+# header and in every section's row of its results file. The device section is the one
+# section that can skip on its own, and only where the build carries no usable device
+# backend, which it establishes from lucifer's own banner rather than from the platform.
+# A results file recording any skip cannot write the generated table, which
+# report_validation.py refuses.
 #
 # Exit status is zero only if every tier passes its tolerance.
 
@@ -102,6 +112,7 @@ RESULTS=""
 CPUS=""
 SECTION_WORKERS=""
 KEY_ONLY=0
+NO_SECTIONS=0
 TIERS_MARKER=""
 WAIT_TIERS=""
 
@@ -116,9 +127,10 @@ while [[ $# -gt 0 ]]; do
     --cpus)     CPUS="$2";     shift 2 ;;
     --section-workers) SECTION_WORKERS="$2"; shift 2 ;;
     --reference-key)   KEY_ONLY=1; shift ;;
+    --no-sections)     NO_SECTIONS=1; shift ;;
     --tiers-marker) TIERS_MARKER="$2"; shift 2 ;;
     --wait-tiers)   WAIT_TIERS="$2";   shift 2 ;;
-    -h|--help)  sed -n '2,59p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,65p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -284,7 +296,12 @@ echo "               $GENESIS_EEV"
 echo "  python:      $PYTHON"
 echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"
-echo "  cores:       $CPUS for the check sections${MACHINE_CPUS:+ on a machine of $MACHINE_CPUS}, $SECTION_WORKERS at once, $SECTION_CPUS for the pools in each"
+if [[ $NO_SECTIONS -eq 1 ]]; then
+  echo "  sections:    none, under --no-sections: the refusals, the tiers, thread independence"
+  echo "               and the tier comparison run, and no check section does"
+else
+  echo "  cores:       $CPUS for the check sections${MACHINE_CPUS:+ on a machine of $MACHINE_CPUS}, $SECTION_WORKERS at once, $SECTION_CPUS for the pools in each"
+fi
 echo
 
 # The results file is for doc generation, so it records what is reproducible: which
@@ -1066,72 +1083,84 @@ run_section () {   # <name> <dir>
   printf '%s\n%s\n%s\n%s\n' "$outcome" "$rc" "$((SECONDS - t0))" "$reason" > "$SECTIONS/$name.rec"
 }
 
-mkdir -p "$SECTIONS"
-for name in $SECTION_ORDER; do stage_section "$SECTIONS/$name"; done
-cp AramisTDSASEF.out.h5 AramisTDSASEF-initial.par.h5 AramisTDSASEF-initial.beam.h5 \
-   AramisTDSASEF-initial.wf.h5 "$SECTIONS/source-filter/"
-cp tier1.toml tier1.stats.h5 Aramis-initial.beam.h5 Aramis-initial.wf.h5 tdsase.toml \
-   AramisTDSASE-initial.beam.h5 AramisTDSASE-initial.wf.h5 "$SECTIONS/spectral/"
-
-echo "--- check sections: $SECTION_WORKERS at once, $SECTION_CPUS cores each, in $SECTIONS ---"
-echo
-
-# Each worker holds a slot in a fifo, since bash 3.2 has no "wait -n". A worker takes a
-# slot before it launches and returns it as it ends, whatever it returned.
-SLOTS="$SECTIONS/.slots"
-mkfifo "$SLOTS"
-exec 9<>"$SLOTS"
-i=0
-while [[ $i -lt $SECTION_WORKERS ]]; do printf '.\n' >&9; i=$((i + 1)); done
-SEC_T0=$SECONDS
-SEC_PIDS=""
-for name in $LAUNCH_ORDER; do
-  IFS= read -r -u 9 slot || { echo "FAIL: a section slot could not be taken" >&2; exit 1; }
-  ( run_section "$name" "$SECTIONS/$name"; printf '.\n' >&9 ) &
-  SEC_PIDS="$SEC_PIDS $!"
-done
-for pid in $SEC_PIDS; do wait "$pid"; done
-exec 9>&-
-
-# The output lists every expected section exactly once, in the listed order, each with
-# its own time. A results row is written for a pass or a skip and never for a failure,
-# so a results file with a section missing says which section did not pass.
-SECTIONS_OK=1
-SECTIONS_FAILED=""
-for name in $SECTION_ORDER; do
-  [[ -f "$SECTIONS/$name.log" ]] && cat "$SECTIONS/$name.log"
-  if [[ ! -f "$SECTIONS/$name.rec" ]]; then
-    echo "  [time: $name -, FAILED: no record, the section did not run]"
-    SECTIONS_OK=0
-    SECTIONS_FAILED="$SECTIONS_FAILED $name"
-    echo
-    continue
-  fi
-  outcome=""; rc=""; secs=""; reason=""
-  { read -r outcome; read -r rc; read -r secs; IFS= read -r reason || reason=""; } < "$SECTIONS/$name.rec"
-  case "$outcome" in
-    pass)
-      echo "  [time: $name $secs s]"
-      if [[ -n "$RESULTS" ]]; then
-        echo "section|$name|pass" >> "$RESULTS"
-        if [[ -s "$SECTIONS/$name/.checks" ]]; then cat "$SECTIONS/$name/.checks" >> "$RESULTS"; fi
-      fi ;;
-    skip)
-      echo "  [time: $name $secs s, skipped: $reason]"
-      if [[ -n "$RESULTS" ]]; then echo "section|$name|skip|$reason" >> "$RESULTS"; fi ;;
-    *)
-      echo "  [time: $name $secs s, FAILED with exit $rc]"
-      SECTIONS_OK=0
-      SECTIONS_FAILED="$SECTIONS_FAILED $name" ;;
-  esac
+# Under --no-sections no section runs, and each is recorded as skipped with the reason,
+# so the results file names every section a full run would and cannot be read as one.
+NO_SECTIONS_REASON="not run: --no-sections, the refusals and tiers only"
+if [[ $NO_SECTIONS -eq 1 ]]; then
+  echo "--- check sections: none, under --no-sections --------------------------------"
+  for name in $SECTION_ORDER; do
+    if [[ -n "$RESULTS" ]]; then echo "section|$name|skip|$NO_SECTIONS_REASON" >> "$RESULTS"; fi
+  done
+  echo "  $(echo $SECTION_ORDER | wc -w | tr -d ' ') check sections not run. A full pass runs every one of them."
   echo
-done
-echo "  [time: sections-all-concurrent $((SECONDS - SEC_T0)) s, $SECTION_WORKERS at once]"
-echo
-SECTION_T_LAST=$SECONDS
-if [[ $SECTIONS_OK -ne 1 ]]; then
-  echo "FAIL: these sections did not pass:$SECTIONS_FAILED; outputs kept in: $SECTIONS" >&2
-  exit 1
+else
+  mkdir -p "$SECTIONS"
+  for name in $SECTION_ORDER; do stage_section "$SECTIONS/$name"; done
+  cp AramisTDSASEF.out.h5 AramisTDSASEF-initial.par.h5 AramisTDSASEF-initial.beam.h5 \
+     AramisTDSASEF-initial.wf.h5 "$SECTIONS/source-filter/"
+  cp tier1.toml tier1.stats.h5 Aramis-initial.beam.h5 Aramis-initial.wf.h5 tdsase.toml \
+     AramisTDSASE-initial.beam.h5 AramisTDSASE-initial.wf.h5 "$SECTIONS/spectral/"
+
+  echo "--- check sections: $SECTION_WORKERS at once, $SECTION_CPUS cores each, in $SECTIONS ---"
+  echo
+
+  # Each worker holds a slot in a fifo, since bash 3.2 has no "wait -n". A worker takes a
+  # slot before it launches and returns it as it ends, whatever it returned.
+  SLOTS="$SECTIONS/.slots"
+  mkfifo "$SLOTS"
+  exec 9<>"$SLOTS"
+  i=0
+  while [[ $i -lt $SECTION_WORKERS ]]; do printf '.\n' >&9; i=$((i + 1)); done
+  SEC_T0=$SECONDS
+  SEC_PIDS=""
+  for name in $LAUNCH_ORDER; do
+    IFS= read -r -u 9 slot || { echo "FAIL: a section slot could not be taken" >&2; exit 1; }
+    ( run_section "$name" "$SECTIONS/$name"; printf '.\n' >&9 ) &
+    SEC_PIDS="$SEC_PIDS $!"
+  done
+  for pid in $SEC_PIDS; do wait "$pid"; done
+  exec 9>&-
+
+  # The output lists every expected section exactly once, in the listed order, each with
+  # its own time. A results row is written for a pass or a skip and never for a failure,
+  # so a results file with a section missing says which section did not pass.
+  SECTIONS_OK=1
+  SECTIONS_FAILED=""
+  for name in $SECTION_ORDER; do
+    [[ -f "$SECTIONS/$name.log" ]] && cat "$SECTIONS/$name.log"
+    if [[ ! -f "$SECTIONS/$name.rec" ]]; then
+      echo "  [time: $name -, FAILED: no record, the section did not run]"
+      SECTIONS_OK=0
+      SECTIONS_FAILED="$SECTIONS_FAILED $name"
+      echo
+      continue
+    fi
+    outcome=""; rc=""; secs=""; reason=""
+    { read -r outcome; read -r rc; read -r secs; IFS= read -r reason || reason=""; } < "$SECTIONS/$name.rec"
+    case "$outcome" in
+      pass)
+        echo "  [time: $name $secs s]"
+        if [[ -n "$RESULTS" ]]; then
+          echo "section|$name|pass" >> "$RESULTS"
+          if [[ -s "$SECTIONS/$name/.checks" ]]; then cat "$SECTIONS/$name/.checks" >> "$RESULTS"; fi
+        fi ;;
+      skip)
+        echo "  [time: $name $secs s, skipped: $reason]"
+        if [[ -n "$RESULTS" ]]; then echo "section|$name|skip|$reason" >> "$RESULTS"; fi ;;
+      *)
+        echo "  [time: $name $secs s, FAILED with exit $rc]"
+        SECTIONS_OK=0
+        SECTIONS_FAILED="$SECTIONS_FAILED $name" ;;
+    esac
+    echo
+  done
+  echo "  [time: sections-all-concurrent $((SECONDS - SEC_T0)) s, $SECTION_WORKERS at once]"
+  echo
+  SECTION_T_LAST=$SECONDS
+  if [[ $SECTIONS_OK -ne 1 ]]; then
+    echo "FAIL: these sections did not pass:$SECTIONS_FAILED; outputs kept in: $SECTIONS" >&2
+    exit 1
+  fi
 fi
 
 COMPARE_ARGS=()

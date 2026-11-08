@@ -32,7 +32,10 @@ say less than it claims.
 A results file with a section recorded as anything but pass is refused. The device
 section skips on a build with no usable backend, as on a Linux CI runner. A table
 written from such a file would name one section fewer while claiming to list them all.
-So the generated table comes from a full local run on both builds.
+So the generated table comes from a full local run on both builds. A run under
+run_fel_validation.sh --no-sections, which the Linux CI job's debug build takes on a pull
+request, records every section as skipped with the reason "not run: --no-sections", and is
+refused with a message naming the option.
 """
 
 import argparse
@@ -62,7 +65,7 @@ def read_results(path):
         if kind == "build":
             out["build"] = f[0]
         elif kind == "section":
-            out["sections"].append((f[0], f[1]))
+            out["sections"].append((f[0], f[1], f[2] if len(f) > 2 else ""))
         elif kind == "tier":
             out["tiers"].append({"key": f[0], "level": f[1], "outcome": f[2],
                                  "desc": f[3] if len(f) > 3 else ""})
@@ -70,7 +73,11 @@ def read_results(path):
             raise SystemExit(f"{path}: unknown record kind {kind!r}")
     if out["build"] is None:
         raise SystemExit(f"{path}: no build record")
-    skipped = [n for n, outcome in out["sections"] if outcome != "pass"]
+    if any(reason.startswith("not run: --no-sections") for _, _, reason in out["sections"]):
+        raise SystemExit(
+            f"{path}: this run took --no-sections and ran the refusals and the tiers alone, "
+            "with no check\n  section. Write the table from a full run on both builds.")
+    skipped = [n for n, outcome, _ in out["sections"] if outcome != "pass"]
     if skipped:
         raise SystemExit(
             f"{path}: this run skipped {', '.join(skipped)}, so it records fewer sections "
@@ -128,7 +135,7 @@ def check_tables(dbg, prod):
     if missing:
         raise SystemExit("checks recorded in one build and not the other:\n  "
                          + "\n  ".join(f"{s}: {n}" for s, n in sorted(missing)))
-    sections = [s for s, _ in dbg["sections"]]
+    sections = [s for s, _, _ in dbg["sections"]]
     by_section = {s: [r for r in dbg["checks"] if r["section"] == s] for s in sections}
     L = []
     n = 0
@@ -206,8 +213,8 @@ def main():
     L.append(f"Every section below ran and passed on both builds, {len(dbg['sections'])} in all.")
     L.append("A section that fails stops the run, so an entry here means it passed.")
     L.append("")
-    dsec = [s for s, _ in dbg["sections"]]
-    psec = [s for s, _ in prod["sections"]]
+    dsec = [s for s, _, _ in dbg["sections"]]
+    psec = [s for s, _, _ in prod["sections"]]
     if dsec != psec:
         raise SystemExit(f"section sets differ between builds:\n  debug {dsec}\n  production {psec}")
     for s in dsec:
