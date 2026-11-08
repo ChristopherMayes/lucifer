@@ -52,6 +52,16 @@ What the pull request's form gives up is where one class of defect is found. A r
 
 The job is named `validation, debug build` in both forms, since the branch protection on `main` requires the check by that name. The suite's step name and the step summary state the form. A dispatch with the input `no_sections` set runs the pull request's form, which is how it is measured. Under the option the suite's header says no section runs, and every section's row in the results file is a skip with the reason `not run: --no-sections`. `report_validation.py` refuses that file, so the levels page is written from full runs alone.
 
+The two forms were measured in one round on 2026-11-08: the pull request's own run and two dispatches of the same commit, with `no_sections` on and off, started within 8 s of one another, the reference set restored in all three.
+
+| run | debug job | debug tiers, sections | release job | release sections |
+|---|---|---|---|---|
+| the pull request | 7.0 min, no section | 196 s, none | 30.2 min | 1326 s |
+| dispatch, `no_sections` on | 8.4 min, no section | 203 s, none | 30.4 min | 1280 s |
+| dispatch, `no_sections` off | 46.2 min, every section | 348 s, 2115 s | 28.5 min | 1155 s |
+
+The debug job in the pull request's form took 7.0 and 8.4 minutes, and the pull request took as long as its release job, 30.2 minutes. The full debug job beside them took 46.2 minutes, 2115 s of it in the check sections, of which the spectral section took 1753 s. Earlier rounds gave the full debug job 29 to 39 minutes, so the gain is read inside this round: the pull request waited 30.2 minutes where the full debug job took 46.2. A pull request now waits on the release job's check sections, 1155 to 1326 s here, the longest of them spectral at 790 to 966 s and spontaneous at 460 to 593 s.
+
 (val-the-keystone-rule)=
 ## The keystone rule
 
