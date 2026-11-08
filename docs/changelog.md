@@ -30,6 +30,21 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-09 Changed: the `spectral` and `spontaneous` sections of the validation suite run on
+  inputs sized for what each check measures ([](validation.md#val-spectral),
+  [](validation.md#val-spontaneous-emission-the-two)). The spectral section's three SASE runs stop
+  at the second undulator, `run.track_end = "UND##2"`, since the tier's window of 32 slices holds
+  the start-up light alone and the propagators' level at the undulators' ends sits between 5.8e-3
+  and 9.6e-3 along the whole line: the three runs took 41 s on the debug build against 434. The
+  SASE comparison's bound is 1.5e-2 at the measured 5.8e-3, where it was 2e-2 at 8.7e-3, and the
+  coarse field's level is 8.3e-2 against the sweep's bound as before. Three rows join the levels
+  page: the coarse field against the slice run, 7.9e-2, above the SASE comparison's bound, which
+  shows the comparison sees a coarser field, and the field at two slices a plane, 4.3e-2 and 0.52
+  of the level at four, which shows the coarse check's level follows the sampling, since no coarser
+  sampling than the derived one is accepted on this window. The spontaneous section's thread pair
+  runs at a grid of 128 in place of the reference 256, the identity being of the draws' order
+  under threads and no grid quantity, and the ledger is read from a run at the reference grid with
+  the same switches, so every spontaneous level keeps its digits.
 - 2026-11-08 Changed: on a pull request the Linux CI job's debug build runs the refusals and the
   eleven tiers and leaves the 24 check sections to the push to `main`, the weekly schedule and a
   dispatch, so a pull request waits on the release job alone ([](validation.md#val-linux-ci)).

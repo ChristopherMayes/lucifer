@@ -15,6 +15,15 @@ leaves, which docs/spectral-field.md measures. Six checks:
   sase        the SASE tier with the source filter on under both propagators, Lucifer
               against Lucifer, the spectral run at one plane a slice: the exit power
               across the window. The tolerance is the measured level with its margin.
+              The SASE runs stop at the second undulator, a FODO cell with one interlude
+              between its two undulators. The tier's window of 32 slices holds the
+              start-up light alone: its power does not grow along the twelve undulators,
+              since the light slips out of the window faster than the gain builds, and
+              the propagators' level at the undulators' ends sits between 5.8e-3 and
+              9.6e-3 over the line, 5.8e-3 at the second and 8.7e-3 at the last. A run
+              over the line measures what the run to the second undulator does, at six
+              times the steps. The coarse run, below, is the run that must fail this
+              comparison, and its level against the slice run is recorded.
   one slice   a Gaussian pulse through a pipe whose slippage is one slice, with no beam,
               under both propagators: the ramp by one slice is the rotation by one slice
               to rounding, since a shift by a whole slot is exact in the transform.
@@ -22,7 +31,16 @@ leaves, which docs/spectral-field.md measures. Six checks:
               field is sampled coarser than the beam's slices as far as the tier's window
               of 32 slices allows, against the same tier at one plane a slice: the exit
               power per beam slice, which the stats take from the plane each slice reads.
-              The bound is the sweep's (docs/spectral-field.md).
+              The bound is the sweep's (docs/spectral-field.md). The run stops where the
+              SASE runs stop. Its level at the undulators' ends ranges from 5e-2 to 2e-1
+              over the line, 8.3e-2 at the second undulator and 8.0e-2 at the last, so
+              the bound holds the sampling at a few times rounding of that spread and
+              not at a converged number. No stated sampling coarser than the derived one
+              is accepted on this window, since the derived 12 wavelengths is the floor
+              of 8 planes over 32 slices, so the check's sensitivity is shown from the
+              finer side: the field at two slices a plane, half the derived sampling,
+              differs by half as much, and both that level and the ratio of the two are
+              recorded.
   cliff       the SASE tier set up alone, run.load_only, with the window's slice raised to
               192 wavelengths, which puts it at 0.31 of the cooperation length, above the
               cliff at a quarter: a stated field.n_wavelength equal to the slice runs and
@@ -68,8 +86,11 @@ from lucifer.field import read_field  # noqa: E402
 from lucifer.flat import to_toml  # noqa: E402
 
 STEADY_TOL = 1e-11      # The steady state: one transform pair apart, 1e-12 measured.
-COARSE_TOL = 1.5e-1     # The derived coarse field against one plane a slice on the SASE tier, 8.0e-2 measured
-                        #   on a window of 32 slices at saturation (docs/spectral-field.md).
+COARSE_TOL = 1.5e-1     # The derived coarse field against one plane a slice on the SASE tier, 8.3e-2
+                        #   measured at the second undulator and 8.0e-2 at the line's end, on a window
+                        #   of 32 slices (docs/spectral-field.md).
+SASE_END = "UND##2"     # Where the SASE runs stop: the second undulator, with one interlude before it.
+FINE_N_WAVELENGTH = 6   # Two slices a plane, half the derived sampling, 4.3e-2 measured against 8.3e-2 at four.
 ONE_SLICE_TOL = 1e-8    # The ramp by a whole slice against the rotation, over the pulse's peak, 1e-9 measured.
 BANK_TOL = {"slices": 1e-9, "spectral": 1e-5}   # The ledger's closure, relative to the energy that
                                                  #   entered: rounding under the rotation, and 1e-6 under
@@ -223,32 +244,39 @@ def sase(exe, wd, threads, tol):
     roots = {}
     for key, more in (("slices", []), ("spectral", ["field.propagator=spectral", f"field.n_wavelength={n_wl}"])):
         root = f"spec_tdsase_{key}"
-        if run(exe, wd, "tdsase.toml", root, ["run.source_filter=true"] + more, threads) is None:
+        if run(exe, wd, "tdsase.toml", root, ["run.source_filter=true", f"run.track_end={SASE_END}"] + more,
+               threads) is None:
             return False
         roots[key] = root
     d = worst_of(differences(read_curves(wd / f"{roots['spectral']}.stats.h5"),
                              read_curves(wd / f"{roots['slices']}.stats.h5")), ("exit_power",))
     worst = max(d.values())
     good = worst <= tol
-    print(f"  SASE tier, source filter on, spectral against slices: " +
-          ", ".join(f"{k} {v:.2e}" for k, v in d.items()) + f", worst {worst:.2e} (tolerance {tol:.0e})")
+    print(f"  SASE tier to {SASE_END}, source filter on, spectral against slices: " +
+          ", ".join(f"{k} {v:.2e}" for k, v in d.items()) + f", worst {worst:.2e} (tolerance {tol:.1e})")
     record("SASE tier with the source filter on, spectral against slices", worst, tol, "max", good)
     if not good:
         print(f"FAIL: the SASE tier differs by {worst:.2e} between the propagators", file=sys.stderr)
     return good
 
 
-def coarse(exe, wd, threads):
+def exit_power_level(wd, root, ref):
+    """The largest difference of the exit power across the window between two runs' stats
+    files, relative to the reference's peak."""
+    d = worst_of(differences(read_curves(wd / f"{root}.stats.h5"), read_curves(wd / f"{ref}.stats.h5")),
+                 ("exit_power",))
+    return max(d.values())
+
+
+def coarse(exe, wd, threads, sase_tol):
+    base = ["run.source_filter=true", f"run.track_end={SASE_END}", "field.propagator=spectral"]
     root = "spec_tdsase_coarse"
-    text = run(exe, wd, "tdsase.toml", root, ["run.source_filter=true", "field.propagator=spectral"],
-               threads + 0)
+    text = run(exe, wd, "tdsase.toml", root, base, threads)
     if text is None:
         return False
     m = re.search(r"Field\s+(\d+) planes of (\d+) wavelengths over the window, (\d+) slices a plane", text)
     planes, n_wl, n_per = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 1)
-    d = worst_of(differences(read_curves(wd / f"{root}.stats.h5"),
-                             read_curves(wd / "spec_tdsase_spectral.stats.h5")), ("exit_power",))
-    worst = max(d.values())
+    worst = exit_power_level(wd, root, "spec_tdsase_spectral")
     good = worst <= COARSE_TOL and n_per > 1
     print(f"  coarse field, {planes} planes of {n_wl} wavelengths, {n_per} slices a plane, against one a slice: "
           f"exit power {worst:.2e} (tolerance {COARSE_TOL:.1e})")
@@ -257,7 +285,35 @@ def coarse(exe, wd, threads):
     if not good:
         print(f"FAIL: the coarse field differs by {worst:.2e}, or was not coarser ({n_per} slices a plane)",
               file=sys.stderr)
-    return good
+
+    # The coarse run is the run the SASE comparison must fail: a field sampled coarser
+    # than the slices, against the slice run, sits above that comparison's tolerance.
+    against_slices = exit_power_level(wd, root, "spec_tdsase_slices")
+    good_s = against_slices > sase_tol
+    print(f"  the coarse field against the slice run: exit power {against_slices:.2e}, "
+          f"{'above' if good_s else 'INSIDE'} the SASE comparison's tolerance {sase_tol:.1e}")
+    record("the derived coarse field against the slice run, SASE tier", against_slices, sase_tol, "min", good_s)
+    if not good_s:
+        print(f"FAIL: the coarse field sits inside the SASE comparison's tolerance, {against_slices:.2e}, "
+              f"so that comparison cannot see a coarser field", file=sys.stderr)
+
+    # The sensitivity from the finer side, since no coarser sampling is accepted on this
+    # window: at two slices a plane, half the derived sampling, the level is about half.
+    fine = "spec_tdsase_fine"
+    if run(exe, wd, "tdsase.toml", fine, base + [f"field.n_wavelength={FINE_N_WAVELENGTH}"], threads) is None:
+        return False
+    fine_level = exit_power_level(wd, fine, "spec_tdsase_spectral")
+    ratio = fine_level / worst if worst > 0 else float("inf")
+    good_f = fine_level <= COARSE_TOL and ratio <= 1
+    print(f"  the field at two slices a plane against one a slice: exit power {fine_level:.2e}, "
+          f"{ratio:.2f} of the level at four")
+    record("the field at two slices a plane against one a slice, SASE tier", fine_level, COARSE_TOL, "max",
+           fine_level <= COARSE_TOL)
+    record("two slices a plane over four, the ratio of the levels, SASE tier", ratio, 1, "max", ratio <= 1)
+    if not good_f:
+        print(f"FAIL: the field at two slices a plane differs by {fine_level:.2e}, {ratio:.2f} of the level at four",
+              file=sys.stderr)
+    return good and good_s and good_f
 
 
 CLIFF_N_WAVELENGTH = 192   # The tier's slice raised above the cliff, 0.31 of the cooperation length.
@@ -366,8 +422,9 @@ def main():
     p.add_argument("--exe", required=True)
     p.add_argument("--workdir", required=True)
     p.add_argument("--threads", type=int, default=int(os.environ.get("LUCIFER_CPU_BUDGET", "4") or 4))
-    p.add_argument("--sase-tol", type=float, default=2e-2,
-                   help="the bound on the SASE tier's exit power between the propagators, 8.7e-3 measured")
+    p.add_argument("--sase-tol", type=float, default=1.5e-2,
+                   help="the bound on the SASE tier's exit power between the propagators to the second "
+                        "undulator, 5.8e-3 measured, 8.7e-3 at the line's end")
     a = p.parse_args()
     wd = pathlib.Path(a.workdir).resolve()
     exe = pathlib.Path(a.exe).resolve()
@@ -379,7 +436,7 @@ def main():
 
     ok = steady(exe, wd, a.threads)
     ok = sase(exe, wd, a.threads, a.sase_tol) and ok
-    ok = coarse(exe, wd, a.threads) and ok
+    ok = coarse(exe, wd, a.threads, a.sase_tol) and ok
     ok = cliff(exe, wd, a.threads) and ok
     ok = one_slice(exe, wd, a.threads) and ok
     ok = bank(exe, wd, a.threads) and ok

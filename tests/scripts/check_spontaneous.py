@@ -34,8 +34,9 @@ of the angular distribution, which is good only to a factor of a few at aw ~ 1. 
 shape is therefore checked tightly and the magnitude loosely.
 
 Then, with Bmad's switches on: damping in both FEL modes (5), fluctuations against the
-analytic variance and against runge_kutta (6), 1 against 8 threads with fluctuations on
-(7), and the energy ledger closing with the radiated energy (8).
+analytic variance and against runge_kutta (6), 1 against 8 threads with fluctuations on,
+at half the reference grid (7), and the energy ledger closing with the radiated energy, at
+the reference grid (8).
 
 Run by the validation suite. Exits nonzero on failure.
 """
@@ -67,6 +68,12 @@ NGRID_REF = 256
 # so the captured solid angle spans 16x across it. Named once because the scan is written
 # in two places and its coarse end is divided by in a third.
 NGRID_SCAN = (64, 128, NGRID_REF)
+# The thread-identity pair runs at half the reference grid. The identity is of the draws'
+# order and the deposit's sums under threads, and no grid enters it, where the single-thread
+# run at the reference grid was the longest run of the section, 43 s of its 125 on the
+# release build alone against 12 s here. The ledger's closure, a grid quantity, is read
+# from a run at the reference grid with the same switches.
+NGRID_PAIR = 128
 
 FAILED = False
 
@@ -197,14 +204,16 @@ def main():
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
         lambda: run(exe, wd, "sp_uv_d", NML.format(lat="sp_uv.bmad", root="sp_uv_d",
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
-        # sp_uv_f1 runs single threaded for the thread-identity comparison, and that
-        # makes it the longest job here. Its grid stays at the reference. It also feeds
-        # the energy-ledger closure, whose recorded level is a grid quantity, so a
-        # smaller grid would move that level.
+        # The thread-identity pair, one and eight threads at NGRID_PAIR, and the run the
+        # energy ledger is read from, at the reference grid with the same switches and
+        # eight threads.
         lambda: run(exe, wd, "sp_uv_f1", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f1",
-                    ngrid=NGRID_REF,
+                    ngrid=NGRID_PAIR,
                     extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="1"),
         lambda: run(exe, wd, "sp_uv_f8", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f8",
+                    ngrid=NGRID_PAIR,
+                    extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8"),
+        lambda: run(exe, wd, "sp_uv_fd", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_fd",
                     ngrid=NGRID_REF,
                     extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8"),
     ]
@@ -288,7 +297,7 @@ def main():
           note="(measured 0.13: the two references' F-convention spread)")
 
     # 7. Determinism with fluctuations on: draws are serial in fixed slice order from
-    #    the one seeded stream, so 1 vs 8 threads must be byte-identical.
+    #    the one seeded stream, so 1 vs 8 threads must be byte-identical, at NGRID_PAIR.
     same = all((wd / f"sp_uv_f1{s}").read_bytes() == (wd / f"sp_uv_f8{s}").read_bytes()
                for s in (".diag.txt", ".ledger.txt"))
     check("fluctuations: 1-thread vs 8-thread byte-identical (0 = yes)",
@@ -296,8 +305,9 @@ def main():
 
     # 8. The ledger closes with the E_radiated column (radiation on, time-dependent,
     #    unaveraged):
-    #    E_beam + U_window + U_escaped - U_spont + E_radiated = const, actual drawn sums.
-    led = np.loadtxt(wd / "sp_uv_f1.ledger.txt")
+    #    E_beam + U_window + U_escaped - U_spont + E_radiated = const, actual drawn sums,
+    #    at the reference grid.
+    led = np.loadtxt(wd / "sp_uv_fd.ledger.txt")
     etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
     turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
     check("ledger: max|d(E+U+U_esc-U_spont+E_rad)| / turnover, radiation on",
