@@ -154,7 +154,9 @@ jobs:
     # debug job took 30.8 minutes end to end, 27.4 of them in the validation suite, and the
     # release job 24.8 minutes, 19.6 in the suite. Before either change the debug job took
     # 57.8 minutes and the release job 39.8. A runner's speed moves by a third between
-    # runs, so the page compares runs made side by side in one round.
+    # runs, so the page compares runs made side by side in one round. In the round of
+    # 2026-11-08 the debug job took 7.0 and 8.4 minutes in the pull request's form and
+    # 46.2 with every section, and the release job 28.5 to 30.4.
     timeout-minutes: 120
     # NO_SECTIONS is true for the debug build on a pull request, or on a dispatch that asks
     # for that form, and false otherwise. The release build never takes it.

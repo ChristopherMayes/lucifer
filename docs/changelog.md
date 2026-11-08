@@ -33,6 +33,9 @@ of that history. The entries before that date describe that branch.
 - 2026-11-08 Changed: on a pull request the Linux CI job's debug build runs the refusals and the
   eleven tiers and leaves the 24 check sections to the push to `main`, the weekly schedule and a
   dispatch, so a pull request waits on the release job alone ([](validation.md#val-linux-ci)).
+  In one round on the runner the debug job took 7.0 and 8.4 minutes in the pull request's form
+  and 46.2 with every section, and the release job 28.5 to 30.4, so the pull request took 30.2
+  minutes against the 46.2 a full debug job took beside it.
   `tests/run_fel_validation.sh --no-sections` runs the reference set, the refusals, the tiers,
   thread independence and the tier comparison, states in its header that no section runs, and
   records every section as a skip with the reason `not run: --no-sections`, which
