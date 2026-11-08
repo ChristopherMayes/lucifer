@@ -30,6 +30,19 @@ of that history. The entries before that date describe that branch.
   delay of the wide-angle shot-noise light the filter removes, and the tier is not reproduced
   within its tolerance of 1e-3 as it is configured. The boundary forms and the cost are on the
   page. No recorded digit moved.
+- 2026-11-08 Changed: on a pull request the Linux CI job's debug build runs the refusals and the
+  eleven tiers and leaves the 24 check sections to the push to `main`, the weekly schedule and a
+  dispatch, so a pull request waits on the release job alone ([](validation.md#val-linux-ci)).
+  `tests/run_fel_validation.sh --no-sections` runs the reference set, the refusals, the tiers,
+  thread independence and the tier comparison, states in its header that no section runs, and
+  records every section as a skip with the reason `not run: --no-sections`, which
+  `report_validation.py` refuses. The release job runs every section on every event, the debug
+  job runs every section at every merge, and the keystone never passes the option. A read past
+  the end of an array that only the debug build's bounds checks catch, reached only through a
+  check section and shown only on Linux, now fails the run after the merge and not the pull
+  request. The debug job keeps its name, which the branch protection on `main` requires, and the
+  suite's step and the step summary state the form. The dispatch input `no_sections` runs the
+  pull request's form.
 - 2026-11-06 Changed: the Linux CI job's validation suite takes about 0.6 of its time on both
   builds, with every check section still run on both builds
   ([](validation.md#val-linux-ci)). The Genesis4 reference set, which a runner generated cold on

@@ -75,6 +75,21 @@
 # path filter would be no substitute, since the defects this reaches come from the
 # platform rather than from which file moved.
 #
+# The debug job has two forms. On a pull request it builds, runs the refusals, the eleven
+# tiers, thread independence and the tier comparison, and leaves out the 24 check
+# sections, which take about 22 of its 29 to 39 minutes on four cores (docs/validation.md,
+# val-linux-ci). On a push to main, on the weekly schedule and on a dispatch it runs every
+# section. The release job runs every section on every event. So a pull request waits on
+# the release job alone, and every section still runs on the debug build at every merge.
+# What the pull request's form gives up is where one class of defect is found: a read past
+# the end of an array that only -fbounds-check turns into a failure, reached only by a
+# check section, and shown only on Linux. Such a defect fails the push's run after the
+# merge and not the pull request. The keystone runs every section on the debug build on
+# macOS before every push, so a defect the two platforms share is still caught before the
+# merge. The job keeps its name in both forms, since the branch protection on main
+# requires "validation, debug build" by that name. The suite's step and the summary name
+# the form.
+#
 # It does not replace Bmad's own CI, which builds the whole distribution on every push
 # to Bmad.
 
@@ -101,13 +116,18 @@ on:
         description: "Cores the check sections share, --cpus (empty: the runner's)"
         required: false
         default: ""
+      no_sections:
+        description: "Debug build in the pull request's form: refusals and tiers, no check section"
+        type: boolean
+        required: false
+        default: false
   schedule:
     - cron: "17 9 * * 1"
 
-# The group carries the dispatch input, so two dispatches that measure different section
-# counts on one ref run side by side rather than one cancelling the other.
+# The group carries the dispatch inputs, so two dispatches that measure different settings
+# on one ref run side by side rather than one cancelling the other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}-${{ inputs.cpus }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}-${{ inputs.cpus }}-${{ inputs.no_sections }}
   cancel-in-progress: true
 
 jobs:
@@ -136,6 +156,10 @@ jobs:
     # 57.8 minutes and the release job 39.8. A runner's speed moves by a third between
     # runs, so the page compares runs made side by side in one round.
     timeout-minutes: 120
+    # NO_SECTIONS is true for the debug build on a pull request, or on a dispatch that asks
+    # for that form, and false otherwise. The release build never takes it.
+    env:
+      NO_SECTIONS: ${{ matrix.build == 'debug' && (github.event_name == 'pull_request' || inputs.no_sections == true) }}
 
     steps:
       # The whole history, so the tags reach git describe and the build carries the
@@ -307,7 +331,7 @@ jobs:
       # declares, debug or production, and how many check sections run at once. Its exit
       # status is zero only if every tier passed. Run from the validate environment, which
       # is how the recording machine runs it.
-      - name: Validation suite against Genesis4, ${{ matrix.build }} build
+      - name: Validation suite against Genesis4, ${{ matrix.build }} build${{ env.NO_SECTIONS == 'true' && ', refusals and tiers alone' || '' }}
         shell: bash -o pipefail {0}
         env:
           SECTION_WORKERS: ${{ inputs.section_workers }}
@@ -320,6 +344,7 @@ jobs:
           workers=()
           if [ -n "$SECTION_WORKERS" ]; then workers=(--section-workers "$SECTION_WORKERS"); fi
           if [ -n "$SECTION_CPUS" ]; then workers+=(--cpus "$SECTION_CPUS"); fi
+          if [ "$NO_SECTIONS" = true ]; then workers+=(--no-sections); fi
           ./tests/run_fel_validation.sh \
               --exe "$PWD/${{ matrix.dir }}/bin/lucifer" --build ${{ matrix.flavor }} \
               "${workers[@]}" \
@@ -375,7 +400,14 @@ jobs:
             echo
             echo "Genesis4 reference set: key \`${REF_KEY:-none}\`, restored from the cache: \`${REF_HIT:-false}\`."
             echo
-            echo "Check sections at once: \`${SECTION_WORKERS:-set by the validation suite}\`."
+            if [ "$NO_SECTIONS" = true ]; then
+              echo 'Form: the refusals and the tiers alone, with no check section, as on a pull request.'
+              echo 'The check sections run on this build on every push to main and weekly.'
+            else
+              echo 'Form: every check section.'
+              echo
+              echo "Check sections at once: \`${SECTION_WORKERS:-set by the validation suite}\`."
+            fi
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           if [ -f "$RUNNER_TEMP/fel-${{ matrix.build }}.txt" ]; then
