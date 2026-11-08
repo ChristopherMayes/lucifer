@@ -44,7 +44,10 @@ of that history. The entries before that date describe that branch.
   sampling than the derived one is accepted on this window. The spontaneous section's thread pair
   runs at a grid of 128 in place of the reference 256, the identity being of the draws' order
   under threads and no grid quantity, and the ledger is read from a run at the reference grid with
-  the same switches, so every spontaneous level keeps its digits.
+  the same switches, so every spontaneous level keeps its digits. In one round on the Linux
+  runner the debug build's section block took 887 s against the baseline's 2128 and the release
+  build's 879 and 957 s against 1135, so the pull request took 25.3 minutes against 28.4, and
+  the spontaneous section is then the longest at 358 to 450 s.
 - 2026-11-08 Changed: on a pull request the Linux CI job's debug build runs the refusals and the
   eleven tiers and leaves the 24 check sections to the push to `main`, the weekly schedule and a
   dispatch, so a pull request waits on the release job alone ([](validation.md#val-linux-ci)).
