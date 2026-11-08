@@ -43,6 +43,12 @@ The steady and SASE checks need the tier inputs and the imported dumps of a vali
 pass in the work directory, which the validation suite copies in. The pulse checks need
 the tracker alone.
 
+The eleven tracker runs are independent, so they are launched together through
+pool.run_all, longest first, and the checks are judged from their files afterwards in the
+order above. The three SASE runs take nearly all of the section's time. Each run takes
+the threads run_threads gives from the section's allowance, and the tracker writes the
+same bits at any thread count, so only the wall time depends on it.
+
 Usage:
 
   check_spectral.py --exe <lucifer> --workdir <dir> [--threads N] [--sase-tol <rel>]
@@ -61,6 +67,7 @@ import h5py
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pool  # noqa: E402
 from checkrec import record  # noqa: E402
 from convert_genesis import write_openpmd_beam  # noqa: E402
 from lucifer.compare import differences, read_curves  # noqa: E402
@@ -135,17 +142,33 @@ class _Patch:
         self.weight = np.full(n, weight)
 
 
-def run(exe, wd, toml, root, overrides, threads):
-    """Run the tracker on toml with the overrides into root and return its log's text,
-    or None after printing the log's tail when it fails."""
+# Every run's exit status and log text, by its root, filled by launch() and read by the
+# checks through outcome() and result().
+RUNS = {}
+
+
+def launch(exe, wd, toml, root, overrides, threads):
+    """Run the tracker on toml with the overrides into root, keeping its exit status and
+    log text under root and writing the log to root.log."""
     cmd = [str(exe), toml, f"run.out_root={root}"] + list(overrides)
     env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     p = subprocess.run(cmd, cwd=str(wd), env=env, capture_output=True, text=True)
     text = p.stdout + p.stderr
     (wd / f"{root}.log").write_text(text)
-    if p.returncode != 0:
+    RUNS[root] = (p.returncode, text)
+
+
+def outcome(root):
+    """A launched run's exit status and log text."""
+    return RUNS[root]
+
+
+def result(root):
+    """A launched run's log text, or None after printing the log's tail when it failed."""
+    rc, text = RUNS[root]
+    if rc != 0:
         print(text[-3000:], file=sys.stderr)
-        print(f"FAIL: {root} returned {p.returncode}", file=sys.stderr)
+        print(f"FAIL: {root} returned {rc}", file=sys.stderr)
         return None
     return text
 
@@ -194,8 +217,8 @@ def write_pulse(wd, tag, center_slice, e_tot, length):
     return float((np.abs(ex)**2).sum())
 
 
-def steady(exe, wd, threads):
-    text = run(exe, wd, "tier1.toml", "spec_tier1", ["field.propagator=spectral"], threads)
+def steady(wd):
+    text = result("spec_tier1")
     if text is None:
         return False
     d = worst_of(differences(read_curves(wd / "spec_tier1.stats.h5"), read_curves(wd / "tier1.stats.h5")))
@@ -216,14 +239,11 @@ def window_n_wavelength(wd, toml):
         return int(tomllib.load(fh)["window"]["n_wavelength"])
 
 
-def sase(exe, wd, threads, tol):
-    # The spectral run at one plane a slice: field.n_wavelength would otherwise derive a
-    # coarser field, which the coarse step measures on its own.
-    n_wl = window_n_wavelength(wd, "tdsase.toml")
+def sase(wd, tol):
     roots = {}
-    for key, more in (("slices", []), ("spectral", ["field.propagator=spectral", f"field.n_wavelength={n_wl}"])):
+    for key in ("slices", "spectral"):
         root = f"spec_tdsase_{key}"
-        if run(exe, wd, "tdsase.toml", root, ["run.source_filter=true"] + more, threads) is None:
+        if result(root) is None:
             return False
         roots[key] = root
     d = worst_of(differences(read_curves(wd / f"{roots['spectral']}.stats.h5"),
@@ -238,11 +258,13 @@ def sase(exe, wd, threads, tol):
     return good
 
 
-def coarse(exe, wd, threads):
+def coarse(wd):
     root = "spec_tdsase_coarse"
-    text = run(exe, wd, "tdsase.toml", root, ["run.source_filter=true", "field.propagator=spectral"],
-               threads + 0)
+    text = result(root)
     if text is None:
+        return False
+    if outcome("spec_tdsase_spectral")[0] != 0:
+        print("FAIL: the coarse field is compared with the spectral SASE run, which failed", file=sys.stderr)
         return False
     m = re.search(r"Field\s+(\d+) planes of (\d+) wavelengths over the window, (\d+) slices a plane", text)
     planes, n_wl, n_per = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 1)
@@ -264,19 +286,10 @@ CLIFF_N_WAVELENGTH = 192   # The tier's slice raised above the cliff, 0.31 of th
 COOP_CLIFF = 0.25          # fel_field_coop_cliff$ (fel_spectral_mod).
 
 
-def cliff(exe, wd, threads):
+def cliff():
     # The setup alone of the SASE tier with its slice raised above the cliff, the key
     # stated at the slice, left unset, and stated at twice the slice.
-    base = ["run.load_only=true", "field.propagator=spectral", f"window.n_wavelength={CLIFF_N_WAVELENGTH}"]
-    out = {}
-    for key, more in (("stated", [f"field.n_wavelength={CLIFF_N_WAVELENGTH}"]), ("unset", []),
-                      ("coarser", [f"field.n_wavelength={2 * CLIFF_N_WAVELENGTH}"])):
-        root = f"spec_cliff_{key}"
-        cmd = [str(exe), "tdsase.toml", f"run.out_root={root}"] + base + more
-        p = subprocess.run(cmd, cwd=str(wd), env=dict(os.environ, OMP_NUM_THREADS=str(threads)),
-                           capture_output=True, text=True)
-        out[key] = (p.returncode, p.stdout + p.stderr)
-        (wd / f"{root}.log").write_text(out[key][1])
+    out = {key: outcome(f"spec_cliff_{key}") for key in ("stated", "unset", "coarser")}
 
     rc, text = out["stated"]
     m = re.search(r"Field sampling the window's slice, (\d+) wavelengths, stated: the slice is\s+([0-9.]+) of", text)
@@ -304,12 +317,10 @@ def cliff(exe, wd, threads):
     return good_s and good_u and good_c
 
 
-def one_slice(exe, wd, threads):
-    # 100 GeV: the pipe's slippage is the floor's one wavelength, one slice.
-    write_pulse(wd, "spec_one", NZ // 2, 100e9, 1e-6)
+def one_slice(wd):
     fields = {}
-    for key, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
-        if run(exe, wd, "spec_one.toml", f"spec_one_{key}", more, threads) is None:
+    for key in ("slices", "spectral"):
+        if result(f"spec_one_{key}") is None:
             return False
         fields[key] = read_field(wd / f"spec_one_{key}-final.wf.h5")["u"]
     diff = float(np.abs(fields["spectral"] - fields["slices"]).max() / np.abs(fields["slices"]).max())
@@ -321,18 +332,19 @@ def one_slice(exe, wd, threads):
     return good
 
 
-def bank(exe, wd, threads):
-    # 1.14 GeV over 0.4 m: 41 wavelengths of slippage, and the pulse's center 100 slices
-    # from the head, so most of it crosses.
-    e_tot = 1.14e9
-    gamma = e_tot / 0.51099895e6
-    length = 0.4
-    n_slip = int(np.floor(length / (2 * gamma**2 * WAVELENGTH))) + 1
-    write_pulse(wd, "spec_bank", NZ - 100, e_tot, length)
+# The bank's pulse: 1.14 GeV over 0.4 m, 41 wavelengths of slippage, and the pulse's
+# center 100 slices from the head, so most of it crosses.
+BANK_E_TOT = 1.14e9
+BANK_LENGTH = 0.4
+
+
+def bank(wd):
+    gamma = BANK_E_TOT / 0.51099895e6
+    n_slip = int(np.floor(BANK_LENGTH / (2 * gamma**2 * WAVELENGTH))) + 1
     ok = True
-    for key, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
+    for key in ("slices", "spectral"):
         root = f"spec_bank_{key}"
-        text = run(exe, wd, "spec_bank.toml", root, more, threads)
+        text = result(root)
         if text is None:
             return False
         escaped = escaped_energy(text)
@@ -361,6 +373,18 @@ def bank(exe, wd, threads):
     return ok
 
 
+def run_threads(budget):
+    """The threads each run takes and the threads pool.run_all divides the allowance by,
+    from the section's allowance."""
+    rule = os.environ.get("LUCIFER_SPECTRAL_THREADS") or "each"
+    if rule == "serial":
+        return budget, budget
+    if rule == "each":
+        return budget, max(1, budget // 3)
+    t = max(1, budget // 3)
+    return t, t
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--exe", required=True)
@@ -377,12 +401,39 @@ def main():
             print(f"FAIL: the work directory lacks {f} from a validation pass", file=sys.stderr)
             return 1
 
-    ok = steady(exe, wd, a.threads)
-    ok = sase(exe, wd, a.threads, a.sase_tol) and ok
-    ok = coarse(exe, wd, a.threads) and ok
-    ok = cliff(exe, wd, a.threads) and ok
-    ok = one_slice(exe, wd, a.threads) and ok
-    ok = bank(exe, wd, a.threads) and ok
+    # The pulses' inputs. 100 GeV over a micron slips the floor's one wavelength, one slice.
+    write_pulse(wd, "spec_one", NZ // 2, 100e9, 1e-6)
+    write_pulse(wd, "spec_bank", NZ - 100, BANK_E_TOT, BANK_LENGTH)
+
+    # The runs, longest first. The spectral SASE run is at one plane a slice, since
+    # field.n_wavelength would otherwise derive a coarser field, which the coarse run
+    # measures on its own.
+    n_wl = window_n_wavelength(wd, "tdsase.toml")
+    sase_on = ["run.source_filter=true"]
+    cliff_base = ["run.load_only=true", "field.propagator=spectral", f"window.n_wavelength={CLIFF_N_WAVELENGTH}"]
+    runs = [
+        ("tdsase.toml", "spec_tdsase_spectral", sase_on + ["field.propagator=spectral", f"field.n_wavelength={n_wl}"]),
+        ("tdsase.toml", "spec_tdsase_slices", sase_on),
+        ("tdsase.toml", "spec_tdsase_coarse", sase_on + ["field.propagator=spectral"]),
+        ("spec_bank.toml", "spec_bank_spectral", ["field.propagator=spectral"]),
+        ("tier1.toml", "spec_tier1", ["field.propagator=spectral"]),
+        ("spec_one.toml", "spec_one_spectral", ["field.propagator=spectral"]),
+        ("spec_one.toml", "spec_one_slices", []),
+        ("spec_bank.toml", "spec_bank_slices", []),
+        ("tdsase.toml", "spec_cliff_stated", cliff_base + [f"field.n_wavelength={CLIFF_N_WAVELENGTH}"]),
+        ("tdsase.toml", "spec_cliff_unset", cliff_base),
+        ("tdsase.toml", "spec_cliff_coarser", cliff_base + [f"field.n_wavelength={2 * CLIFF_N_WAVELENGTH}"]),
+    ]
+    threads, per_job = run_threads(a.threads)
+    pool.run_all([lambda r=r: launch(exe, wd, r[0], r[1], r[2], threads) for r in runs],
+                 threads_per_job=per_job)
+
+    ok = steady(wd)
+    ok = sase(wd, a.sase_tol) and ok
+    ok = coarse(wd) and ok
+    ok = cliff() and ok
+    ok = one_slice(wd) and ok
+    ok = bank(wd) and ok
     print("  spectral checks: PASS" if ok else "  spectral checks: FAIL")
     return 0 if ok else 1
 

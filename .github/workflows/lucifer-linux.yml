@@ -101,13 +101,17 @@ on:
         description: "Cores the check sections share, --cpus (empty: the runner's)"
         required: false
         default: ""
+      spectral_threads:
+        description: "MEASUREMENT ONLY: the spectral section's rule, serial, split or each"
+        required: false
+        default: ""
   schedule:
     - cron: "17 9 * * 1"
 
 # The group carries the dispatch input, so two dispatches that measure different section
 # counts on one ref run side by side rather than one cancelling the other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}-${{ inputs.cpus }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.section_workers }}-${{ inputs.cpus }}-${{ inputs.spectral_threads }}
   cancel-in-progress: true
 
 jobs:
@@ -312,6 +316,7 @@ jobs:
         env:
           SECTION_WORKERS: ${{ inputs.section_workers }}
           SECTION_CPUS: ${{ inputs.cpus }}
+          LUCIFER_SPECTRAL_THREADS: ${{ inputs.spectral_threads }}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
