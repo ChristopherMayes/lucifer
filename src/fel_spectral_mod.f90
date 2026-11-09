@@ -878,6 +878,168 @@ end subroutine fel_spectral_correct
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_spectral_twin_table (sp, fs, dz, remainder, ax)
+!
+! Routine to build the FP64 factor table the instrument's CPU twin rounds its pass from
+! (fel_fp32_spectral_pass): the kernel's over the step, as fel_spectral_apply builds it,
+! or the kernel's remainder with the k0 part divided out, as fel_spectral_correct builds
+! it. The expressions are those two routines' own, kept apart from them so that neither
+! FP64 pass is touched, as fel_spectral_device_slip keeps the crossing arithmetic apart.
+!
+! Input:
+!   sp        -- fel_spectral_struct: The propagator's switch and pad.
+!   fs        -- fel_field_struct: The member.
+!   dz        -- real(rp): Step length [m].
+!   remainder -- logical: The remainder's table? False builds the kernel's.
+!
+! Output:
+!   ax(:,:)   -- complex(rp), allocatable: The table, (ngrid, nz + n_pad), a column per
+!                  wavenumber along tau and a row per transverse mode.
+!-
+
+subroutine fel_spectral_twin_table (sp, fs, dz, remainder, ax)
+
+type (fel_spectral_struct) sp
+type (fel_field_struct), target :: fs
+type (wavefront_struct), pointer :: wf
+real(rp) dz
+logical remainder
+complex(rp), allocatable :: ax(:,:)
+
+real(rp) k0, dk, dtau, kappa, kt
+integer ngrid_arr(3), ngrid, nz, nt, ix, m, mx, mt
+
+!
+
+wf => fs%wf
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+nz = ngrid_arr(3)
+nt = nz + sp%n_pad
+k0 = twopi / wf%wavelength
+dk = twopi / (ngrid * wf%dx)
+dtau = wf%dz
+
+allocate (ax(ngrid, nt))
+do m = 1, nt
+  mt = m - 1;  if (2*mt > nt-1) mt = mt - nt
+  kappa = twopi * mt / (nt * dtau)
+  kt = k0 + kappa
+  do ix = 1, ngrid
+    mx = ix - 1;  if (2*mx > ngrid-1) mx = mx - ngrid
+    if (remainder) then
+      ax(ix, m) = exp(cmplx(0.0_rp, -dz * (mx * dk)**2 * (1 / (2 * kt) - 1 / (2 * k0)), rp))
+    else
+      ax(ix, m) = exp(cmplx(0.0_rp, -dz * (mx * dk)**2 / (2 * kt), rp))
+    endif
+  enddo
+enddo
+
+end subroutine fel_spectral_twin_table
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_twin_close (sp, und, beam, ff, fp32, err_flag)
+!
+! Routine to close one step of the instrument with the CPU twin under the spectral
+! propagator. fel_track_und_step rounded the twin's record from the pre-step planes and
+! kept the step's constants, and the walk has since run its own kernel pass and deposit
+! (fel_spectral_step_field) and not yet slipped. The twin's record takes the same kernel
+! pass in single precision over the window and the pad, then each slice's deposit and
+! add, and the source and field rows are read against the FP64 record here, before
+! either record slips, where the device twin's are read (fel_track_und_twin_close): a
+! row read after the slip is normalized by the residue of a shift. The twin never
+! slips, since lockstep rounds its record again before the next step.
+!
+! Input:
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
+!   und      -- fel_und_struct: The segment.
+!   beam     -- fel_beam_struct: The beam, after the step.
+!   ff(:)    -- fel_field_struct: The field set, after the kernel pass and the deposit.
+!   fp32     -- fel_fp32_struct: The instrument, its record rounded before the step.
+!
+! Output:
+!   fp32     -- fel_fp32_struct: This step's rows recorded and the stream advanced.
+!   err_flag -- logical: Set True on a transform failure or a guard refusal. False otherwise.
+!-
+
+subroutine fel_spectral_twin_close (sp, und, beam, ff, fp32, err_flag)
+
+type (fel_spectral_struct) sp
+type (fel_und_struct) und
+type (fel_beam_struct), target :: beam
+type (fel_field_struct), target :: ff(:)
+type (fel_fp32_struct), target :: fp32
+logical err_flag
+
+complex(rp), allocatable :: ax(:,:)
+real(rp) ks
+integer is, nz, ifl
+
+!
+
+err_flag = .true.
+nz = size(ff(1)%wf%Ex, 3)
+ks = twopi / ff(1)%wf%wavelength
+
+call fel_spectral_twin_table (sp, ff(1), und%dz, .false., ax)
+call fel_fp32_spectral_pass (fp32, nz, ax, err_flag)
+if (err_flag) return
+
+do is = 1, size(beam%slice)
+  ifl = fel_field_index(ff(1)%slip, is, nz)
+  call fel_fp32_field_twin (fp32, is, beam%slice(is), beam, ff(1)%wf%Ex(:,:,ifl), fp32%scl_w, &
+                            ff(1)%wf%dx, fp32%gridmax, und%kx, und%ky, und%ax, und%ay, &
+                            und%cos_t, und%sin_t, ks)
+enddo
+call fel_fp32_step_close (fp32, err_flag)
+
+end subroutine fel_spectral_twin_close
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_spectral_twin_correct (sp, ff, fp32, dz, err_flag)
+!
+! Routine to put the unaveraged twin's record through the kernel's remainder in single
+! precision after a record step's substeps, fel_spectral_correct on the twin's window
+! and pad (fel_unavg_step).
+!
+! Input:
+!   sp       -- fel_spectral_struct: The propagator's switch and pad.
+!   ff(:)    -- fel_field_struct: The field set, one member.
+!   fp32     -- fel_fp32_struct: The instrument, its record after the substeps.
+!   dz       -- real(rp): The record step [m].
+!
+! Output:
+!   fp32     -- fel_fp32_struct: %e32 and %pad32 through the remainder.
+!   err_flag -- logical: Set True on a transform failure. False otherwise.
+!-
+
+subroutine fel_spectral_twin_correct (sp, ff, fp32, dz, err_flag)
+
+type (fel_spectral_struct) sp
+type (fel_field_struct), target :: ff(:)
+type (fel_fp32_struct), target :: fp32
+real(rp) dz
+logical err_flag
+
+complex(rp), allocatable :: ax(:,:)
+
+!
+
+call fel_spectral_twin_table (sp, ff(1), dz, .true., ax)
+call fel_fp32_spectral_pass (fp32, size(ff(1)%wf%Ex, 3), ax, err_flag)
+
+end subroutine fel_spectral_twin_correct
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_spectral_bank_merge (dst, src)
 !
 ! Routine to append every plane of one bank to another, in transmission order, for a

@@ -22,6 +22,13 @@ can fail.
    instrument's stream is byte-identical at 1 and 8 threads, since its work is per slice.
 6. Refused. The twin mirrors the advance at the fundamental with no collective effects,
    so a wake run with the instrument on must be refused rather than measured wrongly.
+7. The spectral propagator (spectral-field.md). The twin's record takes the kernel pass
+   along tau in single precision over the window and its pad, and its rows are read
+   after the FP64 kernel pass and deposit and before the slip. The steady state and the
+   eight-slice window hold the same ceilings, the FP64 diag is byte-identical with the
+   twin on against off, the mutation moves the source and the field rows, and the
+   stream is byte-identical at 1 and 8 threads. Freerun under the propagator and a
+   field coarser than the slices with the twin are refused.
 
 Usage: check_fp32.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad. Exit 0 only if all pass.
@@ -79,6 +86,17 @@ TD_EXTRA = """  beam.bunch_charge = 1.601107656951e-14
 CEIL = {"pz": 2e-6, "theta": 3e-4, "phasor": 3e-5, "source": 1e-4, "field": 1e-4}
 GUARD_FLOOR = 256.0
 RENORM_CEIL = 1.5
+
+# The spectral propagator, with the field's plane the window's slice on the
+# time-dependent window, so the twin's rows compare slice for slice.
+SPECTRAL = '  field.propagator = "spectral"\n'
+SP_PLANE = '  field.n_wavelength = 3\n'
+# A window of 48 slices, where a plane of 6 wavelengths leaves the 8 planes a stated
+# sampling must and the twin's own refusal is the one that fires.
+SP_COARSE_EXTRA = TD_EXTRA.replace("z_min = -1.200000e-09", "z_min = -7.200000e-09").replace(
+    "z_max = 1.200000e-09", "z_max = 7.200000e-09").replace(
+    "window_length = 2.4e-9", "window_length = 1.44e-8").replace(
+    "1.601107656951e-14", "9.606645941706e-14") + '  field.n_wavelength = 6\n'
 
 
 def ok(label, value, check, good, num=None, bound=None, kind="bool"):
@@ -205,6 +223,54 @@ def main():
         expect_fail=True)
     refused = r.returncode != 0 and "FP32_CHECK DOES NOT COVER WAKES" in r.stdout
     ok("wake with the instrument refused", refused, "True", refused)
+
+    # 7. The spectral propagator: the twin's kernel pass along tau in single precision,
+    # its rows read before the slip. The same ceilings, the read-only proof against the
+    # CPU's own spectral run, the mutation on the source and the field rows, the
+    # time-dependent window at 1 and 8 threads, and the two refusals.
+    run(args.exe, wd, "fp32_spss.in", BASE.format(root="fp32spss",
+        extra=SPECTRAL + '  run.fp32_check = "lockstep"\n'))
+    sp = summary(wd, "fp32spss")
+    for q in ("pz", "theta", "phasor", "source", "field"):
+        ok(f"spectral lockstep steady worst_{q}", f"{sp[q]:.3e}", f"<= {CEIL[q]:.0e}", sp[q] <= CEIL[q],
+           num=sp[q], bound=CEIL[q], kind="max")
+    ok("spectral lockstep steady guard ulps", f"{sp['guard']:.3e}", f">= {GUARD_FLOOR:.0f}",
+       sp["guard"] >= GUARD_FLOOR,
+       num=sp["guard"], bound=GUARD_FLOOR, kind="min")
+    run(args.exe, wd, "fp32_spoff.in", BASE.format(root="fp32spoff", extra=SPECTRAL))
+    same = (wd / "fp32spss.diag.txt").read_bytes() == (wd / "fp32spoff.diag.txt").read_bytes()
+    ok("spectral FP64 diag byte-identical, instrument on vs off", same, "True", same)
+    run(args.exe, wd, "fp32_spmut.in", BASE.format(root="fp32spmut",
+        extra=SPECTRAL + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
+    m = summary(wd, "fp32spmut")
+    ok("spectral mutation moves worst_source", f"{m['source']:.3e} vs {sp['source']:.3e}",
+       ">= 5x", m["source"] >= 5 * sp["source"],
+       num=m["source"], bound=5 * sp["source"], kind="min")
+    ok("spectral mutation moves worst_field", f"{m['field']:.3e} vs {sp['field']:.3e}",
+       ">= 5x", m["field"] >= 5 * sp["field"],
+       num=m["field"], bound=5 * sp["field"], kind="min")
+    run(args.exe, wd, "fp32_sptd.in", BASE.format(root="fp32sptd",
+        extra=TD_EXTRA + SPECTRAL + SP_PLANE + '  run.fp32_check = "lockstep"\n'), threads="8")
+    t8 = (wd / "fp32sptd.fp32.txt").read_bytes()
+    t = summary(wd, "fp32sptd")
+    for q in ("pz", "theta", "phasor", "source", "field"):
+        ok(f"spectral lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.0e}", t[q] <= CEIL[q],
+           num=t[q], bound=CEIL[q], kind="max")
+    ok("spectral lockstep TD guard ulps", f"{t['guard']:.3e}", f">= {GUARD_FLOOR:.0f}",
+       t["guard"] >= GUARD_FLOOR,
+       num=t["guard"], bound=GUARD_FLOOR, kind="min")
+    run(args.exe, wd, "fp32_sptd.in", BASE.format(root="fp32sptd",
+        extra=TD_EXTRA + SPECTRAL + SP_PLANE + '  run.fp32_check = "lockstep"\n'), threads="1")
+    same = t8 == (wd / "fp32sptd.fp32.txt").read_bytes()
+    ok("spectral instrument stream byte-identical, 1 vs 8 threads", same, "True", same)
+    r = run(args.exe, wd, "fp32_spfr.in", BASE.format(root="fp32spfr",
+        extra=SPECTRAL + '  run.fp32_check = "freerun"\n'), expect_fail=True)
+    refused = r.returncode != 0 and 'DOES NOT COVER FP32_CHECK = "freerun"' in r.stdout
+    ok("freerun under the spectral propagator refused", refused, "True", refused)
+    r = run(args.exe, wd, "fp32_spco.in", BASE.format(root="fp32spco",
+        extra=SP_COARSE_EXTRA + SPECTRAL + '  run.fp32_check = "lockstep"\n'), expect_fail=True)
+    refused = r.returncode != 0 and "WHICH THE FP32 CHECK'S CPU TWIN DOES NOT COVER" in r.stdout
+    ok("a field coarser than the slices with the twin refused", refused, "True", refused)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0

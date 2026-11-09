@@ -421,7 +421,7 @@ complex(rp), pointer :: exp_k2_p(:,:)
 complex(rp) ehat, jhat, wphasor, cdep, ehat_y, cph
 logical two_pol
 integer is, ip, isub, nslice, ifld, ix, iy, ngrid_arr(3), ngrid
-logical on_grid, err, any_err, dev_twin
+logical on_grid, err, any_err, dev_twin, cpu_twin_sp
 integer n_s0
 character(*), parameter :: r_name = 'fel_unavg_step'
 
@@ -494,20 +494,16 @@ scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_
 ! propagator by 1.3e-1 of the peak field where this form and the averaged line's own
 ! propagator difference sit at 5e-2, and it takes 3.5 times the walk. On the device the
 ! record step runs the same form, the remainder pass and the slip passes on the resident
-! record after the substeps (unavg_device_step). Setup refuses the instrument's CPU twin
-! with the propagator, so with the instrument on the device is the twin, whose rows are
-! read after the substeps and whose record is rebuilt from FP64 each record step.
+! record after the substeps (unavg_device_step). With the instrument on, the device twin's
+! rows are read after the substeps and its record is rebuilt from FP64 each record step.
+! The CPU twin's record takes the remainder pass in single precision too, and its field
+! row is read again after the FP64 remainder pass (unavg_twin_correct).
 
 spectral_on = .false.
 slippage_l = 0
 keep_l = .false.
 if (present(spec)) spectral_on = spec%on
 if (spectral_on) then
-  if (fp32%on .and. .not. dev%on) then
-    call out_io (s_error$, r_name, 'THE UNAVERAGED MODE UNDER THE SPECTRAL PROPAGATOR REACHED THE INSTRUMENT''S CPU TWIN.', &
-                                   'PLEASE REPORT THIS!')
-    return
-  endif
   if (present(slippage)) slippage_l = slippage
   if (present(keep)) keep_l = keep
 endif
@@ -795,9 +791,12 @@ if (last) then
 endif
 
 ! The instrument's serial epilogue, which reduces this step's per-slice rows and writes
-! the stream. Outside the parallel region by contract, as the averaged path's is.
+! the stream. Outside the parallel region by contract, as the averaged path's is. Under
+! the spectral propagator the CPU twin's field row is read again after the remainder
+! pass below, so its close waits for that (unavg_twin_correct).
 
-if (fp32%on) then
+cpu_twin_sp = fp32%on .and. .not. dev_twin .and. spectral_on
+if (fp32%on .and. .not. cpu_twin_sp) then
   call fel_fp32_step_close (fp32, err)
   if (err) then
     err_flag = .true.
@@ -811,8 +810,13 @@ endif
 
 if (spectral_on) then
   u_before = unavg_pad_energy (.true.)
+  if (cpu_twin_sp) call fel_fp32_pad_round (fp32, ff(1)%pad)
   call fel_spectral_correct (spec, ff(1), dz_record, err)
   if (err) return
+  if (cpu_twin_sp) then
+    call unavg_twin_correct (err)
+    if (err) return
+  endif
   call fel_spectral_slip (spec, ff(1), slippage_l, keep_l, err)
   if (err) return
   call unavg_ledger_pad (u_before)
@@ -822,6 +826,54 @@ err_flag = .false.
 
 !------------------------------------------------------------------------------
 contains
+
+!+
+! Subroutine unavg_twin_correct (uerr)
+!
+! Routine to take the CPU twin's record through the remainder pass in single precision
+! (fel_spectral_twin_correct) and read its field row where the device twin's cannot be
+! read: after the FP64 remainder pass and before the slip. On the last record step the
+! exit handoff above carried the FP64 record back half a substep before the remainder
+! pass, so the twin's record takes the same half step first, rounded from the cached
+! wavenumbers fel_field_diffract_by forms it from. The particle rows and the ledger row
+! stay as the loop read them, and the step closes here.
+!-
+
+subroutine unavg_twin_correct (uerr)
+
+logical uerr
+complex(rp), pointer :: k2_p(:,:)
+complex(sp), allocatable :: k32h(:,:)
+integer js, jf
+
+!
+
+uerr = .true.
+if (last) then
+  k2_p => fel_field_kernel_k2 (ks)
+  if (.not. associated(k2_p)) then
+    call out_io (s_error$, r_name, 'THE WAVENUMBER TABLE IS NOT IN THE KERNEL CACHE. PLEASE REPORT THIS!')
+    return
+  endif
+  allocate (k32h(ngrid, ngrid))
+  k32h = cmplx(exp(k2_p * (-0.5_rp * dsub)), kind = sp)
+  do js = 1, nslice
+    call fft32_solve (fp32%e32(:,:,js), k32h, ngrid)
+  enddo
+endif
+
+call fel_spectral_twin_correct (spec, ff, fp32, dz_record, uerr)
+if (uerr) return
+
+do js = 1, nslice
+  jf = fel_field_index(slip, js, nslice)
+  fp32%div_slice(9, js) = sqrt(sum(abs(cmplx(fp32%e32(:,:,js), kind = rp) - wf%Ex(:,:,jf))**2)) / &
+                          (sqrt(sum(abs(wf%Ex(:,:,jf))**2)) + 1e-30_rp)
+enddo
+
+call fel_fp32_step_close (fp32, uerr)
+
+end subroutine unavg_twin_correct
 
 !+
 ! Function unavg_pad_energy (with_window) result (u)

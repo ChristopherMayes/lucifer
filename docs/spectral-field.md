@@ -241,8 +241,8 @@ The header's cost estimate counts what the mode runs ([](performance.md)): the p
 (spectral-limits)=
 ## What it does not cover
 
-- The FP32 check without the device under the unaveraged mode, whose CPU twin steps the slice propagator. With `run.device = "metal"` the device takes the twin's role for the mode as for the averaged one.
-- The FP32 check without the device, whose CPU twin steps the slice propagator in single precision. With `run.device = "metal"` the device takes the twin's role ([](validation.md#val-device-spectral), [](validation.md#val-device-unaveraged)).
+- `run.fp32_check = "freerun"` without the device. The twin keeps no slip, and the one-slice window freerun covers carries no pad and no ramp, so the run would measure the slice propagator. The lockstep twin runs under the propagator in both modes ([](validation.md#val-fp32-lockstep), [](validation.md#val-unaveraged-fp32)), and with `run.device = "metal"` the device takes the twin's role ([](validation.md#val-device-spectral), [](validation.md#val-device-unaveraged)).
+- A field coarser than the slices with the FP32 check's CPU twin, whose rows are read slice by slice.
 - The coherent source model, whose deposit is `fel_field_step`'s own.
 - Harmonic fields and `run.dump_reduced` with a field coarser than the slices. The coarse field is carried for the fundamental alone, and the field reductions are taken plane by plane of the record and not on a slice's interpolated plane.
 - A field coarser than the slices in a line with an unaveraged segment, whose source resolves structure below a slice. The message names the slice as the sampling to state.
@@ -255,4 +255,4 @@ The device carries the propagator ([](validation.md#val-device-spectral)). Its s
 (spectral-next)=
 ## What is next
 
-The FP32 check's CPU twin under the propagator, in both modes, which would step the slice propagator in single precision beside the ramp. And the coarse field in an unaveraged segment, whose source resolves structure below a slice, if a deposit onto the field's planes is found that keeps the mode's ledger.
+The coarse field in an unaveraged segment, whose source resolves structure below a slice, if a deposit onto the field's planes is found that keeps the mode's ledger.
