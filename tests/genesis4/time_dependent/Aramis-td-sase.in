@@ -36,7 +36,7 @@ sample = 3
 &field
 power=0
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 &end
 
 &beam

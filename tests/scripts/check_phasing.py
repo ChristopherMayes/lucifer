@@ -66,13 +66,13 @@ LAM = 1e-10
 TOL_FLAT = 5e-3          # The adiabatic trend of the re-anchor baseline spans 1.5e-3.
 TOL_KNOB = 5e-3          # Knob ramp against the exact analytic slope: 1.5e-3.
 TOL_XMODE = 5e-3         # Absolute gap scan against relative knob scan: 1.2e-3.
-TOL_PARITY = 1e-6        # Knob curve against PHASESHIFTER, from shared dumps: 1.9e-8.
+TOL_PARITY = 1e-6        # Knob curve against PHASESHIFTER, from shared dumps: 2.4e-8.
 TOL_CHIC_SLOPE = 2e-3    # Absolute chicane ramp against the geometric slope: 6.8e-4,
                          #   with 583 wavelengths of delay at the base angle.
 TOL_LEDGER = 1e-4        # Unaveraged ledger closure across the chicane: 4.0e-6.
 TOL_CF = 1e-6            # The 2D trace against the small-angle closed form: 6.4e-8.
 TOL_POWER = 1e-6         # Exit power against phi, the knob against Genesis's shifter, from
-                         #   shared dumps: 9.3e-9. Independently loaded beams read 1.4e-4,
+                         #   shared dumps: 1.3e-8. Independently loaded beams read 1.4e-4,
                          #   which measures the loaders, so this check shares the start.
 
 LAT2SEG = """no_digested
@@ -92,12 +92,12 @@ use, SEG
 {modeline}
 """
 
-# The grids here are odd on purpose, as in check_harmonics and for the same reason. This
-# check compares a phase curve against Genesis at 1e-6, and Genesis propagates the field
-# on half-integer wavenumbers when ngrid is even. Lucifer's kernel is correct at both
-# parities, so the comparison has to run where the reference is right. At 128 and 64 the
-# two checks below read 1.0e-6 and 1.0e-5 against a 1e-6 level. Convert them once Genesis
-# is fixed upstream. docs/validation.md (val-the-transverse-grid) has the account.
+# The grids here are powers of two, as in check_harmonics and for the same reason. This
+# check compares a phase curve and the exit power against Genesis at 1e-6, and until
+# release 4.6.16 Genesis propagated the field half a wavenumber out when ngrid was even,
+# so the scans ran at 151 and 63: against 4.6.15 at 128 and 64 the two Genesis checks
+# read 1.0e-6 and 1.0e-5. Against 4.6.16 at 128 they read 2.4e-8 and 1.3e-8.
+# docs/validation.md (val-the-transverse-grid) has the account.
 
 LATCHIC = """no_digested
 parameter[geometry] = open
@@ -139,7 +139,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   beam.b_norm_emit = 4e-7
   seed_power = 1e7
   seed_waist_size = 30e-6
-  grid_n_pts = 151
+  grid_n_pts = 128
   grid_half_width = 2e-4
   ran_seed = 777
   write_diag = T
@@ -183,7 +183,7 @@ NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_
   beamlet_size = 8
   seed_power = 1e6
   seed_waist_size = 30e-6
-  grid_n_pts = 63
+  grid_n_pts = 64
   grid_half_width = 2e-4
   window_length = 1.6e-9
   n_wavelength = 1
@@ -208,7 +208,7 @@ field_global_stat = true
 &field
 power=1e7
 dgrid=2.000000e-04
-ngrid=151
+ngrid=128
 waist_size=30e-6
 &end
 
@@ -240,7 +240,7 @@ nbins = 8
 &field
 power=1e7
 dgrid=2.000000e-04
-ngrid=151
+ngrid=128
 waist_size=30e-6
 &end
 

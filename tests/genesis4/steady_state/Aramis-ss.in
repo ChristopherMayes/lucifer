@@ -36,7 +36,7 @@ zmatch=9.5
 &field
 power=5e3
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 waist_size=30e-6
 &end
 

@@ -19,7 +19,7 @@
 #   1. Lucifer built, so build-debug/bin/lucifer (or build-release/bin) exists:
 #        BUILD_PRODUCTION=N util/conda_compile   # from the Lucifer clone's root
 #
-#   2. genesis4 4.6.15 from conda-forge, in the bmad-fel-validate environment, which this
+#   2. genesis4 4.6.16 from conda-forge, in the bmad-fel-validate environment, which this
 #      validation suite takes ahead of PATH. --genesis names another, and its version is
 #      checked. The validation suite needs FFTW support compiled in, since it runs with
 #      fft_fieldsolver = true.
@@ -146,7 +146,7 @@ fi
 
 # The reference's version, from the binary's own banner, which it prints before
 # complaining about the missing input file.
-GENESIS_VERSION_WANTED=4.6.15
+GENESIS_VERSION_WANTED=4.6.16
 GENESIS_VERSION="$("$GENESIS" 2>&1 | sed -n 's/.*Version \([0-9][0-9.]*\).*/\1/p' | head -1)"
 
 # The key the reference set is cached under, from the directory holding the input files
@@ -272,9 +272,10 @@ echo "  build:       ${BUILD:-not declared, since --build was not given}"
 echo "  genesis4:    $GENESIS"
 # The lines below establish which reference this is. The recorded levels belong to one
 # version of it, and another moves them while every check still passes, so this is a
-# refusal rather than a note: 4.6.15 both carries the CODATA electron rest energy and
-# seeds its noise per global slice index, and digits recorded against anything earlier
-# do not compare. The version comes from the binary's own banner, which it prints before
+# refusal rather than a note: 4.6.16 carries the CODATA electron rest energy, seeds its
+# noise per global slice index and propagates the field on the transform's own
+# wavenumbers at either grid parity, and digits recorded against anything earlier do
+# not compare. The version comes from the binary's own banner, which it prints before
 # complaining about the missing input file, so a binary named by --genesis identifies
 # itself the same way a packaged one does.
 echo "               version $GENESIS_VERSION"

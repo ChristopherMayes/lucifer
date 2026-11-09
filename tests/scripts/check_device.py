@@ -1741,7 +1741,7 @@ def genesis_harmonics(args, wd, exe):
     """check_harmonics' planar input file made time dependent, with shot noise, at grid 64: one
     Genesis reference, its starting state imported by the CPU and the device."""
     (wd / "devg_planar.lat").write_text(ch.GENESIS_LAT)
-    genesis_input = ch.GENESIS_INPUT.replace("ngrid=255", "ngrid=64").replace("shotnoise=0\n", "shotnoise=true\n")
+    genesis_input = ch.GENESIS_INPUT.replace("ngrid=256", "ngrid=64").replace("shotnoise=0\n", "shotnoise=true\n")
     genesis_input = genesis_input.replace("lattice=planar.lat", "lattice=devg_planar.lat").replace("rootname=H3", "rootname=DEVG")
     genesis_input = genesis_input.replace("&field\npower=5e3", "&time\nslen=8e-10\nsample=1\n&end\n\n&field\npower=5e3")
     genesis_input = genesis_input.replace("H3-initial", "DEVG-initial").replace("H3-final", "DEVG-final")

@@ -132,9 +132,10 @@ use, SEG
 """
 
 # The input file twin of lucifer_smoke_test's in-code configuration (same values).
-# grid_n_pts is 63 here on purpose, and this pair is the only place in the validation suite that is
-# not a power of two. Every other input file runs a power-of-two grid, which is what the Metal
-# field solver takes, so an input file moves between the backends unchanged. This pair holds the
+# grid_n_pts is 63 here on purpose. This pair and the coupling probes of check_unaveraged.py
+# are the only places in the validation suite that are not a power of two. Every other input
+# file runs a power-of-two grid, which is what the Metal field solver takes, so an input file
+# moves between the backends unchanged. This pair holds the
 # odd-grid path on the CPU, which has to keep working: a user writing a Genesis-style odd
 # count gets one, and an imported Genesis field can carry one. The value has to match
 # lucifer_smoke_test.f90, since the check below compares the two runs byte for byte.
