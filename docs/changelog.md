@@ -48,6 +48,20 @@ of that history. The entries before that date describe that branch.
   runner the debug build's section block took 887 s against the baseline's 2128 and the release
   build's 879 and 957 s against 1135, so the pull request took 25.3 minutes against 28.4, and
   the spontaneous section is then the longest at 358 to 450 s.
+- 2026-11-08 Fixed: the saturation demo runs again. `examples/saturation_demo/run.sh` handed the
+  tracker Genesis4's own dumps, `AramisSat-initial.par.h5` and `.fld.h5`, which the tracker has
+  refused since it began reading openPMD alone, with `BEAM FILE IS NOT openPMD` and the converter
+  named. The runner converts the two dumps once, untimed, through `convert_genesis.py`, and the two
+  input files state `lambda0` and `window.n_wavelength`, which a converted dump does not carry and
+  the tracker's second refusal asked for. No check had run the demo, since the examples job checks
+  its locations alone. Rerun at grid 256 against Genesis4 4.6.16, Genesis4 reaches 3.484 GW, the
+  averaged mode 3.485 GW, a relative 3.3e-4 where the README said 4.9e-4, and the unaveraged mode
+  6.35 GW, +0.600 in ln where it said +0.615, in 22, 34 and 1064 s at 12 cores each. The README's
+  digits and the report's prose are that run's, its energy budget the ledger's, 6.9e-8 J given and
+  closing to 1.8e-12 of it, and the claim that the averaged mode ran a quarter faster than Genesis4
+  is gone from the README and from `docs/validation.md`: on this machine and toolchain Genesis4
+  took 22 s and the averaged mode 34 s at equal cores.
+
 - 2026-11-08 Changed: the reference is the Genesis4 4.6.16 release, and every input that held an odd
   transverse grid for the reference's sake runs a power of two. 4.6.16 carries one change over
   4.6.15, `FieldSolverFFT` propagating the transverse field on the wavenumbers the transform

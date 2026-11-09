@@ -6,8 +6,14 @@ interlude_model = "bmad"
 source_filter = false
 write_diag = true
 
+# The converted dumps carry the slice partition and not the radiation it was sliced on,
+# so the wavelength and the slice spacing of sat-prep.in are stated here.
+[window]
+n_wavelength = 3
+
 [beam]
-file = "AramisSat-initial.par.h5"
+file = "AramisSat-initial.beam.h5"
 
 [field]
-file = "AramisSat-initial.fld.h5"
+lambda0 = 1e-10
+file = "AramisSat-initial.wf.h5"

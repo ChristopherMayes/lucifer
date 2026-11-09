@@ -9,7 +9,8 @@
 # unaveraged mode, at about 32 times the averaged cost, whose progress lines show it working.
 #
 # Methodology: an untimed Genesis prep run (same ranks, same seed, no &track) writes
-# the shared initial dumps. Wall times come from one external clock (/usr/bin/time -p).
+# the shared initial dumps, converted once to openPMD for the tracker, which reads
+# openPMD alone. Wall times come from one external clock (/usr/bin/time -p).
 # check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
 # input files stay static. The section "The saturation demo" of
@@ -158,6 +159,12 @@ export FI_PROVIDER=tcp
 echo "== saturation demo: 96 slices x 2048 particles, 57 m, $WORKERS cores each =="
 echo "-- prep: Genesis writes the shared initial dumps (untimed, no tracking)"
 "$MPIRUN" -np "$WORKERS" "$GENESIS" sat-prep.in > sat-prep.log 2>&1 || { tail -10 sat-prep.log >&2; exit 1; }
+# The tracker reads openPMD alone, so the two dumps convert once here, untimed. Genesis
+# keeps reading its own, so the three runs still start from the same particles and field.
+for pair in "AramisSat-initial.par.h5 AramisSat-initial.beam.h5" \
+            "AramisSat-initial.fld.h5 AramisSat-initial.wf.h5"; do
+  "$PYTHON" "$SCRIPTS/convert_genesis.py" to-openpmd $pair || { echo "Error: could not convert $pair" >&2; exit 1; }
+done
 
 declare -a TIMES
 timed () {  # <label> <log> <command...>

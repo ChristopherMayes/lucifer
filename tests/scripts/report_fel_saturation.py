@@ -133,11 +133,11 @@ def cover(pdf, d, checks):
         ("", 10, 0),
         ("What to expect in the pages that follow", 11, 1),
         ("    1. Gain curves: the averaged mode lies on Genesis through eight decades of z", 10, 0),
-        ("       and three of power (4.9e-4 at the exit). The unaveraged mode -- an", 10, 0),
+        ("       and three of power (3.3e-4 at the exit). The unaveraged mode -- an", 10, 0),
         ("       independent integrator through the real undulator field, with the", 10, 0),
         ("       coupling factor nowhere in its inputs -- reproduces startup, gain shape", 10, 0),
         ("       and saturation location, riding ~2%/m above the averaged codes while its", 10, 0),
-        ("       beam gives up ~14x more energy -- see page 4.", 10, 0),
+        ("       beam gives up ~12x more energy -- see page 4.", 10, 0),
         ("    2. Pulse structure: per-slice exit power and bunching evolution.", 10, 0),
         ("    3. Beam evolution: energy loss and spread -- where the unaveraged mode's", 10, 0),
         ("       extra physics is visible on the beam itself.", 10, 0),
@@ -336,9 +336,9 @@ def energy_page(pdf, d, checks):
         "\n"
         "Top: per tracker, the upper bar is the total energy the beam handed to radiation\n"
         "by the exit; the lower bar shows where it is now -- still in the window (solid)\n"
-        "or slipped out ahead (hatched). Genesis and the averaged mode keep ~72%: their\n"
+        "or slipped out ahead (hatched). Genesis and the averaged mode keep ~62%: their\n"
         "radiation is made late, near saturation, and has not had time to escape. The\n"
-        "unaveraged beam gave ~14x more and keeps only ~10%: it is charged for the\n"
+        "unaveraged beam gave ~12x more and keeps only ~9%: it is charged for the\n"
         "spontaneous radiation both models emit (the averaged model creates that field\n"
         "energy without debiting the beam, page 4's caption), and\n"
         "that emission is spread uniformly along all 57 m, so anything radiated more than\n"
