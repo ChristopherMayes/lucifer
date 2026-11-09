@@ -48,6 +48,29 @@ of that history. The entries before that date describe that branch.
   runner the debug build's section block took 887 s against the baseline's 2128 and the release
   build's 879 and 957 s against 1135, so the pull request took 25.3 minutes against 28.4, and
   the spontaneous section is then the longest at 358 to 450 s.
+- 2026-11-08 Added: the FP32 check's CPU twin runs under the spectral propagator in both modes,
+  `run.fp32_check = "lockstep"` with `field.propagator = "spectral"` and no device. The twin's record
+  spans the window and the pad, rounded from the FP64 record before the step, and takes the kernel
+  pass along tau in single precision in the FP64 pass's order, through FFTW's single-precision
+  interface, then each slice's deposit and add, with its rows read after the FP64 kernel pass and
+  deposit and before the slip (`fel_fp32_spectral_pass`, `fel_spectral_twin_close`). The unaveraged
+  twin takes the kernel's remainder the same way after its substeps, and on a segment's last record
+  step the half substep the exit handoff carries the FP64 record back by, and its field row is read
+  after the FP64 remainder pass and before the slip (`unavg_twin_correct`). Setup had refused the
+  check without the device under the propagator. It now refuses freerun there, since the twin keeps
+  no slip and a one-slice window carries no pad and no ramp, and a field coarser than the slices
+  with the CPU twin, whose rows are read slice by slice. `check_fp32.py` records the twin under the
+  propagator on the steady state, where a window of one slice gives the slice propagator's levels
+  to the digit, and on the eight-slice window, where the field row reads 5.1e-6 against 5.3e-6 and
+  theta 9.7e-6 against 9.3e-6, with the read-only proof, the mutation and the thread identity.
+  `check_unaveraged.py` records it on the sandwich window: transverse 9.3e-7, momentum 5.9e-6,
+  energy 1.9e-5, phase 3.6e-6, phasor 6.7e-8, field 7.7e-6, and the ledger row 8.3e-2, the window's
+  own, since a slice there turns over almost nothing. `check_device.py`'s spectral and
+  unaveraged-spectral lockstep ceilings are three times those levels, the rule its other ceilings
+  follow, where they were the slice path's: pz 6.5e-7, theta 2.9e-5, phasor 3.8e-7, source and
+  field 3.8e-5 on the averaged rows, and x and y 2.8e-6, px and py 1.8e-5, pz 5.7e-5, theta 1.1e-5,
+  phasor 2.1e-7, source 2.5e-1 and field 2.4e-5 on the unaveraged ones, and every device level sits
+  inside. The refusal row of its section 14 goes.
 - 2026-11-08 Fixed: the saturation demo runs again. `examples/saturation_demo/run.sh` handed the
   tracker Genesis4's own dumps, `AramisSat-initial.par.h5` and `.fld.h5`, which the tracker has
   refused since it began reading openPMD alone, with `BEAM FILE IS NOT openPMD` and the converter

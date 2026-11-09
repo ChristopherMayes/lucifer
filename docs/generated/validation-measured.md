@@ -281,6 +281,24 @@ where the two builds agree to every printed digit.
 | lockstep TD guard ulps | 5.7301e+03 | same | >= 2.5600e+02 |
 | instrument stream byte-identical, 1 vs 8 threads |  | same | holds |
 | wake with the instrument refused |  | same | holds |
+| spectral lockstep steady worst_pz | 1.9368e-07 | same | <= 2.0000e-06 |
+| spectral lockstep steady worst_theta | 9.0832e-06 | same | <= 3.0000e-04 |
+| spectral lockstep steady worst_phasor | 7.7028e-08 | 7.4524e-08 | <= 3.0000e-05 |
+| spectral lockstep steady worst_source | 1.2749e-05 | 1.2748e-05 | <= 1.0000e-04 |
+| spectral lockstep steady worst_field | 1.2747e-05 | same | <= 1.0000e-04 |
+| spectral lockstep steady guard ulps | 6.7548e+03 | same | >= 2.5600e+02 |
+| spectral FP64 diag byte-identical, instrument on vs off |  | same | holds |
+| spectral mutation moves worst_source | 3.8704e-04 | 3.8705e-04 | >= 6.3745e-05 (debug), >= 6.3740e-05 (production) |
+| spectral mutation moves worst_field | 3.8704e-04 | 3.8705e-04 | >= 6.3735e-05 |
+| spectral lockstep TD worst_pz | 2.1627e-07 | same | <= 2.0000e-06 |
+| spectral lockstep TD worst_theta | 9.6928e-06 | same | <= 3.0000e-04 |
+| spectral lockstep TD worst_phasor | 1.2502e-07 | 1.2293e-07 | <= 3.0000e-05 |
+| spectral lockstep TD worst_source | 5.0699e-06 | 5.0672e-06 | <= 1.0000e-04 |
+| spectral lockstep TD worst_field | 5.0781e-06 | 5.0813e-06 | <= 1.0000e-04 |
+| spectral lockstep TD guard ulps | 5.7305e+03 | same | >= 2.5600e+02 |
+| spectral instrument stream byte-identical, 1 vs 8 threads |  | same | holds |
+| freerun under the spectral propagator refused |  | same | holds |
+| a field coarser than the slices with the twin refused |  | same | holds |
 
 (val-levels-device)=
 ### `device`
@@ -492,15 +510,15 @@ where the two builds agree to every printed digit.
 | two-plane unaveraged production power y vs CPU | 3.4956e-02 | 3.5013e-02 | <= 1.0000e-01 |
 | two-plane unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
 | FP32 transform pair energy loss, two-plane input file | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
-| unaveraged spectral lockstep worst_x | 7.1415e-07 | same | <= 3.5000e-06 |
-| unaveraged spectral lockstep worst_px | 1.8827e-06 | same | <= 2.5000e-05 |
-| unaveraged spectral lockstep worst_y | 9.3288e-07 | same | <= 3.0000e-06 |
-| unaveraged spectral lockstep worst_py | 5.9352e-06 | same | <= 2.1000e-05 |
-| unaveraged spectral lockstep worst_pz | 8.9232e-07 | same | <= 6.5000e-06 |
+| unaveraged spectral lockstep worst_x | 7.1415e-07 | same | <= 2.8000e-06 |
+| unaveraged spectral lockstep worst_px | 1.8827e-06 | same | <= 1.8000e-05 |
+| unaveraged spectral lockstep worst_y | 9.3288e-07 | same | <= 2.8000e-06 |
+| unaveraged spectral lockstep worst_py | 5.9352e-06 | same | <= 1.8000e-05 |
+| unaveraged spectral lockstep worst_pz | 8.9232e-07 | same | <= 5.7000e-05 |
 | unaveraged spectral lockstep worst_theta | 2.3687e-06 | same | <= 1.1000e-05 |
-| unaveraged spectral lockstep worst_phasor | 5.1785e-08 | same | <= 2.5000e-07 |
-| unaveraged spectral lockstep worst_source | 3.4974e-02 | same | <= 1.1000e-01 |
-| unaveraged spectral lockstep worst_field | 5.7714e-06 | same | <= 2.0000e-05 |
+| unaveraged spectral lockstep worst_phasor | 5.1785e-08 | same | <= 2.1000e-07 |
+| unaveraged spectral lockstep worst_source | 3.4974e-02 | same | <= 2.5000e-01 |
+| unaveraged spectral lockstep worst_field | 5.7714e-06 | same | <= 2.4000e-05 |
 | unaveraged spectral lockstep guard [ticks] | 2.7017e+06 | same | >= 9.0000e+05 |
 | unaveraged spectral mutation moves worst_theta | 1.6316e-03 | same | >= 2.3687e-05 |
 | unaveraged spectral mutation moves worst_phasor | 5.2399e-05 | same | >= 2.5892e-06 |
@@ -517,11 +535,11 @@ where the two builds agree to every printed digit.
 | spectral lockstep steady worst_px | 2.6274e-07 | same | <= 1.0000e-06 |
 | spectral lockstep steady worst_y | 1.6628e-07 | same | <= 1.0000e-06 |
 | spectral lockstep steady worst_py | 1.4070e-07 | same | <= 1.0000e-06 |
-| spectral lockstep steady worst_pz | 1.3836e-07 | same | <= 1.3000e-06 |
-| spectral lockstep steady worst_theta | 6.5786e-06 | same | <= 1.5000e-04 |
-| spectral lockstep steady worst_phasor | 7.5288e-08 | same | <= 2.2000e-05 |
-| spectral lockstep steady worst_source | 1.4673e-05 | same | <= 2.2000e-04 |
-| spectral lockstep steady worst_field | 1.4665e-05 | same | <= 2.2000e-04 |
+| spectral lockstep steady worst_pz | 1.3836e-07 | same | <= 6.5000e-07 |
+| spectral lockstep steady worst_theta | 6.5786e-06 | same | <= 2.9000e-05 |
+| spectral lockstep steady worst_phasor | 7.5288e-08 | same | <= 3.8000e-07 |
+| spectral lockstep steady worst_source | 1.4673e-05 | same | <= 3.8000e-05 |
+| spectral lockstep steady worst_field | 1.4665e-05 | same | <= 3.8000e-05 |
 | spectral lockstep steady guard [ticks] | 8.8069e+06 | same | >= 1.0000e+06 |
 | spectral FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | spectral mutation moves worst_theta | 4.6860e-03 | same | >= 6.5786e-05 |
@@ -531,11 +549,11 @@ where the two builds agree to every printed digit.
 | spectral lockstep TD worst_px | 2.6433e-07 | same | <= 1.0000e-06 |
 | spectral lockstep TD worst_y | 2.4632e-07 | same | <= 1.0000e-06 |
 | spectral lockstep TD worst_py | 2.3730e-07 | same | <= 1.0000e-06 |
-| spectral lockstep TD worst_pz | 1.4125e-07 | same | <= 1.3000e-06 |
-| spectral lockstep TD worst_theta | 6.7645e-06 | same | <= 1.5000e-04 |
-| spectral lockstep TD worst_phasor | 9.9422e-08 | same | <= 2.2000e-05 |
-| spectral lockstep TD worst_source | 6.3046e-06 | same | <= 2.2000e-04 |
-| spectral lockstep TD worst_field | 6.3133e-06 | same | <= 2.2000e-04 |
+| spectral lockstep TD worst_pz | 1.4125e-07 | same | <= 6.5000e-07 |
+| spectral lockstep TD worst_theta | 6.7645e-06 | same | <= 2.9000e-05 |
+| spectral lockstep TD worst_phasor | 9.9422e-08 | same | <= 3.8000e-07 |
+| spectral lockstep TD worst_source | 6.3046e-06 | same | <= 3.8000e-05 |
+| spectral lockstep TD worst_field | 6.3133e-06 | same | <= 3.8000e-05 |
 | spectral lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | spectral TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | spectral production TD window power vs CPU | 2.1853e-05 | same | <= 1.6000e-03 |
@@ -571,7 +589,6 @@ where the two builds agree to every printed digit.
 | spectral two-plane lockstep worst_field | 6.3377e-06 | same | <= 2.2000e-04 |
 | spectral crossed production Px vs CPU | 1.4011e-04 | same | <= 1.6000e-03 |
 | spectral crossed production Py vs CPU | 3.7773e-03 | same | <= 1.3000e-02 |
-| refused: the FP32 check's CPU twin under the spectral propagator |  | same | holds |
 
 (val-levels-unaveraged)=
 ### `unaveraged`
@@ -615,6 +632,15 @@ where the two builds agree to every printed digit.
 | spectral: TD ledger on the sandwich, max\|d(E_beam+U_field+U_escaped-U_spont+E_rad)\| / turnover | 8.2436e-09 | 8.2447e-09 | <= 1.0000e-04 |
 | spectral: ledger rows confined to the unaveraged segment (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | spectral: \|ln(P_spectral/P_slices)\| at exit, unaveraged sandwich | 3.6431e-02 | same | <= 5.0000e-02 |
+| spectral twin: worst transverse row | 9.3288e-07 | same | <= 1.0000e-05 |
+| spectral twin: worst transverse momentum row | 5.8301e-06 | 5.9352e-06 | <= 1.0000e-04 |
+| spectral twin: worst energy row | 1.8782e-05 | same | <= 1.0000e-04 |
+| spectral twin: worst phase row | 3.5516e-06 | same | <= 1.0000e-03 |
+| spectral twin: worst phasor row | 6.7293e-08 | 6.3024e-08 | <= 1.0000e-05 |
+| spectral twin: worst ledger row, its energy against the FP64 step's | 8.2516e-02 | same | <= 2.5000e-01 |
+| spectral twin: worst field row, after the substeps and the remainder pass | 7.6590e-06 | 7.6907e-06 | <= 5.0000e-05 |
+| spectral twin: the FP64 stream is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| spectral twin: the ledger is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | spectral: a field coarser than the slice with the unaveraged mode refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 
 (val-levels-spontaneous)=

@@ -61,8 +61,12 @@ point is measuring the inputs of the averaged mode (the coupling factor fc).
     pad. The ledger closes with the pad's planes in its field column and the sponge's
     removal in its escaped column, since light between the window's head and its next
     crossing sits in neither, and the exit power is compared with the slice propagator's
-    unaveraged run. The device and a field coarser than the slice are refused with the
-    mode, and the FP32 twin without the device is refused as under the averaged mode.
+    unaveraged run. A field coarser than the slice is refused with the mode. The
+    single-precision twin of check 10 runs under the propagator too: its record takes
+    the kernel's remainder in single precision after the substeps, its field row is
+    read after the FP64 remainder pass and before the slip, its rows hold the
+    tolerances of check 10, and the FP64 stream and the ledger are byte-identical with
+    the twin on against off.
 
 Usage: check_unaveraged.py --exe <lucifer> --latdir <tests/bmad> --workdir <dir>
 """
@@ -606,8 +610,39 @@ def main():
     p_sp, p_sl = pu[-ns:, 2].sum(), ps[-ns:, 2].sum()
     check(f"spectral: |ln(P_spectral/P_slices)| at exit, unaveraged sandwich  [{p_sp:.4e} vs {p_sl:.4e}]",
           abs(math.log(p_sp / p_sl)), 5e-2, note="(the propagators' own difference)")
-    # The device runs the mode under the propagator (check_device.py, validation.md
-    # val-device-unaveraged), so no refusal is checked here.
+    # The single-precision twin under the propagator, on the same window: the rows of
+    # check 10, and the FP64 stream and the ledger against the run above.
+    run(exe, wd, "uv_sptw", sp.format(root="uv_sptw", lat="")
+        .replace("&end", '  run.fp32_check = "lockstep"\n&end'), threads="8")
+    rows = [l.split() for l in (wd / "uv_sptw.fp32.txt").read_text().splitlines()
+            if l and not l.startswith("#") and l.split()[0].isdigit()]
+    if not rows:
+        check("spectral twin: the stream carries per-step rows", 1.0, 0.5, note="[none written]")
+    else:
+        cols = np.array([[float(v) for v in r] for r in rows])
+        worst = cols.max(axis=0)
+        print(f"      {len(rows)} steps instrumented under the propagator, worst over the run:")
+        for i, nm in ((1, "x"), (2, "px"), (3, "y"), (4, "py"), (5, "pz"), (6, "theta"),
+                      (7, "phasor"), (8, "ledger"), (9, "field")):
+            print(f"        {nm:<7} {worst[i]:.3e}")
+        check("spectral twin: worst transverse row", max(worst[1], worst[3]), 1e-5)
+        check("spectral twin: worst transverse momentum row", max(worst[2], worst[4]), 1e-4)
+        check("spectral twin: worst energy row", worst[5], 1e-4)
+        check("spectral twin: worst phase row [rad]", worst[6], 1e-3)
+        check("spectral twin: worst phasor row", worst[7], 1e-5)
+        # The ledger row is scaled by the energy the record step turned over, and on this
+        # dark-start shot-noise window a slice can turn over almost nothing, so the row
+        # is the window's and not the mode's: 8.3e-2 here against 1.6e-5 on the steady
+        # input file above, and the bound is three times the first measurement.
+        check("spectral twin: worst ledger row, its energy against the FP64 step's", worst[8], 2.5e-1,
+              note="(the window's own: a slice can turn over almost nothing)")
+        check("spectral twin: worst field row, after the substeps and the remainder pass", worst[9], 5e-5)
+    same_diag = (wd / "uv_sptw.diag.txt").read_bytes() == (wd / "uv_spsand.diag.txt").read_bytes()
+    same_led = (wd / "uv_sptw.ledger.txt").read_bytes() == (wd / "uv_spsand.ledger.txt").read_bytes()
+    check("spectral twin: the FP64 stream is identical with it on against off (0 = yes)",
+          0.0 if same_diag else 1.0, 0.5)
+    check("spectral twin: the ledger is identical with it on against off (0 = yes)",
+          0.0 if same_led else 1.0, 0.5)
     # A window of 32 slices, so two slices a plane leaves the 8 planes a stated sampling
     # must, and the mode's own refusal is the one that fires.
     coarse = (sp.format(root="uv_spcoarse", lat="")

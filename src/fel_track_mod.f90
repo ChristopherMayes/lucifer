@@ -968,7 +968,7 @@ logical err_flag
 
 type (fel_device_par_struct) dpar
 real(rp) ks, phi0_new, phi0_old, kappa, b2_tot, g2_tot
-real(rp) fp_rtmp, fp_gridmax
+real(rp) fp_rtmp, fp_gridmax, fp_scl
 real(rp), allocatable :: dev_s0(:,:,:)
 type (fel_coherent_struct), allocatable :: coh(:)
 integer is, io, nslice, nslice_f, ngrid_arr(3)
@@ -1276,13 +1276,28 @@ call fel_toc (fel_t_solve$)
 ! step used. With the device as the twin, its step, encoded before the solve, is read
 ! back here instead and fills every row of the same stream.
 
-if (fp_on .and. dev_twin .and. und%spectral) then
+if (fp_on .and. .not. dev_twin) then
+  fp_scl = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
+  fp_scl = fp_scl / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
+endif
+
+if (fp_on .and. und%spectral) then
 
   ! The twin's field rows wait for the walk's spectral step, which the CPU runs after
-  ! this routine, and fel_track_und_twin_close reads them then.
+  ! this routine. With the device as the twin, fel_track_und_twin_close reads them then
+  ! from the step this routine encoded. The CPU twin's record was rounded from the
+  ! pre-step planes in the loop above. Its pad is rounded here, before the walk's kernel
+  ! pass moves it, and the step's deposit scale and grid extent are kept, for
+  ! fel_spectral_twin_close.
 
-  dev%par_last = dpar
-  dev%phi0_last = phi0_old
+  if (dev_twin) then
+    dev%par_last = dpar
+    dev%phi0_last = phi0_old
+  else
+    fp32%scl_w = fp_scl
+    fp32%gridmax = fp_gridmax
+    call fel_fp32_pad_round (fp32, ff(1)%pad)
+  endif
 elseif (fp_on) then
   if (dev_twin) then
     call fel_tic (fel_t_device$)
@@ -1290,16 +1305,13 @@ elseif (fp_on) then
     call fel_toc (fel_t_device$)
   else
     block
-      real(rp) fp_scl
       integer ikk2, ifl
-      fp_scl = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
-      fp_scl = fp_scl / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
       ikk2 = fel_kernel_index(ngrid_arr(1), ff(1)%wf%dx, twopi / ff(1)%wf%wavelength, und%dz)
       do is = 1, size(beam%slice)
         ifl = fel_field_index(ff(1)%slip, is, size(ff(1)%wf%Ex, 3))
         call fel_fp32_field_twin (fp32, is, beam%slice(is), beam, ff(1)%wf%Ex(:,:,ifl), &
-              fel_kernels(ikk2)%exp_k2, fp_scl, ff(1)%wf%dx, fp_gridmax, und%kx, und%ky, &
-              und%ax, und%ay, und%cos_t, und%sin_t, ks)
+              fp_scl, ff(1)%wf%dx, fp_gridmax, und%kx, und%ky, &
+              und%ax, und%ay, und%cos_t, und%sin_t, ks, exp_k2 = fel_kernels(ikk2)%exp_k2)
       enddo
     end block
   endif
@@ -3026,6 +3038,36 @@ do ik = 1, size(fel_kernels)
 enddo
 
 end function fel_field_kernel_exp_k2
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_field_kernel_k2 (ks) result (p)
+!
+! Routine to point at the cached wavenumber table K2 for this wavelength, which
+! fel_field_diffract_by forms a step of either sign from. The unaveraged twin rounds its
+! half substep from it (fel_unavg_step). The result is null when no entry has been built.
+!-
+
+function fel_field_kernel_k2 (ks) result (p)
+
+complex(rp), pointer :: p(:,:)
+real(rp) ks
+integer ik
+
+!
+
+p => null()
+if (.not. allocated(fel_kernels)) return
+do ik = 1, size(fel_kernels)
+  if (fel_kernels(ik)%ks == ks .and. allocated(fel_kernels(ik)%k2)) then
+    p => fel_kernels(ik)%k2
+    return
+  endif
+enddo
+
+end function fel_field_kernel_k2
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

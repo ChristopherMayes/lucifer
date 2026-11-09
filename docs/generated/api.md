@@ -2488,6 +2488,26 @@ Output:
   fp32 -- fel_fp32_struct: With e32 allocated and zeroed.
 ```
 
+(api-fel-fp32-pad-round)=
+### `fel_fp32_pad_round`
+
+*Subroutine* `(fp32, pad)`
+
+```
+Routine to round the spectral propagator's pad into the twin's record, as lockstep
+rounds the window's planes before the step. A window of one slice has no pad, and the
+twin then carries none.
+```
+
+```
+Input:
+  pad(:,:,:) -- complex(wf_rp), allocatable: The FP64 pad, unallocated where the
+                  window has none (fel_field_struct).
+
+Output:
+  fp32 -- fel_fp32_struct: %pad32 the pad rounded, or deallocated.
+```
+
 (api-fel-fp32-renorm)=
 ### `fel_fp32_renorm`
 
@@ -2610,15 +2630,20 @@ This runs inside the caller's parallel loop. Everything written is indexed by is
 (api-fel-fp32-field-twin)=
 ### `fel_fp32_field_twin`
 
-*Subroutine* `(fp32, is, sl, beam, exfld_post, exp_k2, scl_w, &`
+*Subroutine* `(fp32, is, sl, beam, exfld_post, scl_w, &`
 
 ```
-                                   dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks)
+                                   dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks, exp_k2)
 
 Routine to run one slice's FP32 field step and fill the source and field rows. It runs
 serially, from the caller's epilogue after the production solve loop. The FP64 record
 already carries this step's solve, and the twin recomputes the same step in FP32 from
 its own field record (rounded pre-solve in lockstep, carried in freerun).
+
+Under the slice propagator the caller passes exp_k2, and the step is the slice's own
+transform pair about the rounded propagator. Under the spectral propagator the twin's
+record was propagated over the whole window and pad by fel_fp32_spectral_pass before
+this is called, so exp_k2 is left out and the step here is the deposit and its add.
 
 The source comparison uses the shared post-step FP64 particle state on both sides, the
 FP32 side through rounded values. So the rows isolate the field arithmetic: the
@@ -2633,6 +2658,12 @@ transform, kernel multiply, inverse transform, 1/N, plus 2*source in real space.
 
 Both rows are normalized by the post-solve FP64 field's norm. The source alone can sit
 at noise level on a dark start, and the post-solve field bounds it from below.
+```
+
+```
+Input:
+  exp_k2(:,:) -- complex(rp), optional: The FP64 step propagator the twin rounds. Left
+                   out, the record already carries the step's propagation.
 ```
 
 (api-fel-fp32-kernel-cache)=
@@ -2691,6 +2722,89 @@ A build without the single-precision library compiles the body out, since a call
 fftwf_execute_dft would fail to link. Setup refuses such a build
 (fel_fp32_have_fftw3f$), so this routine is unreachable there. The message says so
 and does not pretend to a fallback.
+```
+
+(api-fel-fp32-fft2)=
+### `fel_fp32_fft2`
+
+*Subroutine* `(e, ng, direction)`
+
+```
+Routine to transform one plane in place in single precision, unnormalized, forward or
+backward, on the calling thread's cached plan (fft32_plan). fel_fp32_spectral_pass
+runs it on every plane of the twin's window and pad about the pass along tau, where
+fft32_solve runs the pair about one slice's propagator.
+```
+
+```
+Input:
+  e(:,:)    -- complex(sp): The plane.
+  ng        -- integer: Grid points per side.
+  direction -- integer: wf_fft_forward$ or wf_fft_backward$.
+
+Output:
+  e(:,:)    -- complex(sp): The plane transformed.
+```
+
+(api-fft32-plan1)=
+### `fft32_plan1`
+
+*Subroutine* `(n, ok)`
+
+```
+Routine to fill the calling thread's single-precision plan cache for a transform of
+length n along tau, remaking it when the length changes, under the lock fft32_plan
+takes and for its reason.
+```
+
+(api-fel-fp32-fft1)=
+### `fel_fp32_fft1`
+
+*Subroutine* `(line, n, direction)`
+
+```
+Routine to transform one line along tau in place in single precision, unnormalized,
+forward or backward, on the calling thread's cached plan (fft32_plan1).
+```
+
+```
+Input:
+  line(:)   -- complex(sp): The line, the window's planes then the pad's at one
+                 transverse point.
+  n         -- integer: Its length.
+  direction -- integer: wf_fft_forward$ or wf_fft_backward$.
+
+Output:
+  line(:)   -- complex(sp): The line transformed.
+```
+
+(api-fel-fp32-spectral-pass)=
+### `fel_fp32_spectral_pass`
+
+*Subroutine* `(fp32, nz, ax, err_flag)`
+
+```
+Routine to put the twin's record, the window's nz planes and the pad's, through the
+spectral propagator's kernel pass in single precision (fel_spectral_mod, apply_component
+and correct_component): the forward transverse transform of every plane, on every line
+of the transverse spectrum the forward transform along tau, the factors, and the
+inverse, then the inverse transverse transform of every plane and the scale by n_t and
+by ngrid^2, in that order. The factor table is the FP64 one the caller built, the
+kernel's or the remainder's, rounded here, so the FP32 pass sees the numbers the FP64
+pass saw. It runs serially, from the caller's epilogue.
+```
+
+```
+Input:
+  fp32     -- fel_fp32_struct: %e32 the window's planes, %pad32 the pad's (unallocated
+                where the window has none).
+  nz       -- integer: The window's planes.
+  ax(:,:)  -- complex(rp): The factor table, (ngrid, nz + n_pad), a column per
+                wavenumber along tau and a row per transverse mode.
+
+Output:
+  fp32     -- fel_fp32_struct: %e32 and %pad32 propagated.
+  err_flag -- logical: Set True if the table does not match the record. False otherwise.
 ```
 
 (api-fel-fp32-step-close)=
@@ -5199,6 +5313,84 @@ Routine to put one polarization's planes through the three passes with the
 remainder's factors, fel_spectral_apply's apply_component without the crossings.
 ```
 
+(api-fel-spectral-twin-table)=
+### `fel_spectral_twin_table`
+
+*Subroutine* `(sp, fs, dz, remainder, ax)`
+
+```
+Routine to build the FP64 factor table the instrument's CPU twin rounds its pass from
+(fel_fp32_spectral_pass): the kernel's over the step, as fel_spectral_apply builds it,
+or the kernel's remainder with the k0 part divided out, as fel_spectral_correct builds
+it. The expressions are those two routines' own, kept apart from them so that neither
+FP64 pass is touched, as fel_spectral_device_slip keeps the crossing arithmetic apart.
+```
+
+```
+Input:
+  sp        -- fel_spectral_struct: The propagator's switch and pad.
+  fs        -- fel_field_struct: The member.
+  dz        -- real(rp): Step length [m].
+  remainder -- logical: The remainder's table? False builds the kernel's.
+
+Output:
+  ax(:,:)   -- complex(rp), allocatable: The table, (ngrid, nz + n_pad), a column per
+                 wavenumber along tau and a row per transverse mode.
+```
+
+(api-fel-spectral-twin-close)=
+### `fel_spectral_twin_close`
+
+*Subroutine* `(sp, und, beam, ff, fp32, err_flag)`
+
+```
+Routine to close one step of the instrument with the CPU twin under the spectral
+propagator. fel_track_und_step rounded the twin's record from the pre-step planes and
+kept the step's constants, and the walk has since run its own kernel pass and deposit
+(fel_spectral_step_field) and not yet slipped. The twin's record takes the same kernel
+pass in single precision over the window and the pad, then each slice's deposit and
+add, and the source and field rows are read against the FP64 record here, before
+either record slips, where the device twin's are read (fel_track_und_twin_close): a
+row read after the slip is normalized by the residue of a shift. The twin never
+slips, since lockstep rounds its record again before the next step.
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
+  und      -- fel_und_struct: The segment.
+  beam     -- fel_beam_struct: The beam, after the step.
+  ff(:)    -- fel_field_struct: The field set, after the kernel pass and the deposit.
+  fp32     -- fel_fp32_struct: The instrument, its record rounded before the step.
+
+Output:
+  fp32     -- fel_fp32_struct: This step's rows recorded and the stream advanced.
+  err_flag -- logical: Set True on a transform failure or a guard refusal. False otherwise.
+```
+
+(api-fel-spectral-twin-correct)=
+### `fel_spectral_twin_correct`
+
+*Subroutine* `(sp, ff, fp32, dz, err_flag)`
+
+```
+Routine to put the unaveraged twin's record through the kernel's remainder in single
+precision after a record step's substeps, fel_spectral_correct on the twin's window
+and pad (fel_unavg_step).
+```
+
+```
+Input:
+  sp       -- fel_spectral_struct: The propagator's switch and pad.
+  ff(:)    -- fel_field_struct: The field set, one member.
+  fp32     -- fel_fp32_struct: The instrument, its record after the substeps.
+  dz       -- real(rp): The record step [m].
+
+Output:
+  fp32     -- fel_fp32_struct: %e32 and %pad32 through the remainder.
+  err_flag -- logical: Set True on a transform failure. False otherwise.
+```
+
 (api-fel-spectral-bank-merge)=
 ### `fel_spectral_bank_merge`
 
@@ -7599,6 +7791,17 @@ this module can then round it into another precision. The result is null when no
 entry has been built, that is, when the caller did not run fel_field_kernel_init first.
 ```
 
+(api-fel-field-kernel-k2)=
+### `fel_field_kernel_k2`
+
+*Function* `(ks) result (p)`
+
+```
+Routine to point at the cached wavenumber table K2 for this wavelength, which
+fel_field_diffract_by forms a step of either sign from. The unaveraged twin rounds its
+half substep from it (fel_unavg_step). The result is null when no entry has been built.
+```
+
 (api-fel-field-kernel-sigmoid)=
 ### `fel_field_kernel_sigmoid`
 
@@ -8087,6 +8290,21 @@ Output:
   dE_beam   -- real(rp): The step's kick-side beam energy change [J] (ledger).
   dU_spont  -- real(rp): The step's spontaneous source energy [J] (ledger).
   err_flag  -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-unavg-twin-correct)=
+### `unavg_twin_correct`
+
+*Subroutine* `(uerr)`
+
+```
+Routine to take the CPU twin's record through the remainder pass in single precision
+(fel_spectral_twin_correct) and read its field row where the device twin's cannot be
+read: after the FP64 remainder pass and before the slip. On the last record step the
+exit handoff above carried the FP64 record back half a substep before the remainder
+pass, so the twin's record takes the same half step first, rounded from the cached
+wavenumbers fel_field_diffract_by forms it from. The particle rows and the ledger row
+stay as the loop read them, and the step closes here.
 ```
 
 (api-unavg-pad-energy)=

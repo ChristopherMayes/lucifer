@@ -1496,11 +1496,15 @@ endif
 
 ! The spectral propagator (fel_spectral_mod, docs/spectral-field.md) is the averaged
 ! mode's field half, on the CPU in double precision and on the device in single
-! (fel_device_mod), and the unaveraged mode's on the CPU (fel_unavg_step). The FP32 twin
-! on the CPU and the coherent source each carry a propagator or a deposit of their own,
-! which it does not reach, so each is refused with the reason, and so is the field
-! coarser than the slices in the unaveraged mode. The FP32 check with the device on puts
-! the device in the twin's role, which the device's spectral step covers.
+! (fel_device_mod), and the unaveraged mode's on the CPU (fel_unavg_step). The coherent
+! source carries a deposit of its own, which it does not reach, so it is refused with
+! the reason, and so is the field coarser than the slices in the unaveraged mode. The
+! FP32 check's lockstep twin takes the kernel pass in single precision beside the FP64
+! one, on the CPU (fel_spectral_twin_close) or with the device in the twin's role. Its
+! rows are read slice by slice, so a field coarser than the slices is refused with it.
+! Freerun carries the twin's field across steps and the twin keeps no slip, and a
+! one-slice window, the one freerun covers, carries no pad and no ramp, so freerun under
+! the propagator would measure the slice propagator and is refused instead.
 
 call fel_spectral_setup (run%spectral, run%winit%propagator)
 if (run%spectral%on) then
@@ -1511,10 +1515,18 @@ if (run%spectral%on) then
                                    i_array = [run%ffield(1)%n_wavelength, fbeam%n_wavelength, fbeam%n_wavelength])
     err_flag = .true.;  return
   endif
-  if (run%global%fp32_check /= 'off' .and. run%global%device == 'off') then
-    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER THE FP32 CHECK WITHOUT THE DEVICE,', &
-                                   'WHOSE CPU TWIN STEPS THE SLICE PROPAGATOR IN SINGLE PRECISION.', &
-                                   'POSSIBLE SOLUTION: RUN.DEVICE = "metal", WHICH TAKES THE TWIN''S ROLE.')
+  if (run%global%fp32_check == 'freerun' .and. run%global%device == 'off') then
+    call out_io (s_error$, r_name, 'FIELD.PROPAGATOR = "spectral" DOES NOT COVER FP32_CHECK = "freerun" WITHOUT THE DEVICE.', &
+                                   'THE TWIN KEEPS NO SLIP, AND A ONE-SLICE WINDOW CARRIES NO PAD AND NO RAMP,', &
+                                   'SO THE RUN WOULD MEASURE THE SLICE PROPAGATOR.', &
+                                   'POSSIBLE SOLUTION: FP32_CHECK = "lockstep".')
+    err_flag = .true.;  return
+  endif
+  if (run%global%fp32_check /= 'off' .and. run%global%device == 'off' .and. run%ffield(1)%n_per > 1) then
+    call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ IS COARSER THAN THE WINDOW''S SLICE OF \i0\ WAVELENGTHS,', &
+                                   'WHICH THE FP32 CHECK''S CPU TWIN DOES NOT COVER: ITS ROWS ARE READ SLICE BY SLICE.', &
+                                   'POSSIBLE SOLUTION: FIELD.N_WAVELENGTH = \i0\, THE SLICE.', &
+                                   i_array = [run%ffield(1)%n_wavelength, fbeam%n_wavelength, fbeam%n_wavelength])
     err_flag = .true.;  return
   endif
   if (run%global%source_model == 'coherent') then

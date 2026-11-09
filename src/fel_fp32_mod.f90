@@ -98,6 +98,16 @@ complex(c_float_complex), private, pointer, save :: f32_buf(:,:) => null()
 integer, private, save :: f32_ng = 0
 !$OMP threadprivate(f32_plan_f, f32_plan_b, f32_buf_p, f32_buf, f32_ng)
 
+! The twin's transform along tau under the spectral propagator (fel_fp32_spectral_pass),
+! one line of the window and its pad at a time, cached as the plane's transform is.
+
+type (c_ptr), private, save :: f32_plan1_f = c_null_ptr
+type (c_ptr), private, save :: f32_plan1_b = c_null_ptr
+type (c_ptr), private, save :: f32_buf1_p = c_null_ptr
+complex(c_float_complex), private, pointer, save :: f32_buf1(:) => null()
+integer, private, save :: f32_n1 = 0
+!$OMP threadprivate(f32_plan1_f, f32_plan1_b, f32_buf1_p, f32_buf1, f32_n1)
+
 #endif
 
 ! The field twin transforms with FFTW's single-precision interface, and not every
@@ -195,6 +205,12 @@ type fel_fp32_struct
   complex(sp), allocatable :: e32(:,:,:)     ! (ngrid, ngrid, nslice).
   complex(sp), allocatable :: k32(:,:)       ! The propagator, rounded from the FP64 kernel.
   real(rp) :: k32_key(4) = -1                ! (ngrid, dgrid, ks, dz) the rounding matches.
+  ! Under the spectral propagator the twin's record carries the pad too, rounded as e32
+  ! is, and the step's constants wait for a close after the walk's own kernel pass
+  ! (fel_spectral_twin_close).
+  complex(sp), allocatable :: pad32(:,:,:)   ! (ngrid, ngrid, n_pad).
+  real(rp) :: scl_w = 0                      ! The step's deposit scale.
+  real(rp) :: gridmax = 0                    ! The grid's half extent [m].
   real(rp), allocatable :: pow32(:), pow64(:)   ! Post-solve field power sums, this step.
   ! The unaveraged twin's per-slice sets, allocated only where that mode runs.
   type (fel_fp32_unavg_slice_struct), allocatable :: un32(:)
@@ -359,6 +375,44 @@ allocate (fp32%e32(nx, ny, size(fp32%sl32)))
 fp32%e32 = 0
 
 end subroutine fel_fp32_field_prep
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_pad_round (fp32, pad)
+!
+! Routine to round the spectral propagator's pad into the twin's record, as lockstep
+! rounds the window's planes before the step. A window of one slice has no pad, and the
+! twin then carries none.
+!
+! Input:
+!   pad(:,:,:) -- complex(wf_rp), allocatable: The FP64 pad, unallocated where the
+!                   window has none (fel_field_struct).
+!
+! Output:
+!   fp32 -- fel_fp32_struct: %pad32 the pad rounded, or deallocated.
+!-
+
+subroutine fel_fp32_pad_round (fp32, pad)
+
+type (fel_fp32_struct) fp32
+complex(wf_rp), allocatable :: pad(:,:,:)
+
+!
+
+if (.not. allocated(pad)) then
+  if (allocated(fp32%pad32)) deallocate (fp32%pad32)
+  return
+endif
+
+if (allocated(fp32%pad32)) then
+  if (any(shape(fp32%pad32) /= shape(pad))) deallocate (fp32%pad32)
+endif
+if (.not. allocated(fp32%pad32)) allocate (fp32%pad32(size(pad, 1), size(pad, 2), size(pad, 3)))
+fp32%pad32 = cmplx(pad, kind = sp)
+
+end subroutine fel_fp32_pad_round
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -876,13 +930,18 @@ end subroutine fel_fp32_twin_slice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_fp32_field_twin (fp32, is, sl, beam, exfld_post, exp_k2, scl_w, &
-!                                    dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks)
+! Subroutine fel_fp32_field_twin (fp32, is, sl, beam, exfld_post, scl_w, &
+!                                    dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks, exp_k2)
 !
 ! Routine to run one slice's FP32 field step and fill the source and field rows. It runs
 ! serially, from the caller's epilogue after the production solve loop. The FP64 record
 ! already carries this step's solve, and the twin recomputes the same step in FP32 from
 ! its own field record (rounded pre-solve in lockstep, carried in freerun).
+!
+! Under the slice propagator the caller passes exp_k2, and the step is the slice's own
+! transform pair about the rounded propagator. Under the spectral propagator the twin's
+! record was propagated over the whole window and pad by fel_fp32_spectral_pass before
+! this is called, so exp_k2 is left out and the step here is the deposit and its add.
 !
 ! The source comparison uses the shared post-step FP64 particle state on both sides, the
 ! FP32 side through rounded values. So the rows isolate the field arithmetic: the
@@ -897,17 +956,22 @@ end subroutine fel_fp32_twin_slice
 !
 ! Both rows are normalized by the post-solve FP64 field's norm. The source alone can sit
 ! at noise level on a dark start, and the post-solve field bounds it from below.
+!
+! Input:
+!   exp_k2(:,:) -- complex(rp), optional: The FP64 step propagator the twin rounds. Left
+!                    out, the record already carries the step's propagation.
 !-
 
-subroutine fel_fp32_field_twin (fp32, is, sl, beam, exfld_post, exp_k2, scl_w, &
-                                dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks)
+subroutine fel_fp32_field_twin (fp32, is, sl, beam, exfld_post, scl_w, &
+                                dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks, exp_k2)
 
 type (fel_fp32_struct), target :: fp32
 type (fel_fp32_slice_struct), pointer :: t
 type (fel_slice_struct) sl
 type (fel_beam_struct) beam
 integer is
-complex(rp) exfld_post(:,:), exp_k2(:,:)
+complex(rp) exfld_post(:,:)
+complex(rp), optional :: exp_k2(:,:)
 real(rp) scl_w, dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks
 
 complex(rp), allocatable :: s64(:,:)
@@ -978,10 +1042,13 @@ enddo
 
 ! Transform, propagate, add: the FP64 record already holds the production result, and
 ! the twin applies the same step to its FP32 record with the single-precision transform
-! and the rounded propagator.
+! and the rounded propagator. Under the spectral propagator the record was propagated
+! before this call, and the add alone is left.
 
-call fel_fp32_kernel_cache (fp32, exp_k2, ng)
-call fft32_solve (fp32%e32(:,:,is), fp32%k32, ng)
+if (present(exp_k2)) then
+  call fel_fp32_kernel_cache (fp32, exp_k2, ng)
+  call fft32_solve (fp32%e32(:,:,is), fp32%k32, ng)
+endif
 fp32%e32(:,:,is) = fp32%e32(:,:,is) + 2 * s32
 
 ! The rows, both against the post-solve FP64 field's norm.
@@ -1233,6 +1300,278 @@ stop 1
 #endif
 
 end subroutine fft32_solve
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_fft2 (e, ng, direction)
+!
+! Routine to transform one plane in place in single precision, unnormalized, forward or
+! backward, on the calling thread's cached plan (fft32_plan). fel_fp32_spectral_pass
+! runs it on every plane of the twin's window and pad about the pass along tau, where
+! fft32_solve runs the pair about one slice's propagator.
+!
+! Input:
+!   e(:,:)    -- complex(sp): The plane.
+!   ng        -- integer: Grid points per side.
+!   direction -- integer: wf_fft_forward$ or wf_fft_backward$.
+!
+! Output:
+!   e(:,:)    -- complex(sp): The plane transformed.
+!-
+
+subroutine fel_fp32_fft2 (e, ng, direction)
+
+use, intrinsic :: iso_c_binding
+
+complex(sp) e(:,:)
+integer ng, direction
+
+#ifdef LUCIFER_HAVE_FFTW3F
+
+include 'fftw3.f03'
+
+logical cache_ok
+character(*), parameter :: r_name = 'fel_fp32_fft2'
+
+!
+
+call fft32_plan (ng, cache_ok)
+if (.not. cache_ok) then
+  call out_io (s_fatal$, r_name, 'FFTW COULD NOT PLAN A \i0\ BY \i0\ SINGLE-PRECISION TRANSFORM.', &
+        'PLEASE REPORT THIS!', i_array = [ng, ng])
+  stop 1
+endif
+
+f32_buf = e
+if (direction == wf_fft_forward$) then
+  call fftwf_execute_dft (f32_plan_f, f32_buf, f32_buf)
+else
+  call fftwf_execute_dft (f32_plan_b, f32_buf, f32_buf)
+endif
+e = f32_buf
+
+#else
+
+character(*), parameter :: r_name = 'fel_fp32_fft2'
+
+call out_io (s_fatal$, r_name, 'THE FP32 FIELD TWIN NEEDS THE SINGLE-PRECISION FFTW (libfftw3f),', &
+      'WHICH THIS BUILD DOES NOT CARRY. SETUP REFUSES SUCH A RUN, SO REACHING HERE', &
+      'IS A BUG. PLEASE REPORT THIS!')
+stop 1
+
+#endif
+
+end subroutine fel_fp32_fft2
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fft32_plan1 (n, ok)
+!
+! Routine to fill the calling thread's single-precision plan cache for a transform of
+! length n along tau, remaking it when the length changes, under the lock fft32_plan
+! takes and for its reason.
+!-
+
+subroutine fft32_plan1 (n, ok)
+
+use, intrinsic :: iso_c_binding
+
+integer n
+logical ok
+
+#ifdef LUCIFER_HAVE_FFTW3F
+
+include 'fftw3.f03'
+
+!
+
+ok = .true.
+if (n == f32_n1 .and. c_associated(f32_plan1_f)) return
+
+!$OMP CRITICAL (fel_fp32_fft_plan_lock)
+
+f32_n1 = 0
+if (c_associated(f32_plan1_f)) call fftwf_destroy_plan (f32_plan1_f)
+if (c_associated(f32_plan1_b)) call fftwf_destroy_plan (f32_plan1_b)
+if (c_associated(f32_buf1_p)) call fftwf_free (f32_buf1_p)
+f32_plan1_f = c_null_ptr;  f32_plan1_b = c_null_ptr;  f32_buf1_p = c_null_ptr
+f32_buf1 => null()
+
+f32_buf1_p = fftwf_alloc_complex (int(n, c_size_t))
+if (c_associated(f32_buf1_p)) then
+  call c_f_pointer (f32_buf1_p, f32_buf1, [n])
+  f32_plan1_f = fftwf_plan_dft_1d (n, f32_buf1, f32_buf1, FFTW_FORWARD,  FFTW_ESTIMATE)
+  f32_plan1_b = fftwf_plan_dft_1d (n, f32_buf1, f32_buf1, FFTW_BACKWARD, FFTW_ESTIMATE)
+  if (c_associated(f32_plan1_f) .and. c_associated(f32_plan1_b)) f32_n1 = n
+endif
+
+ok = (f32_n1 == n)
+
+!$OMP END CRITICAL (fel_fp32_fft_plan_lock)
+
+#else
+
+ok = .false.
+
+#endif
+
+end subroutine fft32_plan1
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_fft1 (line, n, direction)
+!
+! Routine to transform one line along tau in place in single precision, unnormalized,
+! forward or backward, on the calling thread's cached plan (fft32_plan1).
+!
+! Input:
+!   line(:)   -- complex(sp): The line, the window's planes then the pad's at one
+!                  transverse point.
+!   n         -- integer: Its length.
+!   direction -- integer: wf_fft_forward$ or wf_fft_backward$.
+!
+! Output:
+!   line(:)   -- complex(sp): The line transformed.
+!-
+
+subroutine fel_fp32_fft1 (line, n, direction)
+
+use, intrinsic :: iso_c_binding
+
+complex(sp) line(:)
+integer n, direction
+
+#ifdef LUCIFER_HAVE_FFTW3F
+
+include 'fftw3.f03'
+
+logical cache_ok
+character(*), parameter :: r_name = 'fel_fp32_fft1'
+
+!
+
+call fft32_plan1 (n, cache_ok)
+if (.not. cache_ok) then
+  call out_io (s_fatal$, r_name, 'FFTW COULD NOT PLAN A SINGLE-PRECISION TRANSFORM OF \i0\ .', &
+        'PLEASE REPORT THIS!', i_array = [n])
+  stop 1
+endif
+
+f32_buf1 = line(1:n)
+if (direction == wf_fft_forward$) then
+  call fftwf_execute_dft (f32_plan1_f, f32_buf1, f32_buf1)
+else
+  call fftwf_execute_dft (f32_plan1_b, f32_buf1, f32_buf1)
+endif
+line(1:n) = f32_buf1
+
+#else
+
+character(*), parameter :: r_name = 'fel_fp32_fft1'
+
+call out_io (s_fatal$, r_name, 'THE FP32 FIELD TWIN NEEDS THE SINGLE-PRECISION FFTW (libfftw3f),', &
+      'WHICH THIS BUILD DOES NOT CARRY. SETUP REFUSES SUCH A RUN, SO REACHING HERE', &
+      'IS A BUG. PLEASE REPORT THIS!')
+stop 1
+
+#endif
+
+end subroutine fel_fp32_fft1
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_spectral_pass (fp32, nz, ax, err_flag)
+!
+! Routine to put the twin's record, the window's nz planes and the pad's, through the
+! spectral propagator's kernel pass in single precision (fel_spectral_mod, apply_component
+! and correct_component): the forward transverse transform of every plane, on every line
+! of the transverse spectrum the forward transform along tau, the factors, and the
+! inverse, then the inverse transverse transform of every plane and the scale by n_t and
+! by ngrid^2, in that order. The factor table is the FP64 one the caller built, the
+! kernel's or the remainder's, rounded here, so the FP32 pass sees the numbers the FP64
+! pass saw. It runs serially, from the caller's epilogue.
+!
+! Input:
+!   fp32     -- fel_fp32_struct: %e32 the window's planes, %pad32 the pad's (unallocated
+!                 where the window has none).
+!   nz       -- integer: The window's planes.
+!   ax(:,:)  -- complex(rp): The factor table, (ngrid, nz + n_pad), a column per
+!                 wavenumber along tau and a row per transverse mode.
+!
+! Output:
+!   fp32     -- fel_fp32_struct: %e32 and %pad32 propagated.
+!   err_flag -- logical: Set True if the table does not match the record. False otherwise.
+!-
+
+subroutine fel_fp32_spectral_pass (fp32, nz, ax, err_flag)
+
+type (fel_fp32_struct), target :: fp32
+integer nz
+complex(rp) ax(:,:)
+logical err_flag
+
+complex(sp), allocatable :: a32(:,:), line(:)
+integer ng, nt, n_pad, j, ix, iy, m
+character(*), parameter :: r_name = 'fel_fp32_spectral_pass'
+
+!
+
+err_flag = .true.
+ng = size(fp32%e32, 1)
+n_pad = 0
+if (allocated(fp32%pad32)) n_pad = size(fp32%pad32, 3)
+nt = nz + n_pad
+if (size(ax, 1) /= ng .or. size(ax, 2) /= nt .or. nz > size(fp32%e32, 3)) then
+  call out_io (s_error$, r_name, 'THE FACTOR TABLE DOES NOT MATCH THE TWIN''S RECORD. PLEASE REPORT THIS!')
+  return
+endif
+
+allocate (a32(ng, nt), line(nt))
+a32 = cmplx(ax, kind = sp)
+
+do j = 1, nt
+  if (j <= nz) then
+    call fel_fp32_fft2 (fp32%e32(:,:,j), ng, wf_fft_forward$)
+  else
+    call fel_fp32_fft2 (fp32%pad32(:,:,j-nz), ng, wf_fft_forward$)
+  endif
+enddo
+
+do iy = 1, ng
+  do ix = 1, ng
+    line(1:nz) = fp32%e32(ix, iy, 1:nz)
+    if (n_pad > 0) line(nz+1:nt) = fp32%pad32(ix, iy, 1:n_pad)
+    call fel_fp32_fft1 (line, nt, wf_fft_forward$)
+    do m = 1, nt
+      line(m) = line(m) * (a32(ix, m) * a32(iy, m))
+    enddo
+    call fel_fp32_fft1 (line, nt, wf_fft_backward$)
+    fp32%e32(ix, iy, 1:nz) = line(1:nz) / real(nt, sp)
+    if (n_pad > 0) fp32%pad32(ix, iy, 1:n_pad) = line(nz+1:nt) / real(nt, sp)
+  enddo
+enddo
+
+do j = 1, nt
+  if (j <= nz) then
+    call fel_fp32_fft2 (fp32%e32(:,:,j), ng, wf_fft_backward$)
+    fp32%e32(:,:,j) = fp32%e32(:,:,j) / real(ng*ng, sp)
+  else
+    call fel_fp32_fft2 (fp32%pad32(:,:,j-nz), ng, wf_fft_backward$)
+    fp32%pad32(:,:,j-nz) = fp32%pad32(:,:,j-nz) / real(ng*ng, sp)
+  endif
+enddo
+
+err_flag = .false.
+
+end subroutine fel_fp32_spectral_pass
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

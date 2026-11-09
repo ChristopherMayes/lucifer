@@ -338,18 +338,24 @@ do ie = run%i_start, run%i_end
                                          .false., err)
         else
 
-          if (run%dev%on .and. run%fp32%on) then
+          if (run%fp32%on) then
 
-            ! The device in the twin's role: its rows are read after the CPU's kernel
-            ! pass and deposit and before either slips, as the slice path reads them
-            ! before its rotation, since the ramp leaves the tail slices with the
-            ! residue of a shift and a row normalized by that residue measures nothing.
-            ! The twin's record then slips as the CPU's does.
+            ! The twin, the device or the CPU in that role: its rows are read after the
+            ! CPU's kernel pass and deposit and before either slips, as the slice path
+            ! reads them before its rotation, since the ramp leaves the tail slices with
+            ! the residue of a shift and a row normalized by that residue measures
+            ! nothing. The device twin's record then slips as the CPU's does. The CPU
+            ! twin's takes the kernel pass in single precision at the close and never
+            ! slips, since lockstep rounds it again before the next step.
 
             call fel_spectral_step_field (run%spectral, und, fbeam, ffield, und%dz, keep_escaped_field, err)
-            if (.not. err) call fel_track_und_twin_close (fbeam, ffield, run%fp32, run%dev, err)
-            if (.not. err) call fel_spectral_device_slip (run%spectral, run%dev, ffield, slip_step, &
-                                                          .false., .true., err)
+            if (run%dev%on) then
+              if (.not. err) call fel_track_und_twin_close (fbeam, ffield, run%fp32, run%dev, err)
+              if (.not. err) call fel_spectral_device_slip (run%spectral, run%dev, ffield, slip_step, &
+                                                            .false., .true., err)
+            else
+              if (.not. err) call fel_spectral_twin_close (run%spectral, und, fbeam, ffield, run%fp32, err)
+            endif
             if (.not. err) call fel_spectral_step_slip (run%spectral, ffield, slip_step, keep_escaped_field, err)
           else
             call fel_spectral_step (run%spectral, und, fbeam, ffield, und%dz, slip_step, keep_escaped_field, err)

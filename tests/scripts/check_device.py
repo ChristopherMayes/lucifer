@@ -82,8 +82,7 @@ physics alone, the check can fail, and everything the backend does not cover is 
    the device at the CPU's level on a seeded chargeless window, with the pulse file's
    planes the CPU's. The coarse field at its derived default lands against the CPU's
    coarse run per slice. Harmonic members and two polarization planes ride under it at
-   one plane a slice. Two device runs agree bit for bit, and the FP32 check without the
-   device is refused, since the CPU twin steps the slice propagator. See spectral().
+   one plane a slice. Two device runs agree bit for bit. See spectral().
 
 The deposit accumulates in fixed point, so two device runs of one input file agree bit for
 bit, and checks 8, 9 and the unaveraged section assert that. Against the CPU the
@@ -471,11 +470,17 @@ def main():
     return 1 if FAILED else 0
 
 
-# The spectral propagator's own levels (section 14), each three times its first
-# measurement on both builds. The lockstep rows sit at the slice propagator's own levels,
-# since the deposit and the push are the same kernels and the rows are read before the
-# ramp, so they hold the ceilings above. The production bands are the slice path's too:
-# 6.0e-4 steady and 2.2e-5 on the time-dependent window against the CPU's spectral run.
+# The spectral propagator's own levels (section 14). The lockstep rows' ceilings are
+# three times the CPU twin's recorded levels under the propagator (check_fp32.py,
+# validation.md val-fp32-lockstep), the rule the ceilings above follow, taken over the
+# steady state and the time-dependent window and over both builds: pz 2.2e-7, theta
+# 9.7e-6, phasor 1.3e-7, source 1.3e-5 and field 1.3e-5. The transverse rows keep the
+# device's own, since the CPU twin's transverse maps stay FP64 and measure representation
+# alone. The device's rows sit at the slice propagator's own levels, since the deposit and
+# the push are the same kernels and the rows are read before the ramp. The production
+# bands are the slice path's too: 6.0e-4 steady and 2.2e-5 on the time-dependent window
+# against the CPU's spectral run. The harmonic and two-plane rows under the propagator
+# keep the ceilings above, since the CPU twin does not cover the set.
 # The coarse field at its derived default, nine planes of six slices over 48, lands at
 # 5.4e-5 on the window power and 9.2e-5 per slice over the peak. The bank's ledger on a
 # seeded chargeless window of eight slices over the segment closes at 1.2e-4 on the CPU
@@ -484,6 +489,8 @@ def main():
 # the pass along tau was rewritten (docs/performance.md, perf-device-tau), since its
 # sums run in another order, and every one stayed inside its ceiling.
 
+SP_CEIL = {"x": 1e-6, "px": 1e-6, "y": 1e-6, "py": 1e-6,
+           "pz": 6.5e-7, "theta": 2.9e-5, "phasor": 3.8e-7, "source": 3.8e-5, "field": 3.8e-5}
 SP_COARSE_CEIL = 3.0e-4
 SP_BANK_CEIL = 1.2e-6
 SP_ESCAPED_CEIL = 1.2e-6
@@ -535,9 +542,9 @@ def spectral(args, wd, exe):
     # CPU's spectral run, the rows read before the slip.
     runlog("devsp_ss.in", BASE.format(root="devspss", extra=SPECTRAL + DEV + '  run.fp32_check = "lockstep"\n'))
     s = summary(wd, "devspss")
-    for q in CEIL:
-        ok(f"spectral lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
-           num=s[q], bound=CEIL[q], kind="max")
+    for q in SP_CEIL:
+        ok(f"spectral lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {SP_CEIL[q]:.1e}", s[q] <= SP_CEIL[q],
+           num=s[q], bound=SP_CEIL[q], kind="max")
     ok("spectral lockstep steady guard [ticks]", f"{s['guard']:.3e}", f">= {GUARD_FLOOR:.0e}",
        s["guard"] >= GUARD_FLOOR, num=s["guard"], bound=GUARD_FLOOR, kind="min")
 
@@ -568,9 +575,9 @@ def spectral(args, wd, exe):
     td = TD_EXTRA + SPECTRAL + SP_PLANE
     runlog("devsp_td.in", BASE.format(root="devsptd", extra=td + DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devsptd")
-    for q in CEIL:
-        ok(f"spectral lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
-           num=t[q], bound=CEIL[q], kind="max")
+    for q in SP_CEIL:
+        ok(f"spectral lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {SP_CEIL[q]:.1e}", t[q] <= SP_CEIL[q],
+           num=t[q], bound=SP_CEIL[q], kind="max")
     ok("spectral lockstep TD guard [ticks]", f"{t['guard']:.3e}", f">= {GUARD_FLOOR:.0e}",
        t["guard"] >= GUARD_FLOOR, num=t["guard"], bound=GUARD_FLOOR, kind="min")
     runlog("devsp_tdoff.in", BASE.format(root="devsptdoff", extra=td), threads="8")
@@ -678,13 +685,6 @@ def spectral(args, wd, exe):
         rel = abs(pd - pc) / pc
         ok(f"spectral crossed production P{comp} vs CPU", f"{rel:.3e}", f"<= {band:.1e}", rel <= band,
            num=rel, bound=band, kind="max")
-
-    # 11. The FP32 check without the device is refused under the spectral propagator,
-    # since the CPU twin steps the slice propagator.
-    r = runlog("devsp_rt.in", BASE.format(root="devsprt", extra=SPECTRAL + '  run.fp32_check = "lockstep"\n'),
-               expect_fail=True)
-    refused = r.returncode != 0 and "DOES NOT COVER THE FP32 CHECK WITHOUT THE DEVICE" in r.stdout
-    ok("refused: the FP32 check's CPU twin under the spectral propagator", refused, "True", refused)
 
 
 
@@ -994,13 +994,19 @@ def unaveraged(args, wd, exe):
     unavg_handedness(args, wd, exe)
 
 
-# The sandwich probe's own levels under the propagator, on the device, each three times
-# its first measurement. The source row and the guard are the probe's and not the mode's:
-# under the slice propagator the same twin reads 3.7e-2 and 2.7e6 on this input file. The
-# ledger on the device closes at 3.7e-4 of the turnover under the propagator and at
-# 4.2e-4 under the slice propagator, the FP32 transform pairs' own loss (validation.md,
+# The sandwich probe's own ceilings under the propagator, on the device: three times the
+# CPU twin's recorded levels on the same input file under the propagator
+# (check_unaveraged.py, validation.md val-unaveraged-fp32), the rule the other device
+# ceilings follow, over both builds. The CPU twin reads the transverse pair at 9.3e-7, the
+# momentum pair at 5.9e-6, pz 1.9e-5, theta 3.6e-6, the phasor 6.7e-8, the ledger row
+# 8.3e-2 and the field 7.7e-6, its field row after the remainder pass where the device's
+# is read after the substeps. The ledger row and the guard are the probe's and not the
+# mode's: on this dark-start window a slice can turn over almost nothing. The ledger on
+# the device closes at 3.7e-4 of the turnover under the propagator and at 4.2e-4 under
+# the slice propagator, the FP32 transform pairs' own loss (validation.md,
 # val-device-unaveraged), where the CPU closes at 8e-9 and 1e-9.
-USP_SOURCE_CEIL = 1.1e-1
+USP_CEIL = {"x": 2.8e-6, "px": 1.8e-5, "y": 2.8e-6, "py": 1.8e-5, "pz": 5.7e-5,
+            "theta": 1.1e-5, "phasor": 2.1e-7, "source": 2.5e-1, "field": 2.4e-5}
 USP_GUARD_FLOOR = 9e5
 USP_LEDGER_CEIL = 1.1e-3
 
@@ -1050,8 +1056,8 @@ def unavg_spectral(args, wd, exe):
     # The lockstep rows, the device in the twin's role, and the mutation.
     run(exe, wd, "dvus_ss.in", USAND.format(root="dvusss", extra=DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
     s = summary(wd, "dvusss")
-    for q in CEIL_U:
-        ceil = USP_SOURCE_CEIL if q == "source" else CEIL_U[q]
+    for q in USP_CEIL:
+        ceil = USP_CEIL[q]
         ok(f"unaveraged spectral lockstep worst_{q}", f"{s[q]:.3e}", f"<= {ceil:.1e}", s[q] <= ceil,
            num=s[q], bound=ceil, kind="max")
     ok("unaveraged spectral lockstep guard [ticks]", f"{s['guard']:.3e}", f">= {USP_GUARD_FLOOR:.0e}",
