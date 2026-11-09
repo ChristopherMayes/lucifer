@@ -48,6 +48,37 @@ of that history. The entries before that date describe that branch.
   runner the debug build's section block took 887 s against the baseline's 2128 and the release
   build's 879 and 957 s against 1135, so the pull request took 25.3 minutes against 28.4, and
   the spontaneous section is then the longest at 358 to 450 s.
+- 2026-11-08 Changed: the reference is the Genesis4 4.6.16 release, and every input that held an odd
+  transverse grid for the reference's sake runs a power of two. 4.6.16 carries one change over
+  4.6.15, `FieldSolverFFT` propagating the transverse field on the wavenumbers the transform
+  carries at either grid parity, the correction this code's kernel took on 2026-09-09 and this
+  project offered upstream. Against 4.6.16 on the unchanged inputs every digit recorded on an odd
+  grid is reproduced, and the three rows that moved are the comparisons that already ran even
+  grids: the device's rows against its Genesis reference at grid 64, P1 6.3096e-05 -> 1.4734e-05
+  and P3 2.1616e-05 -> 2.3199e-05, and the two startup cross-checks at 256 by under 4e-4 in ln
+  ratio. The five reference input files under `tests/genesis4/` then moved from `ngrid` 255 to 256,
+  `check_harmonics.py` from 255 to 256 and its own runs from 63 and 151 to 64 and 128,
+  `check_phasing.py` from 151 and 63 to 128 and 64. The
+  tiers' levels at 255 and at 256 on the debug build: tier1 1.825899e-06 -> 1.568854e-06,
+  tier1_unavg 6.984497e-02 -> 6.102423e-02, tier2_genesis 1.771890e-05 -> 1.365597e-05, tier2_bmad
+  5.001254e-02 -> 4.846885e-02, td1 8.362073e-07 -> 8.357080e-07, td2_genesis 2.376734e-06 ->
+  2.293948e-06, td2_bmad 3.442186e-02 -> 4.002424e-02, tdsase 2.349627e-06 -> 2.365384e-06, tdsc
+  2.868371e-04 -> 2.373113e-04, tdwk 8.917019e-07 -> 8.949320e-07, weight_split 3.532394e-13 ->
+  3.606216e-13. The production build differs where it did before, tier1_unavg 6.102604e-02,
+  tier2_genesis 1.365595e-05 and weight_split 3.577366e-13. Every tolerance is unchanged and every
+  level stays in its own order, td2_bmad at the 3.9e-2 the kernel's correction gave at 256 before
+  the reference carried it. The harmonic tier reads P1 1.192e-07 and P3 2.179e-04 at 256 where 255
+  gave 5.3211e-08 and 1.2745e-04, and the phasing curve against Genesis4's shifter 2.359e-08 and
+  its exit power 1.263e-08 at 128 where 151 gave 1.8788e-08 and 9.2672e-09, against bounds of
+  1e-6, 1e-3, 1e-6 and 1e-6. The CPU's level against the device's Genesis reference reads 8.4e-7
+  again, where it read 6.4e-5 between the kernel's correction and the reference's. Two odd grids
+  remain, both this code's own: `lucifer_smoke_test` with its input-file twin at 63, the odd-grid
+  path itself, and the unaveraged coupling probes at 129, whose parity is the bilinear gather's.
+  The source-filter, spectral and harmonic sections run inputs derived from the reference inputs,
+  and their rows moved within their bounds with them, the filter-on level 2.1770e-06 -> 2.1294e-06
+  and the SASE tier's spectral comparison 5.8449e-03 -> 5.8944e-03 among them. The validation
+  suite refuses any reference but 4.6.16, as it refused any but 4.6.15.
+
 - 2026-11-08 Changed: on a pull request the Linux CI job's debug build runs the refusals and the
   eleven tiers and leaves the 24 check sections to the push to `main`, the weekly schedule and a
   dispatch, so a pull request waits on the release job alone ([](validation.md#val-linux-ci)).

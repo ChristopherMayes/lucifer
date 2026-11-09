@@ -70,8 +70,8 @@ C_LIGHT = 2.99792458e8
 # (val-harmonic-fields-and-the) records the levels.
 TOL_RT_FORMATS = 1e-13       # Double rounding of the dfl, with Bmad's own mu_0, is 4e-16.
 TOL_PY_ENERGY = 1e-9         # Python class energy through its Genesis path is 1.2e-12.
-TOL_TIER_P1 = 1e-6           # Fundamental power against Genesis, planar, steady state: 5.3e-8.
-TOL_TIER_P3 = 1e-3           # Third-harmonic power against Genesis, dark growth: 1.3e-4.
+TOL_TIER_P1 = 1e-6           # Fundamental power against Genesis, planar, steady state: 1.2e-7.
+TOL_TIER_P3 = 1e-3           # Third-harmonic power against Genesis, dark growth: 2.2e-4.
 TOL_DEPOSIT = 1e-12          # One-step P3/P1 against the exact deposit sum is 3.3e-16.
 
 GENESIS_INPUT = """&setup
@@ -90,7 +90,7 @@ field_global_stat = true
 &field
 power=5e3
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 waist_size=30e-6
 &end
 
@@ -98,7 +98,7 @@ waist_size=30e-6
 harm=3
 power=0
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 &end
 
 &beam
@@ -161,13 +161,11 @@ NML_IMPORT = """! flat keys; routed into the input file's tables by lucifer.flat
 {extra}&end
 """
 
-# The grids here are odd on purpose, where the rest of the validation suite runs powers of two.
-# Genesis propagates the transverse field on wavenumbers that are whole multiples of dk
-# only when ngrid is odd. On an even ngrid its FieldSolverFFT carries every mode half a
-# step out. Lucifer's kernel is correct at both parities, so a power comparison this tight
-# against Genesis has to run where Genesis is right, which is an odd grid. Moving these to
-# 64 and 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed
-# upstream. docs/validation.md (val-the-transverse-grid) has the account.
+# The grids here are powers of two, as everywhere in the validation suite. Until release
+# 4.6.16 Genesis propagated the transverse field half a wavenumber out when ngrid was
+# even, and this check ran odd grids for it: against 4.6.15 at 64 and 256 the tier's P1
+# read 1.4e-3 against its 1e-6 level, where 255 read 5.3e-8. Against 4.6.16 at 256 it
+# reads 1.2e-7 and P3 2.2e-4. docs/validation.md (val-the-transverse-grid) has the account.
 
 NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
@@ -186,7 +184,7 @@ NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
-  grid_n_pts = 63
+  grid_n_pts = 64
   grid_half_width = 2e-4
   window_length = 8e-10
   n_wavelength = 1
@@ -479,7 +477,7 @@ def main():
     buncher = buncher.replace("beam.n_particle = 2048", "beam.n_particle = 8192")
     buncher = buncher.replace("bunch_charge = 8.0e-15", "bunch_charge = 1.000692285594e-15")
     buncher = buncher.replace("seed_power = 1e4", "seed_power = 1e9")
-    buncher = buncher.replace("grid_n_pts = 63", "grid_n_pts = 151")
+    buncher = buncher.replace("grid_n_pts = 64", "grid_n_pts = 128")
     run(exe, wd, "h3bunch", buncher)
 
     shutil.copy(wd / "h3bunch-final.wf.h5", wd / "dark.wf.h5")

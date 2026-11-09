@@ -276,9 +276,10 @@ jobs:
         run: ./${{ matrix.dir }}/bin/lucifer || true
 
       # One environment for the reference and the Python side, from the repository's own
-      # file, which pins genesis4 4.6.15. The pin is the whole reason this job is possible:
+      # file, which pins genesis4 4.6.16. The pin is the whole reason this job is possible:
       # releases to 4.6.14 carry a pre-CODATA electron rest energy and seed their noise per
-      # MPI rank, and the validation suite refuses any other version, printing what it found
+      # MPI rank, 4.6.15 propagates the field half a wavenumber out on an even grid, and
+      # the validation suite refuses any other version, printing what it found
       # and wanted. It is separate from the build environment for the reason the recording
       # machine keeps them separate, and the validation suite finds it by name.
       - name: Install genesis4 and the Python package, ${{ matrix.build }} build

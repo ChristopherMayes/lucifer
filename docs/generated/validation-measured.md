@@ -6,17 +6,17 @@ name links to its figure, the run over Genesis4 with the difference beneath each
 
 | Tier | What runs | Debug | Production |
 |---|---|---|---|
-| [`tier1`](#fig-tier1) | FEL core, one undulator segment | 1.825899e-06 | same |
-| [`tier1_unavg`](#fig-tier1-unavg) | one segment, unaveraged dynamics vs Genesis4 (priced model difference) | 6.984497e-02 | 6.984652e-02 |
-| [`tier2_genesis`](#fig-tier2-genesis) | full line, transcribed interludes | 1.771890e-05 | 1.771899e-05 |
-| [`tier2_bmad`](#fig-tier2-bmad) | full line, Bmad seam interludes | 5.001254e-02 | same |
-| [`td1`](#fig-td1) | FEL core + slippage, one undulator segment | 8.362073e-07 | same |
-| [`td2_genesis`](#fig-td2-genesis) | full line time dependent, transcribed interludes | 2.376734e-06 | 2.376736e-06 |
-| [`td2_bmad`](#fig-td2-bmad) | full line time dependent, Bmad seam interludes | 3.442186e-02 | same |
-| [`tdsase`](#fig-tdsase) | full line, pure SASE (dark start, growth from shot noise alone) | 2.349627e-06 | 2.349843e-06 |
-| [`tdsc`](#fig-tdsc) | one segment TD, space charge on (short range + long range) | 2.868371e-04 | same |
-| [`tdwk`](#fig-tdwk) | one segment TD, all wake kernels on | 8.917019e-07 | same |
-| [`weight_split`](#fig-weight-split) | nonuniform weights must be invisible | 3.532394e-13 | 3.536001e-13 |
+| [`tier1`](#fig-tier1) | FEL core, one undulator segment | 1.568854e-06 | same |
+| [`tier1_unavg`](#fig-tier1-unavg) | one segment, unaveraged dynamics vs Genesis4 (priced model difference) | 6.102423e-02 | 6.102604e-02 |
+| [`tier2_genesis`](#fig-tier2-genesis) | full line, transcribed interludes | 1.365597e-05 | 1.365595e-05 |
+| [`tier2_bmad`](#fig-tier2-bmad) | full line, Bmad seam interludes | 4.846885e-02 | same |
+| [`td1`](#fig-td1) | FEL core + slippage, one undulator segment | 8.357080e-07 | same |
+| [`td2_genesis`](#fig-td2-genesis) | full line time dependent, transcribed interludes | 2.293948e-06 | same |
+| [`td2_bmad`](#fig-td2-bmad) | full line time dependent, Bmad seam interludes | 4.002424e-02 | same |
+| [`tdsase`](#fig-tdsase) | full line, pure SASE (dark start, growth from shot noise alone) | 2.365384e-06 | same |
+| [`tdsc`](#fig-tdsc) | one segment TD, space charge on (short range + long range) | 2.373113e-04 | same |
+| [`tdwk`](#fig-tdwk) | one segment TD, all wake kernels on | 8.949320e-07 | same |
+| [`weight_split`](#fig-weight-split) | nonuniform weights must be invisible | 3.606216e-13 | 3.577366e-13 |
 
 Production levels read "same" where the two builds agree to every printed digit.
 Debug and production binaries are never bit-comparable to each other, so the
@@ -115,7 +115,7 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| SASE startup, dark start, one segment: ln ratio | -7.7514e-03 | same | -3.0000e-01 to 3.0000e-01 |
+| SASE startup, dark start, one segment: ln ratio | -8.1141e-03 | same | -3.0000e-01 to 3.0000e-01 |
 
 (val-levels-seam-wake)=
 ### `seam-wake`
@@ -149,7 +149,7 @@ where the two builds agree to every printed digit.
 | twiss recovery: alpha | 1.0391e-02 | same | <= 1.0000e-01 |
 | twiss recovery: emittance | 1.4134e-02 | same | <= 5.0000e-02 |
 | thread determinism |  | same | holds |
-| startup power | 3.7189e-02 | same | -3.0000e-01 to 3.0000e-01 |
+| startup power | 3.7156e-02 | same | -3.0000e-01 to 3.0000e-01 |
 | cross-path: quiet-load current vs analytic Gaussian | 3.0555e-16 | 3.8193e-16 | <= 1.0000e-12 |
 | cross-path: imported current vs the same Gaussian | 4.8572e-02 | same | <= 7.0000e-02 |
 
@@ -208,10 +208,10 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| filter on, xcut = 1 | 2.1770e-06 | same | <= 1.0000e-04 |
-| filter off against the filtered reference | 1.2835e+00 | same | >= 1.0000e-04 |
-| mutation, the sigmoid on the field instead of the source | 1.2834e+00 | same | >= 1.0000e-04 |
-| mutation, the sigmoid's edge at twice the cut | 1.0808e-01 | same | >= 1.0000e-04 |
+| filter on, xcut = 1 | 2.1294e-06 | same | <= 1.0000e-04 |
+| filter off against the filtered reference | 1.2741e+00 | same | >= 1.0000e-04 |
+| mutation, the sigmoid on the field instead of the source | 1.2741e+00 | same | >= 1.0000e-04 |
+| mutation, the sigmoid's edge at twice the cut | 1.0831e-01 | same | >= 1.0000e-04 |
 | refused, a width that attenuates the axis |  | same | holds |
 | refused, the angle and the cut together |  | same | holds |
 | refused, a negative angle |  | same | holds |
@@ -238,13 +238,13 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| steady state, spectral against the slice run | 8.0147e-15 | 2.3261e-14 | <= 1.0000e-11 |
-| SASE tier with the source filter on, spectral against slices | 5.8449e-03 | same | <= 1.5000e-02 |
-| the derived coarse field against one plane a slice, SASE tier | 8.3125e-02 | same | <= 1.5000e-01 |
+| steady state, spectral against the slice run | 3.6653e-15 | 7.8045e-15 | <= 1.0000e-11 |
+| SASE tier with the source filter on, spectral against slices | 5.8944e-03 | same | <= 1.5000e-02 |
+| the derived coarse field against one plane a slice, SASE tier | 8.3631e-02 | same | <= 1.5000e-01 |
 | the derived coarse field's slices a plane, SASE tier | 4 | same | >= 1 |
-| the derived coarse field against the slice run, SASE tier | 7.9403e-02 | same | >= 1.5000e-02 |
-| the field at two slices a plane against one a slice, SASE tier | 4.3054e-02 | same | <= 1.5000e-01 |
-| two slices a plane over four, the ratio of the levels, SASE tier | 5.1794e-01 | same | <= 1 |
+| the derived coarse field against the slice run, SASE tier | 8.1041e-02 | same | >= 1.5000e-02 |
+| the field at two slices a plane against one a slice, SASE tier | 4.2271e-02 | same | <= 1.5000e-01 |
+| two slices a plane over four, the ratio of the levels, SASE tier | 5.0544e-01 | same | <= 1 |
 | a stated sampling equal to a slice above the cliff runs, the slice over the cooperation length | 3.1000e-01 | same | >= 2.5000e-01 |
 | the key unset derives the same slice above the cliff | 192 | same | = 192 |
 | a stated sampling coarser than a slice above the cliff is refused |  | same | holds |
@@ -362,8 +362,8 @@ where the two builds agree to every printed digit.
 | harmonic production TD escaped energy h3 vs CPU | 1.1700e-05 | same | <= 1.8000e-03 |
 | harmonic production TD window P1 vs CPU | 3.1338e-06 | same | <= 1.6000e-03 |
 | harmonic production TD window P3 vs CPU (shot-noise b3) | 3.3016e-06 | same | <= 1.8000e-03 |
-| device vs Genesis, TD planar with shot noise, P1 | 6.3096e-05 | same | <= 1.6000e-03 |
-| device vs Genesis, TD planar with shot noise, P3 | 2.1616e-05 | same | <= 1.8000e-03 |
+| device vs Genesis, TD planar with shot noise, P1 | 1.4734e-05 | same | <= 1.6000e-03 |
+| device vs Genesis, TD planar with shot noise, P3 | 2.3199e-05 | same | <= 1.8000e-03 |
 | device vs CPU, exit orbit with an x_offset, y_offset, kx and kick (all) | 1.0752e-05 | same | <= 5.0000e-05 |
 | quiet-start dark harmonic: fundamental P1 vs CPU | 3.3915e-04 | same | <= 1.6000e-03 |
 | two-plane lockstep worst_x | 1.4621e-07 | same | <= 1.0000e-06 |
@@ -745,8 +745,8 @@ where the two builds agree to every printed digit.
 | Check | Debug | Production | Bound |
 |---|---|---|---|
 | z grids agree between the codes |  | same | holds |
-| tier P1 vs Genesis (planar SS) | 5.3211e-08 | same | <= 1.0000e-06 |
-| tier P3 vs Genesis (dark start, growth) | 1.2745e-04 | same | <= 1.0000e-03 |
+| tier P1 vs Genesis (planar SS) | 1.1920e-07 | same | <= 1.0000e-06 |
+| tier P3 vs Genesis (dark start, growth) | 2.1789e-04 | same | <= 1.0000e-03 |
 | h3both-final.wf.h5 root attribute openPMD |  | same | holds |
 | h3both-final.wf.h5 root attribute openPMDextension |  | same | holds |
 | h3both-final.wf.h5 root attribute basePath |  | same | holds |
@@ -769,7 +769,7 @@ where the two builds agree to every printed digit.
 | h3both-final.wf.h5 unitDimension |  | same | holds |
 | h3both-final.wf.h5 photonEnergy wavelength | 1.2925e-26 | same | <= 1.0000e-16 |
 | h3both-final.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final.wf.h5) | 1.4688e-16 | same | <= 1.0000e-13 |
+| the converter's Genesis view agrees complex-wise (h3both-final.wf.h5) | 2.7818e-16 | same | <= 1.0000e-13 |
 | h3both-final-h3.wf.h5 root attribute openPMD |  | same | holds |
 | h3both-final-h3.wf.h5 root attribute openPMDextension |  | same | holds |
 | h3both-final-h3.wf.h5 root attribute basePath |  | same | holds |
@@ -792,16 +792,16 @@ where the two builds agree to every printed digit.
 | h3both-final-h3.wf.h5 unitDimension |  | same | holds |
 | h3both-final-h3.wf.h5 photonEnergy wavelength | 0.0000e+00 | same | <= 3.3333e-17 |
 | h3both-final-h3.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.4260e-16 | same | <= 1.0000e-13 |
+| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 2.7851e-16 | 2.7905e-16 | <= 1.0000e-13 |
 | Fortran openPMD read-back, re-dump dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| Python Wavefront class energy (its Genesis path) | 1.1933e-12 | 1.1936e-12 | <= 1.0000e-09 |
-| Python openPMD reader (vs Genesis dump) | 1.4260e-16 | same | <= 1.0000e-13 |
+| Python Wavefront class energy (its Genesis path) | 1.1938e-12 | same | <= 1.0000e-09 |
+| Python openPMD reader (vs Genesis dump) | 2.7851e-16 | 2.7905e-16 | <= 1.0000e-13 |
 | Python openPMD write/read round trip exact | 0.0000e+00 | same | <= 5.0000e-01 |
 | Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 1.1213e-14 | 2.5646e-14 | <= 1.0000e-12 |
+| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 2.1649e-14 | 1.5432e-14 | <= 1.0000e-12 |
 | 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| bank bytes: h1's stated pulse file vs on disk, rel | 1.6369e-03 | same | <= 1.0000e-02 |
-| bank bytes: h3's stated pulse file vs on disk, rel | 1.6369e-03 | same | <= 1.0000e-02 |
+| bank bytes: h1's stated pulse file vs on disk, rel | 1.6273e-03 | same | <= 1.0000e-02 |
+| bank bytes: h3's stated pulse file vs on disk, rel | 1.6273e-03 | same | <= 1.0000e-02 |
 | refusal harmonics without the fundamental |  | same | holds |
 | refusal harmonics + unaveraged element |  | same | holds |
 | refusal harmonics + two polarizations |  | same | holds |
@@ -814,15 +814,15 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| re-anchor baseline: gap scan flat (rad, span) | 1.5107e-03 | same | <= 5.0000e-03 |
-| z_offset knob vs -2pi delta/(2 gamma^2 lambda) | 1.4747e-03 | same | <= 5.0000e-03 |
-| cross-mode identity: absolute gap scan == knob scan | 1.1787e-03 | same | <= 5.0000e-03 |
-| our z_offset curve == Genesis PHASESHIFTER curve | 1.8788e-08 | same | <= 1.0000e-06 |
-| exit power vs phi: our knob == Genesis shifter (max rel) | 9.2672e-09 | same | <= 1.0000e-06 |
-| chicane, relative mode: geometric fraction dropped (flat, rad span) | 6.8083e-06 | 6.2633e-06 | <= 5.0000e-03 |
-| chicane, absolute mode vs independent geometry (rad) | 6.8312e-04 | 6.7027e-04 | <= 2.0000e-03 |
+| re-anchor baseline: gap scan flat (rad, span) | 1.5115e-03 | same | <= 5.0000e-03 |
+| z_offset knob vs -2pi delta/(2 gamma^2 lambda) | 1.4742e-03 | same | <= 5.0000e-03 |
+| cross-mode identity: absolute gap scan == knob scan | 1.1808e-03 | same | <= 5.0000e-03 |
+| our z_offset curve == Genesis PHASESHIFTER curve | 2.3593e-08 | same | <= 1.0000e-06 |
+| exit power vs phi: our knob == Genesis shifter (max rel) | 1.2634e-08 | same | <= 1.0000e-06 |
+| chicane, relative mode: geometric fraction dropped (flat, rad span) | 7.7786e-06 | 7.1474e-06 | <= 5.0000e-03 |
+| chicane, absolute mode vs independent geometry (rad) | 6.8280e-04 | 6.6948e-04 | <= 2.0000e-03 |
 | 2D trace vs the small-angle closed form | 6.4361e-08 | same | <= 1.0000e-06 |
-| unaveraged ledger closure across the chicane | 2.7411e-11 | 3.9141e-11 | <= 1.0000e-04 |
+| unaveraged ledger closure across the chicane | 2.9748e-11 | 2.1418e-11 | <= 1.0000e-04 |
 | extra banked slices == floor(delay/lambda), three delays | 0.0000e+00 | same | <= 5.0000e-01 |
 | TD chicane 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal non-closed-bump break |  | same | holds |
