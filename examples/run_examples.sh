@@ -409,6 +409,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_retired_words.py" --root "$LU
   exit 1
 fi
 
+# And no page names a Genesis4 routine or source file without a link at the reference
+# release.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_genesis_names.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a committed Markdown file names a Genesis4 routine with no link."
+  exit 1
+fi
+
 # And every key with a set of names in the key table is compared against those names and no
 # other, so the table and the code that acts on it cannot drift apart.
 if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_allowed_values.py" --root "$LUCIFER_DIR"; then

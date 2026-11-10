@@ -216,7 +216,7 @@ The analytic loader honors the fields above and refuses every other `beam_init` 
 **`load_mode`** is what becomes of the particles in a slice. In the sample mode a generated bunch takes the analytic loader and a file takes the resampler ([](fel-physics.md#sec-import)). `beam.n_particle` is the count per slice either way. In the keep mode each particle becomes a beamlet of copies at weight over `beamlet_size` sharing its coordinates, so every moment of the bunch is the load's, slice by slice. The window is then the bunch's extent unless `window.` states one. The method is in [](fel-physics.md#sec-loading).
 
 (param-beam-shot-noise)=
-**`shot_noise`** imposes the weighted Fawley loading on the groups the load has: the beamlets when the loader made them, else particles sharing their transverse coordinates, else the occupants of a deposit cell, and the message says which. The loader measures the quiet floor first and refuses noise on a load above it with the value in the message, so noise is never counted twice. The algebra, the rule and the four switch combinations are in [](fel-physics.md#sec-noise). The loader warns where Genesis4 silently clamps groups holding fewer real electrons than macroparticles.
+**`shot_noise`** imposes the weighted Fawley loading on the groups the load has: the beamlets when the loader made them, else particles sharing their transverse coordinates, else the occupants of a deposit cell, and the message says which. The loader measures the quiet floor first and refuses noise on a load above it with the value in the message, so noise is never counted twice. The algebra, the rule and the four switch combinations are in [](fel-physics.md#sec-noise). The loader warns of every group that holds less than one real electron ([](shot-noise.md#shot-clamp)).
 
 ### `[beam.resample]`: the resampler
 
@@ -227,7 +227,7 @@ The names are Genesis4's `&importdistribution` names where an equivalent exists.
 :end-before: <!-- end keys-beam-resample -->
 ```
 
-On the user's path the counts are `beam.n_particle` and `beamlet_size`. Genesis4's `match` and `center` are not ported: a Bmad lattice carries its Twiss and `beam_init` generates matched bunches already. The method is in [](fel-physics.md#sec-import).
+On the user's path the counts are `beam.n_particle` and `beamlet_size`. Genesis4's `match` and `center` have no counterpart: a Bmad lattice carries its Twiss and `beam_init` generates matched bunches already. The method is in [](fel-physics.md#sec-import).
 
 ### Check instruments
 

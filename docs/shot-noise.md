@@ -3,7 +3,7 @@ title: "The shot-noise load: what a beamlet radiates"
 short_title: Shot-noise load
 ---
 
-A SASE run starts from the shot noise of the electron beam. The loader imposes that noise on a quiet load by Fawley's algorithm ([](references.md#ref-fawley)), as Genesis4 does in `ShotNoise::applyShotNoise`. The algorithm is exact to first order in the size of its phase kick. This page derives what the kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for.
+A SASE run starts from the shot noise of the electron beam. The loader imposes that noise on a quiet load by Fawley's algorithm ([](references.md#ref-fawley)). The algorithm is exact to first order in the size of its phase kick. This page derives what the kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for.
 
 The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. The ratio is $1 - 2/N$ to first order for one harmonic, and it is 1 when a beamlet holds many electrons. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. The loader is held to the closed form by `check_shot_noise.py` at five electron counts ([](#shot-measured)).
 
@@ -208,7 +208,7 @@ with $N_g$ the electrons of beamlet $g$. The beamlets are kicked independently, 
 (shot-clamp)=
 ## Below one electron
 
-A beamlet may stand for less than one electron. The tail slice of [](#shot-counts) is such a load: 6 electrons over 128 beamlets. The kick of [](#eq-shot-kick) at $N < 1$ would be larger than at one electron. Genesis4 sets $N$ to 1 in the kick when it is below 1, and the loader does the same, counts the draws and warns:
+A beamlet may stand for less than one electron. The tail slice of [](#shot-counts) is such a load: 6 electrons over 128 beamlets. The kick of [](#eq-shot-kick) at $N < 1$ would be larger than at one electron. The loader sets $N$ to 1 in the kick when it is below 1, counts the draws and warns:
 
 ```
 <count> beamlet draws had fewer than one real electron
@@ -225,6 +225,10 @@ $$ (eq-shot-clamp)
 $R_1(1)$ is 0.161 for the loader's beamlet. The tail slice above, at 0.049 of an electron a beamlet, starts with 0.008 of its shot-noise power. A real slice of 6 electrons has $\langle|b|^2\rangle = 1/6$. The loaded slice has $0.161/128 = 0.0013$.
 
 The loader also takes a kick $a_k$ above $2\pi$ modulo $2\pi$. At one electron that is $e^{-\pi^2} = 5\times10^{-5}$ of the draws at the fundamental, and fewer at every larger count. The closed form leaves it out.
+
+:::{dropdown} Genesis4 source
+`fel_fawley_noise` is transcribed from [`ShotNoise::applyShotNoise`](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/Loading/ShotNoise.cpp#L34), with the electron count of the kick taken from the group's own charge. Genesis4 sets $N$ to 1 below one electron without a message ([line 47](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/Loading/ShotNoise.cpp#L47)), which the warning's text refers to. The closed forms of this page are derived here and have no Genesis4 original.
+:::
 
 (shot-measured)=
 ## The loader against the closed form

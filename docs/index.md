@@ -3,7 +3,7 @@ title: "Lucifer: an FEL tracker inside Bmad"
 short_title: Introduction
 ---
 
-Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its physics is transcribed from Genesis 1.3 Version 4 (Genesis4), embedded in Bmad's lattice machinery, and validated against Genesis4 from bitwise-identical starting states.
+Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its averaged FEL physics began as a transcription of Genesis 1.3 Version 4 (Genesis4) and is validated against Genesis4 from bitwise-identical starting states. The lattice, the beam and the transport outside the FEL step are Bmad's. The unaveraged method, the spectral field propagator, the device step and the numerics derived from the beam are Lucifer's own.
 
 An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's own. The FEL parameters are lattice attributes and not a parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's `track1_bunch`. A run is one input file naming a lattice.
 

@@ -104,6 +104,11 @@ jobs:
       - name: No retired words
         run: python tests/scripts/check_retired_words.py
 
+      # A Genesis4 routine or source file is named in a page only as a link at the
+      # reference release, or inside a collapsed Genesis4 source block.
+      - name: Genesis4 names are linked
+        run: python tests/scripts/check_genesis_names.py
+
       # A key that takes one of a set of names: the code compares it against the names in
       # its set in the key table and no other, and every name is compared or is the default.
       - name: Allowed names agree with the code
