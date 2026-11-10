@@ -49,6 +49,7 @@ The averaged method's transverse maps have a third option behind them, the trans
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what level | [](validation.md) |
 | know where a run spends its time | [](performance.md) |
+| know what noise the load imposes when a beamlet holds few electrons | [](shot-noise.md) |
 | choose the grid, the window and the particle count for a SASE run | [](fel-physics.md#sec-convergence), with the measurements in [](startup-noise.md) |
 | run something and see a figure | [](generated/examples/examples.md) |
 | write or read the statistics format | [](BMAD-STATS-SPEC.md) |

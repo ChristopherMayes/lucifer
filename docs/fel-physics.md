@@ -453,7 +453,7 @@ $$
   \end{aligned}
 $$ (eq-fawley)
 
-with $n_h = (b-1)/2$, $\phi_{gh}$ uniform in $[0,2\pi)$, and kicks accumulated from the unperturbed phases. This makes $\langle|b(h)|^2\rangle = 1/N_\lambda$ exact for any distribution of weight across the groups, $N_\lambda$ the slice's real electron count, and it is what [](validation.md#val-shot-noise-under-weights) measures. Genesis4's silent $n_{g}<1$ clamp is kept, counted and warned.
+with $n_h = (b-1)/2$, $\phi_{gh}$ uniform in $[0,2\pi)$, and kicks accumulated from the unperturbed phases. To first order in the kick this makes $\langle|b(h)|^2\rangle = 1/N_\lambda$ for any distribution of weight across the groups, $N_\lambda$ the slice's real electron count. The kick is small when a group holds many electrons. [](shot-noise.md) derives what the kick imposes at any electron count, in closed form: the noise power is low by about $2.4/n_g$ at the fundamental, 0.95 of the shot-noise power at 50 electrons a group and 0.16 at one. [](validation.md#val-shot-noise-under-weights) measures the load against that form. Genesis4's silent $n_{g}<1$ clamp is kept, counted and warned.
 
 The groups are found by rule, and the rule used is printed once per load:
 
@@ -488,6 +488,8 @@ $$ (eq-importcurrent)
 the weighted generalization of Genesis4's count$\cdot dQ$. The candidate set reduces to $n_{\mathrm{part}}/b$ seeds by random deletion, or grows by Genesis4's phase-space interpolation. That interpolation normalizes the five coordinates $(\gamma,x,y,\hat p_x, \hat p_y)$ to zero mean and unit rms, picks a random parent, and finds its nearest original neighbor under a metric whose per-coordinate weights are fresh random draws. The child is placed at the midpoint plus $\mathrm{uniform}[-1,1]$ times the difference per coordinate. $\theta$ is refilled uniformly over one beamlet spacing, mirrored into $b$ copies, and [](#sec-noise) imposes the noise with $n_e = \mathrm{nint}(I\lambda_0\,\texttt{n\_wavelength}/(e c))$. The file's $p_x/p_y$ are slopes. The slope-to-momentum conversion $\hat p = x'\gamma$ happens at the copy into the candidate set. Genesis4's `match`/`center` transforms are not ported, since a Bmad lattice carries its optics and `init_beam_distribution` generates matched bunches. Genesis4's `align*` inputs are parsed but dead in v4 and not transcribed as functional. A zero-charge bunch is refused.
 
 The resampler's own counts, `beam.resample.n_particle_per_slice` and `beam.resample.beamlet_size`, serve its validation route, `beam.resample.use_beam_init`. That route resamples a bunch Bmad generated, so the transcription can be checked on a known bunch against Genesis4 importing the same file. On the user's path the counts are `beam.n_particle` and `beamlet_size`, the same two numbers the generator reads.
+
+Every slice is given the same number of beamlets. A beamlet in a slice of little charge therefore stands for few electrons, and the noise the load imposes on it is below the shot noise of those electrons. [](shot-noise.md) derives the level against the electrons a beamlet holds, and [](shot-noise.md#shot-clamp) the case of a beamlet under one electron, which the loader counts and warns of.
 
 :::{admonition} Provenance
 :class: note

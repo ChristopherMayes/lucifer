@@ -16,6 +16,7 @@ project:
         - file: notebooks/input.ipynb
         - file: notebooks/output.ipynb
     - file: fel-physics.md
+    - file: shot-noise.md
     - file: validation.md
     - file: performance.md
     - file: startup-noise.md
