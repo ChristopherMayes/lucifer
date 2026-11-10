@@ -1,7 +1,7 @@
 (python-package)=
 # Python
 
-The package `lucifer` under `python/` is the input file as typed Python, a runner for the program, and the readers of the files a run writes. The program is the source of truth. The package holds no default the program does not, writes nothing but the TOML the program reads, and checks nothing the program refuses itself, so a value outside its bounds is refused by the program with the program's message. Every class and function is in the [Python reference](generated/python-api.md), generated from the package's own docstrings. The [notebooks](notebooks/quickstart.ipynb) show the package in use, a step to a cell with each output beneath it, executed with the examples so their outputs are real. Every example on this page is code a test runs: the ones that need no executable under pytest in `python/tests/test_page.py`, and the ones that run the program in `tests/scripts/check_program.py`, which the keystone runs.
+The package `lucifer` under `python/` is the input file as typed Python, a runner for the program, and the readers of the files a run writes. The program is the source of truth. The package holds no default the program does not, writes nothing but the TOML the program reads, and checks nothing the program refuses itself, so a value outside its bounds is refused by the program with the program's message. Every class and function is in the [Python reference](generated/python-api.md), generated from the package's own docstrings. The [notebooks](notebooks/quickstart.ipynb) show the package in use, a step to a cell with each output beneath it, executed with the examples so their outputs are real. Every example on this page is code a test runs: the ones that need no executable under pytest in `python/tests/test_page.py`, and the ones that run the program in `tests/scripts/check_program.py`, which the [keystone](glossary.md#gl-keystone) runs.
 
 ## Installing
 
@@ -35,7 +35,7 @@ R = Lucifer.from_archive("page-run.h5")
 R.input.beam.n_particle
 ```
 
-The archive of a run is its stats file, which holds the input file the run read in `meta/input_echo` and every output array, so `archive()` copies it and `from_archive()` rebuilds the object from it. The restored input is the one the run read, with every value the program derived written out, so its `fingerprint()` differs from an input that left those values to the program. `archive(path, include_dumps=True)` also copies the run's particle and field dumps into a directory beside the archive named for its stem, `run/` for `run.h5`, where `from_archive()` finds them.
+The archive of a run is its [stats file](glossary.md#gl-statistics-file), which holds the input file the run read in `meta/input_echo` and every output array, so `archive()` copies it and `from_archive()` rebuilds the object from it. The restored input is the one the run read, with every value the program derived written out, so its `fingerprint()` differs from an input that left those values to the program. `archive(path, include_dumps=True)` also copies the run's particle and field dumps into a directory beside the archive named for its stem, `run/` for `run.h5`, where `from_archive()` finds them.
 
 (python-dumps)=
 ### The dumps
@@ -51,7 +51,7 @@ W = L.output.fields["final"]         # a Wavefront
 one = L.output.load_particles_by_key("final", slice=0)   # one slice, from its patch alone
 ```
 
-Shown, the mapping lists every key with its file size and whether it is loaded, and reads no file. `load_particles()` and `load_fields()` read every dump of the kind, and `load_particles_by_key()` and `load_field_by_key()` read one, as LUME-Genesis names them. `run(load_particles=True, load_fields=True)` reads them all when the run ends. A `slice` argument reads one slice of a beam dump from its particle patch alone, the i-th from 0 in the order the file stores them, which is the order `lucifer.beam.read_slices` returns. A run in a temporary directory keeps the directory while its output is held, so the files outlive the `Lucifer` object that ran them. openPMD-beamphysics is imported only when a dump is read.
+Shown, the mapping lists every key with its file size and whether it is loaded, and reads no file. `load_particles()` and `load_fields()` read every dump of the kind, and `load_particles_by_key()` and `load_field_by_key()` read one, as LUME-Genesis names them. `run(load_particles=True, load_fields=True)` reads them all when the run ends. A `slice` argument reads one [slice](glossary.md#gl-slice) of a beam dump from its particle patch alone, the i-th from 0 in the order the file stores them, which is the order `lucifer.beam.read_slices` returns. A run in a temporary directory keeps the directory while its output is held, so the files outlive the `Lucifer` object that ran them. openPMD-beamphysics is imported only when a dump is read.
 
 (python-schema)=
 ## The schema the package carries
@@ -165,7 +165,7 @@ slices = read_slices("n1024-final.beam.h5", wavelength=inp.field.lambda0)
 slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
 ```
 
-`lucifer.field` reads the whole pulse at the exit, `<out_root>-pulse.wf.h5`, which a run whose window let light out keeps: the window's planes and then the light that slipped out of the window, each banked plane drifted to the exit, with where each left and its moments when it left. The pulse is an openPMD wavefront file like every field dump, so openpmd-beamphysics reads it whole, and `read_pulse` adds the two arrays of its `lucifer/pulse` group. With `run.write_escaped` the run also writes the bank itself, `<out_root>-escaped.wf.h5`, each plane as it was when it left, which `read_escaped` reads with the same two arrays. A time-dependent run of the same input lets light out:
+`lucifer.field` reads the whole pulse at the exit, `<out_root>-pulse.wf.h5`, which a run whose [window](glossary.md#gl-window) let light out keeps: the window's planes and then the light that slipped out of the window, each banked plane drifted to the exit, with where each left and its moments when it left. The pulse is an openPMD [wavefront](glossary.md#gl-wavefront) file like every field dump, so openpmd-beamphysics reads it whole, and `read_pulse` adds the two arrays of its `lucifer/pulse` group. With `run.write_escaped` the run also writes the [bank](glossary.md#gl-bank) itself, `<out_root>-escaped.wf.h5`, each plane as it was when it left, which `read_escaped` reads with the same two arrays. A time-dependent run of the same input lets light out:
 
 % example: field
 ```python
@@ -253,7 +253,7 @@ from lucifer.plot import compare
 compare("n1024.stats.h5", "scan2048.stats.h5")
 ```
 
-The two runs are one input at 1024 and 2048 particles per slice, so the figure shows where along the line the loader's difference enters. `lucifer.compare` reads either file into one form, `Curves`, and takes the differences, with numpy and h5py alone. The [migration example](generated/examples/migration.md)'s figure is this one, migration on over migration off. The figures of the [validation page](validation.md#val-tiers-drawn) are Lucifer over Genesis4 for each tier, drawn through this function, with their captions' numbers computed from the arrays the figures draw. From the command line, with the two field dumps for the field row:
+The two runs are one input at 1024 and 2048 particles per slice, so the figure shows where along the line the [loader](glossary.md#gl-load)'s difference enters. `lucifer.compare` reads either file into one form, `Curves`, and takes the differences, with numpy and h5py alone. The [migration example](generated/examples/migration.md)'s figure is this one, migration on over migration off. The figures of the [validation page](validation.md#val-tiers-drawn) are Lucifer over Genesis4 for each [tier](glossary.md#gl-tier), drawn through this function, with their captions' numbers computed from the arrays the figures draw. From the command line, with the two field dumps for the field row:
 
 ```
 python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 --fields run-final.wf.h5 Aramis-final.fld.h5
@@ -262,7 +262,7 @@ python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 --fields run-final.wf.
 (python-flat)=
 ## Flat text
 
-`lucifer.flat` turns flat `key = value` text, one key a line, into an input file. A key is written bare, `n_particle = 2048`, and routed into its table by name, or dotted, `run.out_root = 's7'`. The check scripts and the validation suite write their input files this way, so a template is a few lines of text and a variant is a string replacement, and `python -m lucifer.flat <flat file> <toml file>` converts from the command line, with `-` for standard input or output.
+`lucifer.flat` turns flat `key = value` text, one key a line, into an input file. A key is written bare, `n_particle = 2048`, and routed into its table by name, or dotted, `run.out_root = 's7'`. The check scripts and the [validation suite](glossary.md#gl-validation-suite) write their input files this way, so a template is a few lines of text and a variant is a string replacement, and `python -m lucifer.flat <flat file> <toml file>` converts from the command line, with `-` for standard input or output.
 
 % example: flat
 ```python

@@ -1,20 +1,20 @@
 # Lucifer
 
-Lucifer (*lux ferre*, light-bringer) is a free-electron-laser tracker inside Bmad. Its averaged FEL physics began as a transcription of Genesis 1.3 Version 4 (Genesis4) and is validated against Genesis4 over its `benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states. The lattice, the beam and the transport outside the FEL step are Bmad's. The unaveraged method, the spectral field propagator, the device step and the numerics derived from the beam are Lucifer's own. The documentation is published at <https://christophermayes.github.io/lucifer/>.
+Lucifer (*lux ferre*, light-bringer) is a free-electron-laser tracker inside Bmad. Its averaged FEL physics began as a transcription of Genesis 1.3 Version 4 (Genesis4) and is validated against Genesis4 over its `benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states. The lattice, the beam and the transport outside the FEL step are Bmad's. The unaveraged method, the spectral field propagator, the [device](docs/glossary.md#gl-device) step and the numerics derived from the beam are Lucifer's own. The documentation is published at <https://christophermayes.github.io/lucifer/>.
 
-FEL segments are real Bmad wiggler elements tracked by a Bmad FEL method, so a Lucifer lattice is a Bmad lattice: quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's, and the FEL parameters are read from lattice attributes rather than a parallel namelist. Every other element tracks each slice's bunch with Bmad's own `track1_bunch`.
+[FEL segments](docs/glossary.md#gl-fel-segment) are real Bmad wiggler elements tracked by a Bmad FEL method, so a Lucifer lattice is a Bmad lattice: quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's, and the FEL parameters are read from lattice attributes rather than a parallel namelist. Every other element tracks each [slice](docs/glossary.md#gl-slice)'s bunch with Bmad's own `track1_bunch`.
 
-Releases are tags of the form `v<version>` on GitHub, the first `v0.1.0`. The program prints the version it was built from, `lucifer --version`, and records it in every statistics file. Lucifer is under development, and its inputs, outputs and interfaces may change between releases.
+Releases are tags of the form `v<version>` on GitHub, the first `v0.1.0`. The program prints the version it was built from, `lucifer --version`, and records it in every [statistics file](docs/glossary.md#gl-statistics-file). Lucifer is under development, and its inputs, outputs and interfaces may change between releases.
 
 ## Layout
 
 | directory | what it holds |
 |---|---|
-| [`src/`](src) | The library: the FEL modules, the wavefront propagator and, under `src/device/`, the Metal backend and its stub |
+| [`src/`](src) | The library: the FEL modules, the [wavefront](docs/glossary.md#gl-wavefront) propagator and, under `src/device/`, the Metal backend and its stub |
 | [`programs/`](programs) | The main programs: `lucifer`, the smoke test, the advance benchmark and the wavefront drift test |
 | [`docs/`](docs) | The documentation, a MyST site that also reads as Markdown |
 | [`examples/`](examples) | Runnable cases, each a directory of real input files with its own README |
-| [`tests/`](tests) | The keystone suite, the validation suite, its check scripts and, under `tests/wavefront/`, the wavefront validation |
+| [`tests/`](tests) | The [keystone](docs/glossary.md#gl-keystone) suite, the [validation suite](docs/glossary.md#gl-validation-suite), its check scripts and, under `tests/wavefront/`, the wavefront validation |
 | [`util/`](util) | The build script, the release check and the locations rule the scripts share |
 | [`cmake/`](cmake) | `FindBmad.cmake`, which finds the Bmad tree to build against |
 
@@ -31,7 +31,7 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DLUCIFER_BMAD_ROOT=$COND
 cmake --build build-release --parallel
 ```
 
-The binaries land in `build-release/bin`. `LUCIFER_BMAD_ROOT` can as well name a distribution build's `production/` or `debug/` root, and `util/conda_compile` builds that distribution from a checkout `BMAD_DIR` names and then Lucifer against it, the route the recorded digits come from. The Bmad is a release at or after the one in [`BMAD_RELEASE`](BMAD_RELEASE), and the configure refuses an older one. The whole of it is in [`docs/user-guide.md`](docs/user-guide.md#building).
+The binaries land in `build-release/bin`. `LUCIFER_BMAD_ROOT` can as well name a distribution build's `production/` or `debug/` root, and `util/conda_compile` builds that distribution from a checkout `BMAD_DIR` names and then Lucifer against it, the route the [recorded digits](docs/glossary.md#gl-level) come from. The Bmad is a release at or after the one in [`BMAD_RELEASE`](BMAD_RELEASE), and the configure refuses an older one. The whole of it is in [`docs/user-guide.md`](docs/user-guide.md#building).
 
 ## Documentation
 
@@ -44,7 +44,7 @@ The binaries land in `build-release/bin`. `LUCIFER_BMAD_ROOT` can as well name a
 | [`docs/performance.md`](docs/performance.md) | Where does a run spend its time, on what machine? |
 | [`docs/fel-physics.md`](docs/fel-physics.md) | What does it compute, and why is that right? |
 | [`docs/BMAD-STATS-SPEC.md`](docs/BMAD-STATS-SPEC.md) | The statistics file format, normatively, with [`docs/BMAD-STATS-EXT-FEL.md`](docs/BMAD-STATS-EXT-FEL.md) |
-| [`docs/shot-noise.md`](docs/shot-noise.md) | What the shot-noise load imposes on a beamlet of N electrons, derived in closed form |
+| [`docs/shot-noise.md`](docs/shot-noise.md) | What the shot-noise [load](docs/glossary.md#gl-load) imposes on a [beamlet](docs/glossary.md#gl-beamlet) of N electrons, derived in closed form |
 | [`docs/startup-noise.md`](docs/startup-noise.md) | How much of an unseeded run's power is the FEL, measured on four machines |
 | [`docs/changelog.md`](docs/changelog.md) | What changed, newest first |
 
@@ -81,11 +81,11 @@ See [`docs/user-guide.md`](docs/user-guide.md) for the input file's tables, the 
 
 ## Where it stands
 
-Validated against Genesis4 on eleven tiers plus twenty-nine check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
+Validated against Genesis4 on eleven [tiers](docs/glossary.md#gl-tier) plus twenty-nine [check sections](docs/glossary.md#gl-validation-suite), on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
 The keystone is the run every commit passes before it is merged: five jobs at their tolerances, then the generated pages regenerated and required to equal the committed ones. The validation suite, `tests/run_fel_validation.sh`, compares against Genesis4 and runs the check sections, and the Linux CI job runs it on the debug and the release build at its tolerances. Neither judges a wall clock. Performance is measured separately, on an idle machine, in [`docs/performance.md`](docs/performance.md). The table of every test, what it compares against, which build it uses and where it runs opens [`docs/validation.md`](docs/validation.md).
 
-Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`docs/validation.md`](docs/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
+Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are measured model differences, not defects: the Bmad [seam](docs/glossary.md#gl-seam)'s [interlude](docs/glossary.md#gl-interlude) transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`docs/validation.md`](docs/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 
 What the program does, and what it does not do yet, are the two lists in [`docs/index.md`](docs/index.md). They are kept in one place because the examples are checked against them: every declared feature names the example that shows it, and the validation suite refuses a feature that has lost its example.
 

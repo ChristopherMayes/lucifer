@@ -7,7 +7,8 @@ for N real electrons. The load (fel_fawley_noise) kicks every phase by
 
     theta_j -= sum_k a_k sin(k theta_j + phi_k),   a_k = (2/k) sqrt(x_k / N),   k = 1..H
 
-with phi_k uniform, x_k exponential with unit mean and H = (M-1)/2. Averaged over the
+with phi_k uniform, x_k exponential with unit mean and H = (M-1)/2 in integer division.
+The default beamlet is M = 8, so H = 3. Averaged over the
 draws, the beamlet's bunching at harmonic h is
 
     <|b_h|^2> = (1/M) sum_{j=0}^{M-1} cos(2 pi j h / M)
@@ -17,11 +18,11 @@ exactly. N electrons at random phases have <|b_h|^2> = 1/N, so the ratio of the 
 N <|b_h|^2>, is what the load delivers of the shot-noise power. It is 1 - 2/N to first
 order for one harmonic, and 1 as N grows.
 
-Below one electron the loader draws the kick for one electron. The beamlet's bunching is
+Below one electron fel_fawley_noise draws the kick for one electron. The beamlet's bunching is
 then the bunching at N = 1, and the ratio is N times the ratio at 1.
 
 This module is arithmetic only. report_shot_noise.py writes the page's table from it,
-shot_noise_figures.py draws from it, and check_shot_noise.py holds the loader to it.
+shot_noise_figures.py draws from it, and check_shot_noise.py holds loaded beams to it.
 """
 
 from __future__ import annotations
@@ -34,8 +35,8 @@ __all__ = ["ratio", "ratio_one_harmonic", "slice_ratio", "bunching_sq"]
 def bunching_sq(n, h, m=8, nharm=None):
     """<|b_h|^2> of one beamlet of m phases kicked for n electrons, n at least 1 here.
 
-    nharm is the number of harmonics kicked together, (m-1)/2 as the loader takes it when
-    not given. n may be an array."""
+    nharm is the number of harmonics kicked together, (m-1)/2 as fel_fawley_noise takes it
+    when not given. n may be an array."""
     if nharm is None:
         nharm = (m - 1) // 2
     n = np.asarray(n, dtype=float)

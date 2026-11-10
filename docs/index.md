@@ -3,9 +3,9 @@ title: "Lucifer: an FEL tracker inside Bmad"
 short_title: Introduction
 ---
 
-Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its averaged FEL physics began as a transcription of Genesis 1.3 Version 4 (Genesis4) and is validated against Genesis4 from bitwise-identical starting states. The lattice, the beam and the transport outside the FEL step are Bmad's. The unaveraged method, the spectral field propagator, the device step and the numerics derived from the beam are Lucifer's own.
+Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its averaged FEL physics began as a transcription of Genesis 1.3 Version 4 (Genesis4) and is validated against Genesis4 from bitwise-identical starting states. The lattice, the beam and the transport outside the FEL step are Bmad's. The unaveraged method, the spectral field propagator, the [device](glossary.md#gl-device) step and the numerics derived from the beam are Lucifer's own.
 
-An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's own. The FEL parameters are lattice attributes and not a parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's `track1_bunch`. A run is one input file naming a lattice.
+An [FEL segment](glossary.md#gl-fel-segment) is a real Bmad wiggler element carrying a Bmad attribute, so a Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's own. The FEL parameters are lattice attributes and not a parallel namelist, and every non-FEL element tracks each [slice](glossary.md#gl-slice)'s bunch through Bmad's `track1_bunch`. A run is one input file naming a lattice.
 
 ## Features
 
@@ -13,17 +13,17 @@ Lucifer has:
 
 - **The FEL element.** An FEL segment is a Bmad wiggler, so its parameters are lattice attributes and one lattice serves tracking, optics and layout.
 - **Two FEL methods**, averaged and unaveraged, set per element through Bmad's `fel_method` attribute and mixing freely in one line. The [next section](#intro-two-methods) says what each is for.
-- **Per-particle weights** throughout: physical shot noise, collective effects and diagnostics are all weight-correct.
-- **Time dependence** with an exact integer slippage shift, and slice migration when a particle's ponderomotive phase leaves its slice.
-- **Collective effects**: resistive-wall, geometric and roughness wakes, short-range and long-range space charge, and Bmad element wakes applied across the whole time window.
-- **Two polarizations** and harmonic field sets, with tilt honored on planar and helical undulators.
+- **Per-particle weights** throughout: physical [shot noise](glossary.md#gl-shot-noise), collective effects and diagnostics are all weight-correct.
+- **Time dependence** with an exact integer slippage shift, and [slice migration](glossary.md#gl-migration) when a particle's ponderomotive phase leaves its slice.
+- **Collective effects**: resistive-wall, geometric and roughness wakes, short-range and long-range space charge, and Bmad element wakes applied across the whole time [window](glossary.md#gl-window).
+- **Two polarizations** and harmonic [field sets](glossary.md#gl-field-set), with tilt honored on planar and helical undulators.
 - **Undulator tapering**, as a line whose segments are different elements rather than a per-segment input.
 - **Phasing between segments**, following the real geometry in absolute time tracking and autophased in the default relative mode.
 - **Spontaneous emission** turned on by Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
 - **A GPU backend** for the averaged method on Apple Silicon (`run.device = "metal"`). The beam and the field stay resident on the device through each FEL element, harmonic field sets, both polarizations and slice migration included. It is measured between 7x and 12x against twelve CPU cores and checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
-- **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
-- **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever load there is.
+- **openPMD** particle and field dumps in both directions, and a self-describing [statistics file](glossary.md#gl-statistics-file) described by [](BMAD-STATS-SPEC.md).
+- **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever [load](glossary.md#gl-load) there is.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
 
 (intro-two-methods)=
@@ -36,7 +36,7 @@ The method is Bmad's own `fel_method` attribute, set on the element as any attri
 | `averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production method. |
 | `unaveraged` | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. Its cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also an independent check on the averaged method, since the two share no approximation. |
 
-The averaged method's transverse maps have a third option behind them, the transcribed Genesis4 maps, which the comparison tiers select through [](input-reference.md)'s `run.transport_model`. It is validation-internal and no production run sets it.
+The averaged method's transverse maps have a third option behind them, the transcribed Genesis4 maps, which the comparison [tiers](glossary.md#gl-tier) select through [](input-reference.md)'s `run.transport_model`. It is validation-internal and no production run sets it.
 
 ## Where to start
 
@@ -45,11 +45,11 @@ The averaged method's transverse maps have a third option behind them, the trans
 | build it, describe a run, and run it | [](user-guide.md) |
 | know what an input key does | [](input-reference.md) |
 | read an output file you were handed | [](reading-output.md) |
-| know what a slice, a record, a frame or a slab is | [](glossary.md) |
+| know what a slice, a record, a frame or a [slab](glossary.md#gl-slab) is | [](glossary.md) |
 | know the physics and the conventions | [](fel-physics.md) |
-| know what is checked and at what level | [](validation.md) |
+| know what is checked and at what [level](glossary.md#gl-level) | [](validation.md) |
 | know where a run spends its time | [](performance.md) |
-| know what noise the load imposes when a beamlet holds few electrons | [](shot-noise.md) |
+| know what noise the load imposes when a [beamlet](glossary.md#gl-beamlet) holds few electrons | [](shot-noise.md) |
 | choose the grid, the window and the particle count for a SASE run | [](fel-physics.md#sec-convergence), with the measurements in [](startup-noise.md) |
 | run something and see a figure | [](generated/examples/examples.md) |
 | write or read the statistics format | [](BMAD-STATS-SPEC.md) |
@@ -69,4 +69,4 @@ Lucifer does not have:
 - On the GPU: collective effects and the unaveraged mode, each refused. A CUDA backend, which the device interface is shaped for.
 - MPI. The shared-memory design is a design decision rather than a gap, and a case for adding MPI would rest on a measurement.
 
-Validation runs on eleven comparison tiers and twenty-eight check sections, on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants. Three are priced model differences rather than defects, and one shows nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).
+Validation runs on eleven comparison tiers and twenty-eight [check sections](glossary.md#gl-validation-suite), on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants. Three are measured model differences rather than defects, and one shows nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).

@@ -6,7 +6,7 @@ The tables are arithmetic on shot_noise_ratio.py and take no run. The keystone
 regenerates the file and requires no difference, so the page quotes no ratio by hand.
 
     tab-shot-ratio   what the load delivers of the shot-noise power against the electrons
-                     a beamlet holds, for one harmonic and for the loader's three
+                     a beamlet holds, for one harmonic and for the default beamlet's three
     tab-shot-floor   the fewest electrons a beamlet may hold for a stated deficit
 
 Usage: report_shot_noise.py --out docs/generated/shot-noise.md
@@ -23,7 +23,7 @@ import numpy as np
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import shot_noise_ratio as snr  # noqa: E402
 
-# The loader's default beamlet and the harmonics it kicks with it.
+# The default beamlet, beamlet_size = 8, and the harmonics fel_fawley_noise kicks on it.
 M = 8
 HARMONICS = (1, 2, 3)
 
@@ -51,14 +51,14 @@ def table_ratio():
     return block("tab-shot-ratio",
                  "The mean square bunching the load imposes, over the shot-noise value, against "
                  "the electrons one beamlet holds. The first two columns kick one harmonic. The "
-                 f"last three are the loader's, a beamlet of {M} with {len(HARMONICS)} harmonics "
+                 f"last three are the default beamlet's, {M} macroparticles with {len(HARMONICS)} harmonics "
                  "kicked together. Below one electron the kick is the one for one electron.",
                  ["electrons a beamlet", "$1 - 2/N$", "one harmonic"]
-                 + [f"loader, $h = {h}$" for h in HARMONICS], rows)
+                 + [f"default beamlet, $h = {h}$" for h in HARMONICS], rows)
 
 
 def floor(deficit, h):
-    """The fewest electrons at and above which the loader's ratio stays within the deficit."""
+    """The fewest electrons at and above which the default beamlet's ratio stays within the deficit."""
     n = np.logspace(0, 4, 40001)
     low = np.nonzero(snr.ratio(n, h, M) < 1 - deficit)[0]
     return n[low[-1] + 1] if len(low) else n[0]
@@ -68,7 +68,7 @@ def table_floor():
     rows = [[f"{100 * d:g}%"] + [f"{int(np.ceil(floor(d, h)))}" for h in HARMONICS] for d in DEFICITS]
     return block("tab-shot-floor",
                  "The fewest electrons a beamlet may hold for the imposed noise power to be "
-                 f"within the stated fraction of the shot-noise power, for the loader's beamlet of {M}.",
+                 f"within the stated fraction of the shot-noise power, for the default beamlet of {M} macroparticles.",
                  ["deficit"] + [f"$h = {h}$" for h in HARMONICS], rows)
 
 

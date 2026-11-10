@@ -5,15 +5,15 @@ short_title: Performance
 
 This page is the measured record of where a run spends its time. Every number here is machine-local and carries the machine and the build that produced it. That is why this page is hand written and stays out of `generated/`.
 
-This page is the one timing measurement in the tree. The performance benchmark, `tests/run_perf_benchmark.sh`, runs on a release build by hand, on a machine doing nothing else. It never runs in the keystone or in the Linux CI job. The keystone runs five jobs at once and a CI runner shares its hardware, so neither gives a clock that repeats. No test there judges a wall clock ([](validation.md#val-what-is-tested)).
+This page is the one timing measurement in the tree. The performance benchmark, `tests/run_perf_benchmark.sh`, runs on a release build by hand, on a machine doing nothing else. It never runs in the [keystone](glossary.md#gl-keystone) or in the Linux CI job. The keystone runs five jobs at once and a CI runner shares its hardware, so neither gives a clock that repeats. No test there judges a wall clock ([](validation.md#val-what-is-tested)).
 
-The instrument is `src/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the walk, so the fractions sum to it and the remainder has its own row named `unaccounted`. That remainder, measured below, is 0.02% of the walk, so the partition is the walk.
+The instrument is `src/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the [walk](glossary.md#gl-walk), so the fractions sum to it and the remainder has its own row named `unaccounted`. That remainder, measured below, is 0.02% of the walk, so the partition is the walk.
 
-Timers cannot see inside a parallel region. The deposit and its FFT interleave per slice, and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
+Timers cannot see inside a parallel region. The [deposit](glossary.md#gl-deposit) and its FFT interleave per [slice](glossary.md#gl-slice), and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
 
-The tables below are also the calibration of the cost estimate every run prints in its header. `src/fel_cost_mod.f90` holds the fitted rates, one for the particle push and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the logs the runs below wrote. Over the sixteen runs of this page the worst residual on the walk is 16.5 percent, on the four- and eight-thread rows of the thread sweep, where one serial fraction cannot carry a sweep whose efficiency is 92 percent at four threads and 94 at twelve. Every other row is inside 10 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-running that script and pasting its five constants back. A sixth rate, the spectral propagator's passes along tau, is fitted from the cost table of [](spectral-field.md#spectral-cost) by `tests/scripts/spectral_field.py cost`, which prints it from its own rows, and `fel_cost_passes` counts the passes a run makes, two a step and the interludes' own. Under the spectral propagator the field solve's count is the field's planes and not the beam's slices, so a field sampled coarser than the slices ([](spectral-field.md#spectral-coarse)) is estimated at its own planes, and the sweep's table on that page gives the walk at each sampling.
+The tables below are also the calibration of the cost [estimate](glossary.md#gl-estimate) every run prints in its header. `src/fel_cost_mod.f90` holds the fitted rates, one for the particle [push](glossary.md#gl-push) and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the logs the runs below wrote. Over the sixteen runs of this page the worst residual on the walk is 16.5 percent, on the four- and eight-thread rows of the thread sweep, where one serial fraction cannot carry a sweep whose efficiency is 92 percent at four threads and 94 at twelve. Every other row is inside 10 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-running that script and pasting its five constants back. A sixth rate, the [spectral propagator](glossary.md#gl-propagator)'s passes along tau, is fitted from the cost table of [](spectral-field.md#spectral-cost) by `tests/scripts/spectral_field.py cost`, which prints it from its own rows, and `fel_cost_passes` counts the passes a run makes, two a step and the [interludes](glossary.md#gl-interlude)' own. Under the spectral propagator the field solve's count is the field's planes and not the beam's slices, so a field sampled coarser than the slices ([](spectral-field.md#spectral-coarse)) is estimated at its own planes, and the sweep's table on that page gives the walk at each sampling.
 
-Two toolchains sit side by side on this page, and every table carries one line naming the toolchain, the machine and the day it was measured. The tables re-measured on 2026-10-24 were taken under gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits of [](validation.md) belong to since 2026-10-23. The tables kept from September 2026 were taken under gfortran 13.3 and the clang of 2025-06, and no later measurement has replaced them. Where a kept table and a re-measured one are compared, the comparison crosses the toolchain and the text says so.
+Two toolchains sit side by side on this page, and every table carries one line naming the toolchain, the machine and the day it was measured. The tables re-measured on 2026-10-24 were taken under gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the [recorded digits](glossary.md#gl-level) of [](validation.md) belong to since 2026-10-23. The tables kept from September 2026 were taken under gfortran 13.3 and the clang of 2025-06, and no later measurement has replaced them. Where a kept table and a re-measured one are compared, the comparison crosses the toolchain and the text says so.
 
 (perf-reproducing)=
 ## Reproducing this
@@ -22,9 +22,9 @@ Two toolchains sit side by side on this page, and every table carries one line n
 ./tests/run_perf_benchmark.sh --phases
 ```
 
-The phases mode needs no genesis4 and no MPI. It compares the code against itself, so it starts from the tracker's own shot-noise quiet start rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice, `--big-slices` the larger case, `--ngrid` the transverse grid, 256 by default, and `--no-sweep` leaves the sweep out. The particles-against-the-grid table is the same command at `--npart 512` and `--npart 8192`, and the transform-length table is `--grid-scan "128 151 255 256 257"`, which runs the small configuration at each grid three times and takes the best walk. The kept tables that state `ngrid` 255 were measured before the input files moved to power-of-two grids, and on this toolchain the two grids are within 0.3 percent of each other ([](#perf-the-transform-length)).
+The phases mode needs no genesis4 and no MPI. It compares the code against itself, so it starts from Lucifer's own shot-noise [quiet start](glossary.md#gl-quiet-start) rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice, `--big-slices` the larger case, `--ngrid` the transverse grid, 256 by default, and `--no-sweep` leaves the sweep out. The particles-against-the-grid table is the same command at `--npart 512` and `--npart 8192`, and the transform-length table is `--grid-scan "128 151 255 256 257"`, which runs the small configuration at each grid three times and takes the best walk. The kept tables that state `ngrid` 255 were measured before the input files moved to power-of-two grids, and on this toolchain the two grids are within 0.3 percent of each other ([](#perf-the-transform-length)).
 
-The device table runs as:
+The [device](glossary.md#gl-device) table runs as:
 
 ```
 ./tests/perf/device_table.sh
@@ -36,7 +36,7 @@ Its four input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x819
 ./tests/perf/tau_pass_table.sh
 ```
 
-It runs the two SASE windows and `sase_1280x1024.toml` on the device with `run.device_timing = true`, three times each, and prints the run with the fewest busy seconds. The unaveraged sandwich under the two propagators ([](#perf-device-unaveraged-spectral)) runs as:
+It runs the two SASE windows and `sase_1280x1024.toml` on the device with `run.device_timing = true`, three times each, and prints the run with the fewest busy seconds. The mixed line of averaged and unaveraged segments under the two propagators ([](#perf-device-unaveraged-spectral)) runs as:
 
 ```
 ./tests/perf/unavg_spectral_table.sh
@@ -78,7 +78,7 @@ It takes the compile command from the production build's own makefile, so the re
 (perf-the-phase-profile)=
 ## The phase profile
 
-The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 256, 12 threads and the source filter at its default. Each column is the mean of two runs. The `2026-09-07` columns are the same configuration at `ngrid` 255 under gfortran 13.3, the record this one replaces.
+The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 256, 12 threads and the [source filter](glossary.md#gl-source-filter) at its default. Each column is the mean of two runs. The `2026-09-07` columns are the same configuration at `ngrid` 255 under gfortran 13.3, the record this one replaces.
 
 *Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
@@ -89,7 +89,7 @@ The machine and configuration are an Apple M3 Max with 12 performance cores, a p
 | `= FEL step`, the sum of the phases inside it | 29.406 s, 87.6% | 26.468 s, 87.3% | 145.972 s, 88.2% | 142.645 s, 86.6% |
 | stats and diag | 3.326 s, 9.9% | 3.140 s, 10.4% | 16.083 s, 9.7% | 18.559 s, 11.3% |
 | field drift through the breaks | 0.619 s, 1.8% | 0.490 s, 1.6% | 2.783 s, 1.7% | 2.597 s, 1.6% |
-| seam interlude | 0.096 s, 0.3% | 0.096 s, 0.3% | 0.469 s, 0.3% | 0.578 s, 0.4% |
+| [seam](glossary.md#gl-seam) interlude | 0.096 s, 0.3% | 0.096 s, 0.3% | 0.469 s, 0.3% | 0.578 s, 0.4% |
 | slippage | 0.095 s, 0.3% | 0.104 s, 0.3% | 0.092 s, 0.1% | 0.106 s, 0.1% |
 | undulator prep (plans, kernel cache) | 0.056 s, 0.2% | 0.045 s, 0.1% | 0.056 s, 0.0% | 0.075 s, 0.0% |
 | wake | 0.000 s, 0.0% | | 0.000 s, 0.0% | |
@@ -115,14 +115,14 @@ The `= FEL step` row is derived rather than measured, as its label says. It is t
 
 The shares are the result and the third decimal is noise. The two 96-slice runs behind the table give walks of 33.182 s and 33.965 s, and the two 504-slice runs 164.300 s and 166.791 s. The run-to-run spread is therefore about 2% on a walk and a few tenths of a point on a share. The phase timers' own cost, two `system_clock` calls per region, is below that spread.
 
-The shares hold across a factor of 5.25 in slice count. The run row against the walk row is everything outside the walk: the parse, the beam and field build, the slippage schedule, the final dumps and the stats file. That is 0.2 s at 96 slices and 0.9 s at 504.
+The shares hold across a factor of 5.25 in slice count. The run row against the walk row is everything outside the walk: the parse, the beam and field build, the slippage schedule, the final dumps and the [stats file](glossary.md#gl-statistics-file). That is 0.2 s at 96 slices and 0.9 s at 504.
 
 Slippage is 0.4% of the walk and 0.1% at the larger size. [](validation.md#val-parallelism-openmp-over-slices) lists the slippage rotation among the serial operations between steps, and it is too small to cap the scaling. The field solve and the particle push are where the time is, and both are slice-parallel.
 
 (perf-the-transform-length)=
 ## The transform length
 
-Every input file of the validation suite and of the performance benchmark runs a power-of-two transverse grid, so one input file runs on the CPU and on the Metal field solver unchanged, and the derived count rounds up to one ([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is measured here. The input file is the phases input file above, 96 slices of 2048 macroparticles over the full line, 12 threads, production build, varying only `grid_n_pts`, three runs at each grid and the best taken. The last column is the walk over the grid points, and at the small grids the particle work, which does not move with the grid, is most of it.
+Every input file of the [validation suite](glossary.md#gl-validation-suite) and of the performance benchmark runs a power-of-two transverse grid, so one input file runs on the CPU and on the Metal field solver unchanged, and the derived count rounds up to one ([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is measured here. The input file is the phases input file above, 96 slices of 2048 [macroparticles](glossary.md#gl-macroparticle) over the full line, 12 threads, production build, varying only `grid_n_pts`, three runs at each grid and the best taken. The last column is the walk over the grid points, and at the small grids the particle work, which does not move with the grid, is most of it.
 
 *Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
@@ -177,7 +177,7 @@ The twelve-thread speedup is 11.22x against the 9.59x of 2026-09-07 under gfortr
 
 The nameable serial phases account for 0.6% of the walk. The rest is the cost of the parallel regions themselves. Two are spawned per integration step (1068 steps, so about 4300 region entries). The sampling profile below puts 3.7 percent of its samples in the thread wait, which at 94 percent efficiency is the barrier and not a lock.
 
-A steady-state run gets nothing from threads. The parallelism is over slices, and a steady-state window has one: the unaveraged example measured 21.94 s at 1 thread and 21.76 s at 12 on 2026-09-01, before the hoist and the interchange took the mode's step to 60 percent of itself.
+A steady-state run gets nothing from threads. The parallelism is over slices, and a steady-state [window](glossary.md#gl-window) has one: the unaveraged example measured 21.94 s at 1 thread and 21.76 s at 12 on 2026-09-01, before the hoist and the interchange took the mode's step to 60 percent of itself.
 
 The field-free drift is parallel over slices for the same reason. A time-dependent line makes one `wavefront_drift` call per field-free element. With that call's slice loop serial, a 590-slice, 256-point case took about 0.5 s per element on one core, the largest serial block of the walk.
 
@@ -217,7 +217,7 @@ The configuration is one slice of 16384 particles at `ngrid` 129, run serially (
 | | before the hoist | after | 2026-10-24 |
 |---|---|---|---|
 | libm transcendentals | 52.1% | 15.3% | 18.7% |
-| substep RK4 (`unavg_push_all`, `unavg_ode`) | 17.6% | 35.3% | 32.7% |
+| [substep](glossary.md#gl-substep) RK4 (`unavg_push_all`, `unavg_ode`) | 17.6% | 35.3% | 32.7% |
 | undulator field, this code's own arithmetic | 8.9% | 27.7% | 15.0% |
 | FFT transform and `fel_field_diffract` | 13.0% | 17.8% | 21.9% |
 | ramp envelope (`fel_und_envelope`) | 4.8% | 0.0% | 0.0% |
@@ -233,12 +233,12 @@ The share row hides how much moved, because the denominator moved too. In absolu
 
 The before column's label covers every libm transcendental the run entered, `exp` and `cexp` and the shared reduction helper included. Only 13.9% of the run was `sin` and `cos` proper. The hoist recovers most of it either way, because the envelope's own trig was per particle for the same reason.
 
-Under the spectral propagator the mode pays what the averaged step pays for the passes along $\tau$ and no more, since the kernel's remainder and the ramp run once a record step ([](spectral-field.md#spectral-unaveraged)), and the cost estimate counts an unaveraged record step as it counts an averaged step. On the sandwich probe of 200 slices of one wavelength at grid 64 and 512 particles a slice, 12 threads, the unaveraged line walks 2.0 s under the slice propagator and 2.8 s under the spectral one, and the all-averaged twin 0.8 s and 1.5 s, measured 2026-11-05. The form that ran the passes at every substep walked 6.4 s on the same probe and was not taken.
+Under the spectral propagator the mode pays what the averaged step pays for the passes along $\tau$ and no more, since the kernel's remainder and the ramp run once a record step ([](spectral-field.md#spectral-unaveraged)), and the cost estimate counts an unaveraged record step as it counts an averaged step. On the mixed line of [](#perf-device-unaveraged-spectral), with 200 slices of one wavelength at grid 64 and 512 particles a slice, 12 threads, the unaveraged line walks 2.0 s under the slice propagator and 2.8 s under the spectral one, and the all-averaged line of the same layout 0.8 s and 1.5 s, measured 2026-11-05. The form that ran the passes at every substep walked 6.4 s on the same probe and was not taken.
 
 (perf-the-hoist-measured)=
 ## The hoist, measured
 
-The machine and build are the same, on one thread, and each entry is the median of five runs at 2048 particles and three at 16384. The change is bit-identical by construction and checked as such: the diag and ledger files of the unaveraged example are byte-identical before and after at 1 and 8 threads.
+The machine and build are the same, on one thread, and each entry is the median of five runs at 2048 particles and three at 16384. The change is bit-identical by construction and checked as such: the diag and [ledger](glossary.md#gl-ledger) files of the unaveraged example are byte-identical before and after at 1 and 8 threads.
 
 *Measured 2026-09-02: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
@@ -258,7 +258,7 @@ The loop order is the next lever after the hoist. The substep RK4 and the undula
 | 2048 particles per slice | 4.577 s | 4.217 s | -7.9% |
 | 16384 particles per slice | 16.073 s | 13.189 s | -17.9% |
 
-The gain is locality and call overhead, and not vectorization. The stage loops do not vectorize, because each iteration calls `unavg_ode`. Inlining the field into the stage loop fails the identity check. The compiler fuses the inlined arithmetic differently from the called form, the results differ in the last bits, and a moved bit is a moved digit somewhere downstream. So the call stays. Vectorizing this loop needs an arithmetic core whose bits are fixed by its formulation rather than by fusion. That is the territory of the FP32 twin, where the reference is measured divergence rather than identity.
+The gain is locality and call overhead, and not vectorization. The stage loops do not vectorize, because each iteration calls `unavg_ode`. Inlining the field into the stage loop fails the identity check. The compiler fuses the inlined arithmetic differently from the called form, the results differ in the last bits, and a moved bit is a moved digit somewhere downstream. So the call stays. Vectorizing this loop needs an arithmetic core whose bits are fixed by its formulation rather than by fusion. That is the territory of the [FP32](glossary.md#gl-fp32) [twin](glossary.md#gl-twin), where the reference is measured divergence rather than identity.
 
 After the interchange the mode's samples split 37.5% substep RK4, 21.4% FFT, 18.8% undulator field arithmetic, 18.7% the deposit's own transcendentals, 2.2% deposit weights.
 
@@ -335,13 +335,13 @@ The per-particle loops do not vectorize, and the blocker is uniform: an un-inlin
 
 The deposit's `on_grid` guard cannot become a mask. `fel_grid_weights` leaves `ix` and `iy` unassigned when it reports off-grid, so a masked body would index `crsource` with an undefined subscript. Making that safe means clamping the indices, which is no longer the same program.
 
-`fel_apply_focus` is called by `fel_transverse_track`, which runs only under `transport_model = "genesis"`, and by the transcribed interlude, which runs only under `interlude_model = "genesis"`. Both default to `bmad`, no example sets either, and only the comparison tiers select them, so restructuring that loop speeds up a validation-internal path. `faw`, on the production path, carries one branch on `und%sin_t`, which is a property of the element and already loop-invariant.
+`fel_apply_focus` is called by `fel_transverse_track`, which runs only under `transport_model = "genesis"`, and by the transcribed interlude, which runs only under `interlude_model = "genesis"`. Both default to `bmad`, no example sets either, and only the comparison [tiers](glossary.md#gl-tier) select them, so restructuring that loop speeds up a validation-internal path. `faw`, on the production path, carries one branch on `und%sin_t`, which is a property of the element and already loop-invariant.
 
 `fel_advance`'s loops call `fel_sincos` and `fel_runge_kutta` per particle, so `!$omp simd` cannot apply to them until the sincos itself is vectorizable.
 
 Thread scaling at production slice counts is 9.16x on 12 cores with the filter off, and the nameable serial cost is 0.6% of the walk, so there is little to win by removing serial work.
 
-The single-precision question is measured. `run.fp32_check` steps an FP32 twin of the averaged advance beside the FP64 path and records the divergence per quantity. The twin carries the reformulations FP32 forces (offset energy, residual phase, difference-form detuning) and a runtime guard on the one failure that is silent, a residual too coarse for the per-step increment. The measured levels are in [](validation.md#val-fp32-lockstep). The field solve has its own twin there: FP32 deposit, single-precision transform pair, rounded propagator. The end-to-end freerun number for the complete single-precision run is 1.0e-3 on exit power over a gain segment, and 2.7e-1 in deep saturation where phase decorrelation dominates. An FP32 six-vector is 24 bytes per particle against 48, which is the bandwidth argument for a device path. Whether an FP32 CPU mode ships is a decision against those recorded levels.
+The single-precision question is measured. `run.fp32_check` steps an FP32 twin of the averaged advance beside the FP64 path and records the divergence per quantity. The twin carries the reformulations FP32 forces (offset energy, residual phase, difference-form detuning) and a runtime guard on the one failure that is silent, a residual too coarse for the per-step increment. The measured [levels](glossary.md#gl-level) are in [](validation.md#val-fp32-lockstep). The field solve has its own twin there: FP32 deposit, single-precision transform pair, rounded propagator. The end-to-end freerun number for the complete single-precision run is 1.0e-3 on exit power over a gain segment, and 2.7e-1 in deep saturation where phase decorrelation dominates. An FP32 six-vector is 24 bytes per particle against 48, which is the bandwidth argument for a device path. Whether an FP32 CPU mode ships is a decision against those recorded levels.
 
 The unaveraged mode has its own twin, and it costs more than the averaged one because of the substep. It repeats the whole advance in single precision on every substep of a record step, sixty of them on the Benchmark1-SASE segment, and it carries a field record of its own through a single-precision transform pair on each. On that segment at 2048 macroparticles and grid 128 the walk is 6.1 s with `run.fp32_check = "lockstep"` and 3.5 s without. The instrumented run takes 1.75 times the walk of the same run without it. The input file is one slice, where the mode's parallelism is over slices, so the figure is a serial one. The instrument is a measuring device rather than a mode, and no production run turns it on. [](validation.md#val-unaveraged-fp32) records what it measures.
 
@@ -399,9 +399,9 @@ Compression does not pay on this data. The field is chunked one slice at a time 
 | gzip level 4 | 72.6 MB | 1.31x | 0.139 s |
 | float32 | 47.6 MB | 2.00x | |
 
-A saturated FEL field is not sparse. The wide-angle emission of the point beamlets fills the grid, and a float64 mantissa of a noise-like field is incompressible, so gzip buys 1.3 times for sixteen times the read. Storing the field as float32 halves it exactly and costs 5.9e-8 of relative accuracy. That is far below anything a picture or a moment needs and far above single-precision tracking's own floor. Neither is taken. The measurement is what a later decision is made against.
+A saturated FEL field is not sparse. The wide-angle emission of the point [beamlets](glossary.md#gl-beamlet) fills the grid, and a float64 mantissa of a noise-like field is incompressible, so gzip buys 1.3 times for sixteen times the read. Storing the field as float32 halves it exactly and costs 5.9e-8 of relative accuracy. That is far below anything a picture or a moment needs and far above single-precision tracking's own floor. Neither is taken. The measurement is what a later decision is made against.
 
-Writing frames dominates a run at a movie-grade comb, and the device readback does not. The input file is one undulator segment, 15 slices of 4096 at `ngrid` 256 on the Metal backend, with a comb of 0.1 m and 31 records:
+Writing frames dominates a run at a movie-grade [comb](glossary.md#gl-comb), and the device readback does not. The input file is one undulator segment, 15 slices of 4096 at `ngrid` 256 on the Metal backend, with a comb of 0.1 m and 31 records:
 
 *Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
@@ -417,13 +417,13 @@ The readback is about 0.10 s either way, since it happens at every comb row whet
 (perf-frames-slab)=
 ### A slice-range frame costs its slices
 
-Writing fewer slices did not cost less until 2026-10-30. A field frame of a slice range was cut from a scratch copy of the whole window, and so was every field frame inside an unaveraged segment. `fel_dump_frame` copied the window and carried every slice back half a substep through `fel_field_diffract_by` on one thread. The copy was then rotated into time order and the range cut last. On a window of 4212 slices at `ngrid` 128 that is 1.1 GB copied and rotated, and 4212 transform pairs on the main thread while the other eleven waited, for a frame of 12 slices. The frame is now a copy of the slices it writes, each taken from its record through `fel_field_index`. The carry runs in parallel over those slices. The whole-window frame of an unaveraged segment takes the same path. The frames are the same bytes, dataset by dataset, for a range of 12 slices, for a range of 61 across the record's rotation seam, and for the whole window. So are the final dumps and the statistics file.
+Writing fewer slices did not cost less until 2026-10-30. A field frame of a slice range was cut from a scratch copy of the whole window, and so was every field frame inside an unaveraged segment. `fel_dump_frame` copied the window and carried every slice back half a substep through `fel_field_diffract_by` on one thread. The copy was then rotated into time order and the range cut last. On a window of 4212 slices at `ngrid` 128 that is 1.1 GB copied and rotated, and 4212 transform pairs on the main thread while the other eleven waited, for a frame of 12 slices. The frame is now a copy of the slices it writes, each taken from its record through `fel_field_index`. The carry runs in parallel over those slices. The whole-window frame of an unaveraged segment takes the same path. The frames are the same bytes, dataset by dataset, for a range of 12 slices, for a range of 61 across the record's [rotation seam](glossary.md#gl-rotation-seam), and for the whole window. So are the final dumps and the statistics file.
 
 The input file is `tests/perf/flash1_frames.toml`: FLASH1 at one wavelength a slice, 4212 slices of 4096 macroparticles at `ngrid` 128, the undulators unaveraged at 20 substeps a period, on the Metal backend. `comb_ds_save = 0.00546` puts a frame of 12 slices at every FEL step. The run is `run.track_end = "UND##1"`, the first segment, 826 frames:
 
 *Measured 2026-10-30: Apple M3 Max, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
-| phase | whole-window copy and carry | slab alone |
+| phase | whole-window copy and carry | [slab](glossary.md#gl-slab) alone |
 |---|---|---|
 | unaveraged step | 173.1 s | 139.7 s |
 | stats and diag | 77.3 s | 90.4 s |
@@ -471,7 +471,7 @@ Bmad's global `bmad.sr_wakes_on` chooses the interlude path for every element of
 (perf-device)=
 ## The device, measured against the CPU
 
-The Metal backend ([](validation.md#val-device)) is run against the CPU path on the same input files: one 9 m Aramis segment of 89 steps at `ngrid` 256, with `comb_ds_save = -1` so both sides pay stats at the element end only. The table gives walk seconds, best of three, on the M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps. The difference from its wall clock is the host side of each step, dominated by the dispatch floor.
+The Metal backend ([](validation.md#val-device)) is run against the CPU path on the same input files: one 9 m Aramis segment of 89 steps at `ngrid` 256, with `comb_ds_save = -1` so both sides pay stats at the element end only. The table gives walk seconds, best of three, on the M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps. The difference from its wall clock is the [host](glossary.md#gl-device) side of each step, dominated by the dispatch floor.
 
 *Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
@@ -503,12 +503,12 @@ The same four input files under `field.propagator = "spectral"` ([](spectral-fie
 | dispatch floor: 1 x 1024, ngrid 64 | slices | 0.032 s | 0.038 s | 0.012 s | 0.8x |
 | dispatch floor: 1 x 1024, ngrid 64 | spectral | 0.048 s | 0.038 s | 0.010 s | 1.3x |
 
-Under the spectral propagator the device's step takes 1.9 times the GPU time of the slice propagator's step on the 24-slice window and 1.4 times on the 96-slice window. On the CPU the same ratio, taken on the walk, is 2.2 on both windows. On 2026-11-04 the device's ratios were 3.4 and 3.0. The transform along $\tau$ then computed its array indices with integer division at run time and filled the threadgroup memory with two buffers. [](#perf-device-tau) describes that transform and the one that replaced it, with the GPU time of each. The spectral wall clock on the device exceeds its GPU time by about 0.4 s on the 24-slice window, more than under the slice propagator. The difference is the writing of the pulse file that the escaped-field bank fills, 119 MB and 194 MB here. The device run under the slice propagator writes no such file, and the CPU's spectral run writes the same one, as the footer's slippage phase states on both. The coarse row shows what the propagator is for. On the 96-slice window the derived sampling leaves 20 field planes and a pad of 16, so the device's GPU time falls below the slice propagator's on 96 planes, and the wall clock is 0.31 s against 0.80 s at one plane a slice. A window of one slice is one plane with no pad, so its transform along $\tau$ reduces to the multiplication by the kernel, and the steady-state rows agree. The header's run-time estimate uses its own GPU rate for the transform along $\tau$, `fel_cost_tau_device$`, fitted from the two SASE rows at one plane a slice. The fit divides the GPU time above the slice propagator's row by the operation count the estimate uses, the grid points times log2 of the transform length times the passes. The two rows give 1.9e-11 s and 1.2e-11 s, and the constant is their mean, 1.5e-11 s. The rows differ because the GPU-time difference also holds the transverse transforms of the pad's 16 planes, a larger share beside 24 window planes than beside 96.
+Under the spectral propagator the device's step takes 1.9 times the GPU time of the slice propagator's step on the 24-slice window and 1.4 times on the 96-slice window. On the CPU the same ratio, taken on the walk, is 2.2 on both windows. On 2026-11-04 the device's ratios were 3.4 and 3.0. The transform along $\tau$ then computed its array indices with integer division at run time and filled the threadgroup memory with two buffers. [](#perf-device-tau) describes that transform and the one that replaced it, with the GPU time of each. The spectral wall clock on the device exceeds its GPU time by about 0.4 s on the 24-slice window, more than under the slice propagator. The difference is the writing of the pulse file that the escaped-field [bank](glossary.md#gl-bank) fills, 119 MB and 194 MB here. The device run under the slice propagator writes no such file, and the CPU's spectral run writes the same one, as the footer's slippage phase states on both. The coarse row shows what the propagator is for. On the 96-slice window the derived sampling leaves 20 field planes and a [pad](glossary.md#gl-pad) of 16, so the device's GPU time falls below the slice propagator's on 96 planes, and the wall clock is 0.31 s against 0.80 s at one plane a slice. A window of one slice is one plane with no pad, so its transform along $\tau$ reduces to the multiplication by the kernel, and the steady-state rows agree. The header's run-time estimate uses its own GPU rate for the transform along $\tau$, `fel_cost_tau_device$`, fitted from the two SASE rows at one plane a slice. The fit divides the GPU time above the slice propagator's row by the operation count the estimate uses, the grid points times log2 of the transform length times the passes. The two rows give 1.9e-11 s and 1.2e-11 s, and the constant is their mean, 1.5e-11 s. The rows differ because the GPU-time difference also holds the transverse transforms of the pad's 16 planes, a larger share beside 24 window planes than beside 96.
 
 (perf-device-tau)=
 ### The transform along tau on the device
 
-Under the spectral propagator ([](spectral-field.md)) a step Fourier transforms the field along $\tau$ at every transverse grid point, over the window's planes and the 16 planes of the pad, multiplies each mode $\kappa$ by the paraxial kernel at $k_0 + \kappa$, and transforms back. A slip pass does the same with the phase ramp $e^{-i\kappa\Delta}$ in place of the kernel, which moves the light toward the window's head by $\Delta$. Each pass is therefore a forward and an inverse transform of length $n$, the window's planes plus 16, at each of the $N^2$ grid points. On the device the transform runs in threadgroup memory, the on-chip memory that the threads of one threadgroup share. One threadgroup transforms $B$ grid points together, called lines here, so that it reads $B$ adjacent cells of each plane at once.
+Under the spectral propagator ([](spectral-field.md)) a step Fourier transforms the field along $\tau$ at every transverse grid point, over the window's planes and the 16 planes of the pad, multiplies each mode $\kappa$ by the paraxial kernel at $k_0 + \kappa$, and transforms back. A slip pass does the same with the [phase ramp](glossary.md#gl-ramp-phase) $e^{-i\kappa\Delta}$ in place of the kernel, which moves the light toward the window's head by $\Delta$. Each pass is therefore a forward and an inverse transform of length $n$, the window's planes plus 16, at each of the $N^2$ grid points. On the device the transform runs in threadgroup memory, the on-chip memory that the threads of one threadgroup share. One threadgroup transforms $B$ grid points together, called lines here, so that it reads $B$ adjacent cells of each plane at once.
 
 This table gives the GPU time of those passes, measured with `run.device_timing = true`, on three windows at one field plane a slice: the two SASE windows above and a window of 1280 slices, `sase_1280x1024.toml`. Each is one Aramis segment of 89 steps at `ngrid` 256. The planes column is $n$, and the lines column is $B$. The segment runs two passes a step, the kernel's and the slip's, and one more at its end, 179 in all. The timing instrument encodes each pass with a timestamp at its boundaries, which the production path does not, so its seconds are longer than a production run's. The share is the transform's GPU time over the sum over all of the step's passes. Each row is the one of three runs with the least GPU time. The first three rows are the transform as it was before any change, and the last three are the transform that replaced it, measured the same day.
 
@@ -622,7 +622,7 @@ The transverse map and the push are the two passes that evaluate sine and cosine
 (perf-device-unaveraged)=
 ## The unaveraged mode on the device
 
-A second polarization plane costs one more plane: every field plane transforms, and the kick gathers and deposits into one more. On the one-segment unaveraged input file at 89 record steps, forcing the second plane raises the device's busy time from 0.250 s to 0.295 s and the walk from 0.325 s to 0.372 s. That is 18% of the device and 14% of the walk. The kernels are the same kernels with a branch, so a one-plane run pays none of it.
+A second polarization plane costs one more plane: every field plane transforms, and the [kick](glossary.md#gl-kick-force) gathers and deposits into one more. On the one-segment unaveraged input file at 89 record steps, forcing the second plane raises the device's busy time from 0.250 s to 0.295 s and the walk from 0.325 s to 0.372 s. That is 18% of the device and 14% of the walk. The kernels are the same kernels with a branch, so a one-plane run pays none of it.
 
 The mode's parallelism on the CPU is over slices and nothing else, so what the device is worth depends on how many slices an input file has. Both regimes are measured, since they are different questions, and only the single-slice one shows the parallelism the CPU leaves unused. The input file is one 4 m Aramis segment in the unaveraged mode, 89 record steps of 60 substeps, `ngrid` 128, `comb_ds_save` at its default, production builds, on the M3 Max. Each entry is the best of five after a discarded warm-up, with the spread over the five beside it.
 
@@ -665,7 +665,7 @@ The price is zero to fourteen percent on the walk and six to eighteen on device 
 (perf-device-unaveraged-spectral)=
 ### The unaveraged mode under the spectral propagator
 
-The sandwich probe of the validation suite, an averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment over 8 slices of one wavelength with 512 macroparticles a slice at `ngrid` 64 ([](validation.md#val-device-unaveraged)), under the slice propagator and under the spectral propagator, on the CPU and on the device. The input file is `tests/perf/unavg_sandwich_8x512.toml`, the propagator and the device go on the command line, and `tests/perf/unavg_spectral_table.sh` prints the table, the best walk of three a case. The probe is small, so the device's walk is the host's dispatch and readback and the GPU time is a third of it.
+The mixed line of the validation suite, an averaged segment, a pipe, an unaveraged segment, a pipe and an averaged segment over 8 slices of one wavelength with 512 macroparticles a slice at `ngrid` 64 ([](validation.md#val-device-unaveraged)), under the slice propagator and under the spectral propagator, on the CPU and on the device. The input file is `tests/perf/unavg_sandwich_8x512.toml`, the propagator and the device go on the command line, and `tests/perf/unavg_spectral_table.sh` prints the table, the best walk of three a case. The probe is small, so the device's walk is the host's dispatch and readback and the GPU time is a third of it.
 
 *Measured 2026-11-06: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, machine otherwise idle.*
 
@@ -678,7 +678,7 @@ The sandwich probe of the validation suite, an averaged segment, a pipe, an unav
 
 On the device the propagator adds 14 percent to the GPU time of the probe, the remainder pass and the slip pass once a record step beside the 20 substeps' own passes, and 33 percent to the walk, the host's own passes on the segment's last record step and the pad's planes in every readback. On the CPU it adds 87 percent to the walk, since the two passes transform every line of the window and the pad through FFTW in FP64 and the probe's record step is short.
 
-The field set is measured on the planar segment of the harmonics check (3.96 m, 88 steps), since a helical segment couples only the fundamental and the set has nothing to carry there. The window is the same 96 x 8192 at `ngrid` 256 and `comb_ds_save = -1`:
+The [field set](glossary.md#gl-field-set) is measured on the planar segment of the harmonics check (3.96 m, 88 steps), since a helical segment couples only the fundamental and the set has nothing to carry there. The window is the same 96 x 8192 at `ngrid` 256 and `comb_ds_save = -1`:
 
 *Measured 2026-09-12: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 

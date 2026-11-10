@@ -7,7 +7,7 @@ Draw the figures of docs/shot-noise.md.
     kick.svg      J1(z) against z/2, under the distribution of the kick z at 150, 18 and
                   1 electrons a beamlet
     ratio.svg     what the load delivers of the shot-noise power against the electrons a
-                  beamlet holds, with the levels check_shot_noise.py measured on the loader
+                  beamlet holds, with the levels check_shot_noise.py measured on loaded beams
 
 The curves are arithmetic on shot_noise_ratio.py. The measured points are read from the
 levels page, docs/generated/validation-measured.md, which the keystone regenerates before
@@ -46,7 +46,7 @@ def j1(z):
 
 
 def measured(levels):
-    """The loader's levels at the fundamental and the two harmonics, uniform weights.
+    """The measured levels at the fundamental and the two harmonics, uniform weights.
 
     Returns {harmonic: [(electrons, value, sigma), ...]}. A row's range is the closed
     form with five standard deviations either side."""
@@ -131,7 +131,7 @@ def draw_ratio(plt, lp, path, points):
     ax.plot(n[big], 1 - 2 / n[big], color=lp.INK2, ls=":", lw=1.2, label=r"$1 - 2/N$")
     ax.plot(n, snr.ratio_one_harmonic(n), color=lp.INK2, ls="--", lw=1.2, label="one harmonic kicked")
     for h, color in zip(HARMONICS, lp.COLORS):
-        ax.plot(n, snr.ratio(n, h, M), color=color, lw=1.8, label=f"loader, $h = {h}$")
+        ax.plot(n, snr.ratio(n, h, M), color=color, lw=1.8, label=f"default beamlet, $h = {h}$")
         e, v, s = np.array(points[h]).T
         ax.errorbar(e, v, yerr=s, fmt="o", color=color, ms=4, lw=1, capsize=2, zorder=4)
     ax.set_xscale("log")
