@@ -44,6 +44,7 @@ The binaries land in `build-release/bin`. `LUCIFER_BMAD_ROOT` can as well name a
 | [`docs/performance.md`](docs/performance.md) | Where does a run spend its time, on what machine? |
 | [`docs/fel-physics.md`](docs/fel-physics.md) | What does it compute, and why is that right? |
 | [`docs/BMAD-STATS-SPEC.md`](docs/BMAD-STATS-SPEC.md) | The statistics file format, normatively, with [`docs/BMAD-STATS-EXT-FEL.md`](docs/BMAD-STATS-EXT-FEL.md) |
+| [`docs/shot-noise.md`](docs/shot-noise.md) | What the shot-noise load imposes on a beamlet of N electrons, derived in closed form |
 | [`docs/startup-noise.md`](docs/startup-noise.md) | How much of an unseeded run's power is the FEL, measured on four machines |
 | [`docs/changelog.md`](docs/changelog.md) | What changed, newest first |
 

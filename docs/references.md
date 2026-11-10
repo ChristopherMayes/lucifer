@@ -28,7 +28,10 @@ This page lists what this code implements, and where each thing came from. Every
 **Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, [SLAC-PUB-10707](https://www.slac.stanford.edu/pubs/slacpubs/10500/slac-pub-10707.pdf). The numerical impedance with AC (Drude) conductivity and Leontovich surface impedance, round and flat geometry. It is transcribed in `fel_collective_mod` (`fel_resistive_wall_wake`), with Genesis4's exact numerics kept. See [](fel-physics.md#sec-wakes).
 
 (ref-fawley)=
-**Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in FEL simulation codes, [Phys. Rev. ST Accel. Beams **5**, 070701 (2002)](https://doi.org/10.1103/PhysRevSTAB.5.070701), in the one-substitution weighted generalization that makes it correct for per-particle weights. `fel_fawley_noise`, checked statistically against $\langle|b(h)|^2\rangle = 1/N_\lambda$ under uniform and nonuniform weights. See [](fel-physics.md#sec-noise).
+**Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in FEL simulation codes, [Phys. Rev. ST Accel. Beams **5**, 070701 (2002)](https://doi.org/10.1103/PhysRevSTAB.5.070701), in the one-substitution weighted generalization that makes it correct for per-particle weights. `fel_fawley_noise`, checked statistically against the closed form of its kick under uniform and nonuniform weights. See [](fel-physics.md#sec-noise) and [](shot-noise.md).
+
+(ref-watson)=
+**Weber's exponential integrals.** G. N. Watson, *A Treatise on the Theory of Bessel Functions*, 2nd edition (Cambridge University Press, 1944), sections 13.3 and 13.31. The two integrals of Bessel functions against a Gaussian that give the mean of the shot-noise kick in closed form. See [](shot-noise.md).
 
 **Incoherent (quantum) diffusion.** The standard undulator quantum-diffusion variance in the Saldin form, as fitted in Genesis4's `Incoherent.cpp`, with one draw per beamlet so the quiet start's cancellation survives. Applied only when Bmad's own `radiation_fluctuations` switch is on. See [](fel-physics.md#sec-eom).
 

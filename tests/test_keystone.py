@@ -11,7 +11,7 @@ it exactly. No job judges a wall clock.
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the nine page sets and requires the Markdown diff to be empty. Before it
+regenerates the ten page sets and requires the Markdown diff to be empty. Before it
 runs a generator, the sixth test verifies for itself that all five outcomes are present
 and successful. So it does not lean on test order and cannot pass on a partial run.
 Nothing here builds. Both trees are prerequisites and are checked before any job
@@ -28,7 +28,7 @@ What the contract means in practice:
 - xdist is refused (conftest.py beside this file). A session fixture runs once per
   worker, so a parallel run would launch the five jobs several times over, into the
   same work directories.
-- The regeneration test writes into the tree: the nine generated page sets, under
+- The regeneration test writes into the tree: the ten generated page sets, under
   docs/generated and, for the schema and the models, python/lucifer. The keystone writes
   them by design. An empty diff then shows
   that the committed pages agree with what the sources generate.
@@ -322,7 +322,7 @@ def test_job(keystone: Keystone, name: str) -> None:
 
 
 def test_regeneration(keystone: Keystone) -> None:
-    """Regenerate the nine page sets and require no diff, after all five jobs passed.
+    """Regenerate the ten page sets and require no diff, after all five jobs passed.
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
@@ -356,6 +356,11 @@ def test_regeneration(keystone: Keystone) -> None:
         # record of spectral_field.py's runs, which run on demand, so this costs no run.
         (str(SCRIPTS / "report_spectral.py"), "--json", str(GENERATED / "spectral" / "measured.json"),
          "--out", str(GENERATED / "spectral"), "--page", str(GENERATED / "spectral-measured.md")),
+        # The shot-noise page's tables, arithmetic on the closed form, and its figures, whose
+        # measured points are the levels page's rows written above.
+        (str(SCRIPTS / "report_shot_noise.py"), "--out", str(GENERATED / "shot-noise.md")),
+        (str(SCRIPTS / "shot_noise_figures.py"), "--levels", str(GENERATED / "validation-measured.md"),
+         "--out", str(GENERATED / "shot-noise")),
         # The layouts page runs its own fixtures with the production executable. A failed
         # fixture fails this test, keeps its log in the artifact directory and leaves the
         # committed page as it was, since the generator writes the page whole or not at all.

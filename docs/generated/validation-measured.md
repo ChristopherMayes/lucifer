@@ -70,29 +70,63 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| shot noise, uniform weights | 9.8101e-01 | same | 8.1366e-01 to 1.1863e+00 |
-| shot noise, uniform weights, harmonic 1 | 9.3633e-01 | same | 6.7725e-01 to 1.3227e+00 |
-| shot noise, uniform weights, harmonic 2 | 1.0048e+00 | same | 6.7725e-01 to 1.3227e+00 |
-| shot noise, uniform weights, harmonic 3 | 1.0019e+00 | same | 6.7725e-01 to 1.3227e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x) | 9.9817e-01 | same | 8.1366e-01 to 1.1863e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x), harmonic 1 | 9.3338e-01 | same | 6.7725e-01 to 1.3227e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x), harmonic 2 | 1.0138e+00 | same | 6.7725e-01 to 1.3227e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x), harmonic 3 | 1.0473e+00 | same | 6.7725e-01 to 1.3227e+00 |
+| shot noise, uniform weights | 9.8998e-01 | same | 9.4180e-01 to 1.0338e+00 |
+| shot noise, uniform weights, harmonic 1 | 1.0046e+00 | same | 9.0412e-01 to 1.0628e+00 |
+| shot noise, uniform weights, harmonic 2 | 9.6731e-01 | same | 9.1183e-01 to 1.0719e+00 |
+| shot noise, uniform weights, harmonic 3 | 9.9806e-01 | same | 9.0841e-01 to 1.0679e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x) | 9.8844e-01 | same | 9.4169e-01 to 1.0337e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), harmonic 1 | 1.0006e+00 | same | 9.0431e-01 to 1.0630e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), harmonic 2 | 9.5984e-01 | same | 9.1072e-01 to 1.0706e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), harmonic 3 | 1.0049e+00 | same | 9.0900e-01 to 1.0686e+00 |
+| shot noise, uniform weights, 50 electrons a beamlet | 9.6805e-01 | same | 9.1943e-01 to 1.0093e+00 |
+| shot noise, uniform weights, 50 electrons a beamlet, harmonic 1 | 9.7373e-01 | same | 8.7566e-01 to 1.0294e+00 |
+| shot noise, uniform weights, 50 electrons a beamlet, harmonic 2 | 9.4669e-01 | same | 8.9202e-01 to 1.0486e+00 |
+| shot noise, uniform weights, 50 electrons a beamlet, harmonic 3 | 9.8372e-01 | same | 8.9194e-01 to 1.0485e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), 50 electrons a beamlet | 9.6167e-01 | same | 9.1686e-01 to 1.0065e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), 50 electrons a beamlet, harmonic 1 | 9.7085e-01 | same | 8.7717e-01 to 1.0311e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), 50 electrons a beamlet, harmonic 2 | 9.3433e-01 | same | 8.8723e-01 to 1.0430e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), 50 electrons a beamlet, harmonic 3 | 9.7982e-01 | same | 8.8781e-01 to 1.0437e+00 |
+| shot noise, uniform weights, 18 electrons a beamlet | 8.9834e-01 | same | 8.5026e-01 to 9.3335e-01 |
+| shot noise, uniform weights, 18 electrons a beamlet, harmonic 1 | 8.9547e-01 | same | 8.0408e-01 to 9.4523e-01 |
+| shot noise, uniform weights, 18 electrons a beamlet, harmonic 2 | 8.7224e-01 | same | 8.1723e-01 to 9.6068e-01 |
+| shot noise, uniform weights, 18 electrons a beamlet, harmonic 3 | 9.2732e-01 | same | 8.3823e-01 to 9.8537e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 18 electrons a beamlet | 8.9091e-01 | same | 8.5060e-01 to 9.3372e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 18 electrons a beamlet, harmonic 1 | 9.0046e-01 | same | 8.1361e-01 to 9.5643e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 18 electrons a beamlet, harmonic 2 | 8.6772e-01 | same | 8.1966e-01 to 9.6355e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 18 electrons a beamlet, harmonic 3 | 9.0455e-01 | same | 8.2724e-01 to 9.7246e-01 |
+| shot noise, uniform weights, 4 electrons a beamlet | 5.0905e-01 | same | 4.7800e-01 to 5.2471e-01 |
+| shot noise, uniform weights, 4 electrons a beamlet, harmonic 1 | 5.8007e-01 | same | 5.1864e-01 to 6.0969e-01 |
+| shot noise, uniform weights, 4 electrons a beamlet, harmonic 2 | 4.6567e-01 | same | 4.2840e-01 to 5.0361e-01 |
+| shot noise, uniform weights, 4 electrons a beamlet, harmonic 3 | 4.8141e-01 | same | 4.3566e-01 to 5.1214e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 4 electrons a beamlet | 6.1828e-01 | same | 5.9252e-01 to 6.5042e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 4 electrons a beamlet, harmonic 1 | 6.5537e-01 | same | 5.9296e-01 to 6.9705e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 4 electrons a beamlet, harmonic 2 | 5.8656e-01 | same | 5.5046e-01 to 6.4708e-01 |
+| shot noise, nonuniform weights (0.25x/1.75x), 4 electrons a beamlet, harmonic 3 | 6.1290e-01 | same | 5.7054e-01 to 6.7070e-01 |
+| shot noise, uniform weights, 0.25 electrons a beamlet | 3.4529e-02 | same | 3.2660e-02 to 3.5852e-02 |
+| shot noise, uniform weights, 0.25 electrons a beamlet, harmonic 1 | 4.0864e-02 | same | 3.7018e-02 to 4.3517e-02 |
+| shot noise, uniform weights, 0.25 electrons a beamlet, harmonic 2 | 3.1524e-02 | same | 2.8728e-02 to 3.3771e-02 |
+| shot noise, uniform weights, 0.25 electrons a beamlet, harmonic 3 | 3.1199e-02 | same | 2.8728e-02 to 3.3771e-02 |
+| shot noise, uniform weights, 0.25 electrons a beamlet: the loader warns of beamlets under one electron |  | same | holds |
+| shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet | 5.3556e-02 | same | 5.1031e-02 to 5.6018e-02 |
+| shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 1 | 6.4040e-02 | same | 5.7841e-02 to 6.7995e-02 |
+| shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 2 | 4.8221e-02 | same | 4.4888e-02 to 5.2768e-02 |
+| shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 3 | 4.8408e-02 | same | 4.4888e-02 to 5.2768e-02 |
+| shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet: the loader warns of beamlets under one electron |  | same | holds |
 | shot noise, keep load: the noise reported on the beamlets the loader made |  | same | holds |
-| shot noise, keep mode, beamlets of a generated bunch | 9.7811e-01 | same | 8.5638e-01 to 1.1436e+00 |
-| shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.0199e+00 | same | 7.5124e-01 to 1.2488e+00 |
-| shot noise, keep mode, beamlets of a generated bunch, harmonic 2 | 9.3672e-01 | same | 7.5124e-01 to 1.2488e+00 |
-| shot noise, keep mode, beamlets of a generated bunch, harmonic 3 | 9.7771e-01 | same | 7.5124e-01 to 1.2488e+00 |
+| shot noise, keep mode, beamlets of a generated bunch | 9.7811e-01 | same | 8.4595e-01 to 1.1297e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.0199e+00 | same | 7.3882e-01 to 1.2281e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, harmonic 2 | 9.3672e-01 | same | 7.4512e-01 to 1.2386e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, harmonic 3 | 9.7771e-01 | same | 7.4233e-01 to 1.2339e+00 |
 | shot noise, copies load: the noise reported on particles sharing their transverse coordinates |  | same | holds |
-| shot noise, copies made outside the loader | 9.8365e-01 | same | 7.5155e-01 to 1.2485e+00 |
-| shot noise, copies made outside the loader, harmonic 1 | 9.6382e-01 | same | 5.6967e-01 to 1.4303e+00 |
-| shot noise, copies made outside the loader, harmonic 2 | 1.0216e+00 | same | 5.6967e-01 to 1.4303e+00 |
-| shot noise, copies made outside the loader, harmonic 3 | 9.6553e-01 | same | 5.6967e-01 to 1.4303e+00 |
+| shot noise, copies made outside the loader | 9.8365e-01 | same | 7.4239e-01 to 1.2332e+00 |
+| shot noise, copies made outside the loader, harmonic 1 | 9.6382e-01 | same | 5.6025e-01 to 1.4067e+00 |
+| shot noise, copies made outside the loader, harmonic 2 | 1.0216e+00 | same | 5.6503e-01 to 1.4187e+00 |
+| shot noise, copies made outside the loader, harmonic 3 | 9.6553e-01 | same | 5.6291e-01 to 1.4134e+00 |
 | shot noise, cells load: the noise reported on the occupants of each deposit cell |  | same | holds |
-| shot noise, the occupants of each deposit cell | 9.6999e-01 | same | 7.5155e-01 to 1.2485e+00 |
-| shot noise, the occupants of each deposit cell, harmonic 1 | 1.0530e+00 | same | 5.6967e-01 to 1.4303e+00 |
-| shot noise, the occupants of each deposit cell, harmonic 2 | 9.4860e-01 | same | 5.6967e-01 to 1.4303e+00 |
-| shot noise, the occupants of each deposit cell, harmonic 3 | 9.0833e-01 | same | 5.6967e-01 to 1.4303e+00 |
+| shot noise, the occupants of each deposit cell | 9.6999e-01 | same | 7.4336e-01 to 1.2349e+00 |
+| shot noise, the occupants of each deposit cell, harmonic 1 | 1.0530e+00 | same | 5.6387e-01 to 1.4158e+00 |
+| shot noise, the occupants of each deposit cell, harmonic 2 | 9.4860e-01 | same | 5.6663e-01 to 1.4227e+00 |
+| shot noise, the occupants of each deposit cell, harmonic 3 | 9.0833e-01 | same | 5.5990e-01 to 1.4058e+00 |
 | mode split against the dump's far field | 0.0000e+00 | 3.3676e-16 | <= 1.0000e-06 |
 
 (val-levels-load)=
