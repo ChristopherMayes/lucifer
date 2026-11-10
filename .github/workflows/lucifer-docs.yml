@@ -109,6 +109,10 @@ jobs:
       - name: Genesis4 names are linked
         run: python tests/scripts/check_genesis_names.py
 
+      # A page links the glossary where it first uses one of the glossary's words.
+      - name: Glossary words are linked at first use
+        run: python tests/scripts/check_glossary.py
+
       # A key that takes one of a set of names: the code compares it against the names in
       # its set in the key table and no other, and every name is compared or is the default.
       - name: Allowed names agree with the code

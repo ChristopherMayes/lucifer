@@ -3,9 +3,9 @@ title: "The shot-noise load: what a beamlet radiates"
 short_title: Shot-noise load
 ---
 
-A SASE run starts from the shot noise of the electron beam. The loader imposes that noise on a quiet load by Fawley's algorithm ([](references.md#ref-fawley)). The algorithm is exact to first order in the size of its phase kick. This page derives what the kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for.
+A SASE run starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at random phases have a mean square bunching of $1/N$. Lucifer makes the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice) before tracking begins. That is the [load](glossary.md#gl-load), and the code that makes it is the loader. The load is made quiet first, in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases that have no bunching ([quiet start](glossary.md#gl-quiet-start)). The loader then imposes the shot noise by Fawley's algorithm ([](references.md#ref-fawley)), which shifts every phase by a small random amount, the [kick](glossary.md#gl-kick-noise). The algorithm is exact to first order in the size of the kick. This page derives what the kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for.
 
-The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. The ratio is $1 - 2/N$ to first order for one harmonic, and it is 1 when a beamlet holds many electrons. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. The loader is held to the closed form by `check_shot_noise.py` at five electron counts ([](#shot-measured)).
+The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. The ratio is $1 - 2/N$ to first order for one harmonic, and it is 1 when a beamlet holds many electrons. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. The load is held to the closed form by `check_shot_noise.py` at five electron counts ([](#shot-measured)).
 
 The page uses the FEL quantities of [](fel-physics.md) and the words of the [glossary](glossary.md). The load itself, its switches and its grouping rules are in [](fel-physics.md#sec-noise).
 
@@ -20,7 +20,7 @@ $$
   N_\lambda = \frac{I\,\Delta}{e\,c}
 $$ (eq-shot-nlambda)
 
-real electrons. The loader represents the slice by $n_p$ macroparticles, `beam.n_particle`. Each macroparticle carries a weight, the charge it stands for.
+real electrons. The load represents the slice by $n_p$ macroparticles, `beam.n_particle`. Each macroparticle carries a weight, the charge it stands for.
 
 The macroparticles are loaded in beamlets. A beamlet is $M$ macroparticles, `beamlet_size`, 8 by default. The macroparticles of one beamlet share their transverse coordinates and their energy. Their phases are spaced evenly over one radiation period. A slice holds $n_p/M$ beamlets.
 
@@ -128,7 +128,7 @@ The same holds for any single harmonic $h$ kicked alone, since the kick enters $
 (shot-all)=
 ## The harmonics together
 
-The loader kicks $H$ harmonics together, and each kick also changes the bunching at the other harmonics. The mean is found without the expansion, from the pairs of macroparticles.
+The kick of [](#eq-shot-kick) sums $H$ harmonics, and each kick also changes the bunching at the other harmonics. The mean is found without the expansion, from the pairs of macroparticles.
 
 From [](#eq-shot-b) and [](#eq-shot-kick),
 
@@ -166,7 +166,7 @@ $$ (eq-shot-rh)
 
 Three limits check the form. With one harmonic and dense phases the sum over $j$ is an integral over $\delta$, and the integral is $e^{-2/N} I_1(2/N)$ by the integral representation of $I_1$, which is [](#eq-shot-weber). To first order in $1/N$ only the term $k = h$ survives the sum over $j$, and it gives $1/N$ for every kicked harmonic. A harmonic above $H$ is not kicked and has no first-order term. Its bunching is of order $1/N^2$.
 
-To second order the loader's beamlet of 8 with 3 harmonics has
+To second order the default beamlet, $M = 8$ with $H = 3$ harmonics kicked, has
 
 $$
   R_1 \approx 1 - \frac{22}{9N}, \qquad R_2 \approx 1 - \frac{1.01}{N}, \qquad R_3 \approx 1 - \frac{2.00}{N} .
@@ -185,7 +185,7 @@ The fundamental loses more than the $2/N$ of [](#eq-shot-r1), because the kicks 
 :::{figure} generated/shot-noise/ratio.svg
 :name: fig-shot-ratio
 :alt: The ratio of imposed to physical noise power against the electrons a beamlet holds, from 0.1 to 1000 on a logarithmic axis. The curves rise from near zero below one electron through about 0.5 at four electrons to 1 above one hundred. Measured points with error bars lie on the curves.
-The ratio $R_h(N)$ of [](#eq-shot-rh) for the loader's beamlet of 8, at the fundamental and the two harmonics it kicks. The dashed curve is one harmonic kicked alone, [](#eq-shot-r1), and the dotted curve its first-order form. The points are the loader's own levels with one standard deviation, from `check_shot_noise.py` ([](#shot-measured)). In the shaded band a beamlet holds less than one electron ([](#shot-clamp)).
+The ratio $R_h(N)$ of [](#eq-shot-rh) for the default beamlet, $M = 8$ with 3 harmonics kicked, at the fundamental and the two harmonics above it. The dashed curve is one harmonic kicked alone, [](#eq-shot-r1), and the dotted curve its first-order form. The points are the levels measured on loaded beams, with one standard deviation, from `check_shot_noise.py` ([](#shot-measured)). In the shaded band a beamlet holds less than one electron ([](#shot-clamp)).
 :::
 
 The ratio has no threshold. The deficit at the fundamental is close to $2.4/N$ above 20 electrons a beamlet. The worked slice of [](#shot-counts), at 48.8 electrons a beamlet, starts with 0.951 of the shot-noise power at the fundamental.
@@ -222,7 +222,7 @@ $$
   R_h(N) = N\, R_h(1), \qquad N < 1 .
 $$ (eq-shot-clamp)
 
-$R_1(1)$ is 0.161 for the loader's beamlet. The tail slice above, at 0.049 of an electron a beamlet, starts with 0.008 of its shot-noise power. A real slice of 6 electrons has $\langle|b|^2\rangle = 1/6$. The loaded slice has $0.161/128 = 0.0013$.
+$R_1(1)$ is 0.161 for the default beamlet. The tail slice above, at 0.049 of an electron a beamlet, starts with 0.008 of its shot-noise power. A real slice of 6 electrons has $\langle|b|^2\rangle = 1/6$. The loaded slice has $0.161/128 = 0.0013$.
 
 The loader also takes a kick $a_k$ above $2\pi$ modulo $2\pi$. At one electron that is $e^{-\pi^2} = 5\times10^{-5}$ of the draws at the fundamental, and fewer at every larger count. The closed form leaves it out.
 
@@ -231,14 +231,14 @@ The loader also takes a kick $a_k$ above $2\pi$ modulo $2\pi$. At one electron t
 :::
 
 (shot-measured)=
-## The loader against the closed form
+## The load, measured against the closed form
 
-`check_shot_noise.py` loads a uniform bunch of 256 slices with 15 seeds and reads the bunching of every slice at harmonics 1 to 3 from the particle dump. It runs at 146, 50, 18 and 4 electrons a beamlet and at a quarter of an electron, each with uniform weights and with beamlet weights alternating between 0.25 and 1.75 of the mean. The mean of $|b_h|^2 N_\lambda$ over the samples is held to [](#eq-shot-slice) within five standard deviations of the mean. The check runs in every pass of the validation suite, and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio).
+`check_shot_noise.py` loads a uniform bunch of 256 slices with 15 seeds and reads the bunching of every slice at harmonics 1 to 3 from the particle dump. It runs at 146, 50, 18 and 4 electrons a beamlet and at a quarter of an electron, each with uniform weights and with beamlet weights alternating between 0.25 and 1.75 of the mean. The mean of $|b_h|^2 N_\lambda$ over the samples is held to [](#eq-shot-slice) within five standard deviations of the mean. The check runs in every pass of the [validation suite](glossary.md#gl-validation-suite), and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio).
 
 (shot-scope)=
 ## Scope
 
-The closed form [](#eq-shot-closed) is for a beamlet of evenly spaced phases kicked by `fel_fawley_noise`. That covers the loader's own beamlets in both load modes. It also covers copies made by another loader, which `fel_group_noise` kicks by the same rule when the copies are evenly spaced.
+The closed form [](#eq-shot-closed) is for a beamlet of evenly spaced phases kicked by `fel_fawley_noise`. That covers the beamlets Lucifer's loader makes in both load modes. It also covers copies a bunch file brings from another code's loader, which `fel_group_noise` kicks by the same rule when the copies are evenly spaced.
 
 Where the groups are the occupants of a deposit cell, one group holds the copies of several particles at different base phases. The terms of [](#eq-shot-ja) that do not depend on the base phase are the same, so the dense form, [](#eq-shot-closed) at large $M$, applies with $N$ the electrons of the whole group. A group whose phases are not copies at even spacing is outside this page.
 

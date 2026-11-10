@@ -129,7 +129,8 @@ def main():
             problems.append(f"Features bullet {lead!r} has no matrix row naming it")
 
     # 2. No row invents a feature.
-    feat_prose = norm(re.sub(r"\*\*", "", features))
+    # The list's words alone: a bullet may link a word to the glossary.
+    feat_prose = norm(re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", re.sub(r"\*\*", "", features)))
     for name, _ in matrix_rows:
         if any(norm(lead) in norm(name) for lead in leads):
             continue
