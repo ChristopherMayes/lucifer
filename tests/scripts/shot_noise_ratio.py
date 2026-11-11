@@ -10,7 +10,7 @@ for N real electrons. The load (fel_fawley_noise) kicks every phase by
 with phi_k uniform and H = (M-1)/2 in integer division. The default beamlet is M = 8, so
 H = 3. Each harmonic draws x_k, exponential with unit mean, and asks for the bunching
 sqrt(x_k / N). A kick of size z at its own harmonic gives the beamlet the bunching J1(z).
-Two kicks are in the program, beam.shot_noise_kick:
+Two kicks are in the program, beam.shot_noise_method:
 
     "bessel"       J1(z_k) = sqrt(x_k / N), and z_k = Z_MAX where sqrt(x_k / N) is above
                    B_MAX, the maximum of J1
@@ -37,7 +37,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import j0, j1
 
-__all__ = ["Z_MAX", "B_MAX", "bessel_kick", "ratio", "ratio_one_harmonic", "slice_ratio", "bunching_sq"]
+__all__ = ["Z_MAX", "B_MAX", "bessel_kick", "ratio", "ratio_one_harmonic", "slice_ratio", "bunching_sq",
+           "ratio_weight_total", "ratio_weight_kept"]
 
 # The kick at the first maximum of J1, and the bunching there: the most a kick gives.
 Z_MAX = 1.8411837813406593
@@ -159,3 +160,19 @@ def slice_ratio(electrons, h, m=8, nharm=None, kick="bessel"):
     counts, inverse = np.unique(e, return_inverse=True)
     r = ratio(counts, h, m, nharm, kick)[inverse]
     return float(np.sum(e * r) / np.sum(e))
+
+
+def ratio_weight_total(n_total):
+    """What the weight load delivers of the shot-noise power in the sample mode, at every
+    harmonic below the beamlet size: the bunch's n_total electrons are counted as the
+    nearest whole number, at least one, each of the bunch charge over that number."""
+    n_total = np.asarray(n_total, dtype=float)
+    return n_total / np.maximum(1.0, np.rint(n_total))
+
+
+def ratio_weight_kept(n):
+    """What the weight load delivers of the shot-noise power in the keep mode, for a particle
+    of n electrons: n times the mean of one over its count. The count is floor(n) or one
+    more, with the probability of floor(n) that makes that mean 1/n, so the ratio is 1.
+    A particle under one electron is counted as one, and the ratio is n."""
+    return np.minimum(np.asarray(n, dtype=float), 1.0)

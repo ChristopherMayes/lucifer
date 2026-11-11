@@ -3,9 +3,9 @@ title: "The shot-noise load: what a beamlet radiates"
 short_title: Shot-noise load
 ---
 
-A SASE run starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at random phases have a mean square bunching of $1/N$. Lucifer makes the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice) before tracking begins. That is the [load](glossary.md#gl-load), and the code that makes it is the loader. The load is made quiet first, in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases that have no bunching ([quiet start](glossary.md#gl-quiet-start)). The loader then imposes the shot noise by Fawley's algorithm ([](references.md#ref-fawley)), which shifts every phase by a small random amount, the [kick](glossary.md#gl-kick-noise). The algorithm sizes the kick to first order in its size. This page derives what a kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for. It then states the kick Lucifer takes, which is sized from the bunching a kick gives.
+A SASE run starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at random phases have a mean square bunching of $1/N$. Lucifer makes the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice) before tracking begins. That is the [load](glossary.md#gl-load), and the code that makes it is the loader. The load is made quiet first, in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases that have no bunching ([quiet start](glossary.md#gl-quiet-start)). The loader then imposes the shot noise in one of three ways, `beam.shot_noise_method`. Two of them are Fawley's algorithm ([](references.md#ref-fawley)), which shifts every phase by a small random amount, the [kick](glossary.md#gl-kick-noise). The algorithm sizes the kick to first order in its size. This page derives what a kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for, and then a kick sized from the bunching it gives. The third way moves no phase and imposes the noise through the weights, which is exact at every electron count and is the default.
 
-The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. Under the first-order kick the ratio is $1 - 2/N$ to first order for one harmonic. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. Lucifer sizes the kick from the Bessel function $J_1$, which is the bunching a kick gives ([](#shot-bessel)). The ratio at the fundamental is then $1 - 4/(9N)$ to first order: 0.99 at 50 electrons a beamlet, 0.91 at 10 and 0.22 at one. This is `beam.shot_noise_kick = "bessel"`, the default. `"first_order"` gives the first-order kick, which is Genesis4's. The load is held to both closed forms by `check_shot_noise.py` ([](#shot-measured)). A slice of little charge is loaded with fewer beamlets, so that none stands for less than one electron ([](#shot-fewer)).
+The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. Under the first-order kick the ratio is $1 - 2/N$ to first order for one harmonic. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. Lucifer sizes the kick from the Bessel function $J_1$, which is the bunching a kick gives ([](#shot-bessel)). The ratio at the fundamental is then $1 - 4/(9N)$ to first order: 0.99 at 50 electrons a beamlet, 0.91 at 10 and 0.22 at one. This is `beam.shot_noise_method = "bessel"`. `"first_order"` gives the first-order kick, which is Genesis4's. `"weight"`, the default, gives every macroparticle a whole number of electrons with the bunch's charge held ([](#shot-weight)). Its ratio is 1 at every harmonic below the beamlet size, at any number of electrons. The load is held to the three closed forms by `check_shot_noise.py` ([](#shot-measured)). Under the kicks a slice of little charge is loaded with fewer beamlets, so that none stands for less than one electron ([](#shot-fewer)).
 
 The page uses the FEL quantities of [](fel-physics.md) and the words of the [glossary](glossary.md). The load itself, its switches and its grouping rules are in [](fel-physics.md#sec-noise).
 
@@ -261,7 +261,7 @@ $$
   J_1(z_k) = \sqrt{\frac{x_k}{N}} .
 $$ (eq-shot-bessel)
 
-`fel_bessel_kick` finds the root by Newton's method, to rounding. The draws $u_k$ and $\phi_k$ and their order are those of the first-order kick. The two loads of one `ran_seed` are therefore the same shot, and this one has the larger kicks. The key is `beam.shot_noise_kick`, `"bessel"` by default and `"first_order"` for [](#eq-shot-first). Fawley's algorithm ([](references.md#ref-fawley)) is the first-order kick, and sizing it from $J_1$ is this program's choice.
+`fel_bessel_kick` finds the root by Newton's method, to rounding. The draws $u_k$ and $\phi_k$ and their order are those of the first-order kick. The two loads of one `ran_seed` are therefore the same shot, and this one has the larger kicks. The key is `beam.shot_noise_method`, `"bessel"` for this kick and `"first_order"` for [](#eq-shot-first). Fawley's algorithm ([](references.md#ref-fawley)) is the first-order kick, and sizing it from $J_1$ is this program's choice.
 
 $J_1$ has its first maximum, $b_{\max} = 0.5819$, at $z_{\max} = 1.8412$. No kick gives a beamlet more bunching than $b_{\max}$ at the kicked harmonic. A draw with $x_k$ above $b_{\max}^2 N = 0.3386\,N$ has no root. The loader holds such a draw at $z_{\max}$ and counts it, and the load's report states the count with the share of the charge in the slices that have one. The share of the draws held is $e^{-0.3386 N}$: 0.2% at 18 electrons a beamlet, 3.4% at 10 and 71% at one.
 
@@ -317,10 +317,98 @@ Three machines were tracked under each kick on 2026-11-11: `examples/sase`, `exa
 
 The start-up power follows the closed forms on all three machines. FLASH1 and LCLS saturate, and the kick moves their exit pulse energy by 2e-5 and 1e-4 of itself, where the standard error over the six seeds is 1.9% and 0.4%. The sase example does not saturate, and its exit pulse energy is higher by 2.6%, as its noise is. A run with many electrons a beamlet is therefore changed little by the kick. The kick matters where a beamlet holds tens of electrons or fewer: short wavelengths, low currents and large `beam.n_particle`.
 
+(shot-weight)=
+## The noise through the weights
+
+The two kicks move the phases and leave every macroparticle of a beamlet at one weight. The shot noise can be imposed the other way round. The phases stay the quiet beamlet's, and the weights carry the noise. This is the load of McNeil, Poole and Robb ([](references.md#ref-mcneil)), put on a beamlet as Hwang and Qiang put it ([](references.md#ref-hwang-qiang-weight)). It is `beam.shot_noise_method = "weight"`.
+
+A macroparticle of a beamlet of $N$ electrons stands for $N/M$ of them. Let it stand for a whole number $c_j$ of electrons instead, drawn as the electrons of a real beam fall: independently, each into any of the $M$ macroparticles with the same probability. Independent counts of that kind are Poisson numbers of mean $N/M$ and variance $N/M$. The beamlet's source at harmonic $h$ is the sum over its electrons,
+
+$$
+  S_h = \sum_{j=0}^{M-1} c_j\, e^{-ih\theta_j} .
+$$ (eq-shot-s)
+
+The mean of $S_h$ is $(N/M)\sum_j e^{-ih\theta_j}$, which is zero for the evenly spaced phases at every $h$ that is not a multiple of $M$. Its mean square is the sum of the variances of the counts:
+
+$$
+  \langle |S_h|^2 \rangle = \sum_j \langle (c_j - N/M)^2 \rangle = N,
+  \qquad \langle |b_h|^2 \rangle = \frac{\langle |S_h|^2 \rangle}{N^2} = \frac{1}{N} .
+$$ (eq-shot-weight)
+
+This is [](#eq-shot-real), and no step of it is an approximation. The bunching is linear in the counts, so there is no order of a kick to stop at and no largest bunching. It holds at any $N$, whole or not, and at every harmonic below $M$: 1 to 7 for the default beamlet, where the kicks reach 3. At one electron a beamlet most macroparticles draw no electron and a few draw one. The load is then the electrons themselves, each at one of $M$ phases.
+
+### The bunch's charge, held
+
+Independent counts leave the bunch's charge to chance. The loader holds it. A bunch of charge $Q$ is counted as $n$ electrons, the whole number nearest $Q/e$ and at least one. The counts of all the macroparticles of the bunch are then one multinomial draw of $n$ electrons, each macroparticle with a probability $p_j$ in proportion to the weight the quiet load gave it. The counts sum to $n$ in every draw. They are no longer independent: the variance of $c_j$ is $n p_j (1 - p_j)$ and the covariance of two counts is $-n p_j p_k$. For any set of macroparticles, a slice or a beamlet,
+
+$$
+  \langle |S_h|^2 \rangle = n \sum_j p_j \;-\; n\, \Bigl| \sum_j p_j\, e^{-ih\theta_j} \Bigr|^2 .
+$$ (eq-shot-multinomial)
+
+The second term is the square of the mean source. The probabilities are equal within a beamlet and the beamlet's phases are evenly spaced, so it is zero beamlet by beamlet. What is left is $n \sum_j p_j$, the mean count of the set. [](#eq-shot-weight) therefore holds with the bunch's charge held, for a slice of any charge and for any weights across the beamlets.
+
+The charge of one counted electron is $Q/n$, which is $e$ only where $Q/e$ is whole. The loaded charge is $Q$ exactly. The noise power goes as the square of that charge times $n$, so
+
+$$
+  R = \frac{Q/e}{n}
+$$ (eq-shot-weight-ratio)
+
+at every harmonic and in every slice. $R$ is within $1/(2n)$ of 1. That is $10^{-9}$ for the $5\times10^8$ electrons of FLASH1's window, and it is the whole cost of a count that is not whole. A bunch of less than half an electron is counted as one.
+
+A slice's count is a binomial number: $n$ trials, each with the slice's share of the charge as its probability. Its mean is the slice's $N_\lambda$ and its variance is $N_\lambda (1 - N_\lambda/n)$. The charge of a slice thus varies from shot to shot by $1/\sqrt{N_\lambda}$ of itself, as the real beam's does: 0.7% for the 18740 electrons of a slice of `examples/sase`. The current profile of the load is the bunch's in the mean.
+
+`fel_weight_noise` takes the draw in order. A slice takes a binomial share of the electrons not yet given, by its share of the charge not yet loaded. Each macroparticle then takes a binomial share of what its slice has left. `fel_ran_binomial` is exact in distribution: it is Hörmann's transformed rejection ([](references.md#ref-hormann)) where ten or more successes are expected, and a sum of the probabilities upward from zero successes below.
+
+A beamlet none of whose copies drew an electron is not loaded. A copy that drew none, in a beamlet that holds charge, stays at zero weight, so a loaded slice is still whole beamlets. A slice that drew no electron has no particles. `beam.beamlet_min_electrons` is a rule for the kicks and this load does not read it: a slice of few electrons loads few beamlets with no rule.
+
+### The keep mode
+
+In the keep mode a beamlet is a particle of the bunch and its copies, and every particle keeps its own charge. A particle of $N$ electrons is counted as $k = \lfloor N \rfloor$ electrons or as $k + 1$, and the charge of one counted electron is the particle's charge over its count. Its noise power goes as its charge squared over the count. The count is $k$ with the probability
+
+$$
+  P(k) = \frac{k\,(k + 1 - N)}{N} ,
+$$ (eq-shot-kept)
+
+which makes the mean of one over the count $1/N$. The ratio is then 1 for every particle of one electron or more. The count falls on the $M$ copies with equal probability, so at least one copy holds charge and the others may hold none. A particle under one electron is counted as one. One of its copies holds its whole charge, and the ratio is $N$.
+
+```{include} generated/shot-noise.md
+:start-after: <!-- begin tab-shot-three -->
+:end-before: <!-- end tab-shot-three -->
+```
+
+:::{figure} generated/shot-noise/weight.svg
+:name: fig-shot-weight
+:alt: The ratio of imposed to physical noise power at the fundamental against the electrons a beamlet holds, from 0.1 to 1000 on a logarithmic axis. The first-order kick and the kick from J1 rise from near zero below one electron to 1 above one hundred. The weight load is a level line at 1, with measured points at five electron counts lying on it.
+The ratio at the fundamental under the three values of `beam.shot_noise_method`. The points are the weight load's levels at harmonics 1 to 7 measured on loaded beams by `check_shot_noise.py`, with one standard deviation, set side by side at each electron count.
+:::
+
+### What else differs
+
+The weight load carries shot noise at harmonics 4 to 7 of the default beamlet, which the kicks leave quiet. On $M$ phases the harmonics $h$ and $M - h$ of one beamlet have the same magnitude, since $e^{-i(M-h)\theta_j}$ is the conjugate of $e^{-ih\theta_j}$ up to the beamlet's base phase. The beamlets of a slice stand at different base phases, so the two harmonics of the slice are independent sums.
+
+The weights of a beamlet's copies differ, and at few electrons some are zero. Every pass over the particles takes each particle's own weight. The radiated power, the [FP32](glossary.md#gl-fp32) [twin](glossary.md#gl-twin) and the [device](glossary.md#gl-device) are held on such loads by the [validation suite](glossary.md#gl-validation-suite).
+
+A weight load and a kick load of one `ran_seed` are different shots, since the weight load draws its counts and the kicks draw phases and sizes.
+
+`tests/scripts/shot_noise_monte_carlo.py --weight` draws the counts with no run of the program, in three forms: independent Poisson counts on one beamlet, a slice of 16 beamlets with its total held, and the keep mode's particle. At 150, 18, 4, 3.76, 1 and 0.25 electrons a beamlet, with $10^8$ draws of the first and third and $1.25\times10^7$ of the second, the means at harmonics 1 to 7 agree with the forms within 2.7 standard errors of the mean at all 126 points (2026-11-11). The standard error is $1.4\times10^{-4}$ to $2.8\times10^{-4}$ and the largest difference is $5\times10^{-4}$. At 3.76 electrons a beamlet the slice of 16 beamlets holds 60.16 electrons counted as 60, and its mean is 1.0024 to 1.0031 where [](#eq-shot-weight-ratio) gives 1.0027. A keep-mode particle under one electron reads its electron count exactly, with no spread.
+
+Four loads were tracked under the weight load and under the kick from $J_1$ on 2026-11-11: the kept bunch of `examples/import`, `examples/sase`, `examples/flash1` and `examples/lcls`, each at `run.ran_seed` 1 to 6. The two loads of a seed are different shots, so each column is a mean over the six seeds with its standard error, and the ratio is the ratio of the means. The start-up power is the power summed over the window one gain length into the line.
+
+| load | electrons a beamlet | loaded power over shot-noise power, $J_1$ | weights | start-up power, weights over $J_1$ | the forms' ratio | exit pulse energy, $J_1$ | weights | macroparticles, $J_1$ | weights | run time, $J_1$ | weights |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| import, kept bunch | 3.76 | 0.6201 | 1.0000 | 1.62 ± 0.16 | 1.61 | 9.14 ± 0.27 pJ | 14.82 ± 0.67 pJ | 400000 | 400000 | 54.0 s | 52.9 s |
+| sase | 73.2 | 0.9938 | 1.0000 | 1.08 ± 0.08 | 1.006 | 3.48 ± 0.92 nJ | 2.41 ± 0.55 nJ | 196608 | 196608 | 39.7 s | 39.8 s |
+| FLASH1 | 16700 at the peak | 0.9999 | 1.0000 | 1.034 ± 0.024 | 1.0001 | 48.4 ± 0.9 µJ | 48.9 ± 1.9 µJ | 880832 | 862161 | 18.9 s | 18.9 s |
+| LCLS | 1250 at the peak | 0.9996 | 1.0000 | 1.009 ± 0.011 | 1.0004 | 278.9 ± 1.2 µJ | 277.4 ± 1.7 µJ | 1228800 | 1228800 | 62.7 s | 62.2 s |
+
+The run times are medians, on 12 threads. The start-up power agrees with the forms on all four within its spread. The kept bunch, at 3.76 electrons a particle, starts 1.6 times higher under the weights, which is the 0.62 the kick from $J_1$ loads there. The three machines with many electrons a beamlet start and exit as they do under the kick, within the spread of six shots. The macroparticles tracked and the run time are the same. FLASH1 tracks 2% fewer macroparticles, since its 82 slices of the least charge draw no electron. The loaded charge is the input file's to rounding in every run.
+
+The weight load is therefore the default. It loads the shot noise at every electron count and at every harmonic below the beamlet size, it holds the bunch's charge, and it takes the same run time. The kick from $J_1$ is within 1% of it above 50 electrons a beamlet and stays in the program, as does the first-order kick, which the checks that compare a load with Genesis4 set.
+
 (shot-fewer)=
 ## Fewer beamlets in a slice of little charge
 
-In the sample mode the loader does not give every slice $n_p/M$ beamlets. A slice of $N_\lambda$ electrons is loaded with
+Under the two kicks the sample mode does not give every slice $n_p/M$ beamlets. A slice of $N_\lambda$ electrons is loaded with
 
 $$
   n_b = \min\!\left(\frac{n_p}{M},\ \max\!\left(1,\ \left\lfloor \frac{N_\lambda}{N_{\min}} \right\rfloor\right)\right)
@@ -353,12 +441,14 @@ With `beam.beamlet_min_electrons = 0` every slice has $n_p/M$ beamlets, as in Ge
 
 Under the kick sized from $J_1$ it runs at 146, 50, 18, 10 and 1 electrons a beamlet with uniform weights, held to that kick's form the same way. Five standard deviations of such a mean are 8% at one harmonic, which is more than the two kicks differ by above 18 electrons. The two kicks take the same draws, so a seed's two loads are one shot kicked twice, and the difference of their statistics slice by slice has a far smaller spread than either. The mean difference is held to the difference of the two closed forms within five standard deviations of its own mean. At 146 electrons a beamlet it reads 0.0140 against 0.0139 with a bound of 0.0008. The level the loader prints for each of these loads, from `fel_shot_ratio`, is held to `shot_noise_ratio.py`'s to the four decimals printed.
 
-A Gaussian bunch whose last slices hold two electrons is then loaded at the default and at $N_{\min} = 18$, and at the default under both kicks. Each slice is held to the charge it has with the key at 0 and to the beamlets of [](#eq-shot-fewer), and the slices with fewer beamlets to the closed form at the electrons their beamlets hold. A flat bunch over the middle half of the window is loaded both ways: a slice with no charge must have no particles at the default and the input file's count at 0. The keep mode and the two loads whose beamlets were made outside the loader run under both kicks as well, with the same paired difference. The check runs in every pass of the [validation suite](glossary.md#gl-validation-suite), and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio) and [](#fig-shot-bessel).
+The weight load runs at 146, 18, 4 and 1 electrons a beamlet and at a quarter of an electron, with uniform weights. Its statistic is held to [](#eq-shot-weight-ratio) at each of harmonics 1 to 7. The loaded charge is held to the input file's to $10^{-12}$, every weight to a whole number of the counted electron's charge, and the variance of the slices' counts to the binomial variance within five standard deviations. A Gaussian bunch whose last slices hold a hundredth of an electron is loaded the same way: 30% of its slices draw no electron and have no particles, the bunch is a whole number of electrons, and the statistic of the other slices is held to 1. In the keep mode every particle of the bunch must be present at the charge the kick load gives it.
+
+A Gaussian bunch whose last slices hold two electrons is then loaded under the kicks at the default $N_{\min}$ and at $N_{\min} = 18$, and at the default under both kicks. Each slice is held to the charge it has with the key at 0 and to the beamlets of [](#eq-shot-fewer), and the slices with fewer beamlets to the closed form at the electrons their beamlets hold. A flat bunch over the middle half of the window is loaded both ways: a slice with no charge must have no particles at the default and the input file's count at 0. The keep mode and the two loads whose beamlets were made outside the loader run under both kicks as well, with the same paired difference. The check runs in every pass of the [validation suite](glossary.md#gl-validation-suite), and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio), [](#fig-shot-bessel) and [](#fig-shot-weight).
 
 (shot-scope)=
 ## Scope
 
-The closed forms [](#eq-shot-general) and [](#eq-shot-closed) are for a beamlet of evenly spaced phases kicked by `fel_fawley_noise`. That covers the beamlets Lucifer's loader makes in both load modes. It also covers copies a bunch file brings from another code's loader, which `fel_group_noise` kicks by the same rule when the copies are evenly spaced.
+The weight load needs the beamlets this loader makes, in either load mode. A load without the quiet start is refused under `"weight"`, with `"bessel"` in the message. The closed forms [](#eq-shot-general) and [](#eq-shot-closed) are for a beamlet of evenly spaced phases kicked by `fel_fawley_noise`. That covers the beamlets Lucifer's loader makes in both load modes. It also covers copies a bunch file brings from another code's loader, which `fel_group_noise` kicks by the same rule when the copies are evenly spaced.
 
 Where the groups are the occupants of a deposit cell, one group holds the copies of several particles at different base phases. The terms of [](#eq-shot-ja) that do not depend on the base phase are the same, so the dense form, [](#eq-shot-general) at large $M$, applies with $N$ the electrons of the whole group. Under the kick sized from $J_1$ a group of more than 64 phases is taken as 64, which differs at the 63rd order of the kick. A group whose phases are not copies at even spacing is outside this page.
 

@@ -30,6 +30,15 @@ This page lists what this code implements, and where each thing came from. Every
 (ref-fawley)=
 **Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in FEL simulation codes, [Phys. Rev. ST Accel. Beams **5**, 070701 (2002)](https://doi.org/10.1103/PhysRevSTAB.5.070701), in the one-substitution weighted generalization that makes it correct for per-particle weights. `fel_fawley_noise`, checked statistically against the closed form of its kick under uniform and nonuniform weights. See [](fel-physics.md#sec-noise) and [](shot-noise.md).
 
+(ref-mcneil)=
+**Shot noise through macroparticle charge.** B. W. J. McNeil, M. W. Poole and G. R. M. Robb, [Phys. Rev. ST Accel. Beams **6**, 070701 (2003)](https://doi.org/10.1103/PhysRevSTAB.6.070701), and their conference paper, [Proc. PAC 2003, p. 950](https://accelconf.web.cern.ch/p03/PAPERS/MPPB059.PDF). A [macroparticle](glossary.md#gl-macroparticle) stands for a Poisson number of electrons, so the statistics of the load are those of the electrons' arrival and not of an averaged bunching. `fel_weight_noise` was written from the conference paper and from the restatement below, with the bunch's charge held. See [](shot-noise.md#shot-weight).
+
+(ref-hwang-qiang-weight)=
+**The weight load on a beamlet.** K. Hwang and J. Qiang, [Phys. Rev. Accel. Beams **21**, 120702 (2018)](https://doi.org/10.1103/PhysRevAccelBeams.21.120702), Section III. Reviews Fawley's phase perturbation and McNeil, Poole and Robb's charge-weight perturbation on a [beamlet](glossary.md#gl-beamlet) of evenly spaced phases, and shows the second has the shot-noise bunching as an equality. The same paper is cited below for its migration scheme.
+
+(ref-hormann)=
+**Binomial random numbers.** W. Hörmann, "The generation of binomial random variates", J. Stat. Comput. Simul. **46**, 101 (1993), algorithm BTRS. `fel_ran_binomial`, which draws the weight load's counts.
+
 (ref-watson)=
 **Weber's exponential integrals.** G. N. Watson, *A Treatise on the Theory of Bessel Functions*, 2nd edition (Cambridge University Press, 1944), sections 13.3 and 13.31. The two integrals of Bessel functions against a Gaussian that give the mean of the shot-noise kick in closed form. See [](shot-noise.md).
 

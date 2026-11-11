@@ -98,7 +98,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   window_length = 2.4e-9
   n_wavelength = 1
   shot_noise = T
-  shot_noise_kick = "first_order"
+  shot_noise_method = "first_order"
   ran_seed = 4242
   write_diag = T
 {extra}&end

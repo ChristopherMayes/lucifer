@@ -11,6 +11,8 @@ Draw the figures of docs/shot-noise.md.
                   on loaded beams
     bessel.svg    the same for the kick sized from J1, beside the first-order kick's
                   fundamental
+    weight.svg    the fundamental under the two kicks and under the weight load, with the
+                  weight load's measured levels at harmonics 1 to 7
 
 The curves are arithmetic on shot_noise_ratio.py. The measured points are read from the
 levels page, docs/generated/validation-measured.md, which the keystone regenerates before
@@ -171,6 +173,43 @@ def draw_bessel(plt, lp, path, points):
     plt.close(fig)
 
 
+def measured_weight(levels):
+    """The weight load's measured levels: {harmonic: [(electrons, value, sigma), ...]}."""
+    row = re.compile(r"^\| shot noise, weight load, uniform weights, ([0-9.]+) electrons? a beamlet, "
+                     r"harmonic ([1-7]) \| (\S+) \| (\S+) \| (\S+) to (\S+) \|")
+    out = {}
+    for line in pathlib.Path(levels).read_text().splitlines():
+        m = row.match(line)
+        if not m:
+            continue
+        value = float(m.group(3) if m.group(4) == "same" else m.group(4))
+        out.setdefault(int(m.group(2)), []).append((float(m.group(1)), value, (float(m.group(6)) - float(m.group(5))) / 10))
+    if not out:
+        raise SystemExit(f"{levels}: no shot-noise rows for the weight load. Run the validation suite and "
+                         "report_validation.py first.")
+    return out
+
+
+def draw_weight(plt, lp, path, points):
+    n = np.logspace(-1, 3, 401)
+    fig, ax = plt.subplots(figsize=(6.8, 4.2), layout="constrained")
+    ax.plot(n, snr.ratio(n, 1, M, kick="first_order"), color=lp.INK2, ls="--", lw=1.4, label="first-order kick")
+    ax.plot(n, snr.ratio(n, 1, M), color=lp.COLORS[0], lw=1.6, label=r"kick from $J_1$")
+    ax.plot(n, np.ones_like(n), color=lp.COLORS[1], lw=1.8, label="weights")
+    for h, pts in sorted(points.items()):
+        e, v, s = np.array(pts).T
+        ax.errorbar(e * (1 + 0.035 * (h - 4)), v, yerr=s, fmt="o", color=lp.COLORS[1], ms=3, lw=0.8, capsize=1.5,
+                    zorder=4, label="weights, measured at $h = 1$ to 7" if h == 1 else None)
+    ax.set_xscale("log")
+    ax.set_xlim(0.1, 1000)
+    ax.set_ylim(0, 1.12)
+    ax.set_xlabel("electrons one beamlet holds, $N$")
+    ax.set_ylabel(r"$\langle|b_1|^2\rangle\,N$")
+    ax.legend(frameon=False, loc="lower right")
+    lp.save(fig, path)
+    plt.close(fig)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--levels", required=True, help="docs/generated/validation-measured.md")
@@ -178,6 +217,7 @@ def main():
     a = p.parse_args()
     points = measured(a.levels)
     points_bessel = measured(a.levels, "bessel")
+    points_weight = measured_weight(a.levels)
 
     import matplotlib
     matplotlib.use("Agg")
@@ -191,7 +231,8 @@ def main():
         draw_kick(plt, lp, out / "kick.svg")
         draw_ratio(plt, lp, out / "ratio.svg", points)
         draw_bessel(plt, lp, out / "bessel.svg", points_bessel)
-    print(f"wrote {out}: 4 figures, the drawn kick of {Z_DRAWN:g} rad leaves |b| = {b:.4f}, "
+        draw_weight(plt, lp, out / "weight.svg", points_weight)
+    print(f"wrote {out}: 5 figures, the drawn kick of {Z_DRAWN:g} rad leaves |b| = {b:.4f}, "
           f"J1 = {float(j1(Z_DRAWN)):.4f}")
     return 0
 

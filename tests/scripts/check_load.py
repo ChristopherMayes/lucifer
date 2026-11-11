@@ -198,7 +198,7 @@ def incone(exe, wd):
     the default, which loads the slices of little charge with fewer beamlets, 52 of the 85
     here. The two are different shots at one seed, since the random numbers after the first
     such slice differ. Both take the first-order kick, which the target was measured with.
-    The third is the second with the kick sized from J1, beam.shot_noise_kick at its
+    The third is the second with the kick sized from J1, beam.shot_noise_method at its
     default: the same draws with larger kicks."""
     ok = True
     for root, limit, kick, name in (("ldcone", "  beam.beamlet_min_electrons = 0\n", "first_order",
@@ -221,7 +221,7 @@ def incone_run(exe, wd, root, limit, kick, name):
   beamlet_size = 8
   quiet_start = T
   shot_noise = T
-  shot_noise_kick = "{kick}"
+  shot_noise_method = "{kick}"
 {limit}"""
     pextra = (f'  run.track_end = "UND##1"\n  run.source_filter = F\n'
               f'  run.source_filter_angle = {INCONE_CUT:.1e}\n'
@@ -272,7 +272,7 @@ def refusals(exe, wd):
     bunchfile.write_bunch(wd / "load_bunch.h5", wd / "load_copies.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING))
     rc, out = run(exe, wd, "ldcopies", '  beam.position_file = "load_copies.h5"\n'
-                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_kick = "first_order"\n',
+                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n',
                   pextra="  run.load_only = T\n")
     good = rc == 0 and "particles sharing their transverse coordinates" in out
     fl = re.search(r"worst quiet floor before imposing, \|b\|\^2 \* N_lambda:\s*([0-9.E+-]+)", out)
@@ -286,7 +286,7 @@ def refusals(exe, wd):
     bunchfile.write_bunch(wd / "load_bunch.h5", wd / "load_shifted.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING, shift=1.0))
     rc, out = run(exe, wd, "ldshift", '  beam.position_file = "load_shifted.h5"\n'
-                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_kick = "first_order"\n',
+                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n',
                   pextra="  run.load_only = T\n")
     m = floor_re.search(out)
     good = rc != 0 and "NOT QUIET ENOUGH" in out and m is not None

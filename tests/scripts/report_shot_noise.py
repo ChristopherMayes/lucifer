@@ -10,6 +10,7 @@ regenerates the file and requires no difference, so the page quotes no ratio by 
                      beamlet's three
     tab-shot-bessel  the same for the kick sized from J1, with the share of the draws held
                      at the largest bunching a kick gives
+    tab-shot-three   the fundamental under the three ways of imposing the noise
     tab-shot-floor   the fewest electrons a beamlet may hold for the load to be within a
                      stated fraction of the shot noise, under each kick
 
@@ -76,6 +77,20 @@ def table_bessel():
                  + [f"default beamlet, $h = {h}$" for h in HARMONICS], rows)
 
 
+def table_three():
+    rows = []
+    for n in COUNTS:
+        rows.append([f"{n:g}", f"{float(snr.ratio(n, 1, M, kick='first_order')):.3f}",
+                     f"{float(snr.ratio(n, 1, M)):.3f}", "1.000", f"{float(snr.ratio_weight_kept(n)):.3f}"])
+    return block("tab-shot-three",
+                 "The noise power loaded at the fundamental over the shot-noise power, against the electrons one "
+                 "beamlet holds, under the three values of `beam.shot_noise_method`. The weight load's columns "
+                 "hold at every harmonic below the beamlet size. In the keep mode a particle under one electron "
+                 "is counted as one electron.",
+                 ["electrons a beamlet", "`first_order`", "`bessel`", "`weight`, sample mode", "`weight`, keep mode"],
+                 rows)
+
+
 def floor(fraction, h, kick):
     """The fewest electrons at and above which the default beamlet's ratio stays within the
     fraction of 1. The last count outside it is found on 100 counts a decade from 1 to
@@ -112,6 +127,7 @@ def main():
          "Do not edit. -->", ""]
     L += table_ratio()
     L += table_bessel()
+    L += table_three()
     L += table_floor()
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -42,6 +42,27 @@
 ```
 <!-- end tab-shot-bessel -->
 
+<!-- begin tab-shot-three -->
+```{table} The noise power loaded at the fundamental over the shot-noise power, against the electrons one beamlet holds, under the three values of `beam.shot_noise_method`. The weight load's columns hold at every harmonic below the beamlet size. In the keep mode a particle under one electron is counted as one electron.
+:name: tab-shot-three
+
+| electrons a beamlet | `first_order` | `bessel` | `weight`, sample mode | `weight`, keep mode |
+|---|---|---|---|---|
+| 0.25 | 0.040 | 0.059 | 1.000 | 0.250 |
+| 0.5 | 0.081 | 0.115 | 1.000 | 0.500 |
+| 1 | 0.161 | 0.219 | 1.000 | 1.000 |
+| 2 | 0.345 | 0.397 | 1.000 | 1.000 |
+| 4 | 0.564 | 0.644 | 1.000 | 1.000 |
+| 10 | 0.788 | 0.913 | 1.000 | 1.000 |
+| 18 | 0.875 | 0.970 | 1.000 | 1.000 |
+| 50 | 0.953 | 0.991 | 1.000 | 1.000 |
+| 100 | 0.976 | 0.995 | 1.000 | 1.000 |
+| 146.4 | 0.983 | 0.997 | 1.000 | 1.000 |
+| 150 | 0.984 | 0.997 | 1.000 | 1.000 |
+| 1000 | 0.998 | 1.000 | 1.000 | 1.000 |
+```
+<!-- end tab-shot-three -->
+
 <!-- begin tab-shot-floor -->
 ```{table} The fewest electrons a beamlet may hold for the imposed noise power to be within the stated fraction of the shot-noise power, for the default beamlet of 8 macroparticles under each kick.
 :name: tab-shot-floor
