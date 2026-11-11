@@ -45,7 +45,7 @@ KEYS = {
     "beam": [
         "file", "position_file", "n_particle", "bunch_charge", "sig_z", "sig_pz", "a_norm_emit",
         "b_norm_emit", "z_distribution", "z_min", "z_max", "load_mode", "quiet_start",
-        "beamlet_size", "shot_noise", "write_genesis_dist", "write_openpmd_file",
+        "beamlet_size", "shot_noise", "beamlet_min_electrons", "write_genesis_dist", "write_openpmd_file",
         "split_weights", "swap_beam_xy", "gen_test_weights", "resample_split_weights",
     ],
     "beam.resample": ["slice_width", "n_particle_per_slice", "beamlet_size", "n_slice", "use_beam_init"],

@@ -58,6 +58,7 @@ character(400) field_file(9)
 logical quiet_start, shot_noise, gen_test_weights, resample_split_weights
 logical split_weights, swap_beam_xy, err
 integer beamlet_size, ran_seed, is
+real(rp) beamlet_min_electrons
 real(rp) gamma0, lambda0, window_length, seed_power, seed_waist_size, grid_half_width
 integer n_win
 integer window_sample, grid_n_pts, npart_gen
@@ -79,6 +80,12 @@ write_openpmd_file = run%bparam%write_openpmd_file
 load_mode = run%bparam%load_mode
 quiet_start = run%bparam%quiet_start
 beamlet_size = run%bparam%beamlet_size
+
+! Fewer beamlets in a slice of little charge is a rule about the noise, so it acts only
+! where the noise is imposed on beamlets this loader makes (docs/shot-noise.md).
+
+beamlet_min_electrons = 0
+if (run%bparam%shot_noise .and. run%bparam%quiet_start) beamlet_min_electrons = run%bparam%beamlet_min_electrons
 shot_noise = run%bparam%shot_noise
 gen_test_weights = run%bparam%gen_test_weights
 resample_split_weights = run%bparam%resample_split_weights
@@ -243,7 +250,8 @@ real(rp) spacing_gen, zlen_gen, s_i, q_slice, zbunch_gen, slip_gen, s_und
 real(rp), allocatable :: eslip(:), lcorr(:)
 integer ncenter_gen, n_head_gen, s_int, s_chic
 logical serr
-integer ib, im, ip, mbase, is_g, nslice_gen, n_clamp, rule, rule_seen, n_group_w
+type (fel_noise_tally_struct) tally
+integer ib, im, ip, mbase, is_g, nslice_gen, rule, rule_seen, n_group_w, mb_s, n_s
 integer, allocatable :: group_w(:)
 logical flat_z
 character(*), parameter :: r_name = 'generate_initial_state'
@@ -443,14 +451,23 @@ eg_x = beam_init%a_norm_emit / p0_mc  ! Normalized emittance to geometric.
 eg_y = beam_init%b_norm_emit / p0_mc
 
 allocate (theta_work(npart_gen), beta_work(npart_gen))
-n_clamp = 0;  rule_seen = 0
+rule_seen = 0
 nl_min = huge(1.0_rp); nl_max = 0; neff_min = huge(1.0_rp); neff_max = 0; floor_max = 0
 
 do is_g = 1, nslice_gen
   sl => fbeam%slice(is_g)
-  call fel_slice_reallocate (sl, npart_gen)
-  sl%n = npart_gen
-  w_part = cur_gen(is_g) * fbeam%slice_spacing / (c_light * npart_gen)
+
+  ! The slice's beamlets, mb_s, and its particles, n_s. They are the input file's counts
+  ! unless the slice holds too few electrons for them (fel_beamlet_count). The weight
+  ! follows, so the slice's charge is the same either way.
+
+  mb_s = mbase
+  if (quiet_start) mb_s = fel_beamlet_count (cur_gen(is_g) * fbeam%slice_spacing / (c_light * e_charge), &
+                                             mbase, beamlet_min_electrons)
+  n_s = merge(mb_s * beamlet_size, npart_gen, quiet_start)
+  call fel_slice_reallocate (sl, n_s)
+  sl%n = n_s
+  w_part = cur_gen(is_g) * fbeam%slice_spacing / (c_light * n_s)
 
   ! Quiet start: mbase base samples, each replicated at beamlet_size equally spaced
   ! ponderomotive phases. theta0 is spread on a uniform grid within one beamlet spacing.
@@ -464,7 +481,7 @@ do is_g = 1, nslice_gen
   ! harmonic, as a real bunch does. mbase then counts particles and not beamlets.
 
   ip = 0
-  do ib = 1, merge(mbase, npart_gen, quiet_start)
+  do ib = 1, merge(mb_s, npart_gen, quiet_start)
     call ran_gauss (u);  call ran_gauss (v)
     x  = sqrt(eg_x * tw_beta_x) * u
     xp = sqrt(eg_x / tw_beta_x) * (v - tw_alpha_x * u)
@@ -479,7 +496,7 @@ do is_g = 1, nslice_gen
     pz = (p_mc - p0_mc) / p0_mc
 
     if (quiet_start) then
-      theta0 = (ib - 0.5_rp) * twopi / (beamlet_size * mbase)
+      theta0 = (ib - 0.5_rp) * twopi / (beamlet_size * mb_s)
       do im = 0, beamlet_size - 1
         ip = ip + 1
         theta_work(ip) = theta0 + im * twopi / beamlet_size
@@ -505,10 +522,11 @@ do is_g = 1, nslice_gen
   ! charge is preserved, and the weight is uniform within each beamlet so the quiet
   ! cancellation is untouched. This exercises every weighted-noise path. A slice-uniform
   ! electron count used where the beamlet's charge belongs would mis-set <|b|^2> by 56
-  ! percent ((0.25^2 + 1.75^2)/2 = 1.56).
+  ! percent ((0.25^2 + 1.75^2)/2 = 1.56). The beamlets are weighted in pairs, so a slice
+  ! with an odd count leaves its last beamlet at the mean weight.
 
   if (gen_test_weights) then
-    do ib = 1, mbase
+    do ib = 1, 2 * (mb_s / 2)
       sl%weight((ib-1)*beamlet_size+1 : ib*beamlet_size) = &
               sl%weight((ib-1)*beamlet_size+1 : ib*beamlet_size) * (1 + 0.75_rp * (-1)**ib)
     enddo
@@ -517,8 +535,8 @@ do is_g = 1, nslice_gen
   ! Noise bookkeeping per slice (fel-physics.md sec-noise): real electrons
   ! N_lambda = charge/e, and effective macroparticle number N_eff = (sum w)^2/sum w^2.
 
-  wsum = sum(sl%weight(1:npart_gen))
-  w2sum = sum(sl%weight(1:npart_gen)**2)
+  wsum = sum(sl%weight(1:n_s))
+  w2sum = sum(sl%weight(1:n_s)**2)
   n_lambda = wsum / e_charge
   n_eff = wsum**2 / w2sum
   nl_min = min(nl_min, n_lambda);  nl_max = max(nl_max, n_lambda)
@@ -533,17 +551,18 @@ do is_g = 1, nslice_gen
     ! noise. The groups here are beamlets, so fel_fawley_noise runs unchanged. Its draw
     ! order is two ran_uniform per harmonic per beamlet, which the recorded levels assume.
 
-    call fel_impose_noise (sl, theta_work, npart_gen, quiet_start, beamlet_size, grid_half_width, &
-                           grid_n_pts, is_g, n_clamp, rule, floor_nl, err_flag)
+    call fel_impose_noise (sl, theta_work, n_s, quiet_start, beamlet_size, grid_half_width, &
+                           grid_n_pts, is_g, tally, rule, floor_nl, err_flag)
     if (err_flag) return
     rule_seen = max(rule_seen, rule)
     floor_max = max(floor_max, floor_nl)
+    if (mb_s < mbase) tally%n_slice_thin = tally%n_slice_thin + 1
   endif
 
   ! The slice's independent transverse samples: the beamlets, or every particle alone.
 
   if (quiet_start) then
-    sl%m_ind = fel_m_ind (sl, beamlet_groups(npart_gen, beamlet_size), mbase)
+    sl%m_ind = fel_m_ind (sl, beamlet_groups(n_s, beamlet_size), mb_s)
   else
     call fel_transverse_groups (sl, group_w, n_group_w)
     sl%m_ind = fel_m_ind (sl, group_w, n_group_w)
@@ -551,7 +570,7 @@ do is_g = 1, nslice_gen
 
   ! To the stored chart: z = beta*theta/ks with phi0 = 0, beta of the base sample.
 
-  do ip = 1, npart_gen
+  do ip = 1, n_s
     sl%z(ip) = beta_work(ip) * theta_work(ip) / ks_l
   enddo
 enddo
@@ -559,16 +578,14 @@ enddo
 deallocate (theta_work, beta_work)
 
 if (shot_noise) then
-  call fel_report_noise (rule_seen, floor_max, nslice_gen)
+  if (quiet_start) then
+    call fel_report_noise (rule_seen, floor_max, tally, beamlet_min_electrons)
+  else
+    call fel_report_noise (rule_seen, floor_max, tally)
+  endif
   call out_io (s_info$, r_name, '  N_lambda per slice: \es10.3\ to \es10.3\ ', &
                '  N_eff per slice:    \es10.3\ to \es10.3\ ', &
                r_array = [nl_min, nl_max, neff_min, neff_max])
-  if (n_clamp > 0) then
-    call out_io (s_warn$, r_name, '\i0\ beamlet draws had fewer than one real electron', &
-                 '(nbl clamped to 1, as Genesis does silently). The noise level in those', &
-                 'beamlets is not physical; use fewer macroparticles or more charge.', &
-                 i_array = [n_clamp])
-  endif
 endif
 
 end subroutine generate_initial_state
@@ -718,6 +735,7 @@ if (.not. resample%use_beam_init) then
   resample%n_particle_per_slice = beam_init%n_particle
   resample%beamlet_size = beamlet_size
 endif
+resample%beamlet_min_electrons = beamlet_min_electrons
 
 call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, resample, quiet_start, shot_noise, &
                        grid_half_width, grid_n_pts, fbeam, err_i, moments)
@@ -725,7 +743,7 @@ if (err_i) then
   err_flag = .true.;  return
 endif
 call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
-             i_array = [size(fbeam%slice), resample%n_particle_per_slice])
+             i_array = [size(fbeam%slice), maxval(fbeam%slice%n)])
 
 ! The RNG-free outputs the exactness checks read (the analysis moments and the
 ! per-slice current profile) go to a file and not stdout. stdout is for humans, and
@@ -846,7 +864,8 @@ real(rp), allocatable :: s_k(:)
 real(rp) p0_mc, p_mc, gam, beta_p, ks_l, spacing_k, smin, ttotal, offset, theta0, w_copy
 real(rp) floor_max, wsum
 integer, allocatable :: isl(:), nfill(:), group_w(:)
-integer nalive, nslice_k, ncopy, ip, i, is_g, im, n_out, n_clamp, rule_seen, n_group_w
+type (fel_noise_tally_struct) tally
+integer nalive, nslice_k, ncopy, ip, i, is_g, im, n_out, rule_seen, n_group_w
 logical err_i
 character(*), parameter :: r_name = 'keep_initial_state'
 
@@ -1004,7 +1023,7 @@ enddo
 ! The noise routine gets the input file's beamlet_size, since that sets the harmonics resolved
 ! and the floor swept. This holds whether or not the load made beamlets of that size.
 
-n_clamp = 0;  rule_seen = 0;  floor_max = 0
+rule_seen = 0;  floor_max = 0
 do is_g = 1, nslice_k
   sl => fbeam%slice(is_g)
   if (sl%n == 0) then
@@ -1013,7 +1032,7 @@ do is_g = 1, nslice_k
   endif
   wsum = sum(sl%weight(1:sl%n))
   if (shot_noise .and. wsum > 0) then
-    call keep_impose_on_slice (sl, is_g, p0_mc, ks_l, beamlet_size, n_clamp, rule_seen, floor_max)
+    call keep_impose_on_slice (sl, is_g, p0_mc, ks_l, beamlet_size, tally, rule_seen, floor_max)
     if (err_flag) return
   endif
   if (quiet_start) then
@@ -1024,13 +1043,7 @@ do is_g = 1, nslice_k
   endif
 enddo
 
-if (shot_noise) then
-  call fel_report_noise (rule_seen, floor_max, nslice_k)
-  if (n_clamp > 0) then
-    call out_io (s_warn$, r_name, '\i0\ noise groups had fewer than one real electron (nbl clamped to 1);', &
-                 'the noise level there is not physical.', i_array = [n_clamp])
-  endif
-endif
+if (shot_noise) call fel_report_noise (rule_seen, floor_max, tally)
 
 call out_io (s_info$, r_name, 'Kept \i0\ particles as \i0\ macroparticles in \i0\ slices.', &
              i_array = [nalive - n_out, sum(nfill) * ncopy, nslice_k])
@@ -1043,7 +1056,7 @@ end subroutine keep_initial_state
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine keep_impose_on_slice (sl, is_g, p0_mc, ks_l, nbins, n_clamp, rule_seen, floor_max)
+! Subroutine keep_impose_on_slice (sl, is_g, p0_mc, ks_l, nbins, tally, rule_seen, floor_max)
 !
 ! Routine to impose the shot noise on one kept slice. The phases come back out of the
 ! stored z chart, and the noise is imposed on the groups the load has. The phases then
@@ -1051,11 +1064,12 @@ end subroutine keep_initial_state
 ! round trip is exact to roundoff.
 !-
 
-subroutine keep_impose_on_slice (sl, is_g, p0_mc, ks_l, nbins, n_clamp, rule_seen, floor_max)
+subroutine keep_impose_on_slice (sl, is_g, p0_mc, ks_l, nbins, tally, rule_seen, floor_max)
 
 type (fel_slice_struct) sl
+type (fel_noise_tally_struct) tally
 real(rp) p0_mc, ks_l, floor_max
-integer is_g, nbins, n_clamp, rule_seen
+integer is_g, nbins, rule_seen
 
 real(rp), allocatable :: theta_k(:), beta_k(:)
 real(rp) floor_nl, pm
@@ -1070,7 +1084,7 @@ do k = 1, sl%n
   theta_k(k) = sl%z(k) * ks_l / beta_k(k)
 enddo
 call fel_impose_noise (sl, theta_k, sl%n, quiet_start, nbins, grid_half_width, grid_n_pts, &
-                       is_g, n_clamp, rule, floor_nl, err_flag)
+                       is_g, tally, rule, floor_nl, err_flag)
 if (err_flag) return
 rule_seen = max(rule_seen, rule)
 floor_max = max(floor_max, floor_nl)

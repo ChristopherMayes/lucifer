@@ -230,7 +230,7 @@ call add ('beam', 'z_min', key_real$, 'm', 'z min', &
 call add ('beam', 'z_max', key_real$, 'm', 'z max', &
       'The flat profile''s upper z bound, read under grid only.')
 call add ('beam', 'load_mode', key_string$, '', 'load mode', &
-      'How the bunch becomes slices: sample, the same count in every slice with weights from the ' // &
+      'How the bunch becomes slices: sample, n_particle in a slice with weights from the ' // &
       'slice charge, or keep, every particle kept with the counts following the charge.', &
       allowed = [character(16) :: 'sample', 'keep'])
 call add ('beam', 'quiet_start', key_logical$, '', 'quiet start', &
@@ -239,6 +239,9 @@ call add ('beam', 'beamlet_size', key_int$, '', 'beamlet size', &
       'Copies per beamlet, and the harmonics the noise resolves.', lo = 1.0_rp)
 call add ('beam', 'shot_noise', key_logical$, '', 'shot noise', &
       'Impose the physical noise on the load''s groups. Time-dependent windows only.')
+call add ('beam', 'beamlet_min_electrons', key_real$, 'electrons', 'beamlet electrons', &
+      'Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice ' // &
+      'with too little charge is loaded with fewer beamlets. 0 gives every slice n_particle.', lo = 0.0_rp)
 call add ('beam', 'write_genesis_dist', key_path$, '', 'genesis distribution', &
       'Write the bunch as a Genesis4 importdistribution file.')
 call add ('beam', 'write_openpmd_file', key_path$, '', 'openPMD bunch', &
@@ -580,6 +583,7 @@ case ('beam.load_mode');                   call put (run%bparam%load_mode)
 case ('beam.quiet_start');                 run%bparam%quiet_start = lv
 case ('beam.beamlet_size');                run%bparam%beamlet_size = iv
 case ('beam.shot_noise');                  run%bparam%shot_noise = lv
+case ('beam.beamlet_min_electrons');       run%bparam%beamlet_min_electrons = rv
 case ('beam.write_genesis_dist');          call put (run%bparam%write_genesis_dist)
 case ('beam.write_openpmd_file');          call put (run%bparam%write_openpmd_file)
 case ('beam.split_weights');               run%bparam%split_weights = lv
@@ -944,6 +948,7 @@ case ('beam.load_mode');                   sv = run%bparam%load_mode
 case ('beam.quiet_start');                 lv = run%bparam%quiet_start
 case ('beam.beamlet_size');                iv = run%bparam%beamlet_size
 case ('beam.shot_noise');                  lv = run%bparam%shot_noise
+case ('beam.beamlet_min_electrons');       rv = run%bparam%beamlet_min_electrons
 case ('beam.write_genesis_dist');          sv = run%bparam%write_genesis_dist
 case ('beam.write_openpmd_file');          sv = run%bparam%write_openpmd_file
 case ('beam.split_weights');               lv = run%bparam%split_weights

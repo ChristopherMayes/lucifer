@@ -89,6 +89,7 @@ COHERENT = '  run.source_model = "coherent"\n'
 
 SASE_B = """  beamlet_size = 8
   shot_noise = T
+  beam.beamlet_min_electrons = 0
   beam.z_distribution = "GRID"
   beam.z_min = -1.6e-9
   beam.z_max = 1.6e-9
@@ -194,7 +195,7 @@ def main():
 
     (wd / "cohshort.bmad").write_text(LAT.replace("l = 3.96,", "l = 0.90,"))
     IMP = ('  beam.position_file = "beam0.h5"\n  beam.n_particle = 2048\n  beamlet_size = 4\n'
-           '  shot_noise = T\n  beam.resample.n_slice = 0\n  beam.resample.slice_width = 0.05\n')
+           '  shot_noise = T\n  beam.beamlet_min_electrons = 0\n  beam.resample.n_slice = 0\n  beam.resample.slice_width = 0.05\n')
     WIN = '  window.n_wavelength = 20\n'
     run(exe, wd, "seedbeam", 200000, False, pextra='  run.load_only = T\n', sig_z='4e-9',
         bextra='  beam.resample.use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'

@@ -112,6 +112,20 @@ where the two builds agree to every printed digit.
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 2 | 4.8221e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 3 | 4.8408e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet: the loader warns of beamlets under one electron |  | same | holds |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice's charge is the charge with the key at 0 |  | same | holds |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: no beamlet is under the limit where the slice holds it |  | same | holds |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: the loader states the slices with fewer beamlets |  | same | holds |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, fewer beamlets | 1.4938e-01 | same | 1.3425e-01 to 1.6016e-01 |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, the input file's beamlets | 7.5206e-01 | same | 7.0908e-01 to 8.0375e-01 |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more: each slice's charge is the charge with the key at 0 |  | same | holds |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more: no beamlet is under the limit where the slice holds it |  | same | holds |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more: the loader states the slices with fewer beamlets |  | same | holds |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more, one beamlet, under the limit | 6.1763e-01 | same | 5.6027e-01 to 7.1029e-01 |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more, fewer beamlets | 9.0665e-01 | same | 8.4109e-01 to 9.5964e-01 |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more, the input file's beamlets | 9.2958e-01 | same | 8.7360e-01 to 1.0174e+00 |
+| shot noise, no slice with fewer beamlets: the same bits as with beam.beamlet_min_electrons = 0 |  | same | holds |
 | shot noise, keep load: the noise reported on the beamlets the loader made |  | same | holds |
 | shot noise, keep mode, beamlets of a generated bunch | 9.7811e-01 | same | 8.4595e-01 to 1.1297e+00 |
 | shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.0199e+00 | same | 7.3882e-01 to 1.2281e+00 |
@@ -143,6 +157,7 @@ where the two builds agree to every printed digit.
 | refused, a slice dump through beam.position_file |  | same | holds |
 | refused, a negative window.n_wavelength |  | same | holds |
 | in-cone startup, Gaussian bunch in sample mode | 4.3086e-02 | same | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge | 2.1414e-01 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`

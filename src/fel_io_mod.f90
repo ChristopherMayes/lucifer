@@ -752,7 +752,7 @@ endif
 
 block
   real(rp) n_pstep, n_gpt, secs
-  integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise
+  integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise, n_load
   character(16) backend
   character(64) ramp_str
 
@@ -856,10 +856,24 @@ block
   ! slice in 128 beamlets. Below it, the mode power in the exponential regime rises on
   ! its own (docs/fel-physics.md sec-convergence).
 
-  nbeamlet = minval(run%fbeam%slice%n) / max(1, run%bparam%beamlet_size)
-  write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', minval(run%fbeam%slice%n), &
-        ' macroparticles in the thinnest slice, beamlets of ', run%bparam%beamlet_size, &
-        ', ', nbeamlet, ' beamlets.'
+  !
+  ! The sample mode gives a slice of little charge fewer beamlets on purpose
+  ! (fel_beamlet_count), and every other slice the input file's count. So there the load
+  ! is judged on that count, the largest, and the fewest is stated beside it.
+
+  n_load = minval(run%fbeam%slice%n)
+  if (run%bparam%load_mode == 'sample' .and. run%bparam%beam_file == '') n_load = maxval(run%fbeam%slice%n)
+  nbeamlet = n_load / max(1, run%bparam%beamlet_size)
+  if (n_load == minval(run%fbeam%slice%n)) then
+    write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', n_load, &
+          ' macroparticles in the thinnest slice, beamlets of ', run%bparam%beamlet_size, &
+          ', ', nbeamlet, ' beamlets.'
+  else
+    write (line, '(a, i0, a, i0, a, i0, a, i0, a)') ' Load        ', n_load, &
+          ' macroparticles in a slice, beamlets of ', run%bparam%beamlet_size, &
+          ', ', nbeamlet, ' beamlets. The slices of little charge have fewer, down to ', &
+          minval(run%fbeam%slice%n) / max(1, run%bparam%beamlet_size), '.'
+  endif
   call out_io (s_blank$, r_name, trim(line))
 
   if (.not. run%global%source_filter) then
@@ -868,7 +882,7 @@ block
     call out_io (s_blank$, r_name, '             between machines. The two tests are a run at twice ' // &
           'this load and the')
     call out_io (s_blank$, r_name, '             convergence report in this run''s footer.')
-  else if (minval(run%fbeam%slice%n) >= 1024 .and. nbeamlet >= 128) then
+  else if (n_load >= 1024 .and. nbeamlet >= 128) then
     call out_io (s_blank$, r_name, '             This load is the one the filter''s convergence ' // &
           'was measured on (fel-physics.md).')
   else
@@ -1066,7 +1080,8 @@ character(400) line
 character(*), parameter :: r_name = 'lucifer'
 type (fel_convergence_struct) cvg
 integer ir, ih, n_listed, is, n_thin, n_shown, nbl, ie, nrec
-real(rp) pow, ene, bun, pul, worst, secs, ratio_s
+real(rp) pow, ene, bun, pul, worst, secs, ratio_s, e_thin
+logical few
 character(8) hsuf
 character(16) backend
 character(420) root, dname
@@ -1137,6 +1152,14 @@ if (cvg%ok) then
   ! window. A tail under the floor of 128 beamlets, or whose light is mostly wide angle,
   ! disappears into it. This is for an imported beam with irregular counts per slice.
   ! load_mode = "sample" levels it.
+  !
+  ! A slice with fewer electrons than 128 beamlets may stand for is not thin by its count.
+  ! The sample mode loads such a slice with fewer beamlets on purpose (fel_beamlet_count),
+  ! and no load of it has more samples than electrons. e_thin is that electron count.
+
+  e_thin = 128
+  if (run%bparam%load_mode == 'sample' .and. run%bparam%shot_noise .and. run%bparam%quiet_start) &
+        e_thin = 128 * max(1.0_rp, run%bparam%beamlet_min_electrons)
 
   n_thin = 0;  n_shown = 0
   do is = 1, min(stats%nslice, size(run%fbeam%slice))
@@ -1151,7 +1174,8 @@ if (cvg%ok) then
     if (stats%f_angles_valid(is, cvg%ir(1)) == 1 .and. stats%f_p_in(is, cvg%ir(1)) > 0) &
           ratio_s = max(0.0_rp, stats%f_power(is, cvg%ir(1)) - stats%f_p_in(is, cvg%ir(1))) / &
                     stats%f_p_in(is, cvg%ir(1))
-    if (nbl >= 128 .and. ratio_s <= 0.1_rp) cycle
+    few = (nbl < 128 .and. stats%charge_live(is, cvg%ir(1)) >= e_thin * e_charge)
+    if (.not. few .and. ratio_s <= 0.1_rp) cycle
     n_thin = n_thin + 1
     if (n_shown >= n_thin_max$) cycle
     if (n_shown == 0) call out_io (s_blank$, r_name, '             Thin slices at the mode ' // &
@@ -1168,7 +1192,7 @@ if (cvg%ok) then
     call out_io (s_blank$, r_name, trim(line))
   endif
   if (n_thin > 0) call out_io (s_blank$, r_name, '             Possible solution: ' // &
-        'load_mode = "sample", which draws the same number of beamlets in every slice.')
+        'load_mode = "sample", which loads a slice from beam.n_particle and not from the bunch''s counts.')
 endif
 
 ! Where the time went, one row per phase the run entered. The phases partition the

@@ -9,6 +9,28 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-10 Changed: under `shot_noise` the sample mode loads a slice of little charge with fewer
+  beamlets, so that no beamlet stands for less than `beam.beamlet_min_electrons` electrons, 1 by
+  default ([](shot-noise.md#shot-fewer)). A slice of N electrons has `min(n_particle/beamlet_size,
+  max(1, floor(N/beamlet_min_electrons)))` beamlets and keeps its charge. Before, every slice had
+  `beam.n_particle` macroparticles, and a beamlet under one electron was kicked as one electron:
+  a slice of 6 electrons over 128 beamlets started with 0.008 of its shot-noise power, and now
+  starts with 0.161. Both FLASH1 inputs warned on every run that about a sixth of their beamlet
+  draws held under one electron. FLASH1 now loads 146 of its 351 slices with fewer beamlets, tracks
+  880832 macroparticles where it tracked 1437696, and prints no warning. Its exit pulse energy
+  over six seeds is 49.9 +- 1.9 uJ against 48.2 +- 2.7 uJ before. A run with such a slice is a
+  different shot at the same `ran_seed`, since the random numbers after that slice differ, and a
+  load with none is the same bits as before. `beam.beamlet_min_electrons = 0` gives every slice
+  `beam.n_particle` macroparticles again, which the checks that compare a load with Genesis4 set.
+  The keep mode is unchanged. The load's report states the noise power loaded over the shot-noise
+  power of the window, the slices with fewer beamlets and the slices of less than one electron.
+  The warning `<count> beamlet draws had fewer than one real electron` is replaced by one that
+  states the slices that hold one electron or more and have a group under one, their share of
+  the charge and the noise power loaded in them. The footer no longer lists a slice as thin for
+  its beamlet count when it holds fewer than 128 electrons. The FP32 check's residual guard is
+  read on the slices of 256 particles or more, since a slice of one beamlet has one sample of the
+  phase increment and FLASH1 was refused under `run.fp32_check = "lockstep"` at 13.5 ulps.
+
 - 2026-11-03 Added: a research prototype of a spectral field propagator, `field.propagator =
   "spectral"`, outside the keystone and recorded on `docs/spectral-field.md`. `fel_spectral_mod`
   transforms a member's whole window in (x, y, tau), diffracts each mode at its own wavenumber

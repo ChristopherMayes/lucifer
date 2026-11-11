@@ -5,7 +5,7 @@ short_title: Shot-noise load
 
 A SASE run starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at random phases have a mean square bunching of $1/N$. Lucifer makes the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice) before tracking begins. That is the [load](glossary.md#gl-load), and the code that makes it is the loader. The load is made quiet first, in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases that have no bunching ([quiet start](glossary.md#gl-quiet-start)). The loader then imposes the shot noise by Fawley's algorithm ([](references.md#ref-fawley)), which shifts every phase by a small random amount, the [kick](glossary.md#gl-kick-noise). The algorithm is exact to first order in the size of the kick. This page derives what the kick imposes to every order, in closed form, as a function of the number of real electrons one beamlet stands for.
 
-The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. The ratio is $1 - 2/N$ to first order for one harmonic, and it is 1 when a beamlet holds many electrons. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. The load is held to the closed form by `check_shot_noise.py` at five electron counts ([](#shot-measured)).
+The result is one number per harmonic, the ratio $R_h(N)$ of the noise power the load imposes to the shot-noise power of the real beam. The ratio is $1 - 2/N$ to first order for one harmonic, and it is 1 when a beamlet holds many electrons. It is 0.95 at 50 electrons a beamlet and 0.16 at one electron. The load is held to the closed form by `check_shot_noise.py` at five electron counts ([](#shot-measured)). A slice of little charge is loaded with fewer beamlets, so that none stands for less than one electron ([](#shot-fewer)).
 
 The page uses the FEL quantities of [](fel-physics.md) and the words of the [glossary](glossary.md). The load itself, its switches and its grouping rules are in [](fel-physics.md#sec-noise).
 
@@ -208,13 +208,7 @@ with $N_g$ the electrons of beamlet $g$. The beamlets are kicked independently, 
 (shot-clamp)=
 ## Below one electron
 
-A beamlet may stand for less than one electron. The tail slice of [](#shot-counts) is such a load: 6 electrons over 128 beamlets. The kick of [](#eq-shot-kick) at $N < 1$ would be larger than at one electron. The loader sets $N$ to 1 in the kick when it is below 1, counts the draws and warns:
-
-```
-<count> beamlet draws had fewer than one real electron
-(nbl clamped to 1, as Genesis does silently). The noise level in those
-beamlets is not physical; use fewer macroparticles or more charge.
-```
+A beamlet may stand for less than one electron. The tail slice of [](#shot-counts) is such a load when it is given the beamlets of every other slice: 6 electrons over 128 beamlets. The kick of [](#eq-shot-kick) at $N < 1$ would be larger than at one electron. The loader sets $N$ to 1 in the kick when it is below 1.
 
 The beamlet's bunching is then the bunching at one electron, $\langle|b_h|^2\rangle = R_h(1)$, whatever its charge. A slice of such beamlets has
 
@@ -224,16 +218,53 @@ $$ (eq-shot-clamp)
 
 $R_1(1)$ is 0.161 for the default beamlet. The tail slice above, at 0.049 of an electron a beamlet, starts with 0.008 of its shot-noise power. A real slice of 6 electrons has $\langle|b|^2\rangle = 1/6$. The loaded slice has $0.161/128 = 0.0013$.
 
+Three loads have such a beamlet. The first is a slice that holds less than one electron in all, which has one beamlet under any rule. The second is the keep mode, where a group is a particle of the bunch and its copies, and the bunch's own weights decide. The third is the sample mode with `beam.beamlet_min_electrons = 0`, which gives every slice the same beamlets. The load's report counts the slices of the first kind. It warns of the slices that hold one electron or more and have a group under one, with their share of the charge and the noise power they are loaded with by [](#eq-shot-slice):
+
+```
+<count> slices have a noise group of less than one real electron.
+They hold <share> of the charge that carries noise, and the noise power loaded
+in them is <ratio> of their shot-noise power at the fundamental.
+```
+
 The loader also takes a kick $a_k$ above $2\pi$ modulo $2\pi$. At one electron that is $e^{-\pi^2} = 5\times10^{-5}$ of the draws at the fundamental, and fewer at every larger count. The closed form leaves it out.
 
 :::{dropdown} Genesis4 source
 `fel_fawley_noise` is transcribed from [`ShotNoise::applyShotNoise`](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/Loading/ShotNoise.cpp#L34), with the electron count of the kick taken from the group's own charge. Genesis4 sets $N$ to 1 below one electron without a message ([line 47](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/Loading/ShotNoise.cpp#L47)), which the warning's text refers to. The closed forms of this page are derived here and have no Genesis4 original.
 :::
 
+(shot-fewer)=
+## Fewer beamlets in a slice of little charge
+
+In the sample mode the loader does not give every slice $n_p/M$ beamlets. A slice of $N_\lambda$ electrons is loaded with
+
+$$
+  n_b = \min\!\left(\frac{n_p}{M},\ \max\!\left(1,\ \left\lfloor \frac{N_\lambda}{N_{\min}} \right\rfloor\right)\right)
+$$ (eq-shot-fewer)
+
+beamlets, where $N_{\min}$ is `beam.beamlet_min_electrons`. The slice keeps its charge: the weight of a macroparticle is the slice charge over $n_b M$. A slice of $N_{\min}$ electrons or more then has no beamlet under $N_{\min}$ electrons. A slice of fewer has one beamlet. The routine is `fel_beamlet_count`. The generator draws $n_b$ base samples for the slice. The [resampler](glossary.md#gl-resampler) reduces the slice's candidates to $n_b$ seeds by the random deletion that reduces them to $n_p/M$. The rule is about the noise, so it acts where `shot_noise` and the quiet start are both set. The keep mode is outside it, since that mode keeps every particle of the bunch.
+
+The default is $N_{\min} = 1$: a slice is loaded with no more beamlets than it has electrons. The tail slice of [](#shot-counts), 6 electrons, has 6 beamlets of one electron and starts with 0.161 of its shot-noise power. Over 128 beamlets it started with 0.008.
+
+A larger $N_{\min}$ raises the level in the slices it acts on, to 0.56 at 4 electrons, 0.87 at 18 and 0.95 at 50. It also acts on more slices. The worked core slice of [](#shot-counts) holds 6246 electrons. $N_{\min} = 18$ takes beamlets from it at 348 beamlets or more, 2784 macroparticles a slice, and $N_{\min} = 50$ at 125 beamlets or more, which the slice's own 128 already exceed. At $N_{\min} = 1$ a slice loses beamlets only when it was given more of them than it has electrons. Three machines were loaded with `run.load_only` at each value on 2026-11-10. The sase example, at 0.1 nm, holds 73.2 electrons a beamlet in every slice and LCLS 1250 at its peak, and neither has a slice under 50 electrons a beamlet. FLASH1 is a Gaussian bunch in a [window](glossary.md#gl-window) with slippage headroom, 351 slices of 512 beamlets:
+
+| $N_{\min}$ | slices with fewer beamlets | their share of the charge | macroparticles | loaded power over shot-noise power, window |
+|---|---|---|---|---|
+| 0 | 0 | 0 | 1437696 | 0.9995 |
+| 1 | 146 | 1.0e-5 | 880832 | 0.9995 |
+| 4 | 162 | 4.7e-5 | 821904 | 0.9995 |
+| 18 | 180 | 2.3e-4 | 752544 | 0.9995 |
+| 50 | 192 | 6.2e-4 | 701472 | 0.9996 |
+
+FLASH1 was then tracked at six seeds for each value. The exit pulse energy, as the mean and its standard error, is 48.2 ± 2.7 µJ at 0, 49.9 ± 1.9 µJ at 1, 48.8 ± 2.0 µJ at 4, 48.2 ± 1.5 µJ at 18 and 45.4 ± 1.5 µJ at 50. The values differ by less than the shots do, since the slices the rule acts on hold 1e-5 to 6e-4 of the charge. The run at 1 tracks 0.61 of the macroparticles of the run at 0 and took 19 s where that run took 23 s. The sase example is the same bits at every value up to 50. A Gaussian bunch of 3 kA at its peak was tracked through one undulator at twelve seeds, the load of [](validation.md#val-shot-noise-under-weights) with 52 of its 85 slices reduced at the default. Its start-up power inside the mode's angle is 0.99 ± 0.06 of the flat window's at 0 and 0.98 ± 0.04 at 1. The measurements therefore do not choose among the values. The default is the one value that takes a beamlet from a slice only when the slice has no electron for it.
+
+A slice with fewer beamlets has fewer samples of the transverse distribution and of the energy spread: $n_b$ draws where the other slices have $n_p/M$. A slice of one beamlet is a point in the transverse plane with one energy. At the default the slice has one sample for each electron it holds, which is what the real slice has. The header's `Load` line states the beamlets of a slice that was not reduced and the fewest any slice has. The [device](glossary.md#gl-device) and the [FP32](glossary.md#gl-fp32) [twin](glossary.md#gl-twin) take each slice's own count, and the twin's residual guard is read on the slices of 256 particles or more ([](performance.md)). The random numbers of the slices after the first reduced slice are not those of a load with the key at 0, so the two are different shots at one `ran_seed`. A load in which no slice is reduced is the same bits either way.
+
+With `beam.beamlet_min_electrons = 0` every slice has $n_p/M$ beamlets, as in Genesis4. The [tiers](glossary.md#gl-tier) of the [validation suite](glossary.md#gl-validation-suite) that compare a load with Genesis4's set it.
+
 (shot-measured)=
 ## The load, measured against the closed form
 
-`check_shot_noise.py` loads a uniform bunch of 256 slices with 15 seeds and reads the bunching of every slice at harmonics 1 to 3 from the particle dump. It runs at 146, 50, 18 and 4 electrons a beamlet and at a quarter of an electron, each with uniform weights and with beamlet weights alternating between 0.25 and 1.75 of the mean. The mean of $|b_h|^2 N_\lambda$ over the samples is held to [](#eq-shot-slice) within five standard deviations of the mean. The check runs in every pass of the [validation suite](glossary.md#gl-validation-suite), and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio).
+`check_shot_noise.py` loads a uniform bunch of 256 slices with 15 seeds and reads the bunching of every slice at harmonics 1 to 3 from the particle dump. It runs at 146, 50, 18 and 4 electrons a beamlet and at a quarter of an electron, each with uniform weights and with beamlet weights alternating between 0.25 and 1.75 of the mean. The mean of $|b_h|^2 N_\lambda$ over the samples is held to [](#eq-shot-slice) within five standard deviations of the mean. These loads set `beam.beamlet_min_electrons = 0`, so that a beamlet holds the count stated. A Gaussian bunch whose last slices hold two electrons is then loaded at the default and at $N_{\min} = 18$. Each slice is held to the charge it has with the key at 0 and to the beamlets of [](#eq-shot-fewer), and the slices with fewer beamlets to the closed form at the electrons their beamlets hold. The check runs in every pass of the [validation suite](glossary.md#gl-validation-suite), and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio).
 
 (shot-scope)=
 ## Scope

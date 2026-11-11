@@ -153,13 +153,15 @@ class Beam:
     z_max: float = 0.0
     """The flat profile's upper z bound, read under grid only. [m]"""
     load_mode: Literal['sample', 'keep'] = 'sample'
-    """How the bunch becomes slices: sample, the same count in every slice with weights from the slice charge, or keep, every particle kept with the counts following the charge."""
+    """How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, or keep, every particle kept with the counts following the charge."""
     quiet_start: bool = True
     """Load beamlets of beamlet_size phase copies, quiet below that harmonic."""
     beamlet_size: int = 8
     """Copies per beamlet, and the harmonics the noise resolves. Bounds: from 1."""
     shot_noise: bool = False
     """Impose the physical noise on the load's groups. Time-dependent windows only."""
+    beamlet_min_electrons: float = 1.0
+    """Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice with too little charge is loaded with fewer beamlets. 0 gives every slice n_particle. [electrons] Bounds: from 0.0."""
     write_genesis_dist: str = ''
     """Write the bunch as a Genesis4 importdistribution file."""
     write_openpmd_file: str = ''

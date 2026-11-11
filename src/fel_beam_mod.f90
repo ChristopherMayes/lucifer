@@ -122,6 +122,29 @@ type fel_beam_struct
                                    !   injects K/gamma of spurious px.
 end type
 
+!+
+! Struct fel_noise_tally_struct
+!
+! What a load's shot noise amounts to, summed over the slices fel_impose_noise has seen
+! (docs/shot-noise.md). A group of N electrons loads R(N) of its shot-noise power
+! (fel_shot_ratio), so a slice loads sum_g N_g R(N_g) against its own N_lambda. The low
+! sums are over the slices that hold one electron or more and have a group under one.
+! A slice that holds less than one electron in all is counted apart, since no load of
+! it has a physical level.
+!-
+
+type fel_noise_tally_struct
+  real(rp) :: n_electron = 0       ! Electrons in the slices that carry noise.
+  real(rp) :: power = 0            ! sum_g N_g R(N_g) over them, at the fundamental.
+  real(rp) :: n_electron_low = 0   ! Electrons in the slices with a group under one electron.
+  real(rp) :: power_low = 0        ! sum_g N_g R(N_g) over those slices.
+  integer :: n_slice = 0           ! Slices that carry noise.
+  integer :: n_slice_low = 0       ! Slices of one electron or more with a group under one.
+  integer :: n_slice_sub = 0       ! Slices that hold less than one electron in all.
+  integer :: n_slice_thin = 0      ! Slices loaded with fewer beamlets than the input file's count.
+  integer :: n_beamlet_min = huge(1)  ! Fewest beamlets in a slice that carries noise.
+end type
+
 ! This program's metadata sits under the root group lucifer, in a subgroup named for its
 ! role (fel_private_group): frame for where a frame was taken (fel_frame_attributes),
 ! field for the slippage residual (fel_write_slippage_residual), and checkpoint for the
@@ -1427,7 +1450,7 @@ end function beamlet_groups
 !------------------------------------------------------------------------------
 !+
 ! Subroutine fel_impose_noise (sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts,
-!                              islice, n_clamp, rule, floor_n_lambda, err_flag)
+!                              islice, tally, rule, floor_n_lambda, err_flag)
 !
 ! Routine to impose physical shot noise on one slice's load, whatever made it
 ! (fel-physics.md sec-noise). Two things happen in order.
@@ -1461,16 +1484,18 @@ end function beamlet_groups
 !
 ! Output:
 !   theta(:)        -- real(rp): Phases with the noise imposed.
-!   n_clamp         -- integer: Incremented per group whose electron count was under one.
+!   tally           -- fel_noise_tally_struct: The slice's electrons and the noise power
+!                       its groups load are added to the running sums.
 !   rule            -- integer: Which grouping was used: 1 beamlets, 2 copies, 3 cells.
 !   floor_n_lambda  -- real(rp): The floor times N_lambda, for the caller's report.
 !   err_flag        -- logical: Set True if the load is too loud to carry noise.
 !-
 
 subroutine fel_impose_noise (sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts, &
-                             islice, n_clamp, rule, floor_n_lambda, err_flag)
+                             islice, tally, rule, floor_n_lambda, err_flag)
 
 type (fel_slice_struct) sl
+type (fel_noise_tally_struct) tally
 real(rp) theta(:), grid_half_width, floor_n_lambda
 integer n, beamlet_size, grid_n_pts, islice, n_clamp, rule
 logical quiet_start, err_flag
@@ -1505,10 +1530,12 @@ if (floor_b2 > 0.01_rp / n_lambda) then
 endif
 
 nharm = max(1, (beamlet_size - 1) / 2)
+n_clamp = 0
 
 if (quiet_start .and. mod(n, max(1, beamlet_size)) == 0) then
   rule = 1
   call fel_fawley_noise (theta(1:n), sl%weight(1:n), n, beamlet_size, n_clamp)
+  call fel_tally_noise (tally, sl%weight, n, beamlet_groups(n, beamlet_size), n / beamlet_size, nharm)
   err_flag = .false.
   return
 endif
@@ -1532,6 +1559,7 @@ else
 endif
 
 call fel_group_noise (theta, sl%weight, n, group, n_group, nharm, n_clamp)
+call fel_tally_noise (tally, sl%weight, n, group, n_group, nharm)
 err_flag = .false.
 
 !------------------------------------------------------------------------------
@@ -1569,23 +1597,189 @@ end subroutine fel_impose_noise
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_report_noise (rule, floor_n_lambda, nslice)
+! Function fel_beamlet_count (n_electron, n_beamlet, n_min) result (n_load)
 !
-! Routine to print, once per load, which grouping the shot noise was imposed on, and the
-! worst quiet floor found before it. A user who did not make the beamlets has no other
-! way to know what the noise was drawn on.
+! Routine to give the beamlets a slice is loaded with in the sample mode
+! (docs/shot-noise.md). A slice of little charge gets fewer, so that no beamlet stands
+! for less than n_min electrons. The kick of fel_fawley_noise loads less than the shot
+! noise of a beamlet's electrons, and far less below one electron. The slice keeps its
+! charge, so its beamlets are heavier. A slice with fewer than n_min electrons in all
+! has one beamlet.
+!
+! A slice with no charge at all keeps n_beamlet. It carries no noise and its particles
+! weigh nothing, so there is nothing to gain, and the random numbers of the slices after
+! it stay those of a load with n_min = 0.
+!
+! Input:
+!   n_electron -- real(rp): Real electrons in the slice.
+!   n_beamlet  -- integer: Beamlets a slice has in the input file, n_particle / beamlet_size.
+!   n_min      -- real(rp): Fewest electrons a beamlet may stand for. 0 or less gives
+!                  every slice n_beamlet.
+!
+! Output:
+!   n_load     -- integer: Beamlets to load, 1 to n_beamlet.
+!-
+
+function fel_beamlet_count (n_electron, n_beamlet, n_min) result (n_load)
+
+real(rp) n_electron, n_min
+integer n_beamlet, n_load
+
+!
+
+n_load = n_beamlet
+if (n_min <= 0 .or. n_electron <= 0) return
+if (n_electron < n_min * n_beamlet) n_load = max(1, floor(n_electron / n_min))
+
+end function fel_beamlet_count
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_shot_ratio (n_electron, n_copy, n_harm, harmonic) result (ratio)
+!
+! Routine to give the noise power the kick of fel_fawley_noise loads on a group, over
+! the shot-noise power of the group's electrons (docs/shot-noise.md eq-shot-rh). The
+! group is n_copy evenly spaced phases that stand for N electrons, kicked at harmonics
+! 1 to n_harm:
+!   R_h(N) = (N/M) sum_j cos(2 pi j h/M) exp(-(2 h^2/N) sum_k (1 - cos(2 pi j k/M))/k^2)
+! with j = 0 to M-1 and k = 1 to n_harm. Below one electron the kick is the kick at one
+! electron, so the ratio is N R_h(1).
+!
+! Input:
+!   n_electron -- real(rp): Real electrons the group stands for.
+!   n_copy     -- integer: Phases in the group, M.
+!   n_harm     -- integer: Harmonics kicked.
+!   harmonic   -- integer: Harmonic h the ratio is wanted at.
+!
+! Output:
+!   ratio      -- real(rp): Loaded power over shot-noise power.
+!-
+
+function fel_shot_ratio (n_electron, n_copy, n_harm, harmonic) result (ratio)
+
+real(rp) n_electron, ratio, n_kick, beta
+integer n_copy, n_harm, harmonic, j, k
+
+!
+
+ratio = 0
+if (n_electron <= 0 .or. n_copy < 1) return
+n_kick = max(n_electron, 1.0_rp)
+do j = 0, n_copy - 1
+  beta = 0
+  do k = 1, n_harm
+    beta = beta + (1 - cos(twopi * j * k / n_copy)) / real(k, rp)**2
+  enddo
+  ratio = ratio + cos(twopi * j * harmonic / n_copy) * exp(-2 * harmonic**2 * beta / n_kick)
+enddo
+ratio = n_electron * ratio / n_copy
+
+end function fel_shot_ratio
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_tally_noise (tally, weight, n, group, n_group, n_harm)
+!
+! Routine to add one slice to a load's noise tally: its electrons, and the noise power
+! its groups load at the fundamental by fel_shot_ratio. A group's phase count is its
+! member count. No random number is drawn.
+!
+! Input:
+!   tally      -- fel_noise_tally_struct: The running sums.
+!   weight(:)  -- real(rp): Macroparticle charges [C].
+!   n          -- integer: Particle count.
+!   group(:)   -- integer: Group index of each particle, 1..n_group.
+!   n_group    -- integer: Group count.
+!   n_harm     -- integer: Harmonics the noise was imposed at.
+!
+! Output:
+!   tally      -- fel_noise_tally_struct: The sums with the slice added.
+!-
+
+subroutine fel_tally_noise (tally, weight, n, group, n_group, n_harm)
+
+type (fel_noise_tally_struct) tally
+real(rp) weight(:)
+integer n, group(:), n_group, n_harm
+
+real(rp), allocatable :: wgroup(:)
+real(rp) n_slice_e, power, n_g, n_last, r_last
+integer, allocatable :: member(:)
+integer ip, ig, m_last
+logical low
+
+!
+
+allocate (wgroup(n_group), member(n_group))
+wgroup = 0;  member = 0
+do ip = 1, n
+  wgroup(group(ip)) = wgroup(group(ip)) + weight(ip)
+  member(group(ip)) = member(group(ip)) + 1
+enddo
+
+! Beamlets of one weight give the same ratio, so the last one is kept.
+
+n_slice_e = sum(wgroup) / e_charge
+power = 0;  low = .false.
+n_last = -1;  m_last = -1;  r_last = 0
+do ig = 1, n_group
+  n_g = wgroup(ig) / e_charge
+  if (n_g <= 0) cycle
+  if (n_g /= n_last .or. member(ig) /= m_last) then
+    n_last = n_g;  m_last = member(ig)
+    r_last = fel_shot_ratio (n_g, member(ig), n_harm, 1)
+  endif
+  power = power + n_g * r_last
+  if (n_g < 1) low = .true.
+enddo
+
+tally%n_slice = tally%n_slice + 1
+tally%n_electron = tally%n_electron + n_slice_e
+tally%power = tally%power + power
+tally%n_beamlet_min = min(tally%n_beamlet_min, n_group)
+if (n_slice_e < 1) then
+  tally%n_slice_sub = tally%n_slice_sub + 1
+elseif (low) then
+  tally%n_slice_low = tally%n_slice_low + 1
+  tally%n_electron_low = tally%n_electron_low + n_slice_e
+  tally%power_low = tally%power_low + power
+endif
+
+end subroutine fel_tally_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_report_noise (rule, floor_n_lambda, tally, n_min)
+!
+! Routine to print, once per load, which grouping the shot noise was imposed on, the
+! worst quiet floor found before it, and the noise power the load holds against the
+! shot noise of its electrons. A user who did not make the beamlets has no other way to
+! know what the noise was drawn on. The slices that hold one electron or more and have a
+! group under one electron are warned of, with their share of the charge and their level.
 !
 ! Input:
 !   rule           -- integer: 1 beamlets, 2 particles sharing coordinates, 3 deposit cells.
 !   floor_n_lambda -- real(rp): The worst |b|^2 N_lambda before imposing.
-!   nslice         -- integer: Slices the noise was imposed on.
+!   tally          -- fel_noise_tally_struct: The load's sums from fel_impose_noise.
+!   n_min          -- real(rp), optional: beam.beamlet_min_electrons, where the load makes
+!                      its own beamlets. The beamlet lines are printed when present.
 !-
 
-subroutine fel_report_noise (rule, floor_n_lambda, nslice)
+subroutine fel_report_noise (rule, floor_n_lambda, tally, n_min)
 
-integer rule, nslice
+type (fel_noise_tally_struct) tally
+integer rule
 real(rp) floor_n_lambda
+real(rp), optional :: n_min
+integer nl
 character(60) what
+character(200) lines(5)
 character(*), parameter :: r_name = 'fel_report_noise'
 
 !
@@ -1596,9 +1790,39 @@ case (2);     what = 'particles sharing their transverse coordinates'
 case (3);     what = 'the occupants of each deposit cell'
 case default; what = 'no group (no slice carried charge)'
 end select
-call out_io (s_info$, r_name, 'Shot noise imposed on \i0\ slices, one phasor per group, the groups being ' // &
-             trim(what) // '.', '  worst quiet floor before imposing, |b|^2 * N_lambda: \es10.2\ ', &
-             i_array = [nslice], r_array = [floor_n_lambda])
+nl = 2
+write (lines(1), '(a, i0, a)') 'Shot noise imposed on ', tally%n_slice, &
+      ' slices, one phasor per group, the groups being ' // trim(what) // '.'
+write (lines(2), '(a, es10.2)') '  worst quiet floor before imposing, |b|^2 * N_lambda: ', floor_n_lambda
+
+if (tally%n_slice > 0 .and. tally%n_electron > 0) then
+  nl = nl + 1
+  write (lines(nl), '(a, f7.4)') '  noise power loaded over the shot-noise power, fundamental: ', &
+        tally%power / tally%n_electron
+  if (present(n_min)) then
+    nl = nl + 1
+    if (n_min > 0) then
+      write (lines(nl), '(a, es9.2, a, i0, a, i0)') '  beamlets of', n_min, &
+            ' electrons or more (beam.beamlet_min_electrons): ', tally%n_slice_thin, &
+            ' slices have fewer beamlets for it, the fewest ', tally%n_beamlet_min
+    else
+      lines(nl) = '  every slice has the same beamlets (beam.beamlet_min_electrons = 0).'
+    endif
+  endif
+  if (tally%n_slice_sub > 0) then
+    nl = nl + 1
+    write (lines(nl), '(a, i0, a)') '  ', tally%n_slice_sub, ' slices hold less than one electron in all.'
+  endif
+endif
+call out_io (s_info$, r_name, lines(1:nl))
+
+if (tally%n_slice_low > 0) then
+  call out_io (s_warn$, r_name, '\i0\ slices have a noise group of less than one real electron.', &
+               'They hold \es9.2\ of the charge that carries noise, and the noise power loaded', &
+               'in them is \f7.4\ of their shot-noise power at the fundamental.', &
+               i_array = [tally%n_slice_low], &
+               r_array = [tally%n_electron_low / tally%n_electron, tally%power_low / tally%n_electron_low])
+endif
 
 end subroutine fel_report_noise
 
