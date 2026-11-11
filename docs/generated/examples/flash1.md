@@ -81,6 +81,8 @@ Two of these do not carry over from Aramis. The convergence page estimates the w
 
 The lattice carries the optics, so the bunch is generated matched to the periodic solution in the `beginning` statement, and there is no `gamma0` and no match transform. The current is derived from `bunch_charge` and `sig_z` and is never given. The window covers the bunch to four sigma either side with 990 wavelengths of slippage headroom at each end, because radiation made at the head of the bunch slips out of a shorter window before the exit. About a quarter of the slices therefore carry no charge, which is the price of holding the whole pulse.
 
+The slices away from the peak hold few electrons. Of the 351 slices, 146 hold fewer electrons than the 512 beamlets `beam.n_particle` asks for, 1.0e-5 of the bunch charge between them, and 88 of those hold less than one electron. The loader gives such a slice one beamlet for each electron and not 512 (`beam.beamlet_min_electrons`, [the shot-noise load](../../shot-noise.md#shot-fewer)), since a beamlet that stands for less than one electron is loaded with far less than its shot noise. The slice keeps its charge. The run therefore tracks 880832 macroparticles where 351 slices of 4096 are 1437696.
+
 On this input at the `ran_seed` default of 12345 the exit power summed over the window and the pulse energy are the table's. The run's own convergence report puts the power outside the split angle at well under a percent of the power inside it, so the total is the mode. With the filter off the same input file gave nearly the same power and pulse energy, with several percent of the total outside the mode. At this load the filter removes an artifact that was already small here, and the settings table above was measured without it.
 
 Leaving `grid_n_pts` and `grid_half_width` out of the input file derives a grid whose cell is within a few percent of the stated one. That run gave the same pulse energy to a part in a thousand and the same ratio, so the stated grid is the derived one. The derivation rounds the point count up to a power of two, so the same input file without a grid derives the count the input file states.
@@ -93,37 +95,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | Unit |
 |---|---|---|
-| exit power | 8.5177e+10 | W |
-| exit power per slice | 2.4267e+08 | W |
-| exit power, rms over mean across slices | 2.6601e+00 |  |
-| exit window energy | 4.6709e-05 | J |
-| exit pulse energy, the window's and the light slipped out of it | 4.6709e-05 | J |
-| peak power | 8.5177e+10 | W |
+| exit power | 8.6205e+10 | W |
+| exit power per slice | 2.4560e+08 | W |
+| exit power, rms over mean across slices | 2.2640e+00 |  |
+| exit window energy | 4.7273e-05 | J |
+| exit pulse energy, the window's and the light slipped out of it | 4.7273e-05 | J |
+| peak power | 8.6205e+10 | W |
 | s of the peak power | 3.1577e+01 | m |
-| mode peak, power inside the split | 8.5127e+10 | W |
+| mode peak, power inside the split | 8.6158e+10 | W |
 | s of the mode peak | 3.1577e+01 | m |
-| exit power inside the split | 8.5127e+10 | W |
-| exit power outside the split | 5.0114e+07 | W |
-| outside over inside, the run's maximum | 5.8869e-04 |  |
-| outside over inside at the exit | 5.8869e-04 |  |
-| split angle | 8.1501e-05 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 9.5236e-01 | m |
-| power at the first element end | 2.8978e+05 | W |
-| power per slice at the first element end | 8.2557e+02 | W |
-| initial bunching, mean |b| over slices | 8.8848e-03 |  |
-| exit bunching, mean |b| over slices | 7.6488e-02 |  |
-| exit bunching, the largest slice | 5.3733e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 8.0278e-02 |  |
-| s of the bunching maximum | 3.1027e+01 | m |
-| bunching at the mode peak | 2.0050e-01 |  |
-| power of the largest slice at the bunching maximum | 4.5362e+09 | W |
-| exit power of the largest slice | 4.5362e+09 | W |
-| mean slice energy at the start | 6.6849e+08 | eV |
-| mean slice energy at the exit | 6.6828e+08 | eV |
-| mean slice energy, exit minus start | -2.1442e+05 | eV |
-| slice energy spread at the start | 4.0099e+05 | eV |
-| slice energy spread at the exit | 5.9655e+05 | eV |
-| span of the slice energies at the exit, head to tail | 1.6841e+06 | eV |
+| exit power inside the split | 8.6158e+10 | W |
+| exit power outside the split | 4.7391e+07 | W |
+| outside over inside, the run's maximum | 5.5005e-04 |  |
+| outside over inside at the exit | 5.5005e-04 |  |
+| split angle | 8.1754e-05 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 1.1254e+00 | m |
+| power at the first element end | 3.3560e+05 | W |
+| power per slice at the first element end | 9.5613e+02 | W |
+| initial bunching, mean |b| over slices | 1.1244e-01 |  |
+| exit bunching, mean |b| over slices | 1.9356e-01 |  |
+| exit bunching, the largest slice | 7.6472e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 2.0297e-01 |  |
+| s of the bunching maximum | 3.0044e+01 | m |
+| bunching at the mode peak | 2.0444e-01 |  |
+| power of the largest slice at the bunching maximum | 2.7894e+09 | W |
+| exit power of the largest slice | 2.8771e+09 | W |
+| mean slice energy at the start | 6.6851e+08 | eV |
+| mean slice energy at the exit | 6.6831e+08 | eV |
+| mean slice energy, exit minus start | -1.9320e+05 | eV |
+| slice energy spread at the start | 2.8714e+05 | eV |
+| slice energy spread at the exit | 4.7200e+05 | eV |
+| span of the slice energies at the exit, head to tail | 2.5258e+06 | eV |
 | slices | 351 |  |
 | records | 361 |  |
 | slice spacing | 1.6440e-07 | m |
@@ -132,10 +134,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5748e-05 | m |
 | grid derived by setup | no |  |
 | FEL steps | 330 |  |
-| source filter, mode angle | 8.1500e-05 | rad |
-| source filter, rho angle | 4.4410e-05 | rad |
+| source filter, mode angle | 8.1750e-05 | rad |
+| source filter, rho angle | 4.4460e-05 | rad |
 | source filter, ratio of the angles | 1.8400e+00 |  |
-| source filter, edge | 8.1501e-05 | rad |
+| source filter, edge | 8.1754e-05 | rad |
 
 ## The input files
 

@@ -193,6 +193,21 @@ WINDOW = 8 * SIG_Z + 2 * 24 * INCONE_SAMPLE * LAMBDA0
 
 
 def incone(exe, wd):
+    """The in-cone start-up power of a Gaussian bunch in sample mode, twice. The first run
+    gives every slice the same beamlets, beam.beamlet_min_electrons = 0. The second takes
+    the default, which loads the slices of little charge with fewer beamlets, 52 of the 85
+    here. The two are different shots at one seed, since the random numbers after the first
+    such slice differ."""
+    ok = True
+    for root, limit, name in (("ldcone", "  beam.beamlet_min_electrons = 0\n",
+                               "in-cone startup, Gaussian bunch in sample mode"),
+                              ("ldconef", "",
+                               "in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge")):
+        ok = incone_run(exe, wd, root, limit, name) and ok
+    return ok
+
+
+def incone_run(exe, wd, root, limit, name):
     bextra = f"""  beam.n_particle = 1024
   beam.a_norm_emit = 4e-7
   beam.b_norm_emit = 4e-7
@@ -202,7 +217,7 @@ def incone(exe, wd):
   beamlet_size = 8
   quiet_start = T
   shot_noise = T
-"""
+{limit}"""
     pextra = (f'  run.track_end = "UND##1"\n  run.source_filter = F\n'
               f'  run.source_filter_angle = {INCONE_CUT:.1e}\n'
               f'  window.window_length = {WINDOW:.6e}\n')
@@ -210,12 +225,12 @@ def incone(exe, wd):
     # this check reads against it is the difference between this Gaussian bunch and the
     # page's flat window. The parity of this input file moves its in-cone power by 3.4 percent
     # of itself (docs/validation.md, the transverse grid).
-    rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
+    rc, out = run(exe, wd, root, bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
                   sample=INCONE_SAMPLE)
     if rc != 0:
-        print(f"FAIL: the in-cone run exited {rc}:\n{out[-1500:]}")
+        print(f"FAIL: the in-cone run {root} exited {rc}:\n{out[-1500:]}")
         return False
-    with h5py.File(wd / "ldcone.stats.h5") as h:
+    with h5py.File(wd / f"{root}.stats.h5") as h:
         angle = float(np.ravel(h["field/total/split_angle"][()])[0])
         p_in = np.asarray(h["field/total/power_inside_angle"])
         p_tot = np.asarray(h["field/total/power"])
@@ -225,11 +240,11 @@ def incone(exe, wd):
     per_3ka = float(np.nansum(p_in[last]) / np.sum(cur / I_PEAK))
     rel = abs(per_3ka / INCONE_TARGET - 1)
     good = rel <= 0.35 and abs(angle - INCONE_CUT) <= 1e-9 and edge < 1e-3
-    print(f"  in-cone startup, Gaussian bunch in sample mode: {per_3ka:.4e} W per 3 kA slice inside "
+    print(f"  {name}: {per_3ka:.4e} W per 3 kA slice inside "
           f"{angle:.1e} rad at the end of the first undulator, summed over {p_in.shape[1]} records "
           f"(edge records carry {edge:.1e} of the peak), against {INCONE_TARGET:.3e} W: "
           f"relative {rel:.3f} (check <= 0.35)  {'ok' if good else 'FAIL'}")
-    record("in-cone startup, Gaussian bunch in sample mode", rel, 0.35, "max", good)
+    record(name, rel, 0.35, "max", good)
     return good
 
 

@@ -74,6 +74,10 @@ implicit none
 
 integer, parameter :: fel_fp32_nq$ = 9   ! x, px, y, py, pz, theta, phasor, source, field.
 
+! The fewest particles a slice holds for its median to enter the residual guard
+! (fel_fp32_step_close): 32 beamlets of the default size.
+integer, parameter :: fel_fp32_guard_n$ = 256
+
 #ifdef LUCIFER_HAVE_FFTW3F
 
 ! The single-precision transform's plan cache, threadprivate for the reason
@@ -196,6 +200,7 @@ type fel_fp32_struct
   type (fel_fp32_slice_struct), allocatable :: sl32(:)
   real(rp), allocatable :: div_slice(:,:)    ! (nq, nslice): this step, filled in parallel.
   real(rp), allocatable :: ulp_slice(:)      ! (nslice): median per-step |d delta| in ulps.
+  integer, allocatable :: n_guard(:)         ! (nslice): particles that median was taken over.
   real(rp) :: worst(fel_fp32_nq$) = 0        ! Run-level worst per quantity.
   real(rp) :: ulp_min = huge(1.0_rp)         ! Run-level worst (smallest) guard statistic.
   logical :: checked = .false.               ! A configuration check ran (first step).
@@ -296,7 +301,8 @@ fp32%mutate = mutate
 allocate (fp32%sl32(nslice))
 allocate (fp32%div_slice(fel_fp32_nq$, nslice))
 allocate (fp32%un32(nslice))     ! The unaveraged twin fills its own sets at first use.
-allocate (fp32%ulp_slice(nslice))
+allocate (fp32%ulp_slice(nslice), fp32%n_guard(nslice))
+fp32%n_guard = 0
 allocate (fp32%pow32(nslice), fp32%pow64(nslice), fp32%bmag32(nslice), fp32%bmag64(nslice))
 fp32%pow32 = 0;  fp32%pow64 = 0;  fp32%bmag32 = 0;  fp32%bmag64 = 0
 
@@ -821,6 +827,7 @@ fp32%bmag32(is) = abs(cmplx(p32sum, kind=rp)) / sc(7)
 
 call fel_fp32_median (incr, n, ulp_med)
 fp32%ulp_slice(is) = ulp_med / max(real(spacing(maxval(abs(ks32 * t%dzr(1:n)))), rp), tiny(1.0_rp))
+fp32%n_guard(is) = n
 
 !------------------------------------------------------------------------------
 contains
@@ -1581,8 +1588,9 @@ end subroutine fel_fp32_spectral_pass
 !
 ! Routine to reduce the step's per-slice divergences, write the row, and run the guard.
 ! It runs serially, after the caller's parallel loop. The guard refuses when the median
-! per-step residual increment falls below 32 ulps of the residual. Below that the FP32
-! representation absorbs the physics silently (docs/performance.md).
+! per-step residual increment falls below 32 ulps of the residual in a slice of
+! fel_fp32_guard_n$ particles or more. Below that the FP32 representation absorbs the
+! physics silently (docs/performance.md).
 !-
 
 subroutine fel_fp32_step_close (fp32, err_flag)
@@ -1602,7 +1610,18 @@ do iq = 1, fel_fp32_nq$
   row(iq) = maxval(fp32%div_slice(iq, :))
   fp32%worst(iq) = max(fp32%worst(iq), row(iq))
 enddo
-gulp = minval(fp32%ulp_slice)
+
+! The guard is read on the slices of fel_fp32_guard_n$ particles or more. The copies of
+! a beamlet share its energy, so a slice of a few beamlets has a few samples of the
+! increment, and its median can fall under the floor by chance while the window's
+! granularity is sound. The sample mode loads such slices where the charge is small
+! (fel_beamlet_count). When no slice has that many particles the guard is read on all.
+
+if (any(fp32%n_guard >= fel_fp32_guard_n$)) then
+  gulp = minval(fp32%ulp_slice, mask = fp32%n_guard >= fel_fp32_guard_n$)
+else
+  gulp = minval(fp32%ulp_slice)
+endif
 fp32%ulp_min = min(fp32%ulp_min, gulp)
 
 write (fp32%iu, '(i8, 10es13.4)') fp32%istep, row, gulp

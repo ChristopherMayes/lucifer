@@ -1537,6 +1537,7 @@ fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
 fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
 call fel_fp32_median (dtau_ulp, n, gmed)
 fp32%ulp_slice(is) = gmed / max(1, ustate%nsub)
+fp32%n_guard(is) = n
 deallocate (dtau_ulp, tsave)
 
 end subroutine unavg_twin_slice

@@ -317,7 +317,8 @@ type fel_beam_init_param_struct
   ! How a bunch becomes slices (fel-physics.md sec-loading). The bunch is beam_init's,
   ! generated or read through beam.position_file. It is binned by arrival time into
   ! the slices of slicing.
-  ! "sample" draws the same number of beamlets in every slice from what fell into it,
+  ! "sample" draws beam.n_particle macroparticles in a slice from what fell into it (fewer
+  ! in a slice of little charge under shot_noise, see beamlet_min_electrons below),
   ! weighted by the slice charge, so the current follows the bunch. This is Genesis's
   ! &beam with &profile and its importdistribution in one. beam.n_particle is the
   ! count per slice after phase copies.
@@ -332,6 +333,11 @@ type fel_beam_init_param_struct
   logical :: quiet_start = .true.
   integer :: beamlet_size = 8             ! Copies per beamlet. A loading parameter only.
   logical :: shot_noise = .false.         ! Impose physical shot noise on the load.
+  ! The fewest real electrons a beamlet stands for in the sample mode. A slice with too
+  ! little charge for its beamlets gets fewer of them (fel_beamlet_count). 0 gives every
+  ! slice the same count. The default is one electron: no more beamlets than electrons
+  ! (docs/shot-noise.md).
+  real(rp) :: beamlet_min_electrons = 1
   ! Check instruments, set by the validation suite. They are not physics inputs.
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.

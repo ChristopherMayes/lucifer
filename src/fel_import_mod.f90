@@ -51,6 +51,8 @@ type fel_resample_param_struct
   real(rp) :: slice_width = 0.01_rp      ! Sampling window / bunch length.
   integer :: n_particle_per_slice = 8192 ! Macroparticles per slice after resampling.
   integer :: beamlet_size = 4            ! Beamlet size of the quiet load.
+  real(rp) :: beamlet_min_electrons = 0  ! Fewest electrons a beamlet stands for. 0: one count
+                                         !   in every slice (fel_beamlet_count).
   integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
   ! For validation only: resample a bunch Bmad generated from beam_init, and not one read
   ! from a file. So the SDDSBeam transcription can be checked on a known bunch. A
@@ -119,8 +121,9 @@ real(rp), allocatable :: s(:), gam(:), x(:), y(:), xp(:), yp(:), wt(:)
 real(rp), allocatable :: cg(:), cx(:), cy(:), cpx(:), cpy(:), theta(:), wk(:)
 
 real(rp) mom(11), gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay
+type (fel_noise_tally_struct) tally
 real(rp) smin, ttotal, dslen, sloc, p_mc, p0_mc, ks_l, cur, ne, w_part
-integer n, nalive, i, ip, islice, nslice, mpart, ncand, n_clamp
+integer n, nalive, i, ip, islice, nslice, mpart, ncand, mpart_s, npart_s
 logical err_flag
 
 character(*), parameter :: r_name = 'fel_import_bunch'
@@ -218,7 +221,6 @@ allocate (fbeam%slice(nslice))
 dslen = prm%slice_width * ttotal
 mpart = prm%n_particle_per_slice / prm%beamlet_size
 ks_l = twopi / lambda0
-n_clamp = 0
 rule_seen = 0
 floor_worst = 0
 
@@ -251,7 +253,16 @@ do islice = 1, nslice
   enddo
   cur = cur * c_light / dslen                       ! c*sum(w)/dslen
 
-  if (ncand > mpart) then
+  ! The slice's seeds, mpart_s, are mpart unless the slice holds too few electrons for
+  ! that many beamlets (fel_beamlet_count). The candidates are then removed down to
+  ! mpart_s by the same rule, and none is interpolated.
+
+  mpart_s = mpart
+  if (quiet_start) mpart_s = fel_beamlet_count (cur * slice_spacing / (c_light * e_charge), mpart, &
+                                                prm%beamlet_min_electrons)
+  npart_s = mpart_s * prm%beamlet_size
+
+  if (ncand > mpart_s) then
     ! Second pass, transcribing removeParticles (gather_and_remove).
     call gather_and_remove ()
   endif
@@ -259,11 +270,12 @@ do islice = 1, nslice
   call fill_slice ()
 enddo
 
-if (shot_noise) call fel_report_noise (rule_seen, floor_worst, nslice)
-
-if (n_clamp > 0) then
-  call out_io (s_warn$, r_name, 'SOME BEAMLET NOISE DRAWS HAD FEWER THAN ONE REAL ELECTRON', &
-    '(CLAMPED TO 1, AS GENESIS DOES SILENTLY); THE NOISE THERE IS NOT PHYSICAL.')
+if (shot_noise) then
+  if (quiet_start) then
+    call fel_report_noise (rule_seen, floor_worst, tally, prm%beamlet_min_electrons)
+  else
+    call fel_report_noise (rule_seen, floor_worst, tally)
+  endif
 endif
 
 err_flag = .false.
@@ -275,7 +287,7 @@ contains
 ! Subroutine gather_and_remove ()
 !
 ! Routine to gather every window candidate, then apply Genesis's removeParticles:
-! overwrite a random index with the last and shrink until mpart remain. The gather needs
+! overwrite a random index with the last and shrink until mpart_s remain. The gather needs
 ! its own storage, since there can be far more candidates than npart.
 !-
 
@@ -295,7 +307,7 @@ do k = 1, nalive
   endif
 enddo
 
-do while (m > mpart)                               ! removeParticles's exact rule.
+do while (m > mpart_s)                               ! removeParticles's exact rule.
   call ran_uniform (uu)
   k = int(m * uu) + 1
   if (k > m) k = m
@@ -304,9 +316,9 @@ do while (m > mpart)                               ! removeParticles's exact rul
   m = m - 1
 enddo
 
-cg(1:mpart) = ag(1:mpart); cx(1:mpart) = axx(1:mpart); cy(1:mpart) = ayy(1:mpart)
-cpx(1:mpart) = apx(1:mpart); cpy(1:mpart) = apy(1:mpart)
-ncand = mpart
+cg(1:mpart_s) = ag(1:mpart_s); cx(1:mpart_s) = axx(1:mpart_s); cy(1:mpart_s) = ayy(1:mpart_s)
+cpx(1:mpart_s) = apx(1:mpart_s); cpy(1:mpart_s) = apy(1:mpart_s)
+ncand = mpart_s
 
 end subroutine gather_and_remove
 
@@ -314,7 +326,7 @@ end subroutine gather_and_remove
 !+
 ! Subroutine fill_slice ()
 !
-! Routine to bring the candidate set to mpart seeds, with Genesis's addParticles when
+! Routine to bring the candidate set to mpart_s seeds, with Genesis's addParticles when
 ! short. It then refills theta, mirrors each seed into beamlet_size copies, imposes the
 ! shot noise and stores the slice.
 !-
@@ -326,19 +338,19 @@ real(rp) gam_p, beta_p
 integer nd, nd0, k, j, n1, n2, i1, i2
 
 ! addParticles (sec-import): an empty set gets one filler at the reference energy. A
-! singleton is mirrored. Then interpolate up to mpart.
+! singleton is mirrored. Then interpolate up to mpart_s.
 
 nd = ncand
 if (nd == 0) then
   cg(1) = gamma0; cx(1) = 0; cy(1) = 0; cpx(1) = 0; cpy(1) = 0
   nd = 1
 endif
-if (nd == 1 .and. mpart > 1) then
+if (nd == 1 .and. mpart_s > 1) then
   cg(2) = cg(1); cx(2) = cx(1); cy(2) = cy(1); cpx(2) = cpx(1); cpy(2) = cpy(1)
   nd = 2
 endif
 
-if (nd < mpart) then
+if (nd < mpart_s) then
   ! Normalize the five coordinates to zero mean and unit rms. Cold dimensions keep scale
   ! 1, as in Genesis.
   g1 = sum(cg(1:nd))/nd;   g2 = sqrt(abs(sum(cg(1:nd)**2)/nd - g1**2))
@@ -358,7 +370,7 @@ if (nd < mpart) then
   cpy(1:nd) = (cpy(1:nd) - py1) * py2
 
   nd0 = nd                                         ! Parents only from the originals.
-  do while (nd < mpart)
+  do while (nd < mpart_s)
     call ran_uniform (uu)
     n1 = int(nd0 * uu) + 1
     if (n1 > nd0) n1 = nd0
@@ -401,11 +413,11 @@ endif
 ! copies keep their coordinates and every phase is its own uniform draw. That load has
 ! macroparticle noise at every harmonic, as a real bunch has.
 
-do k = 1, mpart
+do k = 1, mpart_s
   call ran_uniform (uu)
   wk(k) = (twopi / prm%beamlet_size) * uu
 enddo
-do k = mpart, 1, -1
+do k = mpart_s, 1, -1
   i1 = k
   i2 = prm%beamlet_size * (k-1)
   do j = 0, prm%beamlet_size - 1
@@ -415,7 +427,7 @@ do k = mpart, 1, -1
   enddo
 enddo
 if (.not. quiet_start) then
-  do k = 1, prm%n_particle_per_slice
+  do k = 1, npart_s
     call ran_uniform (uu)
     theta(k) = twopi * uu
   enddo
@@ -425,28 +437,29 @@ endif
 ! shared Fawley noise with ne = charge/e, skipped for empty slices as in Genesis. Then
 ! the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
 
-w_part = cur * slice_spacing / (c_light * prm%n_particle_per_slice)
+w_part = cur * slice_spacing / (c_light * npart_s)
 ne = anint(cur * slice_spacing / (e_charge * c_light))
 
 sl => fbeam%slice(islice)
-call fel_slice_reallocate (sl, prm%n_particle_per_slice)
-sl%n = prm%n_particle_per_slice
-sl%weight(1:prm%n_particle_per_slice) = w_part
+call fel_slice_reallocate (sl, npart_s)
+sl%n = npart_s
+sl%weight(1:npart_s) = w_part
 
 ! Noise where the input file asks for it. Genesis's importdistribution applies it whether or
 ! not its shotnoise flag says so. This port applies it only with shot_noise = true.
 
 if (ne > 0 .and. shot_noise) then
-  call fel_impose_noise (sl, theta(1:prm%n_particle_per_slice), prm%n_particle_per_slice, quiet_start, &
-                         prm%beamlet_size, grid_half_width, grid_n_pts, islice, n_clamp, rule, floor_nl, err_flag)
+  call fel_impose_noise (sl, theta(1:npart_s), npart_s, quiet_start, &
+                         prm%beamlet_size, grid_half_width, grid_n_pts, islice, tally, rule, floor_nl, err_flag)
   if (err_flag) return
+  if (mpart_s < mpart) tally%n_slice_thin = tally%n_slice_thin + 1
   rule_seen = max(rule_seen, rule)
   floor_worst = max(floor_worst, floor_nl)
 endif
-sl%m_ind = fel_m_ind (sl, beamlet_groups(prm%n_particle_per_slice, prm%beamlet_size), &
-                      prm%n_particle_per_slice / prm%beamlet_size)
+sl%m_ind = fel_m_ind (sl, beamlet_groups(npart_s, prm%beamlet_size), &
+                      npart_s / prm%beamlet_size)
 
-do k = 1, prm%n_particle_per_slice
+do k = 1, npart_s
   gam_p = cg(k)
   beta_p = sqrt(gam_p**2 - 1) / gam_p
   sl%x(k) = cx(k);  sl%px(k) = cpx(k) / p0_mc

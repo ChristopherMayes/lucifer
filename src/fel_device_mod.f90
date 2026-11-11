@@ -1930,6 +1930,7 @@ do is = 1, size(beam%slice)
 
   call fel_fp32_median (incr, n, tick_med)
   fp32%ulp_slice(is) = tick_med
+  fp32%n_guard(is) = n
 
   ! The field rows per member: the device's own source grid and post-solve planes
   ! against a fresh FP64 deposit of the shared post-step state at h*theta and the
@@ -2631,6 +2632,7 @@ do is = 1, size(beam%slice)
 
   call fel_fp32_median (incr, n, tick_med)
   fp32%ulp_slice(is) = tick_med
+  fp32%n_guard(is) = n
 enddo
 
 end subroutine fel_device_unavg_twin_rows
