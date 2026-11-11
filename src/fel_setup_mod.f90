@@ -209,9 +209,18 @@ enddo
 ! load with no noise at its own frequency. Its SASE has nothing to grow from, and the run
 ! would report a number with no startup behind it. The refusal names the beamlet size
 ! that would carry it, 2h + 1. A seeded harmonic needs no such noise, so the check
-! applies only where shot noise is asked for.
+! applies only where shot noise is asked for. The weight load (fel_weight_noise) carries
+! the noise at every harmonic below beamlet_size, so its limit is beamlet_size - 1.
 
-if (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size - 1) / 2) then
+if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
+  if (maxval(harmonics) > run%bparam%beamlet_size - 1) then
+    call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
+                 'NOISE AT, WHICH IS BEAMLET_SIZE - 1 = \i0\ UNDER shot_noise_method = "weight".', &
+                 'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE.', &
+                 i_array = [maxval(harmonics), run%bparam%beamlet_size - 1, maxval(harmonics) + 1])
+    err_flag = .true.;  return
+  endif
+elseif (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size - 1) / 2) then
   call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
                'NOISE AT, WHICH IS (BEAMLET_SIZE - 1)/2 = \i0\ AT BEAMLET_SIZE = \i0\ .', &
                'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE.', &

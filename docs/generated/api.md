@@ -99,6 +99,19 @@ it has a physical level. Under the kick sized from J1 a draw can ask for more bu
 than a kick gives. Such a draw is held at the largest, and the held sums count them.
 ```
 
+(api-fel-weight-draw-struct)=
+### `fel_weight_draw_struct`
+
+*Struct*
+
+```
+The state of the weight load's draw as it goes from slice to slice (fel_weight_noise).
+In the sample mode the bunch's electrons are counted once, n_left of them not yet given
+to a slice, and each slice takes a binomial share of what is left, so the counts of all
+the slices sum to the bunch's exactly. In the keep mode every group holds its own
+charge and nothing is carried between slices.
+```
+
 (api-fel-checkpoint-struct)=
 ### `fel_checkpoint_struct`
 
@@ -664,7 +677,7 @@ Output:
 *Subroutine* `(sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts,`
 
 ```
-                             islice, bessel_kick, tally, rule, floor_n_lambda, err_flag)
+                             islice, method, draw, tally, rule, floor_n_lambda, err_flag)
 
 Routine to impose physical shot noise on one slice's load, whatever made it
 (fel-physics.md sec-noise). Two things happen in order.
@@ -697,10 +710,15 @@ Input:
   grid_half_width -- real(rp): The field grid's half width [m], for the cell rule.
   grid_n_pts      -- integer: The field grid's points per side, for the cell rule.
   islice          -- integer: Slice index, for the message.
-  bessel_kick     -- logical: Size the kick from J1 (beam.shot_noise_kick = "bessel")?
-                      False gives the first-order kick.
+  method          -- integer: beam.shot_noise_method: fel_noise_first_order$,
+                      fel_noise_bessel$ or fel_noise_weight$.
+  draw            -- fel_weight_draw_struct: The weight load's state, from
+                      fel_weight_start. Not read by the kicks.
 
 Output:
+  sl              -- fel_slice_struct: Under the weight load, the weights are the counts
+                      drawn. The phases are not moved.
+  draw            -- fel_weight_draw_struct: With the slice's share taken.
   theta(:)        -- real(rp): Phases with the noise imposed.
   tally           -- fel_noise_tally_struct: The slice's electrons, the noise power
                       its groups load and its held draws are added to the running sums.
@@ -716,6 +734,128 @@ Output:
 
 ```
 Routine to renumber sparse cell labels to 1..n_group.
+```
+
+(api-fel-ran-binomial)=
+### `fel_ran_binomial`
+
+*Function* `(n, p) result (k)`
+
+```
+Routine to draw a binomial count, the successes in n trials of probability p each, from
+the program's random stream (ran_uniform). The draw is exact in distribution. Where
+n min(p, 1-p) is under 10 the probabilities are summed upward from zero successes
+against one uniform number. Above, it is the transformed rejection of W. Hormann, "The
+generation of binomial random variates", J. Stat. Comput. Simul. 46, 101 (1993),
+algorithm BTRS, which takes about 1.2 pairs of uniform numbers a draw. The counts are
+reals so that n may pass the largest default integer, and are whole to 2^53.
+```
+
+```
+Input:
+  n -- real(rp): Trials, a whole number.
+  p -- real(rp): Probability of one success, 0 to 1.
+
+Output:
+  k -- real(rp): Successes, a whole number from 0 to n.
+```
+
+(api-stirling-tail)=
+### `stirling_tail`
+
+*Function* `(j) result (tail)`
+
+```
+Routine to give log(j!) less (j + 1/2) log(j + 1) - (j + 1) + log(2 pi)/2.
+```
+
+(api-fel-weight-start)=
+### `fel_weight_start`
+
+*Subroutine* `(draw, q_total, kept)`
+
+```
+Routine to start a load's weight draw (fel_weight_noise). In the sample mode the bunch's
+charge q_total is counted as the nearest whole number of electrons, at least one, and
+the charge of one counted electron is q_total over that number. The loaded charge is
+then q_total exactly. The noise power loaded over the shot noise of q_total/e electrons
+is that charge over e, which is within one part in twice the count of 1.
+```
+
+```
+Input:
+  q_total -- real(rp): The charge the load is to hold, the sum over its slices [C].
+  kept    -- logical: Keep mode? Each group then holds its own charge, and q_total is
+              not read.
+
+Output:
+  draw    -- fel_weight_draw_struct: The state before the first slice.
+```
+
+(api-fel-weight-noise)=
+### `fel_weight_noise`
+
+*Subroutine* `(draw, weight, n, beamlet_size, tally)`
+
+```
+Routine to impose the shot noise on one quiet slice through its weights
+(docs/shot-noise.md). Each macroparticle comes to stand for a whole number of electrons,
+drawn as the electrons of a real beam fall: independently, each into a macroparticle
+with a probability in proportion to the weight the quiet load gave it. The phases stay
+the beamlets' evenly spaced ones. The bunching of the slice at every harmonic below the
+beamlet size is then a sum over independent electrons, and its mean square is one over
+their number, at any number. No phase is moved.
+
+In the sample mode the counts of the whole bunch are one multinomial draw, taken in
+order: the slice takes a binomial share of the electrons not yet given, by its share of
+the charge not yet loaded, and each macroparticle a binomial share of what the slice
+has left. The counts of all the slices therefore sum to the bunch's, and a slice's own
+count varies about its mean as the real beam's does.
+
+In the keep mode every group of beamlet_size copies is a particle of the bunch and
+holds its own charge. A group of N electrons, N at least 1, is counted as floor(N) or
+one more, with the probability of floor(N) that makes the mean of one over the count
+1/N, which is what its noise power goes as. A group under one electron is counted as
+one. The count falls on the copies with equal probability, and the charge of one counted
+electron is the group's charge over its count.
+```
+
+```
+Input:
+  draw         -- fel_weight_draw_struct: The state, from fel_weight_start.
+  weight(:)    -- real(rp): The quiet load's macroparticle charges [C], beamlet-contiguous.
+  n            -- integer: Particles in the slice, a multiple of beamlet_size.
+  beamlet_size -- integer: Copies per beamlet.
+  tally        -- fel_noise_tally_struct: The running sums.
+
+Output:
+  draw         -- fel_weight_draw_struct: With the slice's electrons taken.
+  weight(:)    -- real(rp): Each a whole number of counted electrons' charge [C]. A
+                   macroparticle that drew none has zero.
+  tally        -- fel_noise_tally_struct: The sums with the slice added.
+```
+
+(api-fel-loaded-beamlets)=
+### `fel_loaded_beamlets`
+
+*Subroutine* `(weight, n, beamlet_size, keep, n_keep)`
+
+```
+Routine to list the particles of the beamlets that hold charge, in order. The weight
+load leaves a beamlet none of whose copies drew an electron at zero weight, and the
+sample-mode loaders do not load it. A copy at zero weight in a beamlet that holds
+charge stays, so a loaded slice is still whole beamlets.
+```
+
+```
+Input:
+  weight(:)    -- real(rp): Macroparticle charges [C], beamlet-contiguous.
+  n            -- integer: Particles, a multiple of beamlet_size.
+  beamlet_size -- integer: Copies per beamlet.
+
+Output:
+  keep(:)      -- integer, allocatable: Indices of the particles to load, ascending.
+  n_keep       -- integer: How many, a multiple of beamlet_size.
 ```
 
 (api-fel-beamlet-count)=
@@ -818,7 +958,7 @@ Output:
 ```
 Routine to print, once per load, which grouping the shot noise was imposed on, the
 worst quiet floor found before it, and the noise power the load holds against the
-shot noise of its electrons, by the kick's form (beam.shot_noise_kick). A user who did
+shot noise of its electrons, by how it was imposed (beam.shot_noise_method). A user who did
 not make the beamlets has no other way to know what the noise was drawn on. Under the
 kick from J1 the draws held at the largest bunching a kick gives are stated with the
 share of the charge in their slices. The slices that hold one electron or more and have

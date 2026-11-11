@@ -216,7 +216,7 @@ INPUT = """[run]
   beam.a_norm_emit = {emit:.6e}
   beam.b_norm_emit = {emit:.6e}
   shot_noise = T
-  shot_noise_kick = "first_order"
+  shot_noise_method = "first_order"
   beamlet_size = {beamlet}
 /
 

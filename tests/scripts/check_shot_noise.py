@@ -7,7 +7,7 @@ Genesis cannot represent nonuniform weights, so there is no reference to compare
 Physics under test: after quiet loading plus Fawley-style noise, a beamlet standing for
 N real electrons has <|b(h)|^2> = R_h(N)/N at every imposed harmonic, where R_h is the
 ratio shot_noise_ratio.py computes and docs/shot-noise.md derives for the kick the input
-file names, beam.shot_noise_kick. Under the first-order kick R_h is 1 - 2/N to first
+file names, beam.shot_noise_method. Under the first-order kick R_h is 1 - 2/N to first
 order and goes to 1 as N grows. A slice's <|b(h)|^2> * N_lambda is then the
 charge-weighted mean of R_h over its beamlets, N_lambda the slice's real electron count.
 This holds for uniform and for nonuniform per-particle weights.
@@ -48,6 +48,17 @@ within five standard deviations of the mean, taken from the samples, since a sli
 one beamlet is not a sum of many. A uniform load at 146 electrons a beamlet, where no
 slice has fewer, must be the same bits with the key at its default as with the key at 0.
 The Gaussian bunch runs under both kicks.
+
+The weight load, beam.shot_noise_method = "weight", counts a whole number of electrons
+into every macroparticle and moves no phase. It runs at 146, 18, 4 and 1 electrons a
+beamlet and at a quarter of an electron, and its statistic is held at harmonics 1 to 7 to
+the bunch's electrons over their nearest whole number, which is 1 to a part in 1e4 here.
+The loaded charge is held to the input file's to rounding, every weight to a whole number
+of the counted electron's charge, and the variance of the slices' counts to the binomial
+variance within five standard deviations. A Gaussian bunch whose last slices hold a
+hundredth of an electron is loaded the same way: the charge is held, the slices that drew
+no electron have no particles, and the statistic of the others is held to 1. In the keep
+mode every particle must be present at the charge the kick load gives it.
 
 The same statistic then runs on the loads that do not draw their own beamlets
 (fel-physics.md, sec-noise):
@@ -115,6 +126,11 @@ BESSEL_SCAN = (ELECTRONS, 50.0, 18.0, 10.0, 1.0)
 STATED = re.compile(r"noise power loaded over the shot-noise power, fundamental:\s+([0-9.]+)")
 stated_worst = {"first_order": 0.0, "bessel": 0.0}
 
+# The electrons a beamlet holds in each scan of the weight load, and the harmonics its
+# statistic is held at: every harmonic below the beamlet size.
+WEIGHT_SCAN = (ELECTRONS, 18.0, 4.0, 1.0, 0.25)
+WEIGHT_HARMONICS = tuple(range(1, BEAMLET_SIZE))
+
 # The window the input file below states. A dump carries the slice partition and not the
 # radiation it was sliced on, so the reader is told.
 LAMBDA0 = 1e-10
@@ -140,7 +156,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   window_length = {window:.6e}
   n_wavelength = 3
   shot_noise = T
-  beam.shot_noise_kick = "{kick}"
+  beam.shot_noise_method = "{kick}"
   beam.beamlet_min_electrons = 0
   gen_test_weights = {testw}
   ran_seed = {seed}
@@ -169,7 +185,7 @@ GAUSS_NML = """! flat keys; routed into the input file's tables by lucifer.flat.
   window_length = {window:.6e}
   n_wavelength = 3
   shot_noise = T
-  beam.shot_noise_kick = "{kick}"
+  beam.shot_noise_method = "{kick}"
 {limit}  ran_seed = {seed}
   load_only = T
 &end
@@ -195,7 +211,7 @@ def b2_samples(dump_file, harmonics, cells=False, kick="first_order"):
     A particle's group holds BEAMLET_SIZE times its weight over e electrons, which is the
     count the loader draws the kick on. With cells set the group is the deposit cell's
     occupants, whose copies stand at many base phases, and the expected value is the
-    closed form's for dense phases. kick is the load's beam.shot_noise_kick.
+    closed form's for dense phases. kick is the load's beam.shot_noise_method.
 
     |b(h)| is invariant under a constant shift of theta, which is what a dump's missing
     reference phase amounts to. This statistic is therefore unaffected by it."""
@@ -256,6 +272,186 @@ def run_mode(exe, lat, workdir, seeds, test_weights, electrons, kick="first_orde
     return samples, clamped
 
 
+def weight_statistics(dump, charge):
+    """One weight-load dump: the statistic of every slice that has particles at
+    WEIGHT_HARMONICS, the slices' electron counts, the relative error of the loaded charge
+    against charge, and whether every weight is a whole number of the counted electron's
+    charge. That charge is the dump's total over its nearest whole number of electrons."""
+    slices = list(beamio.read_slices(dump, LAMBDA0, SPACING))
+    total = float(sum(sl["weight"][: sl["n"]].sum() for sl in slices))
+    unit = total / max(1.0, np.rint(total / E_CHARGE))
+    vals = {h: [] for h in WEIGHT_HARMONICS}
+    counts, whole = [], True
+    for sl in slices:
+        w = sl["weight"][: sl["n"]]
+        counts.append(w.sum() / unit)
+        if sl["n"] == 0 or w.sum() == 0:
+            continue
+        whole = whole and bool(np.all(np.abs(w / unit - np.rint(w / unit)) < 1e-6))
+        whole = whole and sl["n"] % BEAMLET_SIZE == 0
+        for h in WEIGHT_HARMONICS:
+            b = np.sum(w * np.exp(-1j * h * sl["theta"][: sl["n"]])) / w.sum()
+            vals[h].append(abs(b) ** 2 * w.sum() / E_CHARGE)
+    return vals, np.asarray(counts), abs(total - charge) / charge, whole
+
+
+def weight_scan(exe, lat, workdir, seeds):
+    """The weight load of the uniform bunch over the seeds at each count of WEIGHT_SCAN."""
+    ok = True
+    worst_charge, whole_ok, stated = 0.0, True, 0.0
+    for electrons in WEIGHT_SCAN:
+        charge = electrons * E_CHARGE * N_SLICE * N_PARTICLE / BEAMLET_SIZE
+        want = float(shot_noise_ratio.ratio_weight_total(charge / E_CHARGE))
+        vals = {h: [] for h in WEIGHT_HARMONICS}
+        counts = []
+        tag = f"{electrons:g}".replace(".", "p")
+        for seed in range(1, seeds + 1):
+            root = f"sn_wt{tag}_{seed}"
+            out, dump = run_load(exe, workdir, root, NML.format(
+                lat=lat, root=root, seed=1000 + 7 * seed, n_particle=N_PARTICLE, window=N_SLICE * SPACING,
+                z_min=-N_SLICE * SPACING / 2, z_max=N_SLICE * SPACING / 2, charge=charge, grid_n_pts=GRID_N_PTS,
+                grid_half_width=GRID_HALF_WIDTH, beamlet_size=BEAMLET_SIZE, kick="weight", testw="F"))
+            v, c, dq, whole = weight_statistics(dump, charge)
+            dump.unlink()
+            said = STATED.search(out)
+            stated = max(stated, abs(float(said.group(1)) - want) if said else 1.0)
+            worst_charge = max(worst_charge, dq)
+            whole_ok = whole_ok and whole
+            counts.append(c)
+            for h in WEIGHT_HARMONICS:
+                vals[h].extend(v[h])
+
+        count = f"{electrons:g} electron{'' if electrons == 1 else 's'} a beamlet"
+        allv = np.concatenate([vals[h] for h in WEIGHT_HARMONICS])
+        bound = 5 * want / np.sqrt(len(allv))
+        good = abs(allv.mean() - want) < bound
+        ok = ok and good
+        print(f"--- shot noise, weight load, uniform weights, {count}: <|b(h)|^2 * N_lambda> = {allv.mean():.4f} "
+              f"(closed form {want:.4f} +- {bound:.3f}, {len(allv)} samples)  {'ok' if good else 'FAIL'}")
+        record(f"shot noise, weight load, uniform weights, {count}", allv.mean(), [want - bound, want + bound],
+               "range", good)
+        for h in WEIGHT_HARMONICS:
+            v = np.asarray(vals[h])
+            bh = 5 * want / np.sqrt(len(v))
+            goodh = abs(v.mean() - want) < bh
+            ok = ok and goodh
+            print(f"      harmonic {h}: {v.mean():.4f} (closed form {want:.4f} +- {bh:.3f})  {'ok' if goodh else 'FAIL'}")
+            record(f"shot noise, weight load, uniform weights, {count}, harmonic {h}", v.mean(),
+                   [want - bh, want + bh], "range", goodh)
+
+        # A slice's count is binomial: the bunch's electrons, each in this slice with probability 1/N_SLICE.
+        c = np.concatenate(counts)
+        n_total = np.rint(charge / E_CHARGE)
+        variance = n_total * (1 - 1 / N_SLICE) / N_SLICE
+        ratio = float(np.mean((c - n_total / N_SLICE) ** 2) / variance)
+        bound = 5 * np.sqrt(2 / len(c))
+        good = abs(ratio - 1) < bound
+        ok = ok and good
+        print(f"      the variance of the slices' electron counts over the binomial variance: {ratio:.4f} "
+              f"(1 +- {bound:.3f}, {len(c)} slices)  {'ok' if good else 'FAIL'}")
+        record(f"shot noise, weight load, {count}: the variance of the slices' counts over the binomial variance",
+               ratio, [1 - bound, 1 + bound], "range", good)
+
+    for name, value, limit in (("the loaded charge against the input file's, worst over the scans", worst_charge, 1e-12),
+                               ("the level the loader states against the closed form", stated, 1e-4)):
+        good = value <= limit
+        ok = ok and good
+        print(f"--- weight load, {name}: {value:.1e} (check <= {limit:g})  {'ok' if good else 'FAIL'}")
+        record(f"shot noise, weight load, {name}", value, limit, "max", good)
+    print(f"--- weight load, every weight is a whole number of counted electrons, in whole beamlets  "
+          f"{'ok' if whole_ok else 'FAIL'}")
+    record("shot noise, weight load, every weight is a whole number of counted electrons, in whole beamlets",
+           None, None, "bool", whole_ok)
+    return ok and whole_ok
+
+
+def weight_gauss(exe, lat, workdir, seeds):
+    """The Gaussian bunch under the weight load. Its last slices hold two electrons at PEAK
+    electrons a beamlet in the peak slice, so the peak is lowered until they hold a
+    hundredth of an electron and most of them draw none."""
+    sig_z = N_SLICE * SPACING / 8
+    scale = 0.005
+    charge = scale * PEAK * (N_PARTICLE / BEAMLET_SIZE) * E_CHARGE * np.sqrt(2 * np.pi) * sig_z / SPACING
+    vals, worst_charge, whole_ok, n_empty, n_slices = [], 0.0, True, 0, 0
+    for seed in range(1, seeds + 1):
+        root = f"sn_wg_{seed}"
+        text = gauss_text(lat, root, 3000 + 7 * seed, None, "weight")
+        line = [x for x in text.splitlines() if "beam.bunch_charge" in x][0]
+        _, dump = run_load(exe, workdir, root, text.replace(line, f"  beam.bunch_charge = {charge:.12e}"))
+        v, c, dq, whole = weight_statistics(dump, charge)
+        # The window is eight sigmas, so the charge loaded is the bunch's less its tails outside.
+        worst_charge = max(worst_charge, abs(c.sum() - np.rint(c.sum())))
+        whole_ok = whole_ok and whole
+        n_empty += int(np.count_nonzero(c == 0))
+        n_slices += len(c)
+        for sl in beamio.read_slices(dump, LAMBDA0, SPACING):
+            whole_ok = whole_ok and (sl["n"] == 0) == (sl["weight"][: sl["n"]].sum() == 0)
+        dump.unlink()
+        vals.extend(np.concatenate([v[h] for h in WEIGHT_HARMONICS]))
+    v = np.asarray(vals)
+    bound = 5 * v.std() / np.sqrt(len(v))
+    good = abs(v.mean() - 1) < bound
+    print(f"--- shot noise, weight load, Gaussian bunch, the slices with particles: <|b(h)|^2 * N_lambda> = "
+          f"{v.mean():.4f} (closed form 1.0000 +- {bound:.3f}, {len(v)} samples)  {'ok' if good else 'FAIL'}")
+    record("shot noise, weight load, Gaussian bunch, the slices with particles", v.mean(), [1 - bound, 1 + bound],
+           "range", good)
+    empty_ok = n_empty > 0 and whole_ok
+    print(f"--- weight load, Gaussian bunch: {n_empty} of {n_slices} slices drew no electron and have no particles, "
+          f"and the bunch is a whole number of counted electrons to {worst_charge:.1e}  "
+          f"{'ok' if empty_ok and worst_charge < 1e-6 else 'FAIL'}")
+    record("shot noise, weight load, Gaussian bunch: a slice that drew no electron has no particles", None, None,
+           "bool", empty_ok)
+    record("shot noise, weight load, Gaussian bunch: the loaded electrons are a whole number", worst_charge, 1e-6,
+           "max", worst_charge < 1e-6)
+    return good and empty_ok and worst_charge < 1e-6
+
+
+def weight_kept(exe, lat, workdir, seeds):
+    """Keep mode under the weight load, against the first-order kick's load of the same
+    bunch: every particle is present, and its copies hold the charge the kick load's hold.
+    The statistic is held to the keep mode's form, 1 at these 146 electrons a particle."""
+    src = KEEP_BUNCH
+    vals, worst, same_count = [], 0.0, True
+    for seed in range(1, seeds + 1):
+        dumps = {}
+        for kick in ("first_order", "weight"):
+            root = f"sn_keepw_{kick[0]}_{seed}"
+            (workdir / f"{root}.toml").write_text(to_toml(KEEP_NML.format(
+                lat=lat, root=root, seed=2000 + 7 * seed, quiet="T", source=src, kick=kick, grid_n_pts=GRID_N_PTS,
+                grid_half_width=GRID_HALF_WIDTH, beamlet_size=BEAMLET_SIZE)))
+            r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
+            if r.returncode != 0:
+                print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
+                sys.exit(1)
+            dumps[kick] = workdir / f"{root}-initial.beam.h5"
+        for s0, s1 in zip(beamio.read_slices(dumps["first_order"], LAMBDA0, SPACING),
+                          beamio.read_slices(dumps["weight"], LAMBDA0, SPACING)):
+            same_count = same_count and s0["n"] == s1["n"]
+            if s0["n"] == 0 or s0["n"] != s1["n"]:
+                continue
+            q0 = s0["weight"].reshape(-1, BEAMLET_SIZE).sum(axis=1)
+            q1 = s1["weight"].reshape(-1, BEAMLET_SIZE).sum(axis=1)
+            worst = max(worst, float(np.max(np.abs(q1 - q0) / q0)))
+            w, theta = s1["weight"], s1["theta"]
+            for h in WEIGHT_HARMONICS:
+                b = np.sum(w * np.exp(-1j * h * theta)) / w.sum()
+                vals.append(abs(b) ** 2 * w.sum() / E_CHARGE)
+        for d in dumps.values():
+            d.unlink()
+    v = np.asarray(vals)
+    bound = 5 / np.sqrt(len(v))
+    good = abs(v.mean() - 1) < bound
+    print(f"--- shot noise, weight load, keep mode: <|b(h)|^2 * N_lambda> = {v.mean():.4f} "
+          f"(closed form 1.0000 +- {bound:.3f}, {len(v)} samples)  {'ok' if good else 'FAIL'}")
+    record("shot noise, weight load, keep mode", v.mean(), [1 - bound, 1 + bound], "range", good)
+    held = same_count and worst < 1e-12
+    print(f"--- weight load, keep mode: every particle is present at its own charge, worst {worst:.1e}  "
+          f"{'ok' if held else 'FAIL'}")
+    record("shot noise, weight load, keep mode: every particle of the bunch is present at its own charge",
+           worst, 1e-12, "max", held)
+    return good and held
+
+
 def run_load(exe, workdir, root, text):
     """One load_only run from flat keys. Returns its output and its particle dump's path."""
     (workdir / f"{root}.toml").write_text(to_groups(text))
@@ -279,7 +475,7 @@ def gauss_text(lat, root, seed, limit, kick):
 def fewer_beamlets(exe, lat, workdir, seeds, limit, label, kick="first_order"):
     """The Gaussian bunch with the fewest electrons a beamlet may hold at limit, None
     being the key left at its default, which the load is then held to as one electron.
-    kick is the load's beam.shot_noise_kick."""
+    kick is the load's beam.shot_noise_method."""
     n_min = 1.0 if limit is None else limit
     mbase = N_PARTICLE // BEAMLET_SIZE
     names = ("one beamlet, under the limit", "fewer beamlets", "the input file's beamlets")
@@ -413,7 +609,7 @@ KEEP_NML = """[run]
   load_mode = "keep"
   quiet_start = {quiet}
   shot_noise = T
-  shot_noise_kick = "{kick}"
+  shot_noise_method = "{kick}"
   beamlet_size = {beamlet_size}
 {source}/
 [field]
@@ -656,6 +852,10 @@ def main():
               f"over the scans (check <= 1e-4)  {'ok' if good else 'FAIL'}")
         record(f"shot noise, the level the loader states for {name} against the closed form",
                stated_worst[kick], 1e-4, "max", good)
+
+    ok = weight_scan(exe, PARSED.lat, workdir, PARSED.seeds) and ok
+    ok = weight_gauss(exe, PARSED.lat, workdir, PARSED.seeds) and ok
+    ok = weight_kept(exe, PARSED.lat, workdir, max(3, PARSED.seeds // 3)) and ok
 
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, None,
                         "Gaussian bunch, beam.beamlet_min_electrons at its default") and ok

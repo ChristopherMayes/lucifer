@@ -146,7 +146,32 @@ type fel_noise_tally_struct
   integer :: n_beamlet_min = huge(1)  ! Fewest beamlets in a slice that carries noise.
   real(rp) :: n_electron_held = 0  ! Electrons in the slices with a draw held at fel_kick_b_max$.
   integer(8) :: n_draw_held = 0    ! Draws held there.
-  logical :: bessel_kick = .true.  ! The kick is sized from J1 (beam.shot_noise_kick).
+  integer :: method = 2            ! How the noise was imposed, fel_noise_bessel$ and its like.
+  real(rp) :: n_counted = 0        ! Electrons counted into weights by the weight load.
+  real(rp) :: q_unit = 0           ! The charge of one of them in the sample mode [C].
+end type
+
+! How the shot noise is imposed, beam.shot_noise_method (docs/shot-noise.md): by a kick of
+! the phases sized to first order or from J1, or through the weights.
+
+integer, parameter :: fel_noise_first_order$ = 1, fel_noise_bessel$ = 2, fel_noise_weight$ = 3
+
+!+
+! Struct fel_weight_draw_struct
+!
+! The state of the weight load's draw as it goes from slice to slice (fel_weight_noise).
+! In the sample mode the bunch's electrons are counted once, n_left of them not yet given
+! to a slice, and each slice takes a binomial share of what is left, so the counts of all
+! the slices sum to the bunch's exactly. In the keep mode every group holds its own
+! charge and nothing is carried between slices.
+!-
+
+type fel_weight_draw_struct
+  real(rp) :: q_unit = 0     ! The charge of one counted electron [C].
+  real(rp) :: n_left = 0     ! Counted electrons not yet given to a slice.
+  real(rp) :: q_left = 0     ! Mean charge of the slices not yet loaded [C].
+  real(rp) :: q_total = 0    ! The bunch's charge [C].
+  logical :: kept = .false.  ! Keep mode: each group holds its own charge.
 end type
 
 ! The largest bunching a sinusoidal kick gives a group of evenly spaced phases, the first
@@ -1584,7 +1609,7 @@ end function beamlet_groups
 !------------------------------------------------------------------------------
 !+
 ! Subroutine fel_impose_noise (sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts,
-!                              islice, bessel_kick, tally, rule, floor_n_lambda, err_flag)
+!                              islice, method, draw, tally, rule, floor_n_lambda, err_flag)
 !
 ! Routine to impose physical shot noise on one slice's load, whatever made it
 ! (fel-physics.md sec-noise). Two things happen in order.
@@ -1615,10 +1640,15 @@ end function beamlet_groups
 !   grid_half_width -- real(rp): The field grid's half width [m], for the cell rule.
 !   grid_n_pts      -- integer: The field grid's points per side, for the cell rule.
 !   islice          -- integer: Slice index, for the message.
-!   bessel_kick     -- logical: Size the kick from J1 (beam.shot_noise_kick = "bessel")?
-!                       False gives the first-order kick.
+!   method          -- integer: beam.shot_noise_method: fel_noise_first_order$,
+!                       fel_noise_bessel$ or fel_noise_weight$.
+!   draw            -- fel_weight_draw_struct: The weight load's state, from
+!                       fel_weight_start. Not read by the kicks.
 !
 ! Output:
+!   sl              -- fel_slice_struct: Under the weight load, the weights are the counts
+!                       drawn. The phases are not moved.
+!   draw            -- fel_weight_draw_struct: With the slice's share taken.
 !   theta(:)        -- real(rp): Phases with the noise imposed.
 !   tally           -- fel_noise_tally_struct: The slice's electrons, the noise power
 !                       its groups load and its held draws are added to the running sums.
@@ -1628,12 +1658,13 @@ end function beamlet_groups
 !-
 
 subroutine fel_impose_noise (sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts, &
-                             islice, bessel_kick, tally, rule, floor_n_lambda, err_flag)
+                             islice, method, draw, tally, rule, floor_n_lambda, err_flag)
 
 type (fel_slice_struct) sl
 type (fel_noise_tally_struct) tally
+type (fel_weight_draw_struct) draw
 real(rp) theta(:), grid_half_width, floor_n_lambda
-integer n, beamlet_size, grid_n_pts, islice, n_clamp, n_held, rule
+integer n, beamlet_size, grid_n_pts, islice, method, n_clamp, n_held, rule
 logical quiet_start, bessel_kick, err_flag
 
 integer, allocatable :: group(:)
@@ -1668,6 +1699,23 @@ endif
 nharm = max(1, (beamlet_size - 1) / 2)
 n_clamp = 0
 n_held = 0
+bessel_kick = (method == fel_noise_bessel$)
+
+! The weight load counts electrons into the weights of the beamlets this loader made, and
+! leaves the phases where the quiet start put them.
+
+if (method == fel_noise_weight$) then
+  if (.not. quiet_start .or. mod(n, max(1, beamlet_size)) /= 0) then
+    call out_io (s_error$, r_name, 'SLICE \i0\ : beam.shot_noise_method = "weight" COUNTS ELECTRONS INTO THE', &
+                 'WEIGHTS OF THE BEAMLETS THE LOADER MAKES, AND THIS LOAD HAS NONE.', &
+                 'POSSIBLE SOLUTION: quiet_start = true, OR shot_noise_method = "bessel".', i_array = [islice])
+    return
+  endif
+  rule = 1
+  call fel_weight_noise (draw, sl%weight, n, beamlet_size, tally)
+  err_flag = .false.
+  return
+endif
 
 if (quiet_start .and. mod(n, max(1, beamlet_size)) == 0) then
   rule = 1
@@ -1730,6 +1778,347 @@ enddo
 end subroutine compress_groups
 
 end subroutine fel_impose_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_ran_binomial (n, p) result (k)
+!
+! Routine to draw a binomial count, the successes in n trials of probability p each, from
+! the program's random stream (ran_uniform). The draw is exact in distribution. Where
+! n min(p, 1-p) is under 10 the probabilities are summed upward from zero successes
+! against one uniform number. Above, it is the transformed rejection of W. Hormann, "The
+! generation of binomial random variates", J. Stat. Comput. Simul. 46, 101 (1993),
+! algorithm BTRS, which takes about 1.2 pairs of uniform numbers a draw. The counts are
+! reals so that n may pass the largest default integer, and are whole to 2^53.
+!
+! Input:
+!   n -- real(rp): Trials, a whole number.
+!   p -- real(rp): Probability of one success, 0 to 1.
+!
+! Output:
+!   k -- real(rp): Successes, a whole number from 0 to n.
+!-
+
+function fel_ran_binomial (n, p) result (k)
+
+real(rp) n, p, k, pp, q, r, u, v, us, f, log_q, spq, a, b, c, v_r, alpha, m, h
+logical flip
+
+!
+
+k = 0
+if (n < 1 .or. p <= 0) return
+k = n
+if (p >= 1) return
+
+flip = (p > 0.5_rp)
+pp = min(p, 1 - p)
+q = 1 - pp
+r = pp / q
+
+if (n * pp < 10) then
+
+  ! log(1 - p) by its series where 1 - p rounds.
+
+  if (pp < 1e-5_rp) then
+    log_q = -pp * (1 + pp * (0.5_rp + pp / 3))
+  else
+    log_q = log(q)
+  endif
+  call ran_uniform (u)
+  k = 0
+  f = exp(n * log_q)
+  do
+    if (u <= f .or. k >= n) exit
+    u = u - f
+    k = k + 1
+    f = f * r * (n - k + 1) / k
+  enddo
+
+else
+  spq = sqrt(n * pp * q)
+  b = 1.15_rp + 2.53_rp * spq
+  a = -0.0873_rp + 0.0248_rp * b + 0.01_rp * pp
+  c = n * pp + 0.5_rp
+  v_r = 0.92_rp - 4.2_rp / b
+  alpha = (2.83_rp + 5.1_rp / b) * spq
+  m = floor((n + 1) * pp)
+  do
+    call ran_uniform (u)
+    call ran_uniform (v)
+    u = u - 0.5_rp
+    us = 0.5_rp - abs(u)
+    k = floor((2 * a / us + b) * u + c)
+    if (us >= 0.07_rp .and. v <= v_r) exit
+    if (k < 0 .or. k > n) cycle
+    if (us <= 0 .or. v <= 0) cycle
+
+    ! The log of the probability of k over that of the mode m, with the factorials by
+    ! Stirling's form and its tail (stirling_tail).
+
+    v = log(v * alpha / (a / us**2 + b))
+    h = (m + 0.5_rp) * log((m + 1) / (r * (n - m + 1))) + (n + 1) * log((n - m + 1) / (n - k + 1)) + &
+        (k + 0.5_rp) * log(r * (n - k + 1) / (k + 1)) + &
+        stirling_tail(m) + stirling_tail(n - m) - stirling_tail(k) - stirling_tail(n - k)
+    if (v <= h) exit
+  enddo
+endif
+
+if (flip) k = n - k
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Function stirling_tail (j) result (tail)
+!
+! Routine to give log(j!) less (j + 1/2) log(j + 1) - (j + 1) + log(2 pi)/2.
+!-
+
+function stirling_tail (j) result (tail)
+
+real(rp) j, tail, jp
+real(rp), parameter :: small(0:9) = [0.0810614667953272_rp, 0.0413406959554092_rp, 0.0276779256849983_rp, &
+        0.02079067210376509_rp, 0.0166446911898211_rp, 0.0138761288230707_rp, 0.0118967099458917_rp, &
+        0.0104112652619720_rp, 0.00925546218271273_rp, 0.00833056343336287_rp]
+
+if (j < 10) then
+  tail = small(nint(j))
+else
+  jp = j + 1
+  tail = (1.0_rp / 12 - (1.0_rp / 360 - 1.0_rp / 1260 / jp**2) / jp**2) / jp
+endif
+
+end function stirling_tail
+
+end function fel_ran_binomial
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_weight_start (draw, q_total, kept)
+!
+! Routine to start a load's weight draw (fel_weight_noise). In the sample mode the bunch's
+! charge q_total is counted as the nearest whole number of electrons, at least one, and
+! the charge of one counted electron is q_total over that number. The loaded charge is
+! then q_total exactly. The noise power loaded over the shot noise of q_total/e electrons
+! is that charge over e, which is within one part in twice the count of 1.
+!
+! Input:
+!   q_total -- real(rp): The charge the load is to hold, the sum over its slices [C].
+!   kept    -- logical: Keep mode? Each group then holds its own charge, and q_total is
+!               not read.
+!
+! Output:
+!   draw    -- fel_weight_draw_struct: The state before the first slice.
+!-
+
+subroutine fel_weight_start (draw, q_total, kept)
+
+type (fel_weight_draw_struct) draw
+real(rp) q_total
+logical kept
+
+!
+
+draw = fel_weight_draw_struct()
+draw%kept = kept
+if (kept .or. q_total <= 0) return
+draw%q_total = q_total
+draw%q_left = q_total
+draw%n_left = max(1.0_rp, anint(q_total / e_charge))
+draw%q_unit = q_total / draw%n_left
+
+end subroutine fel_weight_start
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_weight_noise (draw, weight, n, beamlet_size, tally)
+!
+! Routine to impose the shot noise on one quiet slice through its weights
+! (docs/shot-noise.md). Each macroparticle comes to stand for a whole number of electrons,
+! drawn as the electrons of a real beam fall: independently, each into a macroparticle
+! with a probability in proportion to the weight the quiet load gave it. The phases stay
+! the beamlets' evenly spaced ones. The bunching of the slice at every harmonic below the
+! beamlet size is then a sum over independent electrons, and its mean square is one over
+! their number, at any number. No phase is moved.
+!
+! In the sample mode the counts of the whole bunch are one multinomial draw, taken in
+! order: the slice takes a binomial share of the electrons not yet given, by its share of
+! the charge not yet loaded, and each macroparticle a binomial share of what the slice
+! has left. The counts of all the slices therefore sum to the bunch's, and a slice's own
+! count varies about its mean as the real beam's does.
+!
+! In the keep mode every group of beamlet_size copies is a particle of the bunch and
+! holds its own charge. A group of N electrons, N at least 1, is counted as floor(N) or
+! one more, with the probability of floor(N) that makes the mean of one over the count
+! 1/N, which is what its noise power goes as. A group under one electron is counted as
+! one. The count falls on the copies with equal probability, and the charge of one counted
+! electron is the group's charge over its count.
+!
+! Input:
+!   draw         -- fel_weight_draw_struct: The state, from fel_weight_start.
+!   weight(:)    -- real(rp): The quiet load's macroparticle charges [C], beamlet-contiguous.
+!   n            -- integer: Particles in the slice, a multiple of beamlet_size.
+!   beamlet_size -- integer: Copies per beamlet.
+!   tally        -- fel_noise_tally_struct: The running sums.
+!
+! Output:
+!   draw         -- fel_weight_draw_struct: With the slice's electrons taken.
+!   weight(:)    -- real(rp): Each a whole number of counted electrons' charge [C]. A
+!                    macroparticle that drew none has zero.
+!   tally        -- fel_noise_tally_struct: The sums with the slice added.
+!-
+
+subroutine fel_weight_noise (draw, weight, n, beamlet_size, tally)
+
+type (fel_weight_draw_struct) draw
+type (fel_noise_tally_struct) tally
+real(rp) weight(:)
+integer n, beamlet_size
+
+real(rp) q_slice, n_slice, n_left, q_left, count, n_group, n_floor, u, q_one, power, n_mean
+integer ip, ib, im, i0, n_loaded
+logical low
+
+!
+
+q_slice = sum(weight(1:n))
+n_mean = q_slice / e_charge
+power = 0
+low = .false.
+n_loaded = 0
+
+if (draw%kept) then
+  do ib = 1, n / beamlet_size
+    i0 = (ib - 1) * beamlet_size
+    q_one = sum(weight(i0+1:i0+beamlet_size))
+    n_group = q_one / e_charge
+    if (q_one <= 0) cycle
+    n_floor = floor(n_group)
+    if (n_floor < 1) then
+      count = 1
+      power = power + n_group**2
+      low = .true.
+    else
+      call ran_uniform (u)
+      count = n_floor
+      if (u >= n_floor * (n_floor + 1 - n_group) / n_group) count = n_floor + 1
+      power = power + n_group
+    endif
+    tally%n_counted = tally%n_counted + count
+    q_one = q_one / count
+    n_left = count
+    do im = 1, beamlet_size
+      if (im == beamlet_size) then
+        count = n_left
+      else
+        count = fel_ran_binomial (n_left, 1.0_rp / (beamlet_size - im + 1))
+      endif
+      weight(i0+im) = count * q_one
+      n_left = n_left - count
+    enddo
+    n_loaded = n_loaded + 1
+  enddo
+
+elseif (q_slice > 0 .and. draw%n_left > 0) then
+
+  ! The slice's share of the electrons not yet given. The last slice with charge takes
+  ! what is left.
+
+  if (draw%q_left - q_slice <= 1e-12_rp * draw%q_total) then
+    n_slice = draw%n_left
+  else
+    n_slice = fel_ran_binomial (draw%n_left, q_slice / draw%q_left)
+  endif
+  draw%n_left = draw%n_left - n_slice
+  draw%q_left = draw%q_left - q_slice
+  tally%n_counted = tally%n_counted + n_slice
+  tally%q_unit = draw%q_unit
+  power = n_mean * draw%q_unit / e_charge
+
+  n_left = n_slice
+  q_left = q_slice
+  do ip = 1, n
+    if (n_left <= 0) then
+      count = 0
+    elseif (ip == n .or. q_left - weight(ip) <= 1e-12_rp * q_slice) then
+      count = n_left
+    else
+      count = fel_ran_binomial (n_left, weight(ip) / q_left)
+    endif
+    q_left = q_left - weight(ip)
+    n_left = n_left - count
+    weight(ip) = count * draw%q_unit
+  enddo
+  do ib = 1, n / beamlet_size
+    if (sum(weight((ib-1)*beamlet_size+1 : ib*beamlet_size)) > 0) n_loaded = n_loaded + 1
+  enddo
+else
+  weight(1:n) = 0
+endif
+
+tally%method = fel_noise_weight$
+tally%n_slice = tally%n_slice + 1
+tally%n_electron = tally%n_electron + n_mean
+tally%power = tally%power + power
+if (n_loaded > 0) tally%n_beamlet_min = min(tally%n_beamlet_min, n_loaded)
+if (n_mean < 1) then
+  tally%n_slice_sub = tally%n_slice_sub + 1
+elseif (low) then
+  tally%n_slice_low = tally%n_slice_low + 1
+  tally%n_electron_low = tally%n_electron_low + n_mean
+  tally%power_low = tally%power_low + power
+endif
+
+end subroutine fel_weight_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_loaded_beamlets (weight, n, beamlet_size, keep, n_keep)
+!
+! Routine to list the particles of the beamlets that hold charge, in order. The weight
+! load leaves a beamlet none of whose copies drew an electron at zero weight, and the
+! sample-mode loaders do not load it. A copy at zero weight in a beamlet that holds
+! charge stays, so a loaded slice is still whole beamlets.
+!
+! Input:
+!   weight(:)    -- real(rp): Macroparticle charges [C], beamlet-contiguous.
+!   n            -- integer: Particles, a multiple of beamlet_size.
+!   beamlet_size -- integer: Copies per beamlet.
+!
+! Output:
+!   keep(:)      -- integer, allocatable: Indices of the particles to load, ascending.
+!   n_keep       -- integer: How many, a multiple of beamlet_size.
+!-
+
+subroutine fel_loaded_beamlets (weight, n, beamlet_size, keep, n_keep)
+
+real(rp) weight(:)
+integer n, beamlet_size, n_keep, ib, im
+integer, allocatable :: keep(:)
+
+!
+
+if (allocated(keep)) deallocate (keep)
+allocate (keep(n))
+n_keep = 0
+do ib = 1, n / beamlet_size
+  if (sum(weight((ib-1)*beamlet_size+1 : ib*beamlet_size)) <= 0) cycle
+  do im = 1, beamlet_size
+    n_keep = n_keep + 1
+    keep(n_keep) = (ib - 1) * beamlet_size + im
+  enddo
+enddo
+
+end subroutine fel_loaded_beamlets
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1956,7 +2345,7 @@ tally%n_slice = tally%n_slice + 1
 tally%n_electron = tally%n_electron + n_slice_e
 tally%power = tally%power + power
 tally%n_beamlet_min = min(tally%n_beamlet_min, n_group)
-tally%bessel_kick = bessel_kick
+tally%method = merge(fel_noise_bessel$, fel_noise_first_order$, bessel_kick)
 if (n_held > 0) then
   tally%n_draw_held = tally%n_draw_held + n_held
   tally%n_electron_held = tally%n_electron_held + n_slice_e
@@ -1979,7 +2368,7 @@ end subroutine fel_tally_noise
 !
 ! Routine to print, once per load, which grouping the shot noise was imposed on, the
 ! worst quiet floor found before it, and the noise power the load holds against the
-! shot noise of its electrons, by the kick's form (beam.shot_noise_kick). A user who did
+! shot noise of its electrons, by how it was imposed (beam.shot_noise_method). A user who did
 ! not make the beamlets has no other way to know what the noise was drawn on. Under the
 ! kick from J1 the draws held at the largest bunching a kick gives are stated with the
 ! share of the charge in their slices. The slices that hold one electron or more and have
@@ -2019,21 +2408,41 @@ write (lines(2), '(a, es10.2)') '  worst quiet floor before imposing, |b|^2 * N_
 
 if (tally%n_slice > 0 .and. tally%n_electron > 0) then
   nl = nl + 1
-  if (tally%bessel_kick) then
-    lines(nl) = '  kick sized from the bunching it gives, J1 (beam.shot_noise_kick = "bessel").'
-  else
-    lines(nl) = '  kick of first order in its size (beam.shot_noise_kick = "first_order").'
-  endif
+  select case (tally%method)
+  case (fel_noise_weight$)
+    lines(nl) = '  imposed through the weights, a whole number of electrons each (beam.shot_noise_method = "weight").'
+  case (fel_noise_bessel$)
+    lines(nl) = '  kick sized from the bunching it gives, J1 (beam.shot_noise_method = "bessel").'
+  case default
+    lines(nl) = '  kick of first order in its size (beam.shot_noise_method = "first_order").'
+  end select
   nl = nl + 1
   write (lines(nl), '(a, f7.4)') '  noise power loaded over the shot-noise power, fundamental: ', &
         tally%power / tally%n_electron
+  if (tally%method == fel_noise_weight$) then
+    nl = nl + 1
+    if (tally%q_unit > 0) then
+      write (lines(nl), '(a, es13.6, a, es10.2, a)') '  ', tally%n_counted, &
+            ' electrons counted, the bunch charge held, the charge of one off the electron''s by', &
+            tally%q_unit / e_charge - 1, ' of itself.'
+    else
+      write (lines(nl), '(a, es13.6, a)') '  ', tally%n_counted, &
+            ' electrons counted, every particle of the bunch at its own charge.'
+    endif
+  endif
   if (tally%n_draw_held > 0) then
     nl = nl + 1
     write (lines(nl), '(a, i0, a, f6.3, a, es9.2, a)') '  ', tally%n_draw_held, &
           ' draws asked for more bunching than a kick gives,', fel_kick_b_max$, &
           ', and are held there, in slices with', tally%n_electron_held / tally%n_electron, ' of the charge.'
   endif
-  if (present(n_min)) then
+  if (tally%method == fel_noise_weight$) then
+    if (tally%n_slice_thin > 0) then
+      nl = nl + 1
+      write (lines(nl), '(a, i0, a, i0)') '  a beamlet that drew no electron is not loaded: ', tally%n_slice_thin, &
+            ' slices have fewer beamlets for it, the fewest with any ', min(tally%n_beamlet_min, huge(1) - 1)
+    endif
+  elseif (present(n_min)) then
     nl = nl + 1
     if (n_min > 0) then
       write (lines(nl), '(a, es9.2, a, i0, a, i0)') '  beamlets of', n_min, &

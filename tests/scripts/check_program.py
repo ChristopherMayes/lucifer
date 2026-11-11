@@ -591,7 +591,7 @@ def main():
            "run.fp32_check": "on", "run.device": "metl", "beam.z_distribution": "gauss",
            "beam.load_mode": "all", "field.seed_polarization": "z", "wake.model": "mine",
            "wake.material": "FE", "space_charge.model": "mine", "field.propagator": "spectra",
-           "beam.shot_noise_kick": "second_order"}
+           "beam.shot_noise_method": "second_order"}
     check("every key with a set of names has a refusal check here", sorted(bad) == sorted(names),
           note=f"[{len(names)} keys with a set]")
     for key in sorted(names):

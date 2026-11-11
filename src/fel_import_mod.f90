@@ -54,7 +54,7 @@ type fel_resample_param_struct
   real(rp) :: beamlet_min_electrons = 0  ! Fewest electrons a beamlet stands for. 0: one count
                                          !   in every slice (fel_beamlet_count).
   logical :: skip_empty = .false.        ! Load a slice with no charge with no particles.
-  logical :: bessel_kick = .true.        ! Size the shot-noise kick from J1 (fel_bessel_kick).
+  integer :: noise_method = fel_noise_bessel$   ! How the shot noise is imposed (beam.shot_noise_method).
   integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
   ! For validation only: resample a bunch Bmad generated from beam_init, and not one read
   ! from a file. So the SDDSBeam transcription can be checked on a known bunch. A
@@ -106,7 +106,9 @@ type (bunch_struct), target :: bunch
 type (fel_resample_param_struct) prm
 logical quiet_start, shot_noise
 real(rp) grid_half_width
-integer grid_n_pts, rule, rule_seen
+integer grid_n_pts, rule, rule_seen, n_keep_w
+integer, allocatable :: keep_w(:)
+type (fel_weight_draw_struct) weight_draw
 real(rp) floor_nl, floor_worst
 type (fel_beam_struct), target :: fbeam
 type (fel_slice_struct), pointer :: sl
@@ -228,6 +230,20 @@ floor_worst = 0
 
 allocate (cg(prm%n_particle_per_slice), cx(prm%n_particle_per_slice), cy(prm%n_particle_per_slice), cpx(prm%n_particle_per_slice), cpy(prm%n_particle_per_slice), &
           theta(prm%n_particle_per_slice), wk(prm%n_particle_per_slice))
+
+! The weight load counts the electrons of all the slices once, so the charge of every
+! slice's sampling window is summed before the first slice is loaded.
+
+if (shot_noise .and. prm%noise_method == fel_noise_weight$) then
+  w_part = 0
+  do islice = 1, nslice
+    sloc = (islice - 1) * slice_spacing
+    do i = 1, nalive
+      if (s(i) > sloc - 0.5_rp*dslen .and. s(i) < sloc + 0.5_rp*dslen) w_part = w_part + wt(i)
+    enddo
+  enddo
+  call fel_weight_start (weight_draw, w_part * slice_spacing / dslen, .false.)
+endif
 
 do islice = 1, nslice
   sloc = (islice - 1) * slice_spacing
@@ -461,14 +477,35 @@ sl%weight(1:npart_s) = w_part
 ! Noise where the input file asks for it. Genesis's importdistribution applies it whether or
 ! not its shotnoise flag says so. This port applies it only with shot_noise = true.
 
-if (ne > 0 .and. shot_noise) then
+! The weight load counts into every slice with charge, a slice under half an electron too.
+
+if ((ne > 0 .or. (prm%noise_method == fel_noise_weight$ .and. cur > 0)) .and. shot_noise) then
   call fel_impose_noise (sl, theta(1:npart_s), npart_s, quiet_start, &
-                         prm%beamlet_size, grid_half_width, grid_n_pts, islice, prm%bessel_kick, tally, &
-                         rule, floor_nl, err_flag)
+                         prm%beamlet_size, grid_half_width, grid_n_pts, islice, prm%noise_method, weight_draw, &
+                         tally, rule, floor_nl, err_flag)
   if (err_flag) return
   if (mpart_s < mpart) tally%n_slice_thin = tally%n_slice_thin + 1
   rule_seen = max(rule_seen, rule)
   floor_worst = max(floor_worst, floor_nl)
+
+  ! Under the weight load a beamlet none of whose copies drew an electron is not loaded.
+
+  if (prm%noise_method == fel_noise_weight$) then
+    call fel_loaded_beamlets (sl%weight, npart_s, prm%beamlet_size, keep_w, n_keep_w)
+    if (n_keep_w < npart_s) then
+      cg(1:n_keep_w) = cg(keep_w(1:n_keep_w));    cx(1:n_keep_w) = cx(keep_w(1:n_keep_w))
+      cy(1:n_keep_w) = cy(keep_w(1:n_keep_w));    cpx(1:n_keep_w) = cpx(keep_w(1:n_keep_w))
+      cpy(1:n_keep_w) = cpy(keep_w(1:n_keep_w));  theta(1:n_keep_w) = theta(keep_w(1:n_keep_w))
+      sl%weight(1:n_keep_w) = sl%weight(keep_w(1:n_keep_w))
+      npart_s = n_keep_w
+      sl%n = npart_s
+      tally%n_slice_thin = tally%n_slice_thin + 1
+    endif
+    if (npart_s == 0) then
+      sl%m_ind = 1
+      return
+    endif
+  endif
 endif
 sl%m_ind = fel_m_ind (sl, beamlet_groups(npart_s, prm%beamlet_size), &
                       npart_s / prm%beamlet_size)

@@ -93,7 +93,7 @@ BMAD_NML = """! flat keys; routed into the input file's tables by lucifer.flat.t
   window_length = 9.6e-9
   n_wavelength = 3
   shot_noise = T
-  shot_noise_kick = "first_order"
+  shot_noise_method = "first_order"
   ran_seed = {seed}
   write_diag = T
 &end

@@ -32,37 +32,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | Unit |
 |---|---|---|
-| exit power | 2.8521e+07 | W |
-| exit power per slice | 2.9709e+05 | W |
-| exit power, rms over mean across slices | 1.1140e+00 |  |
-| exit window energy | 2.8540e-11 | J |
-| exit pulse energy, the window's and the light slipped out of it | 8.0888e-10 | J |
-| peak power | 4.2881e+07 | W |
-| s of the peak power | 5.6760e+01 | m |
-| mode peak, power inside the split | 4.2428e+07 | W |
-| s of the mode peak | 5.6760e+01 | m |
-| exit power inside the split | 2.8201e+07 | W |
-| exit power outside the split | 3.1917e+05 | W |
-| outside over inside, the run's maximum | 1.0684e-02 |  |
-| outside over inside at the exit | 1.1317e-02 |  |
-| split angle | 2.9625e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 6.0164e+00 | m |
-| power at the first element end | 6.2330e+06 | W |
-| power per slice at the first element end | 6.4927e+04 | W |
-| initial bunching, mean |b| over slices | 5.7485e-03 |  |
-| exit bunching, mean |b| over slices | 1.4286e-02 |  |
-| exit bunching, the largest slice | 4.7012e-02 |  |
-| bunching, the maximum along the line of the mean |b| | 1.4286e-02 |  |
+| exit power | 3.5069e+07 | W |
+| exit power per slice | 3.6530e+05 | W |
+| exit power, rms over mean across slices | 1.0401e+00 |  |
+| exit window energy | 3.5093e-11 | J |
+| exit pulse energy, the window's and the light slipped out of it | 1.6329e-09 | J |
+| peak power | 9.5426e+07 | W |
+| s of the peak power | 5.1400e+01 | m |
+| mode peak, power inside the split | 9.4344e+07 | W |
+| s of the mode peak | 5.2010e+01 | m |
+| exit power inside the split | 3.4584e+07 | W |
+| exit power outside the split | 4.8467e+05 | W |
+| outside over inside, the run's maximum | 1.1309e-02 |  |
+| outside over inside at the exit | 1.4014e-02 |  |
+| split angle | 2.9788e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 6.4031e+00 | m |
+| power at the first element end | 5.4038e+06 | W |
+| power per slice at the first element end | 5.6289e+04 | W |
+| initial bunching, mean |b| over slices | 6.5646e-03 |  |
+| exit bunching, mean |b| over slices | 1.5300e-02 |  |
+| exit bunching, the largest slice | 4.5762e-02 |  |
+| bunching, the maximum along the line of the mean |b| | 1.5300e-02 |  |
 | s of the bunching maximum | 5.7000e+01 | m |
-| bunching at the mode peak | 1.4203e-02 |  |
-| power of the largest slice at the bunching maximum | 1.2501e+06 | W |
-| exit power of the largest slice | 1.2501e+06 | W |
+| bunching at the mode peak | 1.4162e-02 |  |
+| power of the largest slice at the bunching maximum | 1.2128e+06 | W |
+| exit power of the largest slice | 1.2128e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.7996e+09 | eV |
-| mean slice energy, exit minus start | -4.2329e+06 | eV |
-| slice energy spread at the start | 5.0577e+05 | eV |
-| slice energy spread at the exit | 5.1398e+05 | eV |
-| span of the slice energies at the exit, head to tail | 6.8404e+06 | eV |
+| mean slice energy, exit minus start | -4.2359e+06 | eV |
+| slice energy spread at the start | 5.0859e+05 | eV |
+| slice energy spread at the exit | 5.2697e+05 | eV |
+| span of the slice energies at the exit, head to tail | 6.8319e+06 | eV |
 | slices | 96 |  |
 | records | 1105 |  |
 | slice spacing | 3.0000e-10 | m |
@@ -71,10 +71,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5690e-06 | m |
 | grid derived by setup | no |  |
 | FEL steps | 1068 |  |
-| source filter, mode angle | 2.9620e-06 | rad |
-| source filter, rho angle | 2.6100e-06 | rad |
+| source filter, mode angle | 2.9790e-06 | rad |
+| source filter, rho angle | 2.6270e-06 | rad |
 | source filter, ratio of the angles | 1.1300e+00 |  |
-| source filter, edge | 2.9625e-06 | rad |
+| source filter, edge | 2.9788e-06 | rad |
 
 ## The input files
 

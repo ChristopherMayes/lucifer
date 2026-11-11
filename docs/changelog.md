@@ -9,6 +9,26 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-11 Changed: the shot noise is imposed through the weights by default, and
+  `beam.shot_noise_method` replaces `beam.shot_noise_kick` ([](shot-noise.md#shot-weight)). Under
+  `"weight"` the loader moves no phase. Every macroparticle of a beamlet comes to stand for a whole
+  number of electrons, one multinomial draw of the bunch's electrons over its macroparticles
+  (`fel_weight_noise`, `fel_ran_binomial`). The noise power is then the shot noise as an equality,
+  at every harmonic below `beamlet_size` and at any number of electrons, where the kick from J1
+  loads 0.91 of it at 10 electrons a beamlet and 0.22 at one and reaches harmonics 1 to 3. The
+  loaded charge is the bunch's exactly, and a slice's charge varies about its mean as the real
+  beam's does, by 0.7% for a slice of 18740 electrons. A beamlet that draws no electron is not
+  loaded, so a slice of few electrons loads few beamlets with no rule, and
+  `beam.beamlet_min_electrons` is read by the kicks alone. In the keep mode every particle keeps its
+  own charge. `"bessel"` and `"first_order"` are the two kicks, the same bits as before, and an
+  input file that set `beam.shot_noise_kick` sets `beam.shot_noise_method` to the same value. A run
+  with shot noise that names no method is a different shot at the same `ran_seed`. Over six seeds
+  the import example's kept bunch, 3.76 electrons a particle, starts 1.62 +- 0.16 times higher
+  than under the kick from J1, where the levels give 1.61. The sase example, FLASH1 and LCLS start
+  and exit within the spread of six shots of where they did, in the same run time. The weight load
+  needs the quiet start, and a load without it is refused with `"bessel"` in the message. A
+  harmonic field may now start from noise up to harmonic `beamlet_size - 1`. Every example with
+  shot noise is rerun.
 - 2026-11-11 Changed: the shot-noise kick is sized from the bunching it gives, and the new key
   `beam.shot_noise_kick` selects it ([](shot-noise.md#shot-bessel)). A kick of size z gives a
   beamlet the bunching J1(z). The loader sized it as z/2, the first-order form of Fawley's

@@ -886,8 +886,13 @@ block
   endif
   call out_io (s_blank$, r_name, trim(line))
   if (n_empty > 0) then
-    write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &
-          ' slices have no charge and are loaded with no particles.'
+    if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
+      write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &
+            ' slices have no charge or drew no electron, and are loaded with no particles.'
+    else
+      write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &
+            ' slices have no charge and are loaded with no particles.'
+    endif
     call out_io (s_blank$, r_name, trim(line))
   endif
 
@@ -913,16 +918,19 @@ block
   ! 1 through (beamlet_size - 1)/2.
 
   nharm_noise = (run%bparam%beamlet_size - 1) / 2
-  if (run%bparam%shot_noise) then
+  if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
+    write (line, '(a, i0, a)') '             Shot noise on harmonics 1 to ', run%bparam%beamlet_size - 1, &
+          ', through the weights (beam.shot_noise_method = "weight").'
+  elseif (run%bparam%shot_noise) then
     write (line, '(a, i0, a)') '             Shot noise on harmonics 1 to ', nharm_noise, &
           ', which is (beamlet_size - 1)/2.'
     call out_io (s_blank$, r_name, trim(line))
-    if (run%bparam%shot_noise_kick == 'bessel') then
+    if (run%bparam%shot_noise_method == 'bessel') then
       line = '             The kick is sized from the bunching it gives, J1 ' // &
-            '(beam.shot_noise_kick = "bessel").'
+            '(beam.shot_noise_method = "bessel").'
     else
       line = '             The kick is of first order in its size, as in Genesis4 ' // &
-            '(beam.shot_noise_kick = "first_order").'
+            '(beam.shot_noise_method = "first_order").'
     endif
   else
     write (line, '(a, i0, a)') '             No shot noise. The quiet start leaves no bunching ' // &

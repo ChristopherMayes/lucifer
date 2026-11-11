@@ -55,9 +55,10 @@ character(400) beam_file, write_genesis_dist, write_openpmd_file
 character(16) load_mode
 character(400) out_root
 character(400) field_file(9)
-logical quiet_start, shot_noise, gen_test_weights, resample_split_weights, skip_empty, bessel_kick
+logical quiet_start, shot_noise, gen_test_weights, resample_split_weights, skip_empty
 logical split_weights, swap_beam_xy, err
-integer beamlet_size, ran_seed, is
+type (fel_weight_draw_struct) weight_draw
+integer beamlet_size, ran_seed, is, noise_method
 real(rp) beamlet_min_electrons
 real(rp) gamma0, lambda0, window_length, seed_power, seed_waist_size, grid_half_width
 integer n_win
@@ -81,18 +82,27 @@ load_mode = run%bparam%load_mode
 quiet_start = run%bparam%quiet_start
 beamlet_size = run%bparam%beamlet_size
 
-! Fewer beamlets in a slice of little charge is a rule about the noise, so it acts only
-! where the noise is imposed on beamlets this loader makes (docs/shot-noise.md).
+! How the noise is imposed (docs/shot-noise.md).
+
+select case (run%bparam%shot_noise_method)
+case ('weight');      noise_method = fel_noise_weight$
+case ('first_order'); noise_method = fel_noise_first_order$
+case default;         noise_method = fel_noise_bessel$
+end select
+
+! Fewer beamlets in a slice of little charge is a rule about the kicks, so it acts only
+! where a kick is imposed on beamlets this loader makes. The weight load counts electrons
+! into every slice's beamlets, and a slice of few electrons loads few of them with no rule.
 
 beamlet_min_electrons = 0
-if (run%bparam%shot_noise .and. run%bparam%quiet_start) beamlet_min_electrons = run%bparam%beamlet_min_electrons
+if (run%bparam%shot_noise .and. run%bparam%quiet_start .and. noise_method /= fel_noise_weight$) &
+      beamlet_min_electrons = run%bparam%beamlet_min_electrons
 
 ! A slice with no charge is loaded with no particles in the sample mode, whatever the
 ! noise. beam.beamlet_min_electrons = 0 gives every slice the input file's count, and
 ! such a slice then has particles of zero weight.
 
 skip_empty = run%bparam%beamlet_min_electrons > 0
-bessel_kick = (run%bparam%shot_noise_kick /= 'first_order')
 shot_noise = run%bparam%shot_noise
 gen_test_weights = run%bparam%gen_test_weights
 resample_split_weights = run%bparam%resample_split_weights
@@ -249,6 +259,8 @@ contains
 subroutine generate_initial_state ()
 
 type (fel_slice_struct), pointer :: sl
+integer, allocatable :: keep_w(:)
+integer n_keep_w
 real(rp) p0_mc, ks_l, eg_x, eg_y, u, v, x, xp, y, yp, gam, p_mc, beta, pz, theta0
 real(rp) w_part, wsum, w2sum, n_lambda, n_eff
 real(rp), allocatable :: theta_work(:), beta_work(:), cur_gen(:)
@@ -453,6 +465,11 @@ endif
 
 call ran_seed_put (ran_seed)
 
+! The weight load counts the window's electrons once, so the loaded charge is the charge
+! of these currents exactly.
+
+call fel_weight_start (weight_draw, sum(cur_gen) * fbeam%slice_spacing / c_light, .false.)
+
 ks_l = twopi / lambda0
 eg_x = beam_init%a_norm_emit / p0_mc  ! Normalized emittance to geometric.
 eg_y = beam_init%b_norm_emit / p0_mc
@@ -572,17 +589,37 @@ do is_g = 1, nslice_gen
     ! two ran_uniform per harmonic per beamlet, which the recorded levels assume.
 
     call fel_impose_noise (sl, theta_work, n_s, quiet_start, beamlet_size, grid_half_width, &
-                           grid_n_pts, is_g, bessel_kick, tally, rule, floor_nl, err_flag)
+                           grid_n_pts, is_g, noise_method, weight_draw, tally, rule, floor_nl, err_flag)
     if (err_flag) return
     rule_seen = max(rule_seen, rule)
     floor_max = max(floor_max, floor_nl)
     if (mb_s < mbase) tally%n_slice_thin = tally%n_slice_thin + 1
+
+    ! Under the weight load a beamlet none of whose copies drew an electron is not loaded.
+
+    if (noise_method == fel_noise_weight$) then
+      call fel_loaded_beamlets (sl%weight, n_s, beamlet_size, keep_w, n_keep_w)
+      if (n_keep_w < n_s) then
+        sl%x(1:n_keep_w) = sl%x(keep_w(1:n_keep_w));    sl%px(1:n_keep_w) = sl%px(keep_w(1:n_keep_w))
+        sl%y(1:n_keep_w) = sl%y(keep_w(1:n_keep_w));    sl%py(1:n_keep_w) = sl%py(keep_w(1:n_keep_w))
+        sl%pz(1:n_keep_w) = sl%pz(keep_w(1:n_keep_w));  sl%weight(1:n_keep_w) = sl%weight(keep_w(1:n_keep_w))
+        theta_work(1:n_keep_w) = theta_work(keep_w(1:n_keep_w))
+        beta_work(1:n_keep_w) = beta_work(keep_w(1:n_keep_w))
+        n_s = n_keep_w
+        sl%n = n_s
+        tally%n_slice_thin = tally%n_slice_thin + 1
+      endif
+      if (n_s == 0) then
+        sl%m_ind = 1
+        cycle
+      endif
+    endif
   endif
 
   ! The slice's independent transverse samples: the beamlets, or every particle alone.
 
   if (quiet_start) then
-    sl%m_ind = fel_m_ind (sl, beamlet_groups(n_s, beamlet_size), mb_s)
+    sl%m_ind = fel_m_ind (sl, beamlet_groups(n_s, beamlet_size), n_s / beamlet_size)
   else
     call fel_transverse_groups (sl, group_w, n_group_w)
     sl%m_ind = fel_m_ind (sl, group_w, n_group_w)
@@ -757,7 +794,7 @@ if (.not. resample%use_beam_init) then
 endif
 resample%beamlet_min_electrons = beamlet_min_electrons
 resample%skip_empty = skip_empty
-resample%bessel_kick = bessel_kick
+resample%noise_method = noise_method
 
 call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, resample, quiet_start, shot_noise, &
                        grid_half_width, grid_n_pts, fbeam, err_i, moments)
@@ -1046,6 +1083,7 @@ enddo
 ! and the floor swept. This holds whether or not the load made beamlets of that size.
 
 rule_seen = 0;  floor_max = 0
+call fel_weight_start (weight_draw, 0.0_rp, .true.)
 do is_g = 1, nslice_k
   sl => fbeam%slice(is_g)
   if (sl%n == 0) then
@@ -1106,7 +1144,7 @@ do k = 1, sl%n
   theta_k(k) = sl%z(k) * ks_l / beta_k(k)
 enddo
 call fel_impose_noise (sl, theta_k, sl%n, quiet_start, nbins, grid_half_width, grid_n_pts, &
-                       is_g, bessel_kick, tally, rule, floor_nl, err_flag)
+                       is_g, noise_method, weight_draw, tally, rule, floor_nl, err_flag)
 if (err_flag) return
 rule_seen = max(rule_seen, rule)
 floor_max = max(floor_max, floor_nl)

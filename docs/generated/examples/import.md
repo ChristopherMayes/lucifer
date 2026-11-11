@@ -23,7 +23,7 @@ The bunch is a Gaussian test bunch sized to what the FEL window can afford: `sig
 
 `lucifer.toml` generates 50000 particles and keeps every one. `load_mode = "keep"` makes each particle a beamlet of eight phase copies at an eighth of its charge. The slices then hold as many macroparticles as the bunch put there, a handful in the tails and tens of thousands at the peak, 400000 in all. Every charge-weighted moment of the bunch is the load's, and the window is the bunch's own extent. `quiet_start = true` spreads the copies over 2 pi about each particle's phase. `shot_noise = true` imposes the physical noise on the beamlets after measuring that the load is quiet, 2.6e-29 in |b|^2 N_lambda before the noise goes on. The input file also writes the bunch with `write_openpmd_file` as `import_bunch.h5`, 2.8 MB of openPMD.
 
-`lucifer_from_file.toml` names that file in `beam.position_file` and loads it in the sample mode. `beam.n_particle = 2048` macroparticles go into a slice, resampled by Genesis4's `importdistribution` method from the particles that fell into each slice's sampling window, with the current taken from the same window. Nine slices in the tails hold fewer electrons than the 256 beamlets that count makes, and each is loaded with one beamlet for each electron, the fewest 11 ([the shot-noise load](../../shot-noise.md#shot-fewer)). The same slices come out, since both modes bin the same bunch on the same spacing. `write_genesis_dist` writes the same bunch as a Genesis4 distribution file for its `&importdistribution`.
+`lucifer_from_file.toml` names that file in `beam.position_file` and loads it in the sample mode. `beam.n_particle = 2048` macroparticles go into a slice, resampled by Genesis4's `importdistribution` method from the particles that fell into each slice's sampling window, with the current taken from the same window. The noise is imposed through the weights, a whole number of electrons to each macroparticle, and a beamlet that draws no electron is not loaded ([the shot-noise load](../../shot-noise.md#shot-weight)). Fifteen slices in the tails have fewer than the 256 beamlets that count makes, the fewest 10, and one slice drew no electron. The same slices come out, since both modes bin the same bunch on the same spacing. `write_genesis_dist` writes the same bunch as a Genesis4 distribution file for its `&importdistribution`.
 
 On these inputs both modes exit far below saturation, a startup from a real bunch rather than a saturated FEL. The measured quantities are in the table below, the slice count and the peak slice's macroparticle count among them. The two exit powers differ, and the two runs are different SASE realizations of the same physics. The keep mode draws no random number before the noise and the sample mode draws for every resampled particle, so the noise falls on different phasors. In a dark start a small change in the load re-rolls the realization, as the per-slice spread of `../sase` shows. The keep mode costs what its 400000 macroparticles cost. A production run with a bunch from an accelerator simulation would keep fewer copies or sample.
 
@@ -35,37 +35,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | `lucifer_from_file.toml` | Unit |
 |---|---|---|---|
-| exit power | 4.6605e+04 | 1.3223e+05 | W |
-| exit power per slice | 1.3707e+03 | 3.8892e+03 | W |
-| exit power, rms over mean across slices | 1.6266e+00 | 1.6915e+00 |  |
-| exit window energy | 4.6638e-14 | 1.3233e-13 | J |
-| exit pulse energy, the window's and the light slipped out of it | 8.6279e-12 | 1.3315e-11 | J |
-| peak power | 2.0960e+05 | 3.3360e+05 | W |
-| s of the peak power | 4.5574e+01 | 5.6240e+01 | m |
-| mode peak, power inside the split | 1.7745e+05 | 3.2501e+05 | W |
-| s of the mode peak | 4.7260e+01 | 5.6760e+01 | m |
-| exit power inside the split | 4.4743e+04 | 1.2872e+05 | W |
-| exit power outside the split | 1.8623e+03 | 3.5184e+03 | W |
-| outside over inside, the run's maximum | 2.0531e-02 | 2.6452e-02 |  |
-| outside over inside at the exit | 4.1622e-02 | 2.7335e-02 |  |
-| split angle | 2.9795e-06 | 2.9331e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 4.9842e+00 | 4.1791e+00 | m |
-| power at the first element end | 1.0833e+05 | 1.3268e+05 | W |
-| power per slice at the first element end | 3.1862e+03 | 3.9022e+03 | W |
-| initial bunching, mean |b| over slices | 6.5450e-02 | 2.9157e-02 |  |
-| exit bunching, mean |b| over slices | 6.4561e-02 | 3.1076e-02 |  |
-| exit bunching, the largest slice | 4.1939e-01 | 1.5175e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 8.2006e-02 | 3.6791e-02 |  |
-| s of the bunching maximum | 3.9076e+01 | 7.2157e+00 | m |
-| bunching at the mode peak | 6.5248e-03 | 1.1373e-02 |  |
-| power of the largest slice at the bunching maximum | 9.9946e+03 | 8.5055e+03 | W |
-| exit power of the largest slice | 7.8454e+03 | 1.9801e+04 | W |
+| exit power | 7.3973e+04 | 1.0570e+05 | W |
+| exit power per slice | 2.1757e+03 | 3.1087e+03 | W |
+| exit power, rms over mean across slices | 1.5251e+00 | 1.7093e+00 |  |
+| exit window energy | 7.4024e-14 | 1.0577e-13 | J |
+| exit pulse energy, the window's and the light slipped out of it | 1.4762e-11 | 1.5945e-11 | J |
+| peak power | 3.1258e+05 | 3.6928e+05 | W |
+| s of the peak power | 3.1235e+01 | 2.7347e+00 | m |
+| mode peak, power inside the split | 2.7486e+05 | 3.3519e+05 | W |
+| s of the mode peak | 4.5100e+00 | 9.2600e+00 | m |
+| exit power inside the split | 7.0721e+04 | 1.0268e+05 | W |
+| exit power outside the split | 3.2521e+03 | 3.0182e+03 | W |
+| outside over inside, the run's maximum | 3.1300e-02 | 1.4905e-02 |  |
+| outside over inside at the exit | 4.5985e-02 | 2.9395e-02 |  |
+| split angle | 2.9795e-06 | 2.9551e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 4.6391e+00 | 4.4984e+00 | m |
+| power at the first element end | 2.8347e+05 | 3.1176e+05 | W |
+| power per slice at the first element end | 8.3373e+03 | 9.1695e+03 | W |
+| initial bunching, mean |b| over slices | 7.5523e-02 | 5.3516e-02 |  |
+| exit bunching, mean |b| over slices | 5.6369e-02 | 4.1594e-02 |  |
+| exit bunching, the largest slice | 3.9101e-01 | 2.4487e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 8.9870e-02 | 6.9744e-02 |  |
+| s of the bunching maximum | 1.0979e+01 | 3.2042e+01 | m |
+| bunching at the mode peak | 1.0633e-02 | 1.1449e-02 |  |
+| power of the largest slice at the bunching maximum | 1.4135e+04 | 1.2458e+04 | W |
+| exit power of the largest slice | 1.0271e+04 | 1.7421e+04 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
-| mean slice energy, exit minus start | 1.4751e+02 | 8.2656e+01 | eV |
-| slice energy spread at the start | 4.5587e+05 | 4.3215e+05 | eV |
-| slice energy spread at the exit | 4.5640e+05 | 4.3230e+05 | eV |
-| span of the slice energies at the exit, head to tail | 1.5100e+06 | 1.0896e+06 | eV |
+| mean slice energy, exit minus start | 3.5805e+02 | 7.8294e+00 | eV |
+| slice energy spread at the start | 4.5587e+05 | 4.2981e+05 | eV |
+| slice energy spread at the exit | 4.5666e+05 | 4.2999e+05 | eV |
+| span of the slice energies at the exit, head to tail | 1.5165e+06 | 1.1658e+06 | eV |
 | slices | 34 | 34 |  |
 | records | 1105 | 1105 |  |
 | slice spacing | 3.0000e-10 | 3.0000e-10 | m |
@@ -74,10 +74,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5690e-06 | 1.5690e-06 | m |
 | grid derived by setup | no | no |  |
 | FEL steps | 1068 | 1068 |  |
-| source filter, mode angle | 2.9790e-06 | 2.9330e-06 | rad |
-| source filter, rho angle | 2.6200e-06 | 2.6150e-06 | rad |
-| source filter, ratio of the angles | 1.1400e+00 | 1.1200e+00 |  |
-| source filter, edge | 2.9794e-06 | 2.9331e-06 | rad |
+| source filter, mode angle | 2.9790e-06 | 2.9550e-06 | rad |
+| source filter, rho angle | 2.6200e-06 | 2.6200e-06 | rad |
+| source filter, ratio of the angles | 1.1400e+00 | 1.1300e+00 |  |
+| source filter, edge | 2.9794e-06 | 2.9551e-06 | rad |
 
 ## The input files
 
