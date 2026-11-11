@@ -55,7 +55,7 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 **shot noise.** The bunching $N$ electrons at random phases have, $\langle|b|^2\rangle = 1/N$, which is what a SASE run starts from. `beam.shot_noise = true` imposes it on a quiet load by Fawley's algorithm, in `fel_fawley_noise` ([](fel-physics.md#sec-noise), [](shot-noise.md)).
 
 (gl-kick-noise)=
-**kick, first meaning.** The phase shift the shot-noise load gives each macroparticle of a beamlet, a sum of sines of the phase with a random amplitude and a random phase for each harmonic ([](shot-noise.md#shot-kick)).
+**kick, first meaning.** The phase shift the shot-noise load gives each macroparticle of a beamlet, a sum of sines of the phase with a random amplitude and a random phase for each harmonic ([](shot-noise.md#shot-kick)). `beam.shot_noise_kick` says how its size follows from the bunching the draw asks for ([](shot-noise.md#shot-bessel)).
 
 (gl-quiet-floor)=
 **quiet floor.** The largest bunching a load has before the noise is imposed, $\max_h |b(h)|^2 N_\lambda$ over the harmonics below the beamlet size. The loader measures it and refuses `shot_noise` on a load above 0.01, since that load already carries noise ([](fel-physics.md#sec-noise)).

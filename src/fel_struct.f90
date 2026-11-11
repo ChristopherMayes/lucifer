@@ -338,6 +338,11 @@ type fel_beam_init_param_struct
   ! slice the same count. The default is one electron: no more beamlets than electrons
   ! (docs/shot-noise.md).
   real(rp) :: beamlet_min_electrons = 1
+  ! How the shot-noise kick is sized (docs/shot-noise.md). A draw asks a group for a
+  ! bunching, and a kick of size z gives it J1(z). "bessel" takes the z that gives the
+  ! bunching asked for (fel_bessel_kick). "first_order" takes z = twice the bunching, the
+  ! small-kick form, which is Genesis4's and loads less than the shot noise.
+  character(16) :: shot_noise_kick = 'bessel'
   ! Check instruments, set by the validation suite. They are not physics inputs.
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.

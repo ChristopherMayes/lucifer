@@ -146,6 +146,7 @@ TD_EXTRA = """  beam.bunch_charge = 1.601107656951e-14
   beam.z_max = 1.200000e-09
   seed_power = 0
   shot_noise = T
+  shot_noise_kick = "first_order"
   beam.beamlet_min_electrons = 0
   beamlet_size = 8
   window_length = 2.4e-9
@@ -1032,6 +1033,7 @@ USAND = """! flat keys; routed into the input file's tables by lucifer.flat.to_t
   window_length = 8e-10
   n_wavelength = 1
   shot_noise = T
+  shot_noise_kick = "first_order"
   beam.beamlet_min_electrons = 0
   ran_seed = 999
   write_diag = T
@@ -1623,7 +1625,7 @@ def migration(args, wd, exe):
     # fresh tail slice, as the time-dependent lockstep input file above does, and the 60 m_e c^2
     # energy spread migrates just as heavily.
     heavy_base = base.replace("seed_power = 0\n",
-                              "seed_power = 1e4\n  seed_waist_size = 30e-6\n  shot_noise = T\n  beam.beamlet_min_electrons = 0\n")
+                              "seed_power = 1e4\n  seed_waist_size = 30e-6\n  shot_noise = T\n  shot_noise_kick = \"first_order\"\n  beam.beamlet_min_electrons = 0\n")
     heavy = dict(lat="aramis.bmad", sig_pz="5.282703940115e-03", emit="4e-7", npart=1024,
                  slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9")
     frozen = dict(lat="aramis_1seg.bmad", sig_pz="8.804506566858e-08", emit="1e-13", npart=256,

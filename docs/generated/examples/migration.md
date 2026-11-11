@@ -43,37 +43,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | `lucifer_no_migrate.toml` | Unit |
 |---|---|---|---|
-| exit power | 7.7178e+07 | 1.1167e+08 | W |
-| exit power per slice | 8.0394e+05 | 1.1632e+06 | W |
-| exit power, rms over mean across slices | 1.5880e+00 | 1.5114e+00 |  |
-| exit window energy | 7.7232e-11 | 1.1175e-10 | J |
-| exit pulse energy, the window's and the light slipped out of it | 3.0336e-09 | 2.7608e-09 | J |
-| peak power | 1.3276e+08 | 1.9402e+08 | W |
-| s of the peak power | 5.6016e+01 | 5.6680e+01 | m |
-| mode peak, power inside the split | 1.2941e+08 | 1.9062e+08 | W |
+| exit power | 7.7912e+07 | 1.1282e+08 | W |
+| exit power per slice | 8.1158e+05 | 1.1752e+06 | W |
+| exit power, rms over mean across slices | 1.5866e+00 | 1.5107e+00 |  |
+| exit window energy | 7.7966e-11 | 1.1290e-10 | J |
+| exit pulse energy, the window's and the light slipped out of it | 3.0689e-09 | 2.7959e-09 | J |
+| peak power | 1.3388e+08 | 1.9579e+08 | W |
+| s of the peak power | 5.6016e+01 | 5.6760e+01 | m |
+| mode peak, power inside the split | 1.3050e+08 | 1.9235e+08 | W |
 | s of the mode peak | 5.6760e+01 | 5.6760e+01 | m |
-| exit power inside the split | 7.5568e+07 | 1.0968e+08 | W |
-| exit power outside the split | 1.6106e+06 | 1.9929e+06 | W |
-| outside over inside, the run's maximum | 2.2562e-02 | 1.7833e-02 |  |
-| outside over inside at the exit | 2.1313e-02 | 1.8171e-02 |  |
+| exit power inside the split | 7.6281e+07 | 1.1080e+08 | W |
+| exit power outside the split | 1.6305e+06 | 2.0173e+06 | W |
+| outside over inside, the run's maximum | 2.2613e-02 | 1.7874e-02 |  |
+| outside over inside at the exit | 2.1375e-02 | 1.8206e-02 |  |
 | split angle | 3.0037e-06 | 3.0037e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 5.2960e+00 | 3.7737e+00 | m |
-| power at the first element end | 7.9371e+06 | 7.9371e+06 | W |
-| power per slice at the first element end | 8.2678e+04 | 8.2678e+04 | W |
-| initial bunching, mean |b| over slices | 6.7994e-03 | 6.7994e-03 |  |
-| exit bunching, mean |b| over slices | 3.5969e-02 | 2.7499e-02 |  |
-| exit bunching, the largest slice | 2.5376e-01 | 1.2279e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 3.5969e-02 | 2.7499e-02 |  |
-| s of the bunching maximum | 5.7000e+01 | 5.6760e+01 | m |
-| bunching at the mode peak | 3.3399e-02 | 2.7499e-02 |  |
-| power of the largest slice at the bunching maximum | 4.5555e+06 | 9.8914e+06 | W |
-| exit power of the largest slice | 4.5555e+06 | 6.3168e+06 | W |
+| gain length, the shortest e-folding length over five consecutive records | 5.2963e+00 | 3.7802e+00 | m |
+| power at the first element end | 8.0464e+06 | 8.0464e+06 | W |
+| power per slice at the first element end | 8.3817e+04 | 8.3817e+04 | W |
+| initial bunching, mean |b| over slices | 6.8420e-03 | 6.8420e-03 |  |
+| exit bunching, mean |b| over slices | 3.5982e-02 | 2.7621e-02 |  |
+| exit bunching, the largest slice | 2.5093e-01 | 1.2297e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 3.5982e-02 | 2.7621e-02 |  |
+| s of the bunching maximum | 5.7000e+01 | 5.7000e+01 | m |
+| bunching at the mode peak | 3.3505e-02 | 2.7620e-02 |  |
+| power of the largest slice at the bunching maximum | 4.5904e+06 | 6.3706e+06 | W |
+| exit power of the largest slice | 4.5904e+06 | 6.3706e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
-| mean slice energy, exit minus start | 1.3336e+03 | -7.5451e+03 | eV |
+| mean slice energy, exit minus start | 1.4458e+03 | -7.6429e+03 | eV |
 | slice energy spread at the start | 5.0587e+05 | 5.0587e+05 | eV |
-| slice energy spread at the exit | 5.4336e+05 | 5.4046e+05 | eV |
-| span of the slice energies at the exit, head to tail | 7.0280e+05 | 1.8223e+05 | eV |
+| slice energy spread at the exit | 5.4348e+05 | 5.4088e+05 | eV |
+| span of the slice energies at the exit, head to tail | 7.2606e+05 | 1.8193e+05 | eV |
 | slices | 96 | 96 |  |
 | records | 1105 | 1105 |  |
 | slice spacing | 3.0000e-10 | 3.0000e-10 | m |

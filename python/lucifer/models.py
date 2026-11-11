@@ -162,6 +162,8 @@ class Beam:
     """Impose the physical noise on the load's groups. Time-dependent windows only."""
     beamlet_min_electrons: float = 1.0
     """Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice with too little charge is loaded with fewer beamlets, and a slice with none with no particles. 0 gives every slice n_particle. [electrons] Bounds: from 0.0."""
+    shot_noise_kick: Literal['bessel', 'first_order'] = 'bessel'
+    """How the shot-noise kick is sized: bessel, from the bunching J1 that a kick gives, or first_order, twice the bunching asked for, as Genesis4 sizes it."""
     write_genesis_dist: str = ''
     """Write the bunch as a Genesis4 importdistribution file."""
     write_openpmd_file: str = ''

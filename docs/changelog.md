@@ -9,6 +9,29 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-11 Changed: the shot-noise kick is sized from the bunching it gives, and the new key
+  `beam.shot_noise_kick` selects it ([](shot-noise.md#shot-bessel)). A kick of size z gives a
+  beamlet the bunching J1(z). The loader sized it as z/2, the first-order form of Fawley's
+  algorithm, so a beamlet of N electrons started with less than its shot noise: low by about
+  2.4/N at the fundamental, 0.95 of it at 50 electrons a beamlet and 0.16 at one. With
+  `"bessel"`, the default, the kick is the z at which J1(z) is the bunching the draw asks for
+  (`fel_bessel_kick`). The fundamental is then low by about 0.44/N: 0.99 at 50 electrons a
+  beamlet, 0.91 at 10 and 0.22 at one. What is left comes from the kicks at the other harmonics
+  and from the largest bunching a kick gives, 0.582: a draw that asks for more is held there, and
+  the load's report counts such draws. `"first_order"` gives the kick as before, the same bits,
+  and the checks that compare a load with Genesis4 or hold a level recorded before set it. The
+  random numbers are the same under both, so a `ran_seed` is the same shot with larger kicks.
+  A run with shot noise that does not set the key starts higher than before by the ratio of the
+  two levels, which the header and the load's report state. Over six seeds the start-up power of
+  the sase example is higher by 1.0266 +- 0.0012 where the levels give 1.0274, that of FLASH1 by
+  1.00037 and that of LCLS by 1.0016. FLASH1 and LCLS saturate and their exit pulse energy moves
+  by 2e-5 and 1e-4 of itself. Every example with shot noise is rerun: the sase example exits at
+  857.5 pJ where it exited at 845.4 pJ, and the import example's kept bunch, 3.8 electrons a
+  beamlet, loads 0.62 of its shot noise where it loaded 0.55 and exits at 8.63 pJ where it exited
+  at 7.77 pJ. Under the kick from J1 a beamlet under one electron is no longer kicked as one
+  electron, and the warning for such beamlets states that kick's level. `check_shot_noise.py`
+  holds the load to both closed forms and holds the difference of the two kicks on the same draws
+  to the difference of the forms, 0.0140 against 0.0139 +- 0.0008 at 146 electrons a beamlet.
 - 2026-11-10 Changed: under `shot_noise` the sample mode loads a slice of little charge with fewer
   beamlets, so that no beamlet stands for less than `beam.beamlet_min_electrons` electrons, 1 by
   default ([](shot-noise.md#shot-fewer)). A slice of N electrons has `min(n_particle/beamlet_size,

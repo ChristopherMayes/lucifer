@@ -132,6 +132,7 @@ NML_IMP = """! flat keys; routed into the input file's tables by lucifer.flat.to
   grid_half_width = 2e-4
   beam.resample.use_beam_init = T
   shot_noise = T
+  shot_noise_kick = "first_order"
   beam.beamlet_min_electrons = 0
   beam.n_particle = 20000
   beam.a_norm_emit = 4e-7

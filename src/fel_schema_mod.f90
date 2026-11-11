@@ -243,6 +243,10 @@ call add ('beam', 'beamlet_min_electrons', key_real$, 'electrons', 'beamlet elec
       'Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice ' // &
       'with too little charge is loaded with fewer beamlets, and a slice with none with no ' // &
       'particles. 0 gives every slice n_particle.', lo = 0.0_rp)
+call add ('beam', 'shot_noise_kick', key_string$, '', 'shot-noise kick', &
+      'How the shot-noise kick is sized: bessel, from the bunching J1 that a kick gives, or ' // &
+      'first_order, twice the bunching asked for, as Genesis4 sizes it.', &
+      allowed = [character(16) :: 'bessel', 'first_order'])
 call add ('beam', 'write_genesis_dist', key_path$, '', 'genesis distribution', &
       'Write the bunch as a Genesis4 importdistribution file.')
 call add ('beam', 'write_openpmd_file', key_path$, '', 'openPMD bunch', &
@@ -585,6 +589,7 @@ case ('beam.quiet_start');                 run%bparam%quiet_start = lv
 case ('beam.beamlet_size');                run%bparam%beamlet_size = iv
 case ('beam.shot_noise');                  run%bparam%shot_noise = lv
 case ('beam.beamlet_min_electrons');       run%bparam%beamlet_min_electrons = rv
+case ('beam.shot_noise_kick');             call put (run%bparam%shot_noise_kick)
 case ('beam.write_genesis_dist');          call put (run%bparam%write_genesis_dist)
 case ('beam.write_openpmd_file');          call put (run%bparam%write_openpmd_file)
 case ('beam.split_weights');               run%bparam%split_weights = lv
@@ -950,6 +955,7 @@ case ('beam.quiet_start');                 lv = run%bparam%quiet_start
 case ('beam.beamlet_size');                iv = run%bparam%beamlet_size
 case ('beam.shot_noise');                  lv = run%bparam%shot_noise
 case ('beam.beamlet_min_electrons');       rv = run%bparam%beamlet_min_electrons
+case ('beam.shot_noise_kick');             sv = run%bparam%shot_noise_kick
 case ('beam.write_genesis_dist');          sv = run%bparam%write_genesis_dist
 case ('beam.write_openpmd_file');          sv = run%bparam%write_openpmd_file
 case ('beam.split_weights');               lv = run%bparam%split_weights

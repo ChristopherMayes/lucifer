@@ -6,8 +6,11 @@ Draw the figures of docs/shot-noise.md.
                   the bunching phasor the kick leaves
     kick.svg      J1(z) against z/2, under the distribution of the kick z at 150, 18 and
                   1 electrons a beamlet
-    ratio.svg     what the load delivers of the shot-noise power against the electrons a
-                  beamlet holds, with the levels check_shot_noise.py measured on loaded beams
+    ratio.svg     what the first-order kick delivers of the shot-noise power against the
+                  electrons a beamlet holds, with the levels check_shot_noise.py measured
+                  on loaded beams
+    bessel.svg    the same for the kick sized from J1, beside the first-order kick's
+                  fundamental
 
 The curves are arithmetic on shot_noise_ratio.py. The measured points are read from the
 levels page, docs/generated/validation-measured.md, which the keystone regenerates before
@@ -45,12 +48,14 @@ def j1(z):
     return np.cos(t - np.multiply.outer(z, np.sin(t))).mean(axis=-1)
 
 
-def measured(levels):
-    """The measured levels at the fundamental and the two harmonics, uniform weights.
+def measured(levels, kick="first_order"):
+    """The measured levels at the fundamental and the two harmonics, uniform weights, under
+    the given kick.
 
     Returns {harmonic: [(electrons, value, sigma), ...]}. A row's range is the closed
     form with five standard deviations either side."""
-    row = re.compile(r"^\| shot noise, uniform weights(?:, ([0-9.]+) electrons a beamlet)?, "
+    lead = "kick from J1, " if kick == "bessel" else ""
+    row = re.compile(r"^\| shot noise, " + lead + r"uniform weights(?:, ([0-9.]+) electrons? a beamlet)?, "
                      r"harmonic ([123]) \| (\S+) \| (\S+) \| (\S+) to (\S+) \|")
     out = {h: [] for h in HARMONICS}
     for line in pathlib.Path(levels).read_text().splitlines():
@@ -62,7 +67,7 @@ def measured(levels):
         sigma = (float(m.group(6)) - float(m.group(5))) / 10
         out[int(m.group(2))].append((electrons, value, sigma))
     if not all(out.values()):
-        raise SystemExit(f"{levels}: no shot-noise rows for the uniform weights. Run the validation "
+        raise SystemExit(f"{levels}: no shot-noise rows for the uniform weights, kick {kick}. Run the validation "
                          "suite and report_validation.py first.")
     return out
 
@@ -107,8 +112,8 @@ def draw_beamlet(plt, lp, path):
 def draw_kick(plt, lp, path):
     z = np.linspace(0, 4, 801)
     fig, ax = plt.subplots(figsize=(6.4, 3.8), layout="constrained")
-    ax.plot(z, z / 2, color=lp.INK2, ls="--", lw=1.2, label=r"$z/2$, what the load assumes")
-    ax.plot(z, j1(z), color=lp.COLORS[0], lw=2, label=r"$J_1(z)$, what the kick gives")
+    ax.plot(z, z / 2, color=lp.INK2, ls="--", lw=1.2, label=r"$z/2$, the first-order kick")
+    ax.plot(z, j1(z), color=lp.COLORS[0], lw=2, label=r"$J_1(z)$, what a kick gives")
     for n, color in ((150, lp.COLORS[2]), (18, lp.COLORS[3]), (1, lp.COLORS[4])):
         p = n * z / 2 * np.exp(-n * z**2 / 4)
         ax.fill_between(z, 0, 0.55 * p / p.max(), color=color, alpha=0.2, lw=0,
@@ -129,14 +134,36 @@ def draw_ratio(plt, lp, path, points):
     ax.text(0.32, 1.04, "kick drawn for\none electron", ha="center", va="top", fontsize=9, color=lp.INK2)
     big = n >= 2
     ax.plot(n[big], 1 - 2 / n[big], color=lp.INK2, ls=":", lw=1.2, label=r"$1 - 2/N$")
-    ax.plot(n, snr.ratio_one_harmonic(n), color=lp.INK2, ls="--", lw=1.2, label="one harmonic kicked")
+    ax.plot(n, snr.ratio_one_harmonic(n, "first_order"), color=lp.INK2, ls="--", lw=1.2, label="one harmonic kicked")
     for h, color in zip(HARMONICS, lp.COLORS):
-        ax.plot(n, snr.ratio(n, h, M), color=color, lw=1.8, label=f"default beamlet, $h = {h}$")
+        ax.plot(n, snr.ratio(n, h, M, kick="first_order"), color=color, lw=1.8, label=f"default beamlet, $h = {h}$")
         e, v, s = np.array(points[h]).T
         ax.errorbar(e, v, yerr=s, fmt="o", color=color, ms=4, lw=1, capsize=2, zorder=4)
     ax.set_xscale("log")
     ax.set_xlim(0.1, 1000)
     ax.set_ylim(0, 1.08)
+    ax.set_xlabel("electrons one beamlet holds, $N$")
+    ax.set_ylabel(r"$\langle|b_h|^2\rangle\,N$")
+    ax.legend(frameon=False, loc="lower right")
+    lp.save(fig, path)
+    plt.close(fig)
+
+
+def draw_bessel(plt, lp, path, points):
+    n = np.logspace(-1, 3, 401)
+    fig, ax = plt.subplots(figsize=(6.8, 4.2), layout="constrained")
+    ax.axhline(1, color=lp.GRAY, lw=0.8)
+    ax.plot(n, snr.ratio(n, 1, M, kick="first_order"), color=lp.INK2, ls="--", lw=1.4,
+            label="first-order kick, $h = 1$")
+    ax.plot(n, snr.ratio_one_harmonic(n), color=lp.INK2, ls=":", lw=1.2,
+            label=r"kick from $J_1$, one harmonic kicked")
+    for h, color in zip(HARMONICS, lp.COLORS):
+        ax.plot(n, snr.ratio(n, h, M), color=color, lw=1.8, label=f"kick from $J_1$, $h = {h}$")
+        e, v, s = np.array(points[h]).T
+        ax.errorbar(e, v, yerr=s, fmt="o", color=color, ms=4, lw=1, capsize=2, zorder=4)
+    ax.set_xscale("log")
+    ax.set_xlim(0.1, 1000)
+    ax.set_ylim(0, 1.12)
     ax.set_xlabel("electrons one beamlet holds, $N$")
     ax.set_ylabel(r"$\langle|b_h|^2\rangle\,N$")
     ax.legend(frameon=False, loc="lower right")
@@ -150,6 +177,7 @@ def main():
     p.add_argument("--out", required=True, help="The directory the figures are written to")
     a = p.parse_args()
     points = measured(a.levels)
+    points_bessel = measured(a.levels, "bessel")
 
     import matplotlib
     matplotlib.use("Agg")
@@ -162,7 +190,8 @@ def main():
         b = draw_beamlet(plt, lp, out / "beamlet.svg")
         draw_kick(plt, lp, out / "kick.svg")
         draw_ratio(plt, lp, out / "ratio.svg", points)
-    print(f"wrote {out}: 3 figures, the drawn kick of {Z_DRAWN:g} rad leaves |b| = {b:.4f}, "
+        draw_bessel(plt, lp, out / "bessel.svg", points_bessel)
+    print(f"wrote {out}: 4 figures, the drawn kick of {Z_DRAWN:g} rad leaves |b| = {b:.4f}, "
           f"J1 = {float(j1(Z_DRAWN)):.4f}")
     return 0
 
