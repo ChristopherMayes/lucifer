@@ -868,7 +868,15 @@ def main():
             sp = h5[f"data/{name}/particles"]
             g = sp[sorted(sp.keys())[0]]
             n = int(np.atleast_1d(g.attrs["numParticles"])[0])
-            rec = lambda k: g[k][...] if g[k].shape else np.full(n, g[k][()])
+
+            # A component every particle shares is an openPMD constant, a group holding the
+            # value. The weight is one when every slice with particles has the same charge.
+            def rec(k):
+                obj = g[k]
+                if isinstance(obj, h5py.Group):
+                    return np.full(n, float(np.atleast_1d(obj.attrs["value"])[0]))
+                return obj[...] if obj.shape else np.full(n, obj[()])
+
             ids = rec("id")
             order = np.argsort(ids)
             pops = np.atleast_1d(g["particlePatches/numParticles"][...])
@@ -1442,7 +1450,15 @@ use, SEG
             g = h5[f"data/{n0}/particles"]
             g = g[sorted(g.keys())[0]]
             n = int(np.atleast_1d(g.attrs["numParticles"])[0])
-            rec = lambda k: g[k][...] if g[k].shape else np.full(n, g[k][()])
+
+            # A component every particle shares is an openPMD constant, a group holding the
+            # value. The weight is one when every slice with particles has the same charge.
+            def rec(k):
+                obj = g[k]
+                if isinstance(obj, h5py.Group):
+                    return np.full(n, float(np.atleast_1d(obj.attrs["value"])[0]))
+                return obj[...] if obj.shape else np.full(n, obj[()])
+
             ids = rec("id")
             o = np.argsort(ids)
             return {"time": rec("time")[o], "id": ids[o], "pz": rec("totalMomentum")[o],

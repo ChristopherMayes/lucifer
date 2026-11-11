@@ -126,6 +126,8 @@ where the two builds agree to every printed digit.
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, fewer beamlets | 9.0665e-01 | same | 8.4109e-01 to 9.5964e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, the input file's beamlets | 9.2958e-01 | same | 8.7360e-01 to 1.0174e+00 |
 | shot noise, no slice with fewer beamlets: the same bits as with beam.beamlet_min_electrons = 0 |  | same | holds |
+| shot noise, a slice with no charge is loaded with no particles |  | same | holds |
+| shot noise, the slices with charge beside slices with none keep their particles and charge |  | same | holds |
 | shot noise, keep load: the noise reported on the beamlets the loader made |  | same | holds |
 | shot noise, keep mode, beamlets of a generated bunch | 9.7811e-01 | same | 8.4595e-01 to 1.1297e+00 |
 | shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.0199e+00 | same | 7.3882e-01 to 1.2281e+00 |

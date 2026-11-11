@@ -12,7 +12,9 @@ of that history. The entries before that date describe that branch.
 - 2026-11-10 Changed: under `shot_noise` the sample mode loads a slice of little charge with fewer
   beamlets, so that no beamlet stands for less than `beam.beamlet_min_electrons` electrons, 1 by
   default ([](shot-noise.md#shot-fewer)). A slice of N electrons has `min(n_particle/beamlet_size,
-  max(1, floor(N/beamlet_min_electrons)))` beamlets and keeps its charge. Before, every slice had
+  max(1, floor(N/beamlet_min_electrons)))` beamlets and keeps its charge. A slice with no
+  charge has no particles in the sample mode, with the noise or without it, where it had
+  `beam.n_particle` of zero weight. Before, every slice had
   `beam.n_particle` macroparticles, and a beamlet under one electron was kicked as one electron:
   a slice of 6 electrons over 128 beamlets started with 0.008 of its shot-noise power, and now
   starts with 0.161. Both FLASH1 inputs warned on every run that about a sixth of their beamlet

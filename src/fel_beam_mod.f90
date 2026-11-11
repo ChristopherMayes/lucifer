@@ -1604,11 +1604,8 @@ end subroutine fel_impose_noise
 ! for less than n_min electrons. The kick of fel_fawley_noise loads less than the shot
 ! noise of a beamlet's electrons, and far less below one electron. The slice keeps its
 ! charge, so its beamlets are heavier. A slice with fewer than n_min electrons in all
-! has one beamlet.
-!
-! A slice with no charge at all keeps n_beamlet. It carries no noise and its particles
-! weigh nothing, so there is nothing to gain, and the random numbers of the slices after
-! it stay those of a load with n_min = 0.
+! has one beamlet. A slice with no charge at all has none, and is loaded with no
+! particles, as the keep mode loads a slice no particle of the bunch falls in.
 !
 ! Input:
 !   n_electron -- real(rp): Real electrons in the slice.
@@ -1617,7 +1614,7 @@ end subroutine fel_impose_noise
 !                  every slice n_beamlet.
 !
 ! Output:
-!   n_load     -- integer: Beamlets to load, 1 to n_beamlet.
+!   n_load     -- integer: Beamlets to load, 0 to n_beamlet.
 !-
 
 function fel_beamlet_count (n_electron, n_beamlet, n_min) result (n_load)
@@ -1628,8 +1625,12 @@ integer n_beamlet, n_load
 !
 
 n_load = n_beamlet
-if (n_min <= 0 .or. n_electron <= 0) return
-if (n_electron < n_min * n_beamlet) n_load = max(1, floor(n_electron / n_min))
+if (n_min <= 0) return
+if (n_electron <= 0) then
+  n_load = 0
+elseif (n_electron < n_min * n_beamlet) then
+  n_load = max(1, floor(n_electron / n_min))
+endif
 
 end function fel_beamlet_count
 

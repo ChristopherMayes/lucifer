@@ -241,7 +241,8 @@ call add ('beam', 'shot_noise', key_logical$, '', 'shot noise', &
       'Impose the physical noise on the load''s groups. Time-dependent windows only.')
 call add ('beam', 'beamlet_min_electrons', key_real$, 'electrons', 'beamlet electrons', &
       'Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice ' // &
-      'with too little charge is loaded with fewer beamlets. 0 gives every slice n_particle.', lo = 0.0_rp)
+      'with too little charge is loaded with fewer beamlets, and a slice with none with no ' // &
+      'particles. 0 gives every slice n_particle.', lo = 0.0_rp)
 call add ('beam', 'write_genesis_dist', key_path$, '', 'genesis distribution', &
       'Write the bunch as a Genesis4 importdistribution file.')
 call add ('beam', 'write_openpmd_file', key_path$, '', 'openPMD bunch', &

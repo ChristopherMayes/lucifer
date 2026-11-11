@@ -90,7 +90,7 @@
 | `quiet_start` | true/false | true |  |  | Load beamlets of beamlet_size phase copies, quiet below that harmonic. |
 | `beamlet_size` | integer | `8` |  | from 1 | Copies per beamlet, and the harmonics the noise resolves. |
 | `shot_noise` | true/false | false |  |  | Impose the physical noise on the load's groups. Time-dependent windows only. |
-| `beamlet_min_electrons` | real | `1` | electrons | from 0 | Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice with too little charge is loaded with fewer beamlets. 0 gives every slice n_particle. |
+| `beamlet_min_electrons` | real | `1` | electrons | from 0 | Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice with too little charge is loaded with fewer beamlets, and a slice with none with no particles. 0 gives every slice n_particle. |
 | `write_genesis_dist` | string | `""` |  |  | Write the bunch as a Genesis4 importdistribution file. |
 | `write_openpmd_file` | string | `""` |  |  | Write the bunch as openPMD-beamphysics. |
 | `split_weights` | true/false | false |  |  | Check instrument: coincident copies carrying 1/3 and 2/3 of each weight after loading. |

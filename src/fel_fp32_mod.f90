@@ -75,7 +75,9 @@ implicit none
 integer, parameter :: fel_fp32_nq$ = 9   ! x, px, y, py, pz, theta, phasor, source, field.
 
 ! The fewest particles a slice holds for its median to enter the residual guard
-! (fel_fp32_step_close): 32 beamlets of the default size.
+! (fel_fp32_step_close): 32 beamlets of the default size. A median of 32 samples falls
+! under the floor by chance less than once in 1e7 slice-steps while a tenth of the samples
+! do, and a median of 16 six times in 1e5 (docs/performance.md).
 integer, parameter :: fel_fp32_guard_n$ = 256
 
 #ifdef LUCIFER_HAVE_FFTW3F
