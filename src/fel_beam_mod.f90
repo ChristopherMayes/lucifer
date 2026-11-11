@@ -1783,6 +1783,107 @@ end subroutine fel_impose_noise
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_slice_fill (n_beamlet, beamlet_size, n_period, theta)
+!
+! Routine to give the quiet phases of a slice that is n_period radiation wavelengths long
+! (docs/fel-physics.md sec-quiet). The slice holds the charge of all its periods, so its
+! macroparticles stand over all of them and not in one. The N = n_beamlet * beamlet_size
+! macroparticles stand on one even grid over the slice, at (j + 1/2) n_period / N periods
+! for j = 0 to N - 1. The charge in any stretch of the slice is then the same to one
+! macroparticle, and the sum of exp(-i k z) over the slice is zero to rounding at every
+! multiple of the resonant wavenumber over n_period that is not a harmonic.
+!
+! A beamlet is the beamlet_size grid points whose phases within a period differ by a
+! whole number of 2 pi / beamlet_size, taken one from each such phase in grid order. Its
+! bunching is therefore zero at every harmonic below beamlet_size, as in a slice of one
+! period. Its points stand in several periods of the slice.
+!
+! The grid splits into beamlets this way when the greatest common divisor of n_period and
+! N divides n_beamlet, which holds for the counts an input file states. Otherwise each
+! macroparticle keeps its phase in one period and takes a period by its place on that
+! period's grid in turn, which leaves the charge even and the sum above at one part in N.
+!
+! Input:
+!   n_beamlet    -- integer: Beamlets in the slice.
+!   beamlet_size -- integer: Copies per beamlet.
+!   n_period     -- integer: Radiation wavelengths in a slice, window.n_wavelength.
+!
+! Output:
+!   theta(:)     -- real(rp): Phases [rad], 0 to 2 pi n_period, beamlet-contiguous: copy t
+!                    of beamlet ib at (ib - 1) * beamlet_size + t.
+!-
+
+subroutine fel_slice_fill (n_beamlet, beamlet_size, n_period, theta)
+
+real(rp) theta(:)
+integer n_beamlet, beamlet_size, n_period
+
+integer(8) n_tot, j, q, key
+integer, allocatable :: seen(:,:)
+integer g, i_class, i_copy, i_inst, ib, im, ip
+logical on_grid
+
+!
+
+n_tot = int(n_beamlet, 8) * beamlet_size
+g = int(n_period, 8)
+q = n_tot
+do
+  if (q == 0) exit
+  key = mod(int(g, 8), q)
+  g = int(q)
+  q = key
+enddo
+
+on_grid = (mod(n_beamlet, g) == 0)
+if (on_grid) then
+  allocate (seen(0:n_beamlet/g - 1, 0:beamlet_size - 1))
+  seen = 0
+  theta(1:n_tot) = -1
+  do j = 0, n_tot - 1
+
+    ! The grid point's phase within a period is q / (2 N) periods. Its class is the phase
+    ! modulo 1 / beamlet_size, its copy the multiple of 1 / beamlet_size, and its beamlet
+    ! the count of earlier points of that class and copy.
+
+    q = mod((2 * j + 1) * n_period, 2 * n_tot)
+    key = mod(q, 2_8 * n_beamlet)
+    i_copy = int(q / (2_8 * n_beamlet))
+    i_class = int(key / (2 * g))
+    if (i_class > ubound(seen, 1)) then
+      on_grid = .false.
+      exit
+    endif
+    i_inst = seen(i_class, i_copy)
+    seen(i_class, i_copy) = i_inst + 1
+    if (i_inst >= g) then
+      on_grid = .false.
+      exit
+    endif
+    ip = (i_class * g + i_inst) * beamlet_size + i_copy + 1
+    theta(ip) = twopi * real((2 * j + 1) * n_period, rp) / real(2 * n_tot, rp)
+  enddo
+  if (on_grid) on_grid = all(theta(1:n_tot) >= 0)
+endif
+if (on_grid) return
+
+! No such split: the one-period phases, each macroparticle in the period its place on
+! that period's grid gives in turn.
+
+do ib = 1, n_beamlet
+  do im = 0, beamlet_size - 1
+    ip = (ib - 1) * beamlet_size + im + 1
+    theta(ip) = (ib - 0.5_rp) * twopi / (beamlet_size * n_beamlet) + im * twopi / beamlet_size + &
+                twopi * mod((ib - 1) + im * n_beamlet, n_period)
+  enddo
+enddo
+
+end subroutine fel_slice_fill
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_ran_binomial (n, p) result (k)
 !
 ! Routine to draw a binomial count, the successes in n trials of probability p each, from

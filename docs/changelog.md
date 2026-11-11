@@ -9,6 +9,31 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-11 Fixed: a slice of several wavelengths was loaded with all its particles in one of its
+  periods. A slice is `window.n_wavelength` wavelengths long and holds the charge of all of them,
+  and the generator, the resampler and the keep mode each stood its particles in the first: with
+  slices of three wavelengths a dump held its charge in one third of every slice. The averaged step
+  reads a phase modulo 2 pi and its results were not affected, and neither were the unaveraged
+  step's. A dump tracked on by another code had the gaps, and its bunching spectrum had lines at
+  every multiple of the resonant wavenumber over `n_wavelength`, up to 1e4 times the shot noise.
+  The macroparticles of a slice now stand on one even grid over the whole slice (`fel_slice_fill`,
+  [](fel-physics.md#sec-quiet)), with uniform weights, and a beamlet is the grid points whose phases
+  within a period differ by a whole number of 2 pi over `beamlet_size`, so the quiet start holds at
+  every harmonic. The keep mode stands a particle at its own phase in its slice. With no noise the
+  bunching of a slice at those wavenumbers is 2e-16 where it was 0.83. A slice of one wavelength
+  is the same bits as before. A run with longer slices is the same shot where nothing reads a
+  particle's place in its slice: over six seeds the start-up power and the exit pulse energy of the
+  sase example are the same to 4e-10, and those of FLASH1 and LCLS to 6e-4, where a
+  macroparticle's phase within a period moves by up to one step of the grid, in the same run time.
+  Migration, a Bmad wake and the resampler do read it, and a run with one of them is a different
+  shot: `examples/migration` exits at 3.35 nJ where it exited at 2.79 nJ, `examples/frames` at
+  1.80 pJ from 3.83 pJ, `examples/bmad_wake` at 2.689 nJ from 2.667 nJ, and the import example's
+  file load at 16.3 pJ from 15.9 pJ. Four checks of `check_seam_wake.py` and one of
+  `check_beam_format.py` had held only because neighboring slices did not touch, and are restated
+  ([](validation.md)). The FP32 lockstep twin holds a particle's place as a single-precision
+  offset from its slice's mean, and its residual guard falls with the slice length: 1.65e3 ulps
+  on FLASH1, 12 wavelengths a slice, from 3.31e3, and 253 on LCLS, 68 wavelengths, from 1.13e3,
+  against its floor of 32. Every example with slices of several wavelengths is rerun.
 - 2026-11-11 Changed: the shot noise is imposed through the weights by default, and
   `beam.shot_noise_method` replaces `beam.shot_noise_kick` ([](shot-noise.md#shot-weight)). Under
   `"weight"` the loader moves no phase. Every macroparticle of a beamlet comes to stand for a whole

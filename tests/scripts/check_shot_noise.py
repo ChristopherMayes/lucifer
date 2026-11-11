@@ -60,6 +60,17 @@ hundredth of an electron is loaded the same way: the charge is held, the slices 
 no electron have no particles, and the statistic of the others is held to 1. In the keep
 mode every particle must be present at the charge the kick load gives it.
 
+A slice of several wavelengths is loaded over all its periods. A Gaussian bunch with
+slices of 3 and of 12 wavelengths is loaded under the weight load, the first-order kick
+and no noise, and every slice's sum of w exp(-i (m/n) theta) is taken at the m that are
+not multiples of n, the slice's wavelengths: the wavenumbers at which a load that stood
+its particles in one period had lines. With no noise the sum over the slice's charge is
+held to rounding. Under the weight load its square over the slice's electrons is held to
+1 within five standard deviations. The charge in each period of a slice is held to the
+binomial spread at the load. In the dump at the end of a tracked segment, with migration
+off and on, it is held to be no wider than that of the slice's macroparticles placed at
+random.
+
 The same statistic then runs on the loads that do not draw their own beamlets
 (fel-physics.md, sec-noise):
 - load_mode = "keep" from a generated bunch, where the loader makes the beamlets.
@@ -450,6 +461,130 @@ def weight_kept(exe, lat, workdir, seeds):
     record("shot noise, weight load, keep mode: every particle of the bunch is present at its own charge",
            worst, 1e-12, "max", held)
     return good and held
+
+
+def fill_statistics(dump, n_period):
+    """One dump of slices n_period wavelengths long: every slice's |sum w exp(-i (m/n) theta)|
+    over its charge at the m below 2 n that are not multiples of n, the same squared over
+    the slice's electrons, and each period's count of electrons less its share, squared,
+    over the binomial variance of that share: the electrons' own, and the variance of the
+    slice's macroparticles placed at random with the counts they carry."""
+    spacing = n_period * LAMBDA0
+    slices = list(beamio.read_slices(dump, LAMBDA0, spacing))
+    total = float(sum(sl["weight"][: sl["n"]].sum() for sl in slices))
+    unit = total / max(1.0, np.rint(total / E_CHARGE))
+    orders = [m for m in range(1, 2 * n_period) if m % n_period]
+    bunching, power, spread, placed = [], [], [], []
+    for sl in slices:
+        n = sl["n"]
+        w = sl["weight"][:n]
+        if n == 0 or w.sum() == 0:
+            continue
+        theta = sl["theta"][:n]
+        s = np.array([np.sum(w * np.exp(-1j * m * theta / n_period)) for m in orders])
+        bunching.append(np.abs(s).max() / w.sum())
+        power.extend(np.abs(s) ** 2 / (w.sum() * unit))
+        electrons = w.sum() / unit
+        period = np.floor(theta / (2 * np.pi)).astype(int) % n_period
+        counts = np.bincount(period, weights=w / unit, minlength=n_period)
+        if electrons >= 8 * n_period:
+            share = (1 - 1 / n_period) / n_period
+            spread.extend((counts - electrons / n_period) ** 2 / (electrons * share))
+            placed.extend((counts - electrons / n_period) ** 2 / (np.sum((w / unit) ** 2) * share))
+    return np.asarray(bunching), np.asarray(power), np.asarray(spread), np.asarray(placed)
+
+
+def slice_fill(exe, lat, workdir, seeds):
+    """A Gaussian bunch in slices of 3 and of 12 wavelengths, loaded over the slices' periods."""
+    ok = True
+    sig_z = N_SLICE * SPACING / 8
+    charge = PEAK * (N_PARTICLE / BEAMLET_SIZE) * E_CHARGE * np.sqrt(2 * np.pi) * sig_z / SPACING
+
+    def text(root, seed, n_period, noise, track=False):
+        t = gauss_text(lat, root, seed, None, "weight")
+        t = t.replace("  n_wavelength = 3\n", f"  n_wavelength = {n_period}\n")
+        t = t.replace('  shot_noise = T\n  beam.shot_noise_method = "weight"\n', noise)
+        if n_period != 3:
+            scale = n_period / 3
+            for key, value in (("beam.sig_z", sig_z * scale), ("window_length", N_SLICE * SPACING * scale),
+                               ("beam.bunch_charge", charge * scale)):
+                line = [x for x in t.splitlines() if x.strip().startswith(key + " =")][0]
+                t = t.replace(line, f"  {key} = {value:.12e}")
+        return t.replace("  load_only = T\n", "") if track else t
+
+    methods = (("weight", '  shot_noise = T\n  beam.shot_noise_method = "weight"\n'),
+               ("first_order", '  shot_noise = T\n  beam.shot_noise_method = "first_order"\n'),
+               ("no noise", "  shot_noise = F\n"))
+    for n_period in (3, 12):
+        for name, noise in methods:
+            bunching, power, spread = [], [], []
+            for seed in range(1, (seeds if name == "weight" else 2) + 1):
+                root = f"sn_fill{n_period}_{name[0]}_{seed}"
+                _, dump = run_load(exe, workdir, root, text(root, 5000 + 7 * seed, n_period, noise))
+                b, p, c, _ = fill_statistics(dump, n_period)
+                dump.unlink()
+                bunching.extend(b)
+                power.extend(p)
+                spread.extend(c)
+            label = f"slices of {n_period} wavelengths, {name}"
+            if name == "no noise":
+                worst = float(np.max(bunching))
+                good = worst <= 1e-12
+                print(f"--- {label}: worst |sum w exp(-i (m/n) theta)| over a slice's charge, m not a multiple of n: "
+                      f"{worst:.1e} (check <= 1e-12)  {'ok' if good else 'FAIL'}")
+                record(f"shot noise, {label}: bunching of a slice at the multiples of k_r/n that are not harmonics",
+                       worst, 1e-12, "max", good)
+            elif name == "weight":
+                v = np.asarray(power)
+                bound = 5 * v.std() / np.sqrt(len(v))
+                good = abs(v.mean() - 1) < bound
+                print(f"--- {label}: noise power at the multiples of k_r/n that are not harmonics over the shot "
+                      f"noise: {v.mean():.4f} (1 +- {bound:.3f}, {len(v)} samples)  {'ok' if good else 'FAIL'}")
+                record(f"shot noise, {label}: noise power at the multiples of k_r/n that are not harmonics",
+                       v.mean(), [1 - bound, 1 + bound], "range", good)
+                c = np.asarray(spread)
+                cb = 5 * np.sqrt(2 / len(c))
+                goodc = abs(c.mean() - 1) < cb
+                print(f"      the spread of the electrons in a period of a slice over the binomial spread: "
+                      f"{c.mean():.4f} (1 +- {cb:.3f}, {len(c)} periods)  {'ok' if goodc else 'FAIL'}")
+                record(f"shot noise, {label}: the spread of a period's electrons over the binomial spread",
+                       c.mean(), [1 - cb, 1 + cb], "range", goodc)
+                good = good and goodc
+            else:
+                v = np.asarray(power)
+                good = True
+                print(f"--- {label}: noise power at the multiples of k_r/n that are not harmonics over the shot "
+                      f"noise: {v.mean():.4f} (recorded, not judged)")
+                record(f"shot noise, {label}: noise power at the multiples of k_r/n that are not harmonics",
+                       v.mean(), 0.0, "min", True)
+            ok = ok and good
+
+    # The dump at the end of a tracked segment, with migration off and on. The particles
+    # have slipped by a fraction of a period, each with the electrons it carries, so a
+    # period's count is no longer the electrons' binomial one. It is held to be no wider
+    # than the count of the same macroparticles placed at random. A slice whose particles
+    # stood in one period reads a third of its macroparticle count here, hundreds.
+    for migrate in ("F", "T"):
+        root = f"sn_fillt_{migrate}"
+        t = text(root, 5007, 3, methods[0][1], track=True) .replace("&end", f"  migrate = {migrate}\n&end")
+        (workdir / f"{root}.toml").write_text(to_groups(t))
+        r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"FAIL: the tracked run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
+            sys.exit(1)
+        _, _, _, c = fill_statistics(workdir / f"{root}-final.beam.h5", 3)
+        for f in workdir.glob(f"{root}-*.h5"):
+            f.unlink()
+        cb = 1 + 5 * np.sqrt(2 / len(c))
+        good = c.mean() <= cb
+        ok = ok and good
+        name = "with migration" if migrate == "T" else "without migration"
+        print(f"--- slices of 3 wavelengths after a tracked segment, {name}: the spread of the charge in a "
+              f"period over that of its macroparticles placed at random: {c.mean():.4f} (check <= {cb:.3f}, "
+              f"{len(c)} periods)  {'ok' if good else 'FAIL'}")
+        record(f"shot noise, slices of 3 wavelengths after a tracked segment, {name}: the spread of a period's "
+               f"charge over that of its macroparticles placed at random", c.mean(), cb, "max", good)
+    return ok
 
 
 def run_load(exe, workdir, root, text):
@@ -856,6 +991,7 @@ def main():
     ok = weight_scan(exe, PARSED.lat, workdir, PARSED.seeds) and ok
     ok = weight_gauss(exe, PARSED.lat, workdir, PARSED.seeds) and ok
     ok = weight_kept(exe, PARSED.lat, workdir, max(3, PARSED.seeds // 3)) and ok
+    ok = slice_fill(exe, PARSED.lat, workdir, max(3, PARSED.seeds // 3)) and ok
 
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, None,
                         "Gaussian bunch, beam.beamlet_min_electrons at its default") and ok

@@ -17,7 +17,7 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 **wavelength.** The radiation wavelength $\lambda_s$, `field.lambda0`. Every longitudinal length below is a whole number of it.
 
 (gl-slice)=
-**slice.** One longitudinal sample of the run. The beam's particles are partitioned into slices, and the field holds one transverse grid per slice. Slices are spaced by $\Delta = $ `window.n_wavelength` $\cdot\lambda_s$, so a slice is `n_wavelength` wavelengths long ([](fel-physics.md#sec-window)). A steady-state run is one slice.
+**slice.** One longitudinal sample of the run. The beam's particles are partitioned into slices, and the field holds one transverse grid per slice. Slices are spaced by $\Delta = $ `window.n_wavelength` $\cdot\lambda_s$, so a slice is `n_wavelength` wavelengths long ([](fel-physics.md#sec-window)). Its particles stand over all of those wavelengths ([](fel-physics.md#sec-quiet)). A steady-state run is one slice.
 
 (gl-slice-spacing)=
 **slice spacing, `n_wavelength`.** The whole number of wavelengths one slice spans. It is an integer end to end, since slippage moves the field by exactly one slice per `n_wavelength` undulator periods ([](fel-physics.md#sec-slippage)).

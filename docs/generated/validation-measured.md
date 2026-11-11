@@ -192,24 +192,34 @@ where the two builds agree to every printed digit.
 | shot noise, weight load, Gaussian bunch: the loaded electrons are a whole number | 2.7285e-12 | 1.8190e-12 | <= 1.0000e-06 |
 | shot noise, weight load, keep mode | 9.2015e-01 | same | 8.3913e-01 to 1.1609e+00 |
 | shot noise, weight load, keep mode: every particle of the bunch is present at its own charge | 1.3139e-16 | same | <= 1.0000e-12 |
+| shot noise, slices of 3 wavelengths, weight: noise power at the multiples of k_r/n that are not harmonics | 1.0103e+00 | same | 9.3028e-01 to 1.0697e+00 (debug), 9.3027e-01 to 1.0697e+00 (production) |
+| shot noise, slices of 3 wavelengths, weight: the spread of a period's electrons over the binomial spread | 1.0730e+00 | 1.0740e+00 | 8.7537e-01 to 1.1246e+00 |
+| shot noise, slices of 3 wavelengths, first_order: noise power at the multiples of k_r/n that are not harmonics | 3.6096e-01 | same | >= 0.0000e+00 |
+| shot noise, slices of 3 wavelengths, no noise: bunching of a slice at the multiples of k_r/n that are not harmonics | 2.0127e-16 | 2.0456e-16 | <= 1.0000e-12 |
+| shot noise, slices of 12 wavelengths, weight: noise power at the multiples of k_r/n that are not harmonics | 9.9905e-01 | 9.9851e-01 | 9.7036e-01 to 1.0296e+00 (debug), 9.7033e-01 to 1.0297e+00 (production) |
+| shot noise, slices of 12 wavelengths, weight: the spread of a period's electrons over the binomial spread | 1.0327e+00 | 1.0313e+00 | 9.3760e-01 to 1.0624e+00 (debug), 9.3766e-01 to 1.0623e+00 (production) |
+| shot noise, slices of 12 wavelengths, first_order: noise power at the multiples of k_r/n that are not harmonics | 4.6390e-01 | same | >= 0.0000e+00 |
+| shot noise, slices of 12 wavelengths, no noise: bunching of a slice at the multiples of k_r/n that are not harmonics | 8.2284e-16 | 7.9150e-16 | <= 1.0000e-12 |
+| shot noise, slices of 3 wavelengths after a tracked segment, without migration: the spread of a period's charge over that of its macroparticles placed at random | 5.6401e-01 | 5.6434e-01 | <= 1.2784e+00 |
+| shot noise, slices of 3 wavelengths after a tracked segment, with migration: the spread of a period's charge over that of its macroparticles placed at random | 5.7878e-01 | 5.7922e-01 | <= 1.2765e+00 |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice's charge is the charge with the key at 0 |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: no beamlet is under the limit where the slice holds it |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: the loader states the slices with fewer beamlets |  | same | holds |
-| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, fewer beamlets | 1.4938e-01 | same | 1.3425e-01 to 1.6016e-01 |
+| shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, fewer beamlets | 1.4874e-01 | same | 1.3431e-01 to 1.6010e-01 |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, the input file's beamlets | 7.5206e-01 | same | 7.0908e-01 to 8.0375e-01 |
 | shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: each slice's charge is the charge with the key at 0 |  | same | holds |
 | shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
 | shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: no beamlet is under the limit where the slice holds it |  | same | holds |
 | shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: the loader states the slices with fewer beamlets |  | same | holds |
-| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default, fewer beamlets | 1.6778e-01 | same | 1.5330e-01 to 1.8338e-01 |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default, fewer beamlets | 1.6762e-01 | same | 1.5330e-01 to 1.8338e-01 |
 | shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default, the input file's beamlets | 8.1701e-01 | same | 7.7170e-01 to 8.7369e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: each slice's charge is the charge with the key at 0 |  | same | holds |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: no beamlet is under the limit where the slice holds it |  | same | holds |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: the loader states the slices with fewer beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, one beamlet, under the limit | 6.1763e-01 | same | 5.6027e-01 to 7.1029e-01 |
-| shot noise, Gaussian bunch, beamlets of 18 electrons or more, fewer beamlets | 9.0665e-01 | same | 8.4109e-01 to 9.5964e-01 |
+| shot noise, Gaussian bunch, beamlets of 18 electrons or more, fewer beamlets | 9.0567e-01 | same | 8.4096e-01 to 9.5976e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, the input file's beamlets | 9.2958e-01 | same | 8.7360e-01 to 1.0174e+00 |
 | shot noise, no slice with fewer beamlets: the same bits as with beam.beamlet_min_electrons = 0 |  | same | holds |
 | shot noise, a slice with no charge is loaded with no particles |  | same | holds |
@@ -262,9 +272,9 @@ where the two builds agree to every printed digit.
 | refused, copies shifted singly |  | same | holds |
 | refused, a slice dump through beam.position_file |  | same | holds |
 | refused, a negative window.n_wavelength |  | same | holds |
-| in-cone startup, Gaussian bunch in sample mode | 4.3086e-02 | same | <= 3.5000e-01 |
-| in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge | 2.1414e-01 | same | <= 3.5000e-01 |
-| in-cone startup, Gaussian bunch in sample mode, the kick sized from J1 | 2.2173e-01 | same | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode | 4.3087e-02 | same | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge | 2.1412e-01 | same | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode, the kick sized from J1 | 2.2171e-01 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`
@@ -279,12 +289,12 @@ where the two builds agree to every printed digit.
 | Check | Debug | Production | Bound |
 |---|---|---|---|
 | ramp closed-form | 6.6919e-14 | same | <= 1.0000e-09 |
-| lord resolution | 1.0491e-13 | same | <= 1.0000e-09 |
+| lord resolution | 0.0000e+00 | same | <= 1.0000e-09 |
 | causality | 0.0000e+00 | same | = 0.0000e+00 |
 | d8 direction cross-check | 0.0000e+00 | same | <= 1.8111e-10 |
-| z_long vs first-principles particle convolution | 2.3909e-07 | same | <= 5.0000e-02 |
-| resolved-beam cross-validation (z_long vs wake_on) | 5.4945e-01 | same | <= 1 |
-| split-weight invariance of the kick profile | 5.0207e-10 | same | <= 2.0000e-09 |
+| z_long vs first-principles particle convolution | 1.1258e-02 | same | <= 5.0000e-02 |
+| resolved-beam cross-validation (z_long vs wake_on) | 5.4940e-01 | same | <= 1 |
+| split-weight invariance of the bunch's charge-weighted kick | 3.3593e-10 | same | <= 2.0000e-09 |
 | thread determinism with wake |  | same | holds |
 
 (val-levels-import)=
@@ -305,7 +315,7 @@ where the two builds agree to every printed digit.
 | twiss recovery: alpha | 1.0391e-02 | same | <= 1.0000e-01 |
 | twiss recovery: emittance | 1.4134e-02 | same | <= 5.0000e-02 |
 | thread determinism |  | same | holds |
-| startup power | 3.7156e-02 | same | -3.0000e-01 to 3.0000e-01 |
+| startup power | 3.7209e-02 | same | -3.0000e-01 to 3.0000e-01 |
 | cross-path: quiet-load current vs analytic Gaussian | 3.0555e-16 | 3.8193e-16 | <= 1.0000e-12 |
 | cross-path: imported current vs the same Gaussian | 4.8572e-02 | same | <= 7.0000e-02 |
 
@@ -314,10 +324,10 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| migration conservation: moves | 74076 | same | >= 10000 |
-| migration conservation: charge dropped | 2.6113e-14 | same | >= 0 |
-| migration conservation: worst violation | 1.7080e-14 | same | <= 1.0000e-10 |
-| migration phase continuity | 7.8099e-15 | 7.1446e-15 | <= 1.0000e-10 |
+| migration conservation: moves | 74184 | same | >= 10000 |
+| migration conservation: charge dropped | 2.6125e-14 | same | >= 0 |
+| migration conservation: worst violation | 1.7212e-14 | same | <= 1.0000e-10 |
+| migration phase continuity | 8.4646e-15 | 8.5144e-15 | <= 1.0000e-10 |
 | migration window residency | 0 | same | <= 0 |
 | migration no-op: moves | 0 | same | <= 0 |
 | migration no-op: diag byte-equal |  | same | holds |
@@ -330,7 +340,7 @@ where the two builds agree to every printed digit.
 | migration with a full-turn z_offset: outside their window, zo0t | 0 | same | <= 0 |
 | migration with a full-turn z_offset: moves, zo1t | 0 | same | <= 0 |
 | migration with a full-turn z_offset: outside their window, zo1t | 0 | same | <= 0 |
-| migration with a full-turn z_offset: theta against zero offset | 1.1702e-13 | 1.1724e-13 | <= 1.0000e-09 |
+| migration with a full-turn z_offset: theta against zero offset | 1.2079e-13 | 1.3145e-13 | <= 1.0000e-09 |
 
 (val-levels-collective)=
 ### `collective`
@@ -341,13 +351,13 @@ where the two builds agree to every printed digit.
 | collective sigma_energy invariance under uniform kicks | 2.5007e-07 | same | <= 5.1100e-03 |
 | stale-wake structure: eloss blocks | 49 | same | >= 2 |
 | stale-wake structure: blocks changed |  | same | holds |
-| drop-only stride: strides that dropped and moved nothing | 1 | same | >= 1 |
+| drop-only stride: strides that dropped and moved nothing | 2 | same | >= 1 |
 | drop-only stride: strides that moved | 0 | same | <= 0 |
 | drop-only stride: eloss blocks refreshed |  | same | holds |
-| charge representation, space charge on: one particle split 16 ways | 1.3889e-14 | 7.1071e-15 | <= 1.0000e-12 |
-| charge representation, space charge on: every particle split | 1.1515e-13 | 1.2087e-13 | <= 1.0000e-12 |
-| charge representation, space charge off: one particle split 16 ways | 1.3953e-14 | 1.0031e-14 | <= 1.0000e-12 |
-| charge representation, space charge off: every particle split | 1.2035e-13 | 9.1213e-14 | <= 1.0000e-12 |
+| charge representation, space charge on: one particle split 16 ways | 1.3889e-14 | 9.9477e-15 | <= 1.0000e-12 |
+| charge representation, space charge on: every particle split | 1.1782e-13 | 1.0196e-13 | <= 1.0000e-12 |
+| charge representation, space charge off: one particle split 16 ways | 1.3573e-14 | 7.0833e-15 | <= 1.0000e-12 |
+| charge representation, space charge off: every particle split | 1.2795e-13 | 1.3487e-13 | <= 1.0000e-12 |
 | long-range kernel at zero width | 9.9106e-04 | same | <= 5.0000e-02 |
 | short-range with no radial scale: refused |  | same | holds |
 | nphi outside its domain: refused at setup |  | same | holds |
@@ -430,11 +440,11 @@ where the two builds agree to every printed digit.
 | freerun compounds past lockstep (phasor) | 1.0073e-06 | 1.1073e-06 | >= 7.7028e-08 (debug), >= 7.4524e-08 (production) |
 | freerun end-to-end power divergence recorded | 7.3736e-04 | 6.9311e-04 | 0 to 1.0000e-02 |
 | lockstep TD worst_pz | 2.1196e-07 | same | <= 2.0000e-06 |
-| lockstep TD worst_theta | 9.3080e-06 | same | <= 3.0000e-04 |
-| lockstep TD worst_phasor | 1.5207e-07 | 1.5142e-07 | <= 3.0000e-05 |
-| lockstep TD worst_source | 5.2451e-06 | 5.2396e-06 | <= 1.0000e-04 |
-| lockstep TD worst_field | 5.2515e-06 | 5.2477e-06 | <= 1.0000e-04 |
-| lockstep TD guard ulps | 5.7301e+03 | same | >= 2.5600e+02 |
+| lockstep TD worst_theta | 9.6714e-06 | same | <= 3.0000e-04 |
+| lockstep TD worst_phasor | 1.6199e-07 | 1.5688e-07 | <= 3.0000e-05 |
+| lockstep TD worst_source | 5.2011e-06 | 5.1880e-06 | <= 1.0000e-04 |
+| lockstep TD worst_field | 5.2084e-06 | 5.1931e-06 | <= 1.0000e-04 |
+| lockstep TD guard ulps | 5.2470e+03 | same | >= 2.5600e+02 |
 | instrument stream byte-identical, 1 vs 8 threads |  | same | holds |
 | wake with the instrument refused |  | same | holds |
 | spectral lockstep steady worst_pz | 1.9368e-07 | same | <= 2.0000e-06 |
@@ -447,11 +457,11 @@ where the two builds agree to every printed digit.
 | spectral mutation moves worst_source | 3.8704e-04 | 3.8705e-04 | >= 6.3745e-05 (debug), >= 6.3740e-05 (production) |
 | spectral mutation moves worst_field | 3.8704e-04 | 3.8705e-04 | >= 6.3735e-05 |
 | spectral lockstep TD worst_pz | 2.1627e-07 | same | <= 2.0000e-06 |
-| spectral lockstep TD worst_theta | 9.6928e-06 | same | <= 3.0000e-04 |
-| spectral lockstep TD worst_phasor | 1.2502e-07 | 1.2293e-07 | <= 3.0000e-05 |
-| spectral lockstep TD worst_source | 5.0699e-06 | 5.0672e-06 | <= 1.0000e-04 |
-| spectral lockstep TD worst_field | 5.0781e-06 | 5.0813e-06 | <= 1.0000e-04 |
-| spectral lockstep TD guard ulps | 5.7305e+03 | same | >= 2.5600e+02 |
+| spectral lockstep TD worst_theta | 9.8007e-06 | 9.8165e-06 | <= 3.0000e-04 |
+| spectral lockstep TD worst_phasor | 1.3136e-07 | 1.3306e-07 | <= 3.0000e-05 |
+| spectral lockstep TD worst_source | 5.0965e-06 | 5.0949e-06 | <= 1.0000e-04 |
+| spectral lockstep TD worst_field | 5.1036e-06 | 5.1058e-06 | <= 1.0000e-04 |
+| spectral lockstep TD guard ulps | 5.2470e+03 | same | >= 2.5600e+02 |
 | spectral instrument stream byte-identical, 1 vs 8 threads |  | same | holds |
 | freerun under the spectral propagator refused |  | same | holds |
 | a field coarser than the slices with the twin refused |  | same | holds |
@@ -483,13 +493,13 @@ where the two builds agree to every printed digit.
 | device lockstep TD worst_y | 2.4626e-07 | same | <= 1.0000e-06 |
 | device lockstep TD worst_py | 2.3730e-07 | same | <= 1.0000e-06 |
 | device lockstep TD worst_pz | 1.3942e-07 | same | <= 1.3000e-06 |
-| device lockstep TD worst_theta | 6.7654e-06 | same | <= 1.5000e-04 |
-| device lockstep TD worst_phasor | 9.8334e-08 | same | <= 2.2000e-05 |
-| device lockstep TD worst_source | 6.3614e-06 | same | <= 2.2000e-04 |
-| device lockstep TD worst_field | 6.3706e-06 | same | <= 2.2000e-04 |
+| device lockstep TD worst_theta | 6.7645e-06 | same | <= 1.5000e-04 |
+| device lockstep TD worst_phasor | 9.8311e-08 | same | <= 2.2000e-05 |
+| device lockstep TD worst_source | 6.3669e-06 | same | <= 2.2000e-04 |
+| device lockstep TD worst_field | 6.3791e-06 | same | <= 2.2000e-04 |
 | device lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| device production TD window power vs CPU | 1.3783e-05 | same | <= 1.6000e-03 |
+| device production TD window power vs CPU | 1.3774e-05 | same | <= 1.6000e-03 |
 | refused: does not cover wakes |  | same | holds |
 | refused: does not cover spontaneous radiation |  | same | holds |
 | refused: unrecognized device |  | same | holds |
@@ -568,21 +578,21 @@ where the two builds agree to every printed digit.
 | two-plane TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | crossed TD production Px vs CPU (slippage live) | 4.1859e-06 | same | <= 1.6000e-03 |
 | crossed TD production Py vs CPU (slippage live) | 4.1009e-06 | same | <= 1.6000e-03 |
-| migration on the device bites | 73877 | same | >= 10000 |
-| migration conservation on the device, worst violation | 1.6029e-14 | same | <= 1.0000e-10 |
-| migration phase continuity on the device, worst deviation | 1.2027e-14 | 3.9359e-15 | <= 1.0000e-10 |
+| migration on the device bites | 74054 | same | >= 10000 |
+| migration conservation on the device, worst violation | 1.6292e-14 | same | <= 1.0000e-10 |
+| migration phase continuity on the device, worst deviation | 5.4840e-15 | 5.4735e-15 | <= 1.0000e-10 |
 | migration window residency on the device | 0 | same | <= 0 |
-| heavy-migration window power, device vs CPU | 3.6892e-04 | 3.6902e-04 | <= 3.0000e-03 |
+| heavy-migration window power, device vs CPU | 1.3872e-04 | same | <= 3.0000e-03 |
 | a migrated slice outgrew the rectangle and the seam grew it |  | same | holds |
-| migrating lockstep worst_x | 2.8856e-07 | same | <= 1.0000e-06 |
-| migrating lockstep worst_px | 2.6824e-07 | same | <= 1.0000e-06 |
-| migrating lockstep worst_y | 2.8768e-07 | same | <= 1.0000e-06 |
-| migrating lockstep worst_py | 2.6361e-07 | same | <= 1.0000e-06 |
-| migrating lockstep worst_pz | 2.0247e-07 | same | <= 1.3000e-06 |
-| migrating lockstep worst_theta | 7.3063e-06 | same | <= 1.5000e-04 |
-| migrating lockstep worst_phasor | 2.0859e-07 | same | <= 2.2000e-05 |
-| migrating lockstep worst_source | 7.9209e-06 | same | <= 2.2000e-04 |
-| migrating lockstep worst_field | 7.9209e-06 | same | <= 2.2000e-04 |
+| migrating lockstep worst_x | 2.8844e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_px | 2.6490e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_y | 2.8818e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_py | 2.6788e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_pz | 1.9192e-07 | same | <= 1.3000e-06 |
+| migrating lockstep worst_theta | 7.5589e-06 | same | <= 1.5000e-04 |
+| migrating lockstep worst_phasor | 1.9574e-07 | same | <= 2.2000e-05 |
+| migrating lockstep worst_source | 8.9635e-06 | same | <= 2.2000e-04 |
+| migrating lockstep worst_field | 8.9635e-06 | same | <= 2.2000e-04 |
 | migrating FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
@@ -602,7 +612,7 @@ where the two builds agree to every printed digit.
 | the source row with the quantum 24 bits coarser | 1.4672e-05 | same | <= 1.4688e-05 |
 | refused: a quantum 30 bits coarser, one past the floor |  | same | holds |
 | refused: harmonics together with two live polarizations |  | same | holds |
-| source filter, device vs CPU window power | 1.3921e-05 | same | <= 1.0000e-03 |
+| source filter, device vs CPU window power | 1.3940e-05 | same | <= 1.0000e-03 |
 | source filter on the device removes wide-angle power | 1.0083e+02 | same | >= 1.5000e+00 |
 | refused: source_filter_mutate on the device |  | same | holds |
 | unaveraged lockstep steady worst_x | 1.1317e-06 | same | <= 3.5000e-06 |
@@ -634,12 +644,12 @@ where the two builds agree to every printed digit.
 | unaveraged lockstep TD worst_y | 9.6623e-07 | same | <= 3.0000e-06 |
 | unaveraged lockstep TD worst_py | 6.8603e-06 | same | <= 2.1000e-05 |
 | unaveraged lockstep TD worst_pz | 1.9040e-06 | same | <= 6.5000e-06 |
-| unaveraged lockstep TD worst_theta | 3.1218e-06 | 3.1300e-06 | <= 1.1000e-05 |
+| unaveraged lockstep TD worst_theta | 3.1225e-06 | 3.1300e-06 | <= 1.1000e-05 |
 | unaveraged lockstep TD worst_phasor | 8.0086e-08 | 8.0088e-08 | <= 2.5000e-07 |
 | unaveraged lockstep TD worst_source | 1.7073e-03 | same | <= 5.0000e-03 |
-| unaveraged lockstep TD worst_field | 5.9466e-06 | 5.9562e-06 | <= 2.0000e-05 |
+| unaveraged lockstep TD worst_field | 6.0201e-06 | 6.0104e-06 | <= 2.0000e-05 |
 | unaveraged TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| unaveraged production TD window power vs CPU | 8.3720e-06 | 8.3084e-06 | <= 5.0000e-03 |
+| unaveraged production TD window power vs CPU | 8.3461e-06 | 8.3059e-06 | <= 5.0000e-03 |
 | two unaveraged device runs, diag and ledger identical |  | same | holds |
 | FP32 transform pair energy loss, unaveraged input file | 1.2829e-07 | 1.2854e-07 | 5.0000e-08 to 4.0000e-07 |
 | header counts the transform pairs, unaveraged input file | [5340, 5340] | same | = [5340, 5340] |
@@ -706,19 +716,19 @@ where the two builds agree to every printed digit.
 | spectral lockstep TD worst_y | 2.4632e-07 | same | <= 1.0000e-06 |
 | spectral lockstep TD worst_py | 2.3730e-07 | same | <= 1.0000e-06 |
 | spectral lockstep TD worst_pz | 1.4125e-07 | same | <= 6.5000e-07 |
-| spectral lockstep TD worst_theta | 6.7645e-06 | same | <= 2.9000e-05 |
-| spectral lockstep TD worst_phasor | 9.9422e-08 | same | <= 3.8000e-07 |
-| spectral lockstep TD worst_source | 6.3046e-06 | same | <= 3.8000e-05 |
-| spectral lockstep TD worst_field | 6.3133e-06 | same | <= 3.8000e-05 |
+| spectral lockstep TD worst_theta | 6.7650e-06 | same | <= 2.9000e-05 |
+| spectral lockstep TD worst_phasor | 9.9429e-08 | same | <= 3.8000e-07 |
+| spectral lockstep TD worst_source | 6.3120e-06 | same | <= 3.8000e-05 |
+| spectral lockstep TD worst_field | 6.3220e-06 | same | <= 3.8000e-05 |
 | spectral lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | spectral TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| spectral production TD window power vs CPU | 2.1853e-05 | same | <= 1.6000e-03 |
+| spectral production TD window power vs CPU | 2.1898e-05 | same | <= 1.6000e-03 |
 | spectral bank: the device's ledger closes at the CPU's level | 4.0690e-07 | same | <= 1.2000e-06 |
 | spectral bank: pulse planes, device against CPU | 97 | same | = 97 |
 | spectral bank: escaped energy, device against CPU | 4.0686e-07 | same | <= 1.2000e-06 |
 | spectral coarse field: slices a plane, device against CPU | 6 | same | = 6 |
-| spectral coarse production window power vs CPU | 5.4004e-05 | same | <= 1.6000e-03 |
-| spectral coarse production exit power per slice vs CPU, over the peak | 9.1889e-05 | same | <= 3.0000e-04 |
+| spectral coarse production window power vs CPU | 5.4042e-05 | same | <= 1.6000e-03 |
+| spectral coarse production exit power per slice vs CPU, over the peak | 9.2064e-05 | same | <= 3.0000e-04 |
 | two spectral device runs, every stats array identical | 0 | same | = 0 |
 | spectral harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
 | spectral harmonic lockstep worst_px | 4.1970e-08 | same | <= 1.0000e-06 |
@@ -885,7 +895,7 @@ where the two builds agree to every printed digit.
 | unitSI = 0.5 on doubled samples reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | gridUnitSI = 2 on a halved spacing reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal a y component shaped unlike x |  | same | holds |
-| the filter angle acts on an imported field with no grid in the input file (relative move) | 1.0208e-06 | 1.0184e-06 | <= 1.0000e+00 |
+| the filter angle acts on an imported field with no grid in the input file (relative move) | 1.0414e-06 | 1.0404e-06 | <= 1.0000e+00 |
 | and the input file with the grid keys filters as the input file without them | 0.0000e+00 | same | <= 1.0000e-09 |
 | restart, x | 0.0000e+00 | same | <= 1.0000e-16 |
 | restart, y | 0.0000e+00 | same | <= 1.0000e-16 |
@@ -906,7 +916,7 @@ where the two builds agree to every printed digit.
 | one patch per Genesis slice, the empty one a zero-count patch | 0.0000e+00 | same | <= 5.0000e-01 |
 | every patch's bounds strictly enclose its particles, every extent positive | 0 | same | <= 5.0000e-01 |
 | Bmad's reader returns one bunch per slice of the converted file | 0.0000e+00 | same | <= 5.0000e-01 |
-| the particles come back in the converted file's order, slice by slice [m or gamma beta] | 1.7347e-18 | same | <= 1.0000e-12 |
+| the particles come back in the converted file's order, slice by slice [m or gamma beta] | 1.3878e-17 | same | <= 1.0000e-12 |
 | refusal a beam file that is not openPMD |  | same | holds |
 | refusal patch count against the input file's window |  | same | holds |
 | refusal a file that carries no charge |  | same | holds |
@@ -1020,7 +1030,7 @@ where the two builds agree to every printed digit.
 | limit identity: \|ln P\| curve, coherent vs deposit at M=8192 | 1.8020e-02 | same | <= 5.0000e-02 |
 | the artifact: plain deposit at M=128 fakes energy exchange | 3.9150e-01 | same | >= 2.0000e-01 |
 | the claim: coherent at M=128 stays at the model bias | 4.8728e-02 | same | <= 1.0000e-01 |
-| offset+tilted beam: coherent tracks its deposit twin | 6.0560e-02 | same | <= 2.0000e-01 |
+| offset+tilted beam: coherent tracks its deposit twin | 5.5383e-02 | same | <= 2.0000e-01 |
 | double-horn beam refused (GAUSSIAN ENOUGH) |  | same | holds |
 | coherent + dark start refused |  | same | holds |
 | coherent run 1 vs 8 threads dataset-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |

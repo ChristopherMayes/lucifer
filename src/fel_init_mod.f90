@@ -533,6 +533,7 @@ do is_g = 1, nslice_gen
     pz = (p_mc - p0_mc) / p0_mc
 
     if (quiet_start) then
+
       theta0 = (ib - 0.5_rp) * twopi / (beamlet_size * mb_s)
       do im = 0, beamlet_size - 1
         ip = ip + 1
@@ -546,7 +547,7 @@ do is_g = 1, nslice_gen
     else
       call ran_uniform (u)
       ip = ip + 1
-      theta_work(ip) = twopi * u
+      theta_work(ip) = twopi * window_sample * u
       beta_work(ip) = beta
       sl%x(ip) = x;   sl%px(ip) = xp
       sl%y(ip) = y;   sl%py(ip) = yp
@@ -554,6 +555,12 @@ do is_g = 1, nslice_gen
       sl%weight(ip) = w_part
     endif
   enddo
+
+  ! A slice of several wavelengths holds the charge of all of them, so its macroparticles
+  ! stand over all its periods, on one even grid (fel_slice_fill). The phases above are
+  ! those of a slice of one wavelength, which is as it was.
+
+  if (quiet_start .and. window_sample > 1) call fel_slice_fill (mb_s, beamlet_size, window_sample, theta_work)
 
   ! Check knob, and not a physics input: alternate beamlet weights 0.25x/1.75x. The
   ! charge is preserved, and the weight is uniform within each beamlet so the quiet
@@ -1065,7 +1072,10 @@ do ip = 1, size(bp%particle)
   p_mc = (1 + cp%vec(6)) * cp%p0c / m_electron
   gam = sqrt(p_mc**2 + 1)
   beta_p = p_mc / gam
-  theta0 = modulo(ks_l * (s_k(ip) - smin + offset - (isl(ip) - 1) * spacing_k), twopi)
+
+  ! The particle's own phase in its slice, which is window_sample periods long.
+
+  theta0 = modulo(ks_l * (s_k(ip) - smin + offset - (isl(ip) - 1) * spacing_k), twopi * window_sample)
   w_copy = cp%charge / ncopy
   do im = 0, ncopy - 1
     i = sl%n + 1

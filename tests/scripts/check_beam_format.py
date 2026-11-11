@@ -383,8 +383,10 @@ def main():
     # ------------------------------------------------------------------
     print("== an empty slice survives ==")
 
-    run(exe, wd, "bfe", BASE.format(root="bfe", sig_pz="1.5e-01",
-        extra="  migrate = T\n"))
+    # A bunch over three quarters of the window, so the slices beyond it hold no charge
+    # and are loaded with no particles.
+    run(exe, wd, "bfe", BASE.format(root="bfe", sig_pz="8.804506566858e-05",
+        extra="  migrate = T\n").replace("beam.z_max = 2.4e-9", "beam.z_max = 1.2e-9"))
     run(exe, wd, "bfer", restart("bfer", "bfe-final.beam.h5", "bfe-final.wf.h5"))
 
     c0 = slice_counts(wd / "bfe-final.beam.h5")

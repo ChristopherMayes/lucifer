@@ -736,6 +736,42 @@ Output:
 Routine to renumber sparse cell labels to 1..n_group.
 ```
 
+(api-fel-slice-fill)=
+### `fel_slice_fill`
+
+*Subroutine* `(n_beamlet, beamlet_size, n_period, theta)`
+
+```
+Routine to give the quiet phases of a slice that is n_period radiation wavelengths long
+(docs/fel-physics.md sec-quiet). The slice holds the charge of all its periods, so its
+macroparticles stand over all of them and not in one. The N = n_beamlet * beamlet_size
+macroparticles stand on one even grid over the slice, at (j + 1/2) n_period / N periods
+for j = 0 to N - 1. The charge in any stretch of the slice is then the same to one
+macroparticle, and the sum of exp(-i k z) over the slice is zero to rounding at every
+multiple of the resonant wavenumber over n_period that is not a harmonic.
+
+A beamlet is the beamlet_size grid points whose phases within a period differ by a
+whole number of 2 pi / beamlet_size, taken one from each such phase in grid order. Its
+bunching is therefore zero at every harmonic below beamlet_size, as in a slice of one
+period. Its points stand in several periods of the slice.
+
+The grid splits into beamlets this way when the greatest common divisor of n_period and
+N divides n_beamlet, which holds for the counts an input file states. Otherwise each
+macroparticle keeps its phase in one period and takes a period by its place on that
+period's grid in turn, which leaves the charge even and the sum above at one part in N.
+```
+
+```
+Input:
+  n_beamlet    -- integer: Beamlets in the slice.
+  beamlet_size -- integer: Copies per beamlet.
+  n_period     -- integer: Radiation wavelengths in a slice, window.n_wavelength.
+
+Output:
+  theta(:)     -- real(rp): Phases [rad], 0 to 2 pi n_period, beamlet-contiguous: copy t
+                   of beamlet ib at (ib - 1) * beamlet_size + t.
+```
+
 (api-fel-ran-binomial)=
 ### `fel_ran_binomial`
 
