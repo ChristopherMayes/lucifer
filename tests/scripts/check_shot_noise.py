@@ -332,6 +332,41 @@ def same_bits(exe, lat, workdir):
     return same
 
 
+def empty_slices(exe, lat, workdir):
+    """A flat bunch over the middle half of the window, with the key at its default and at 0.
+    At the default a slice with no charge has no particles, and at 0 it has the input file's
+    count at zero weight. A slice with charge is the same either way."""
+    def text(root, limit):
+        base = NML.format(lat=lat, root=root, seed=4321, n_particle=N_PARTICLE, window=N_SLICE * SPACING,
+                          z_min=-N_SLICE * SPACING / 4, z_max=N_SLICE * SPACING / 4,
+                          charge=ELECTRONS * E_CHARGE * N_SLICE * N_PARTICLE / BEAMLET_SIZE,
+                          grid_n_pts=GRID_N_PTS, grid_half_width=GRID_HALF_WIDTH,
+                          beamlet_size=BEAMLET_SIZE, testw="F")
+        return base if limit else base.replace("  beam.beamlet_min_electrons = 0\n", "")
+    _, a = run_load(exe, workdir, "sn_empty_0", text("sn_empty_0", True))
+    _, b = run_load(exe, workdir, "sn_empty_d", text("sn_empty_d", False))
+    n_empty, none_ok, same_ok, worst = 0, True, True, 0.0
+    for s0, s1 in zip(beamio.read_slices(a, LAMBDA0, SPACING), beamio.read_slices(b, LAMBDA0, SPACING)):
+        q0 = s0["weight"].sum()
+        if q0 == 0:
+            n_empty += 1
+            none_ok = none_ok and s0["n"] == N_PARTICLE and s1["n"] == 0
+        else:
+            same_ok = same_ok and s1["n"] == s0["n"]
+            worst = max(worst, abs(s1["weight"].sum() - q0) / q0)
+    a.unlink()
+    b.unlink()
+    none_ok = none_ok and n_empty > 0
+    same_ok = same_ok and worst < 1e-12
+    print(f"--- a slice with no charge has no particles: {n_empty} such slices  {'ok' if none_ok else 'FAIL'}")
+    record("shot noise, a slice with no charge is loaded with no particles", None, None, "bool", none_ok)
+    print(f"--- the slices with charge beside them keep their particles and their charge, "
+          f"worst {worst:.1e}  {'ok' if same_ok else 'FAIL'}")
+    record("shot noise, the slices with charge beside slices with none keep their particles and charge",
+           None, None, "bool", same_ok)
+    return none_ok and same_ok
+
+
 KEEP_NML = """[run]
   lattice = "{lat}"
   run.out_root = "{root}"
@@ -548,6 +583,7 @@ def main():
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, 18.0,
                         "Gaussian bunch, beamlets of 18 electrons or more") and ok
     ok = same_bits(exe, PARSED.lat, workdir) and ok
+    ok = empty_slices(exe, PARSED.lat, workdir) and ok
 
     ok = other_loads(exe, PARSED.lat, workdir, PARSED.seeds) and ok
     ok = split_check(exe, PARSED.lat, workdir) and ok

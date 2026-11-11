@@ -664,11 +664,8 @@ Routine to give the beamlets a slice is loaded with in the sample mode
 for less than n_min electrons. The kick of fel_fawley_noise loads less than the shot
 noise of a beamlet's electrons, and far less below one electron. The slice keeps its
 charge, so its beamlets are heavier. A slice with fewer than n_min electrons in all
-has one beamlet.
-
-A slice with no charge at all keeps n_beamlet. It carries no noise and its particles
-weigh nothing, so there is nothing to gain, and the random numbers of the slices after
-it stay those of a load with n_min = 0.
+has one beamlet. A slice with no charge at all has none, and is loaded with no
+particles, as the keep mode loads a slice no particle of the bunch falls in.
 ```
 
 ```
@@ -679,7 +676,7 @@ Input:
                  every slice n_beamlet.
 
 Output:
-  n_load     -- integer: Beamlets to load, 1 to n_beamlet.
+  n_load     -- integer: Beamlets to load, 0 to n_beamlet.
 ```
 
 (api-fel-shot-ratio)=

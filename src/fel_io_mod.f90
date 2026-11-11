@@ -752,7 +752,7 @@ endif
 
 block
   real(rp) n_pstep, n_gpt, secs
-  integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise, n_load
+  integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise, n_load, n_few, n_empty
   character(16) backend
   character(64) ramp_str
 
@@ -861,10 +861,20 @@ block
   ! (fel_beamlet_count), and every other slice the input file's count. So there the load
   ! is judged on that count, the largest, and the fewest is stated beside it.
 
+  ! There a slice with no charge has no particles, which is stated on a line of its own,
+  ! and the fewest is taken over the slices that have particles.
+
   n_load = minval(run%fbeam%slice%n)
-  if (run%bparam%load_mode == 'sample' .and. run%bparam%beam_file == '') n_load = maxval(run%fbeam%slice%n)
+  n_few = n_load
+  n_empty = 0
+  if (run%bparam%load_mode == 'sample') then
+    n_empty = count(run%fbeam%slice%n == 0)
+    if (n_empty < size(run%fbeam%slice)) n_few = minval(run%fbeam%slice%n, mask = run%fbeam%slice%n > 0)
+    n_load = n_few
+    if (run%bparam%beam_file == '') n_load = maxval(run%fbeam%slice%n)
+  endif
   nbeamlet = n_load / max(1, run%bparam%beamlet_size)
-  if (n_load == minval(run%fbeam%slice%n)) then
+  if (n_load == n_few) then
     write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', n_load, &
           ' macroparticles in the thinnest slice, beamlets of ', run%bparam%beamlet_size, &
           ', ', nbeamlet, ' beamlets.'
@@ -872,9 +882,14 @@ block
     write (line, '(a, i0, a, i0, a, i0, a, i0, a)') ' Load        ', n_load, &
           ' macroparticles in a slice, beamlets of ', run%bparam%beamlet_size, &
           ', ', nbeamlet, ' beamlets. The slices of little charge have fewer, down to ', &
-          minval(run%fbeam%slice%n) / max(1, run%bparam%beamlet_size), '.'
+          n_few / max(1, run%bparam%beamlet_size), '.'
   endif
   call out_io (s_blank$, r_name, trim(line))
+  if (n_empty > 0) then
+    write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &
+          ' slices have no charge and are loaded with no particles.'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
 
   if (.not. run%global%source_filter) then
     call out_io (s_blank$, r_name, '             The source filter is off, and no estimate of the ' // &

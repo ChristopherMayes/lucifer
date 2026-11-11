@@ -53,56 +53,56 @@ The `avg` run writes it: interior frame of an averaged undulator, the coordinate
         electron/               group
           @chargeLive           float64 little-endian (1,)  [8.00554e-16]
           @chargeUnitSI         float64 little-endian (1,)  [1]
-          @numParticles         int32 little-endian (1,)    [384]
+          @numParticles         int32 little-endian (1,)    [128]
           @speciesType          string fixed(9) ascii ()    "electron"
           @totalCharge          float64 little-endian (1,)  [0]
           branchIndex/          group
             @localName          string fixed(10) ascii ()   "ix_branch"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [0]
           elementIndex/         group
             @localName          string fixed(7) ascii ()    "ix_ele"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
-          id                    dataset                     (384,) int32 little-endian, contiguous
+          id                    dataset                     (128,) int32 little-endian, contiguous
             @localName          string fixed(8) ascii ()    "ix_user"
-            @maxValue           int32 little-endian (1,)    [384]
+            @maxValue           int32 little-endian (1,)    [128]
             @minValue           int32 little-endian (1,)    [1]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
           locationInElement/    group
             @localName          string fixed(9) ascii ()    "location"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [0]
           momentum/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "px * p0c"
-              @maxValue         float64 little-endian (1,)  [40122.6]
+              @maxValue         float64 little-endian (1,)  [27107.1]
               @minValue         float64 little-endian (1,)  [-27848.1]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "py * p0c"
-              @maxValue         float64 little-endian (1,)  [26860.1]
+              @maxValue         float64 little-endian (1,)  [10880.9]
               @minValue         float64 little-endian (1,)  [-27043.7]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            z                   dataset                     (384,) float64 little-endian, contiguous
+            z                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "ps * p0c"
               @maxValue         float64 little-endian (1,)  [5.8051e+09]
-              @minValue         float64 little-endian (1,)  [5.80237e+09]
+              @minValue         float64 little-endian (1,)  [5.80296e+09]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
@@ -152,36 +152,36 @@ The `avg` run writes it: interior frame of an averaged undulator, the coordinate
                 @unitSymbol     string fixed(2) ascii ()    "m"
           particleStatus/       group
             @localName          string fixed(6) ascii ()    "state"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
           position/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "x"
               @maxValue         float64 little-endian (1,)  [5.42582e-05]
-              @minValue         float64 little-endian (1,)  [-3.90907e-05]
+              @minValue         float64 little-endian (1,)  [-2.55659e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "y"
               @maxValue         float64 little-endian (1,)  [3.41684e-05]
-              @minValue         float64 little-endian (1,)  [-3.04977e-05]
+              @minValue         float64 little-endian (1,)  [-2.74185e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
             z/                  group
               @localName        string fixed(2) ascii ()    "z"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
               @value            float64 little-endian (1,)  [0]
           sPosition/            group
             @localName          string fixed(2) ascii ()    "s"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(2) ascii ()    "m"
@@ -189,60 +189,60 @@ The `avg` run writes it: interior frame of an averaged undulator, the coordinate
           spin/                 group
             x/                  group
               @localName        string fixed(3) ascii ()    "Sx"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             y/                  group
               @localName        string fixed(3) ascii ()    "Sy"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             z/                  group
               @localName        string fixed(3) ascii ()    "Sz"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
-          time                  dataset                     (384,) float64 little-endian, contiguous
+          time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [-1.88429e-21]
-            @minValue           float64 little-endian (1,)  [-3.30922e-19]
+            @maxValue           float64 little-endian (1,)  [-1.90003e-21]
+            @minValue           float64 little-endian (1,)  [-3.30724e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          timeOffset            dataset                     (384,) float64 little-endian, contiguous
+          timeOffset            dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(6) ascii ()    "t_ref"
             @maxValue           float64 little-endian (1,)  [5.00346e-11]
             @minValue           float64 little-endian (1,)  [5.00346e-11]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          totalMomentum         dataset                     (384,) float64 little-endian, contiguous
+          totalMomentum         dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(9) ascii ()    "pz * p0c"
             @maxValue           float64 little-endian (1,)  [1.27031e+06]
-            @minValue           float64 little-endian (1,)  [-1.46014e+06]
+            @minValue           float64 little-endian (1,)  [-878652]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
           totalMomentumOffset/  group
             @localName          string fixed(4) ascii ()    "p0c"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
             @value              float64 little-endian (1,)  [5.80383e+09]
-          weight                dataset                     (384,) float64 little-endian, contiguous
+          weight/               group
             @localName          string fixed(13) ascii ()   "macro-charge"
-            @maxValue           float64 little-endian (1,)  [6.25433e-18]
-            @minValue           float64 little-endian (1,)  [0]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
+            @value              float64 little-endian (1,)  [6.25433e-18]
   lucifer/                      group
     frame/                      group
       @aw                       float64 little-endian (1,)  [0.84853]
@@ -287,56 +287,56 @@ The `avg` run writes it: frame at the end of QU, the whole window, at the same s
         electron/               group
           @chargeLive           float64 little-endian (1,)  [8.00554e-16]
           @chargeUnitSI         float64 little-endian (1,)  [1]
-          @numParticles         int32 little-endian (1,)    [384]
+          @numParticles         int32 little-endian (1,)    [128]
           @speciesType          string fixed(9) ascii ()    "electron"
           @totalCharge          float64 little-endian (1,)  [0]
           branchIndex/          group
             @localName          string fixed(10) ascii ()   "ix_branch"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [0]
           elementIndex/         group
             @localName          string fixed(7) ascii ()    "ix_ele"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
-          id                    dataset                     (384,) int32 little-endian, contiguous
+          id                    dataset                     (128,) int32 little-endian, contiguous
             @localName          string fixed(8) ascii ()    "ix_user"
-            @maxValue           int32 little-endian (1,)    [384]
+            @maxValue           int32 little-endian (1,)    [128]
             @minValue           int32 little-endian (1,)    [1]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
           locationInElement/    group
             @localName          string fixed(9) ascii ()    "location"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
           momentum/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "px * p0c"
-              @maxValue         float64 little-endian (1,)  [40122.6]
+              @maxValue         float64 little-endian (1,)  [27107.1]
               @minValue         float64 little-endian (1,)  [-27848.1]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "py * p0c"
-              @maxValue         float64 little-endian (1,)  [26866.6]
+              @maxValue         float64 little-endian (1,)  [10887.3]
               @minValue         float64 little-endian (1,)  [-27052.5]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            z                   dataset                     (384,) float64 little-endian, contiguous
+            z                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "ps * p0c"
               @maxValue         float64 little-endian (1,)  [5.8051e+09]
-              @minValue         float64 little-endian (1,)  [5.80237e+09]
+              @minValue         float64 little-endian (1,)  [5.80296e+09]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
@@ -386,36 +386,36 @@ The `avg` run writes it: frame at the end of QU, the whole window, at the same s
                 @unitSymbol     string fixed(2) ascii ()    "m"
           particleStatus/       group
             @localName          string fixed(6) ascii ()    "state"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
           position/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "x"
               @maxValue         float64 little-endian (1,)  [5.44153e-05]
-              @minValue         float64 little-endian (1,)  [-3.92346e-05]
+              @minValue         float64 little-endian (1,)  [-2.57202e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "y"
               @maxValue         float64 little-endian (1,)  [3.39586e-05]
-              @minValue         float64 little-endian (1,)  [-3.04156e-05]
+              @minValue         float64 little-endian (1,)  [-2.73639e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
             z/                  group
               @localName        string fixed(2) ascii ()    "z"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
               @value            float64 little-endian (1,)  [0]
           sPosition/            group
             @localName          string fixed(2) ascii ()    "s"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(2) ascii ()    "m"
@@ -423,60 +423,60 @@ The `avg` run writes it: frame at the end of QU, the whole window, at the same s
           spin/                 group
             x/                  group
               @localName        string fixed(3) ascii ()    "Sx"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             y/                  group
               @localName        string fixed(3) ascii ()    "Sy"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             z/                  group
               @localName        string fixed(3) ascii ()    "Sz"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
-          time                  dataset                     (384,) float64 little-endian, contiguous
+          time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [2.80764e-22]
-            @minValue           float64 little-endian (1,)  [-3.30813e-19]
+            @maxValue           float64 little-endian (1,)  [2.17793e-22]
+            @minValue           float64 little-endian (1,)  [-3.3002e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          timeOffset            dataset                     (384,) float64 little-endian, contiguous
+          timeOffset            dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(6) ascii ()    "t_ref"
             @maxValue           float64 little-endian (1,)  [2.00138e-10]
             @minValue           float64 little-endian (1,)  [2.00138e-10]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          totalMomentum         dataset                     (384,) float64 little-endian, contiguous
+          totalMomentum         dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(9) ascii ()    "pz * p0c"
             @maxValue           float64 little-endian (1,)  [1.27031e+06]
-            @minValue           float64 little-endian (1,)  [-1.46014e+06]
+            @minValue           float64 little-endian (1,)  [-878652]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
           totalMomentumOffset/  group
             @localName          string fixed(4) ascii ()    "p0c"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
             @value              float64 little-endian (1,)  [5.80383e+09]
-          weight                dataset                     (384,) float64 little-endian, contiguous
+          weight/               group
             @localName          string fixed(13) ascii ()   "macro-charge"
-            @maxValue           float64 little-endian (1,)  [6.25433e-18]
-            @minValue           float64 little-endian (1,)  [0]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
+            @value              float64 little-endian (1,)  [6.25433e-18]
   lucifer/                      group
     checkpoint/                 group
       @checkpointFormat         string fixed(23) ascii ()   "lucifer-checkpoint 2.0"
@@ -484,7 +484,7 @@ The `avg` run writes it: frame at the end of QU, the whole window, at the same s
       @elementName              string fixed(3) ascii ()    "QU"
       @phi0                     float64 little-endian (1,)  [10.5207]
       @sPosition                float64 little-endian (1,)  [0.06]
-      id                        dataset                     (384,) int32 little-endian, contiguous
+      id                        dataset                     (128,) int32 little-endian, contiguous
         @axes                   string fixed(5) ascii ()    "none"
         @description            string fixed(60) ascii ()   "The particle labels in the records' order, which z follows."
         @long_name              string fixed(12) ascii ()   "particle id"
@@ -494,7 +494,7 @@ The `avg` run writes it: frame at the end of QU, the whole window, at the same s
         @description            string fixed(78) ascii ()   "Particles in each slice of the window, in window order: the records' patches."
         @long_name              string fixed(20) ascii ()   "particles per slice"
         @unit                   string fixed(2) ascii ()    "1"
-      z                         dataset                     (384,) float64 little-endian, contiguous
+      z                         dataset                     (128,) float64 little-endian, contiguous
         @axes                   string fixed(5) ascii ()    "none"
         @description            string fixed(86) ascii ()   "Each particle's z as the tracker holds it, -beta c (t - t_ref), before the phi0 fold."
         @long_name              string fixed(24) ascii ()   "longitudinal coordinate"
@@ -540,56 +540,56 @@ The `avg` run writes it: final dump at the zero-length END marker Bmad appends t
         electron/               group
           @chargeLive           float64 little-endian (1,)  [8.00554e-16]
           @chargeUnitSI         float64 little-endian (1,)  [1]
-          @numParticles         int32 little-endian (1,)    [384]
+          @numParticles         int32 little-endian (1,)    [128]
           @speciesType          string fixed(9) ascii ()    "electron"
           @totalCharge          float64 little-endian (1,)  [0]
           branchIndex/          group
             @localName          string fixed(10) ascii ()   "ix_branch"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [0]
           elementIndex/         group
             @localName          string fixed(7) ascii ()    "ix_ele"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [2]
-          id                    dataset                     (384,) int32 little-endian, contiguous
+          id                    dataset                     (128,) int32 little-endian, contiguous
             @localName          string fixed(8) ascii ()    "ix_user"
-            @maxValue           int32 little-endian (1,)    [384]
+            @maxValue           int32 little-endian (1,)    [128]
             @minValue           int32 little-endian (1,)    [1]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
           locationInElement/    group
             @localName          string fixed(9) ascii ()    "location"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [-1]
           momentum/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "px * p0c"
-              @maxValue         float64 little-endian (1,)  [40122.6]
+              @maxValue         float64 little-endian (1,)  [27107.1]
               @minValue         float64 little-endian (1,)  [-27848.1]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "py * p0c"
-              @maxValue         float64 little-endian (1,)  [26866.6]
+              @maxValue         float64 little-endian (1,)  [10887.3]
               @minValue         float64 little-endian (1,)  [-27052.5]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            z                   dataset                     (384,) float64 little-endian, contiguous
+            z                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "ps * p0c"
               @maxValue         float64 little-endian (1,)  [5.8051e+09]
-              @minValue         float64 little-endian (1,)  [5.80237e+09]
+              @minValue         float64 little-endian (1,)  [5.80296e+09]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
@@ -639,36 +639,36 @@ The `avg` run writes it: final dump at the zero-length END marker Bmad appends t
                 @unitSymbol     string fixed(2) ascii ()    "m"
           particleStatus/       group
             @localName          string fixed(6) ascii ()    "state"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
           position/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "x"
               @maxValue         float64 little-endian (1,)  [5.44153e-05]
-              @minValue         float64 little-endian (1,)  [-3.92346e-05]
+              @minValue         float64 little-endian (1,)  [-2.57202e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "y"
               @maxValue         float64 little-endian (1,)  [3.39586e-05]
-              @minValue         float64 little-endian (1,)  [-3.04156e-05]
+              @minValue         float64 little-endian (1,)  [-2.73639e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
             z/                  group
               @localName        string fixed(2) ascii ()    "z"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
               @value            float64 little-endian (1,)  [0]
           sPosition/            group
             @localName          string fixed(2) ascii ()    "s"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(2) ascii ()    "m"
@@ -676,60 +676,60 @@ The `avg` run writes it: final dump at the zero-length END marker Bmad appends t
           spin/                 group
             x/                  group
               @localName        string fixed(3) ascii ()    "Sx"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             y/                  group
               @localName        string fixed(3) ascii ()    "Sy"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             z/                  group
               @localName        string fixed(3) ascii ()    "Sz"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
-          time                  dataset                     (384,) float64 little-endian, contiguous
+          time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [2.80764e-22]
-            @minValue           float64 little-endian (1,)  [-3.30813e-19]
+            @maxValue           float64 little-endian (1,)  [2.17793e-22]
+            @minValue           float64 little-endian (1,)  [-3.3002e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          timeOffset            dataset                     (384,) float64 little-endian, contiguous
+          timeOffset            dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(6) ascii ()    "t_ref"
             @maxValue           float64 little-endian (1,)  [2.00138e-10]
             @minValue           float64 little-endian (1,)  [2.00138e-10]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          totalMomentum         dataset                     (384,) float64 little-endian, contiguous
+          totalMomentum         dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(9) ascii ()    "pz * p0c"
             @maxValue           float64 little-endian (1,)  [1.27031e+06]
-            @minValue           float64 little-endian (1,)  [-1.46014e+06]
+            @minValue           float64 little-endian (1,)  [-878652]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
           totalMomentumOffset/  group
             @localName          string fixed(4) ascii ()    "p0c"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
             @value              float64 little-endian (1,)  [5.80383e+09]
-          weight                dataset                     (384,) float64 little-endian, contiguous
+          weight/               group
             @localName          string fixed(13) ascii ()   "macro-charge"
-            @maxValue           float64 little-endian (1,)  [6.25433e-18]
-            @minValue           float64 little-endian (1,)  [0]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
+            @value              float64 little-endian (1,)  [6.25433e-18]
   lucifer/                      group
     checkpoint/                 group
       @checkpointFormat         string fixed(23) ascii ()   "lucifer-checkpoint 2.0"
@@ -737,7 +737,7 @@ The `avg` run writes it: final dump at the zero-length END marker Bmad appends t
       @elementName              string fixed(4) ascii ()    "END"
       @phi0                     float64 little-endian (1,)  [10.5207]
       @sPosition                float64 little-endian (1,)  [0.06]
-      id                        dataset                     (384,) int32 little-endian, contiguous
+      id                        dataset                     (128,) int32 little-endian, contiguous
         @axes                   string fixed(5) ascii ()    "none"
         @description            string fixed(60) ascii ()   "The particle labels in the records' order, which z follows."
         @long_name              string fixed(12) ascii ()   "particle id"
@@ -747,7 +747,7 @@ The `avg` run writes it: final dump at the zero-length END marker Bmad appends t
         @description            string fixed(78) ascii ()   "Particles in each slice of the window, in window order: the records' patches."
         @long_name              string fixed(20) ascii ()   "particles per slice"
         @unit                   string fixed(2) ascii ()    "1"
-      z                         dataset                     (384,) float64 little-endian, contiguous
+      z                         dataset                     (128,) float64 little-endian, contiguous
         @axes                   string fixed(5) ascii ()    "none"
         @description            string fixed(86) ascii ()   "Each particle's z as the tracker holds it, -beta c (t - t_ref), before the phi0 fold."
         @long_name              string fixed(24) ascii ()   "longitudinal coordinate"
@@ -825,56 +825,56 @@ The `unavg` run writes it: interior frame of an unaveraged undulator, the oscill
         electron/               group
           @chargeLive           float64 little-endian (1,)  [8.00554e-16]
           @chargeUnitSI         float64 little-endian (1,)  [1]
-          @numParticles         int32 little-endian (1,)    [384]
+          @numParticles         int32 little-endian (1,)    [128]
           @speciesType          string fixed(9) ascii ()    "electron"
           @totalCharge          float64 little-endian (1,)  [0]
           branchIndex/          group
             @localName          string fixed(10) ascii ()   "ix_branch"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [0]
           elementIndex/         group
             @localName          string fixed(7) ascii ()    "ix_ele"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
-          id                    dataset                     (384,) int32 little-endian, contiguous
+          id                    dataset                     (128,) int32 little-endian, contiguous
             @localName          string fixed(8) ascii ()    "ix_user"
-            @maxValue           int32 little-endian (1,)    [384]
+            @maxValue           int32 little-endian (1,)    [128]
             @minValue           int32 little-endian (1,)    [1]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
           locationInElement/    group
             @localName          string fixed(9) ascii ()    "location"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [0]
           momentum/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "px * p0c"
-              @maxValue         float64 little-endian (1,)  [346735]
+              @maxValue         float64 little-endian (1,)  [333707]
               @minValue         float64 little-endian (1,)  [278769]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "py * p0c"
-              @maxValue         float64 little-endian (1,)  [26858.1]
+              @maxValue         float64 little-endian (1,)  [10878.9]
               @minValue         float64 little-endian (1,)  [-27041]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
-            z                   dataset                     (384,) float64 little-endian, contiguous
+            z                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "ps * p0c"
               @maxValue         float64 little-endian (1,)  [5.8051e+09]
-              @minValue         float64 little-endian (1,)  [5.80237e+09]
+              @minValue         float64 little-endian (1,)  [5.80296e+09]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
@@ -924,36 +924,36 @@ The `unavg` run writes it: interior frame of an unaveraged undulator, the oscill
                 @unitSymbol     string fixed(2) ascii ()    "m"
           particleStatus/       group
             @localName          string fixed(6) ascii ()    "state"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
             @value              int32 little-endian (1,)    [1]
           position/             group
-            x                   dataset                     (384,) float64 little-endian, contiguous
+            x                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "x"
               @maxValue         float64 little-endian (1,)  [5.42918e-05]
-              @minValue         float64 little-endian (1,)  [-3.90571e-05]
+              @minValue         float64 little-endian (1,)  [-2.55323e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
-            y                   dataset                     (384,) float64 little-endian, contiguous
+            y                   dataset                     (128,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "y"
               @maxValue         float64 little-endian (1,)  [3.41684e-05]
-              @minValue         float64 little-endian (1,)  [-3.04977e-05]
+              @minValue         float64 little-endian (1,)  [-2.74185e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
             z/                  group
               @localName        string fixed(2) ascii ()    "z"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
               @value            float64 little-endian (1,)  [0]
           sPosition/            group
             @localName          string fixed(2) ascii ()    "s"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(2) ascii ()    "m"
@@ -961,60 +961,60 @@ The `unavg` run writes it: interior frame of an unaveraged undulator, the oscill
           spin/                 group
             x/                  group
               @localName        string fixed(3) ascii ()    "Sx"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             y/                  group
               @localName        string fixed(3) ascii ()    "Sy"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
             z/                  group
               @localName        string fixed(3) ascii ()    "Sz"
-              @shape            int32 little-endian (1,)    [384]
+              @shape            int32 little-endian (1,)    [128]
               @unitDimension    float64 little-endian (7,)  [2, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1.05457e-34]
               @unitSymbol       string fixed(5) ascii ()    "hbar"
               @value            float64 little-endian (1,)  [0]
-          time                  dataset                     (384,) float64 little-endian, contiguous
+          time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
             @maxValue           float64 little-endian (1,)  [4.2051e-20]
-            @minValue           float64 little-endian (1,)  [-2.87554e-19]
+            @minValue           float64 little-endian (1,)  [-2.87528e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          timeOffset            dataset                     (384,) float64 little-endian, contiguous
+          timeOffset            dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(6) ascii ()    "t_ref"
             @maxValue           float64 little-endian (1,)  [5.00346e-11]
             @minValue           float64 little-endian (1,)  [5.00346e-11]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
-          totalMomentum         dataset                     (384,) float64 little-endian, contiguous
+          totalMomentum         dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(9) ascii ()    "pz * p0c"
             @maxValue           float64 little-endian (1,)  [1.27031e+06]
-            @minValue           float64 little-endian (1,)  [-1.46014e+06]
+            @minValue           float64 little-endian (1,)  [-878652]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
           totalMomentumOffset/  group
             @localName          string fixed(4) ascii ()    "p0c"
-            @shape              int32 little-endian (1,)    [384]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [5.34429e-28]
             @unitSymbol         string fixed(5) ascii ()    "eV/c"
             @value              float64 little-endian (1,)  [5.80383e+09]
-          weight                dataset                     (384,) float64 little-endian, contiguous
+          weight/               group
             @localName          string fixed(13) ascii ()   "macro-charge"
-            @maxValue           float64 little-endian (1,)  [6.25433e-18]
-            @minValue           float64 little-endian (1,)  [0]
+            @shape              int32 little-endian (1,)    [128]
             @unitDimension      float64 little-endian (7,)  [0, 0, 0, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(1) ascii ()    ""
+            @value              float64 little-endian (1,)  [6.25433e-18]
   lucifer/                      group
     frame/                      group
       @aw                       float64 little-endian (1,)  [0.84853]

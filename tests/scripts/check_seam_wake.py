@@ -114,6 +114,10 @@ def gen_nml(**kw):
     kw.setdefault("half", f"{slen / 2:.9e}")
     return to_groups(NML_GEN.format(**kw))
 
+# The resampled bunch stands among slices with no charge, which the default loads with no
+# particles. beam.beamlet_min_electrons = 0 gives every slice the same beamlets at zero
+# weight, which the causality check needs as its probes of the kick ahead of the charge.
+
 NML_IMP = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
@@ -128,6 +132,7 @@ NML_IMP = """! flat keys; routed into the input file's tables by lucifer.flat.to
   grid_half_width = 2e-4
   beam.resample.use_beam_init = T
   shot_noise = T
+  beam.beamlet_min_electrons = 0
   beam.n_particle = 20000
   beam.a_norm_emit = 4e-7
   beam.b_norm_emit = 4e-7

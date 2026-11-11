@@ -53,6 +53,7 @@ type fel_resample_param_struct
   integer :: beamlet_size = 4            ! Beamlet size of the quiet load.
   real(rp) :: beamlet_min_electrons = 0  ! Fewest electrons a beamlet stands for. 0: one count
                                          !   in every slice (fel_beamlet_count).
+  logical :: skip_empty = .false.        ! Load a slice with no charge with no particles.
   integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
   ! For validation only: resample a bunch Bmad generated from beam_init, and not one read
   ! from a file. So the SDDSBeam transcription can be checked on a known bunch. A
@@ -261,6 +262,17 @@ do islice = 1, nslice
   if (quiet_start) mpart_s = fel_beamlet_count (cur * slice_spacing / (c_light * e_charge), mpart, &
                                                 prm%beamlet_min_electrons)
   npart_s = mpart_s * prm%beamlet_size
+
+  ! A slice with no charge has no particles, with the noise or without it.
+
+  if (prm%skip_empty .and. cur <= 0) mpart_s = 0
+  if (mpart_s == 0) then
+    sl => fbeam%slice(islice)
+    call fel_slice_reallocate (sl, 1)
+    sl%n = 0
+    sl%m_ind = 1
+    cycle
+  endif
 
   if (ncand > mpart_s) then
     ! Second pass, transcribing removeParticles (gather_and_remove).

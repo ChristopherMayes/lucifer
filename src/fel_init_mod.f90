@@ -55,7 +55,7 @@ character(400) beam_file, write_genesis_dist, write_openpmd_file
 character(16) load_mode
 character(400) out_root
 character(400) field_file(9)
-logical quiet_start, shot_noise, gen_test_weights, resample_split_weights
+logical quiet_start, shot_noise, gen_test_weights, resample_split_weights, skip_empty
 logical split_weights, swap_beam_xy, err
 integer beamlet_size, ran_seed, is
 real(rp) beamlet_min_electrons
@@ -86,6 +86,12 @@ beamlet_size = run%bparam%beamlet_size
 
 beamlet_min_electrons = 0
 if (run%bparam%shot_noise .and. run%bparam%quiet_start) beamlet_min_electrons = run%bparam%beamlet_min_electrons
+
+! A slice with no charge is loaded with no particles in the sample mode, whatever the
+! noise. beam.beamlet_min_electrons = 0 gives every slice the input file's count, and
+! such a slice then has particles of zero weight.
+
+skip_empty = run%bparam%beamlet_min_electrons > 0
 shot_noise = run%bparam%shot_noise
 gen_test_weights = run%bparam%gen_test_weights
 resample_split_weights = run%bparam%resample_split_weights
@@ -465,6 +471,19 @@ do is_g = 1, nslice_gen
   if (quiet_start) mb_s = fel_beamlet_count (cur_gen(is_g) * fbeam%slice_spacing / (c_light * e_charge), &
                                              mbase, beamlet_min_electrons)
   n_s = merge(mb_s * beamlet_size, npart_gen, quiet_start)
+
+  ! A slice with no charge has no particles, with the noise or without it, unless
+  ! beam.beamlet_min_electrons = 0 asks for one count in every slice.
+
+  if (skip_empty .and. cur_gen(is_g) <= 0) n_s = 0
+  if (n_s == 0) then
+    call fel_slice_reallocate (sl, 1)
+    sl%n = 0
+    sl%m_ind = 1
+    nl_min = 0
+    cycle
+  endif
+
   call fel_slice_reallocate (sl, n_s)
   sl%n = n_s
   w_part = cur_gen(is_g) * fbeam%slice_spacing / (c_light * n_s)
@@ -736,6 +755,7 @@ if (.not. resample%use_beam_init) then
   resample%beamlet_size = beamlet_size
 endif
 resample%beamlet_min_electrons = beamlet_min_electrons
+resample%skip_empty = skip_empty
 
 call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, resample, quiet_start, shot_noise, &
                        grid_half_width, grid_n_pts, fbeam, err_i, moments)
