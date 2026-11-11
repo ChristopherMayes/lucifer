@@ -210,8 +210,8 @@ The `avg` run writes it: interior frame of an averaged undulator, the coordinate
               @value            float64 little-endian (1,)  [0]
           time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [-1.90003e-21]
-            @minValue           float64 little-endian (1,)  [-3.30724e-19]
+            @maxValue           float64 little-endian (1,)  [-4.506e-21]
+            @minValue           float64 little-endian (1,)  [-6.61682e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
@@ -444,8 +444,8 @@ The `avg` run writes it: frame at the end of QU, the whole window, at the same s
               @value            float64 little-endian (1,)  [0]
           time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [2.17793e-22]
-            @minValue           float64 little-endian (1,)  [-3.3002e-19]
+            @maxValue           float64 little-endian (1,)  [-2.38818e-21]
+            @minValue           float64 little-endian (1,)  [-6.60978e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
@@ -697,8 +697,8 @@ The `avg` run writes it: final dump at the zero-length END marker Bmad appends t
               @value            float64 little-endian (1,)  [0]
           time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [2.17793e-22]
-            @minValue           float64 little-endian (1,)  [-3.3002e-19]
+            @maxValue           float64 little-endian (1,)  [-2.38818e-21]
+            @minValue           float64 little-endian (1,)  [-6.60978e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
@@ -982,8 +982,8 @@ The `unavg` run writes it: interior frame of an unaveraged undulator, the oscill
               @value            float64 little-endian (1,)  [0]
           time                  dataset                     (128,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [4.2051e-20]
-            @minValue           float64 little-endian (1,)  [-2.87528e-19]
+            @maxValue           float64 little-endian (1,)  [3.9445e-20]
+            @minValue           float64 little-endian (1,)  [-6.18486e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
@@ -1282,7 +1282,7 @@ The `keep` run writes it: final dump of several patches, two of them empty. Its 
           time                  dataset                     (512,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
             @maxValue           float64 little-endian (1,)  [-7.00498e-21]
-            @minValue           float64 little-endian (1,)  [-6.19253e-19]
+            @minValue           float64 little-endian (1,)  [-9.33338e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"

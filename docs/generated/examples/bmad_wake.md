@@ -21,7 +21,7 @@ The table was exported by `wake.write_kernels` and then converted to Bmad's conv
 
 `lucifer_transcribed.toml` is the comparison partner: the same beam and the same window through the transcribed model with the same chamber, so the two runs differ in the implementation and in nothing else. `../sase_wake` is not the partner, because it adds the gap and roughness terms that this table has no counterpart for.
 
-The transcribed `chamber_wake` applies the wake per integration step, and the Bmad `sr_wake` `z_long` table applies it once per element. The exit mean energy change of each input file is in the table below on the example's page, and the two differ by well under a percent. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them.
+The transcribed `chamber_wake` applies the wake per integration step, and the Bmad `sr_wake` `z_long` table applies it once per element. The exit mean energy change of each input file is in the table below on the example's page, and the two differ by well under a percent. Per slice, leaving out the 16 slices at the window head where the transcribed model lacks half a slice of charge ahead, the two agree to 0.74% on average and 1.92% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them.
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so the exit powers are the mode. With the filter off both input files reported far more power, nearly all of it that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
 
@@ -33,37 +33,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | `lucifer_transcribed.toml` | Unit |
 |---|---|---|---|
-| exit power | 1.0428e+08 | 1.0610e+08 | W |
-| exit power per slice | 1.0863e+06 | 1.1052e+06 | W |
-| exit power, rms over mean across slices | 1.5081e+00 | 1.5044e+00 |  |
-| exit window energy | 1.0436e-10 | 1.0617e-10 | J |
-| exit pulse energy, the window's and the light slipped out of it | 2.6666e-09 | 2.6881e-09 | J |
-| peak power | 1.9178e+08 | 1.9456e+08 | W |
-| s of the peak power | 5.6760e+01 | 5.6760e+01 | m |
-| mode peak, power inside the split | 1.9034e+08 | 1.9308e+08 | W |
-| s of the mode peak | 5.6680e+01 | 5.6760e+01 | m |
-| exit power inside the split | 1.0350e+08 | 1.0529e+08 | W |
-| exit power outside the split | 7.8783e+05 | 8.0539e+05 | W |
-| outside over inside, the run's maximum | 7.5926e-03 | 7.6466e-03 |  |
-| outside over inside at the exit | 7.6122e-03 | 7.6489e-03 |  |
+| exit power | 1.0553e+08 | 1.0610e+08 | W |
+| exit power per slice | 1.0993e+06 | 1.1052e+06 | W |
+| exit power, rms over mean across slices | 1.5088e+00 | 1.5044e+00 |  |
+| exit window energy | 1.0560e-10 | 1.0617e-10 | J |
+| exit pulse energy, the window's and the light slipped out of it | 2.6889e-09 | 2.6881e-09 | J |
+| peak power | 1.9397e+08 | 1.9456e+08 | W |
+| s of the peak power | 5.6760e+01 | 5.6680e+01 | m |
+| mode peak, power inside the split | 1.9252e+08 | 1.9308e+08 | W |
+| s of the mode peak | 5.6760e+01 | 5.6760e+01 | m |
+| exit power inside the split | 1.0474e+08 | 1.0529e+08 | W |
+| exit power outside the split | 7.9068e+05 | 8.0539e+05 | W |
+| outside over inside, the run's maximum | 7.5298e-03 | 7.6466e-03 |  |
+| outside over inside at the exit | 7.5490e-03 | 7.6489e-03 |  |
 | split angle | 2.9788e-06 | 2.9788e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 4.6825e+00 | 4.6519e+00 | m |
-| power at the first element end | 5.4208e+06 | 5.4204e+06 | W |
-| power per slice at the first element end | 5.6466e+04 | 5.6462e+04 | W |
+| gain length, the shortest e-folding length over five consecutive records | 4.6719e+00 | 4.6519e+00 | m |
+| power at the first element end | 5.4196e+06 | 5.4204e+06 | W |
+| power per slice at the first element end | 5.6454e+04 | 5.6462e+04 | W |
 | initial bunching, mean |b| over slices | 6.5646e-03 | 6.5646e-03 |  |
-| exit bunching, mean |b| over slices | 2.0950e-02 | 2.1028e-02 |  |
-| exit bunching, the largest slice | 7.8305e-02 | 7.8567e-02 |  |
-| bunching, the maximum along the line of the mean |b| | 2.0950e-02 | 2.1028e-02 |  |
+| exit bunching, mean |b| over slices | 2.0963e-02 | 2.1028e-02 |  |
+| exit bunching, the largest slice | 7.8508e-02 | 7.8567e-02 |  |
+| bunching, the maximum along the line of the mean |b| | 2.0963e-02 | 2.1028e-02 |  |
 | s of the bunching maximum | 5.7000e+01 | 5.7000e+01 | m |
-| bunching at the mode peak | 2.0766e-02 | 2.0896e-02 |  |
-| power of the largest slice at the bunching maximum | 6.5153e+06 | 6.5896e+06 | W |
-| exit power of the largest slice | 6.5153e+06 | 6.5896e+06 | W |
+| bunching at the mode peak | 2.0825e-02 | 2.0896e-02 |  |
+| power of the largest slice at the bunching maximum | 6.5913e+06 | 6.5896e+06 | W |
+| exit power of the largest slice | 6.5913e+06 | 6.5896e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8026e+09 | 5.8026e+09 | eV |
 | mean slice energy, exit minus start | -1.1938e+06 | -1.1857e+06 | eV |
 | slice energy spread at the start | 5.0859e+05 | 5.0859e+05 | eV |
-| slice energy spread at the exit | 5.4291e+05 | 5.4068e+05 | eV |
-| span of the slice energies at the exit, head to tail | 2.3650e+06 | 2.3659e+06 | eV |
+| slice energy spread at the exit | 5.4318e+05 | 5.4068e+05 | eV |
+| span of the slice energies at the exit, head to tail | 2.3641e+06 | 2.3659e+06 | eV |
 | slices | 96 | 96 |  |
 | records | 1105 | 1105 |  |
 | slice spacing | 3.0000e-10 | 3.0000e-10 | m |

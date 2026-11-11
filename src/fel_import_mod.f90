@@ -455,24 +455,31 @@ do k = mpart_s, 1, -1
     theta(i2+j+1) = wk(i1) + j * twopi / prm%beamlet_size
   enddo
 enddo
-if (.not. quiet_start) then
-  do k = 1, npart_s
-    call ran_uniform (uu)
-    theta(k) = twopi * uu
-  enddo
-endif
 
-! Uniform per-slice weights from the window current (Genesis's dQ semantics). Then the
-! shared Fawley noise with ne = charge/e, skipped for empty slices as in Genesis. Then
-! the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
+! Uniform weights from the window current (Genesis's dQ semantics).
 
 w_part = cur * slice_spacing / (c_light * npart_s)
-ne = anint(cur * slice_spacing / (e_charge * c_light))
-
 sl => fbeam%slice(islice)
 call fel_slice_reallocate (sl, npart_s)
 sl%n = npart_s
 sl%weight(1:npart_s) = w_part
+
+! A slice is fbeam%n_wavelength periods long and holds the charge of all of them, so its
+! macroparticles stand over all its periods, on one even grid (fel_slice_fill). The
+! draws above are still taken, so the random numbers after them are the same.
+
+if (quiet_start .and. fbeam%n_wavelength > 1) call fel_slice_fill (mpart_s, prm%beamlet_size, fbeam%n_wavelength, theta)
+if (.not. quiet_start) then
+  do k = 1, npart_s
+    call ran_uniform (uu)
+    theta(k) = twopi * fbeam%n_wavelength * uu
+  enddo
+endif
+
+! Then the shared noise with ne = charge/e, skipped for empty slices as in Genesis. Then
+! the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
+
+ne = anint(cur * slice_spacing / (e_charge * c_light))
 
 ! Noise where the input file asks for it. Genesis's importdistribution applies it whether or
 ! not its shotnoise flag says so. This port applies it only with shot_noise = true.

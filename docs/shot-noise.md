@@ -14,7 +14,7 @@ The page uses the FEL quantities of [](fel-physics.md) and the words of the [glo
 
 Four counts enter, and two of them are easily confused.
 
-A slice is one longitudinal sample of the beam, a whole number of radiation wavelengths long. A slice of current $I$ and length $\Delta$ holds
+A slice is one longitudinal sample of the beam, a whole number of radiation wavelengths long, and its macroparticles stand over all of those wavelengths ([](fel-physics.md#sec-quiet)). A slice of current $I$ and length $\Delta$ holds
 
 $$
   N_\lambda = \frac{I\,\Delta}{e\,c}
@@ -59,8 +59,10 @@ A set of macroparticles has its own noise, $1/n_p$ for random phases, which is l
 The $M$ phases of a quiet beamlet are
 
 $$
-  \theta_j = \theta_0 + \frac{2\pi j}{M}, \qquad j = 0 \ldots M-1 .
+  \theta_j = \theta_0 + \frac{2\pi j}{M}, \qquad j = 0 \ldots M-1 ,
 $$ (eq-shot-quiet)
+
+each plus a whole number of $2\pi$ where a slice is several wavelengths long, which no harmonic sees.
 
 The sum of $e^{-ih\theta_j}$ over $j$ is zero unless $h$ is a multiple of $M$. So the beamlet has no bunching at any harmonic below $M$, whatever $\theta_0$ is. A slice of such beamlets radiates nothing.
 
@@ -442,6 +444,8 @@ With `beam.beamlet_min_electrons = 0` every slice has $n_p/M$ beamlets, as in Ge
 Under the kick sized from $J_1$ it runs at 146, 50, 18, 10 and 1 electrons a beamlet with uniform weights, held to that kick's form the same way. Five standard deviations of such a mean are 8% at one harmonic, which is more than the two kicks differ by above 18 electrons. The two kicks take the same draws, so a seed's two loads are one shot kicked twice, and the difference of their statistics slice by slice has a far smaller spread than either. The mean difference is held to the difference of the two closed forms within five standard deviations of its own mean. At 146 electrons a beamlet it reads 0.0140 against 0.0139 with a bound of 0.0008. The level the loader prints for each of these loads, from `fel_shot_ratio`, is held to `shot_noise_ratio.py`'s to the four decimals printed.
 
 The weight load runs at 146, 18, 4 and 1 electrons a beamlet and at a quarter of an electron, with uniform weights. Its statistic is held to [](#eq-shot-weight-ratio) at each of harmonics 1 to 7. The loaded charge is held to the input file's to $10^{-12}$, every weight to a whole number of the counted electron's charge, and the variance of the slices' counts to the binomial variance within five standard deviations. A Gaussian bunch whose last slices hold a hundredth of an electron is loaded the same way: 30% of its slices draw no electron and have no particles, the bunch is a whole number of electrons, and the statistic of the other slices is held to 1. In the keep mode every particle of the bunch must be present at the charge the kick load gives it.
+
+A slice of several wavelengths is loaded over all its periods ([](fel-physics.md#sec-quiet)). A Gaussian bunch in slices of 3 and of 12 wavelengths is loaded with no noise, under the weight load and under the first-order kick. With no noise the sum of $w\,e^{-i(m/n)\theta}$ over a slice, at the $m$ that are not multiples of the slice's $n$ wavelengths, is held to $10^{-12}$ of the slice's charge. Under the weight load its square is held to the shot noise within five standard deviations, and the electrons in each period of a slice to the binomial spread. The first-order kick's is recorded: 0.36 of the shot noise at 3 wavelengths and 0.46 at 12.
 
 A Gaussian bunch whose last slices hold two electrons is then loaded under the kicks at the default $N_{\min}$ and at $N_{\min} = 18$, and at the default under both kicks. Each slice is held to the charge it has with the key at 0 and to the beamlets of [](#eq-shot-fewer), and the slices with fewer beamlets to the closed form at the electrons their beamlets hold. A flat bunch over the middle half of the window is loaded both ways: a slice with no charge must have no particles at the default and the input file's count at 0. The keep mode and the two loads whose beamlets were made outside the loader run under both kicks as well, with the same paired difference. The check runs in every pass of the [validation suite](glossary.md#gl-validation-suite), and its levels are in [](validation.md#val-levels-shot-noise). They are the points of [](#fig-shot-ratio), [](#fig-shot-bessel) and [](#fig-shot-weight).
 
