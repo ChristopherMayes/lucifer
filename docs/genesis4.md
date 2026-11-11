@@ -16,7 +16,7 @@ These are the same model in both codes, transcribed routine by routine, and the 
 | Field solver | The SVEA paraxial wave equation on a transverse grid, split-step with an FFT diffraction kernel and a $+2\cdot$source deposit |
 | Averaged FEL step | The wiggle-averaged (KMR) model: transverse push with natural focusing, RK4 advance of the ponderomotive phase and energy, per-particle source deposition |
 | Slippage | An exact integer rotation of the field record, one wavelength per undulator period, on a [slice](glossary.md#gl-slice) grid uniform in arrival time |
-| Shot noise | Fawley's loading algorithm, here in a weighted generalization |
+| Shot noise | Fawley's loading algorithm, here in a weighted generalization, with the kick sized from $J_1$ unless `beam.shot_noise_kick = "first_order"` |
 | Wakes | The Bane and Stupakov numerical resistive-wall impedance, plus geometric and roughness kernels, with Genesis4's exact numerics |
 | Space charge | Short-range harmonic and long-range solvers at Genesis4's granularity |
 | Distribution import | The `importdistribution` resampling method, transcribed from [`SDDSBeam.cpp`](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/IO/SDDSBeam.cpp) |

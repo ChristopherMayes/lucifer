@@ -636,6 +636,7 @@ a_norm_emit = 4e-7
 b_norm_emit = 4e-7
 quiet_start = T
 shot_noise = T
+shot_noise_kick = "first_order"
 lambda0 = 1e-10
 grid_n_pts = 255
 grid_half_width = 2e-4
@@ -945,6 +946,7 @@ UNAVG_INPUT = """! flat keys; routed into the input file's tables by lucifer.fla
   window_length = 2e-8
   n_wavelength = 1
   shot_noise = T
+  shot_noise_kick = "first_order"
   ran_seed = 999
   write_diag = T
 &end

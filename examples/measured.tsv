@@ -1,90 +1,90 @@
 directory	input	quantity	value	unit
-bmad_wake	lucifer.toml	bunching_max	1.5323e-02	
+bmad_wake	lucifer.toml	bunching_max	1.5455e-02	
 bmad_wake	lucifer.toml	bunching_max_s	5.7000e+01	m
-bmad_wake	lucifer.toml	bunching_peak	1.5301e-02	
+bmad_wake	lucifer.toml	bunching_peak	1.5435e-02	
 bmad_wake	lucifer.toml	energy_change	-1.1881e+06	eV
-bmad_wake	lucifer.toml	exit_bunching	1.5323e-02	
-bmad_wake	lucifer.toml	exit_bunching_max	5.3118e-02	
+bmad_wake	lucifer.toml	exit_bunching	1.5455e-02	
+bmad_wake	lucifer.toml	exit_bunching_max	5.3313e-02	
 bmad_wake	lucifer.toml	exit_energy	5.8026e+09	eV
-bmad_wake	lucifer.toml	exit_energy_span	2.3681e+06	eV
-bmad_wake	lucifer.toml	exit_power	3.0293e+07	W
-bmad_wake	lucifer.toml	exit_power_inside	2.9369e+07	W
-bmad_wake	lucifer.toml	exit_power_outside	9.2352e+05	W
-bmad_wake	lucifer.toml	exit_power_per_slice	3.1555e+05	W
-bmad_wake	lucifer.toml	exit_power_slice_max	1.3751e+06	W
-bmad_wake	lucifer.toml	exit_power_slice_spread	1.2031e+00	
-bmad_wake	lucifer.toml	exit_pulse_energy	1.0207e-09	J
-bmad_wake	lucifer.toml	exit_sigma_energy	5.1993e+05	eV
-bmad_wake	lucifer.toml	exit_window_energy	3.0314e-11	J
+bmad_wake	lucifer.toml	exit_energy_span	2.3678e+06	eV
+bmad_wake	lucifer.toml	exit_power	3.0848e+07	W
+bmad_wake	lucifer.toml	exit_power_inside	2.9909e+07	W
+bmad_wake	lucifer.toml	exit_power_outside	9.3883e+05	W
+bmad_wake	lucifer.toml	exit_power_per_slice	3.2133e+05	W
+bmad_wake	lucifer.toml	exit_power_slice_max	1.3948e+06	W
+bmad_wake	lucifer.toml	exit_power_slice_spread	1.2000e+00	
+bmad_wake	lucifer.toml	exit_pulse_energy	1.0370e-09	J
+bmad_wake	lucifer.toml	exit_sigma_energy	5.2011e+05	eV
+bmad_wake	lucifer.toml	exit_window_energy	3.0869e-11	J
 bmad_wake	lucifer.toml	fel_steps	1068	
 bmad_wake	lucifer.toml	filter_edge	2.9625e-06	rad
 bmad_wake	lucifer.toml	filter_mode_angle	2.9620e-06	rad
 bmad_wake	lucifer.toml	filter_ratio	1.1300e+00	
 bmad_wake	lucifer.toml	filter_rho_angle	2.6100e-06	rad
-bmad_wake	lucifer.toml	gain_length	5.4367e+00	m
+bmad_wake	lucifer.toml	gain_length	5.4477e+00	m
 bmad_wake	lucifer.toml	grid_cell	1.5690e-06	m
 bmad_wake	lucifer.toml	grid_derived	no	
 bmad_wake	lucifer.toml	grid_n_pts	256	
-bmad_wake	lucifer.toml	initial_bunching	5.6750e-03	
+bmad_wake	lucifer.toml	initial_bunching	5.7485e-03	
 bmad_wake	lucifer.toml	initial_energy	5.8038e+09	eV
 bmad_wake	lucifer.toml	initial_sigma_energy	5.0577e+05	eV
-bmad_wake	lucifer.toml	mode_peak_inside	4.6877e+07	W
+bmad_wake	lucifer.toml	mode_peak_inside	4.7619e+07	W
 bmad_wake	lucifer.toml	mode_peak_s	5.6760e+01	m
 bmad_wake	lucifer.toml	n_particle	2048	
 bmad_wake	lucifer.toml	n_record	1105	
 bmad_wake	lucifer.toml	n_slice	96	
-bmad_wake	lucifer.toml	peak_power	4.8315e+07	W
+bmad_wake	lucifer.toml	peak_power	4.9079e+07	W
 bmad_wake	lucifer.toml	peak_power_s	5.6760e+01	m
-bmad_wake	lucifer.toml	power_after_first_element	6.0799e+06	W
-bmad_wake	lucifer.toml	power_after_first_element_per_slice	6.3332e+04	W
-bmad_wake	lucifer.toml	slice_power_max_at_bunching_max	1.3751e+06	W
+bmad_wake	lucifer.toml	power_after_first_element	6.2358e+06	W
+bmad_wake	lucifer.toml	power_after_first_element_per_slice	6.4957e+04	W
+bmad_wake	lucifer.toml	slice_power_max_at_bunching_max	1.3948e+06	W
 bmad_wake	lucifer.toml	slice_spacing	3.0000e-10	m
 bmad_wake	lucifer.toml	split_angle	2.9625e-06	rad
-bmad_wake	lucifer.toml	wide_angle_ratio	3.0674e-02	
-bmad_wake	lucifer.toml	wide_angle_ratio_exit	3.1445e-02	
-bmad_wake	lucifer_transcribed.toml	bunching_max	1.5178e-02	
+bmad_wake	lucifer.toml	wide_angle_ratio	3.0647e-02	
+bmad_wake	lucifer.toml	wide_angle_ratio_exit	3.1390e-02	
+bmad_wake	lucifer_transcribed.toml	bunching_max	1.5310e-02	
 bmad_wake	lucifer_transcribed.toml	bunching_max_s	5.7000e+01	m
-bmad_wake	lucifer_transcribed.toml	bunching_peak	1.5167e-02	
+bmad_wake	lucifer_transcribed.toml	bunching_peak	1.5301e-02	
 bmad_wake	lucifer_transcribed.toml	energy_change	-1.1799e+06	eV
-bmad_wake	lucifer_transcribed.toml	exit_bunching	1.5178e-02	
-bmad_wake	lucifer_transcribed.toml	exit_bunching_max	5.2134e-02	
+bmad_wake	lucifer_transcribed.toml	exit_bunching	1.5310e-02	
+bmad_wake	lucifer_transcribed.toml	exit_bunching_max	5.2332e-02	
 bmad_wake	lucifer_transcribed.toml	exit_energy	5.8026e+09	eV
-bmad_wake	lucifer_transcribed.toml	exit_energy_span	2.3683e+06	eV
-bmad_wake	lucifer_transcribed.toml	exit_power	3.0288e+07	W
-bmad_wake	lucifer_transcribed.toml	exit_power_inside	2.9387e+07	W
-bmad_wake	lucifer_transcribed.toml	exit_power_outside	9.0131e+05	W
-bmad_wake	lucifer_transcribed.toml	exit_power_per_slice	3.1550e+05	W
-bmad_wake	lucifer_transcribed.toml	exit_power_slice_max	1.3749e+06	W
-bmad_wake	lucifer_transcribed.toml	exit_power_slice_spread	1.1995e+00	
-bmad_wake	lucifer_transcribed.toml	exit_pulse_energy	1.0100e-09	J
-bmad_wake	lucifer_transcribed.toml	exit_sigma_energy	5.1722e+05	eV
-bmad_wake	lucifer_transcribed.toml	exit_window_energy	3.0309e-11	J
+bmad_wake	lucifer_transcribed.toml	exit_energy_span	2.3681e+06	eV
+bmad_wake	lucifer_transcribed.toml	exit_power	3.0846e+07	W
+bmad_wake	lucifer_transcribed.toml	exit_power_inside	2.9930e+07	W
+bmad_wake	lucifer_transcribed.toml	exit_power_outside	9.1651e+05	W
+bmad_wake	lucifer_transcribed.toml	exit_power_per_slice	3.2131e+05	W
+bmad_wake	lucifer_transcribed.toml	exit_power_slice_max	1.3948e+06	W
+bmad_wake	lucifer_transcribed.toml	exit_power_slice_spread	1.1965e+00	
+bmad_wake	lucifer_transcribed.toml	exit_pulse_energy	1.0262e-09	J
+bmad_wake	lucifer_transcribed.toml	exit_sigma_energy	5.1740e+05	eV
+bmad_wake	lucifer_transcribed.toml	exit_window_energy	3.0868e-11	J
 bmad_wake	lucifer_transcribed.toml	fel_steps	1068	
 bmad_wake	lucifer_transcribed.toml	filter_edge	2.9625e-06	rad
 bmad_wake	lucifer_transcribed.toml	filter_mode_angle	2.9620e-06	rad
 bmad_wake	lucifer_transcribed.toml	filter_ratio	1.1300e+00	
 bmad_wake	lucifer_transcribed.toml	filter_rho_angle	2.6100e-06	rad
-bmad_wake	lucifer_transcribed.toml	gain_length	5.4305e+00	m
+bmad_wake	lucifer_transcribed.toml	gain_length	5.4866e+00	m
 bmad_wake	lucifer_transcribed.toml	grid_cell	1.5690e-06	m
 bmad_wake	lucifer_transcribed.toml	grid_derived	no	
 bmad_wake	lucifer_transcribed.toml	grid_n_pts	256	
-bmad_wake	lucifer_transcribed.toml	initial_bunching	5.6750e-03	
+bmad_wake	lucifer_transcribed.toml	initial_bunching	5.7485e-03	
 bmad_wake	lucifer_transcribed.toml	initial_energy	5.8038e+09	eV
 bmad_wake	lucifer_transcribed.toml	initial_sigma_energy	5.0577e+05	eV
-bmad_wake	lucifer_transcribed.toml	mode_peak_inside	4.6881e+07	W
+bmad_wake	lucifer_transcribed.toml	mode_peak_inside	4.7628e+07	W
 bmad_wake	lucifer_transcribed.toml	mode_peak_s	5.6760e+01	m
 bmad_wake	lucifer_transcribed.toml	n_particle	2048	
 bmad_wake	lucifer_transcribed.toml	n_record	1105	
 bmad_wake	lucifer_transcribed.toml	n_slice	96	
-bmad_wake	lucifer_transcribed.toml	peak_power	4.8288e+07	W
+bmad_wake	lucifer_transcribed.toml	peak_power	4.9055e+07	W
 bmad_wake	lucifer_transcribed.toml	peak_power_s	5.6680e+01	m
-bmad_wake	lucifer_transcribed.toml	power_after_first_element	6.0861e+06	W
-bmad_wake	lucifer_transcribed.toml	power_after_first_element_per_slice	6.3397e+04	W
-bmad_wake	lucifer_transcribed.toml	slice_power_max_at_bunching_max	1.3749e+06	W
+bmad_wake	lucifer_transcribed.toml	power_after_first_element	6.2421e+06	W
+bmad_wake	lucifer_transcribed.toml	power_after_first_element_per_slice	6.5022e+04	W
+bmad_wake	lucifer_transcribed.toml	slice_power_max_at_bunching_max	1.3948e+06	W
 bmad_wake	lucifer_transcribed.toml	slice_spacing	3.0000e-10	m
 bmad_wake	lucifer_transcribed.toml	split_angle	2.9625e-06	rad
-bmad_wake	lucifer_transcribed.toml	wide_angle_ratio	2.9994e-02	
-bmad_wake	lucifer_transcribed.toml	wide_angle_ratio_exit	3.0670e-02	
+bmad_wake	lucifer_transcribed.toml	wide_angle_ratio	2.9971e-02	
+bmad_wake	lucifer_transcribed.toml	wide_angle_ratio_exit	3.0622e-02	
 chicane	lucifer.toml	bunching_max	1.3452e-01	
 chicane	lucifer.toml	bunching_max_s	2.3050e+00	m
 chicane	lucifer.toml	bunching_peak	1.3452e-01	
@@ -331,20 +331,20 @@ crossed_undulator	lucifer.toml	slice_spacing	1.0000e-10	m
 crossed_undulator	lucifer.toml	split_angle	3.2637e-06	rad
 crossed_undulator	lucifer.toml	wide_angle_ratio	3.5795e-07	
 crossed_undulator	lucifer.toml	wide_angle_ratio_exit	3.5795e-07	
-flash1	lucifer.toml	bunching_max	2.0297e-01	
+flash1	lucifer.toml	bunching_max	2.2545e-01	
 flash1	lucifer.toml	bunching_max_s	3.0044e+01	m
 flash1	lucifer.toml	bunching_peak	2.0444e-01	
 flash1	lucifer.toml	energy_change	-1.9320e+05	eV
-flash1	lucifer.toml	exit_bunching	1.9356e-01	
-flash1	lucifer.toml	exit_bunching_max	7.6472e-01	
+flash1	lucifer.toml	exit_bunching	2.1603e-01	
+flash1	lucifer.toml	exit_bunching_max	8.1875e-01	
 flash1	lucifer.toml	exit_energy	6.6831e+08	eV
 flash1	lucifer.toml	exit_energy_span	2.5258e+06	eV
 flash1	lucifer.toml	exit_power	8.6205e+10	W
 flash1	lucifer.toml	exit_power_inside	8.6158e+10	W
-flash1	lucifer.toml	exit_power_outside	4.7391e+07	W
+flash1	lucifer.toml	exit_power_outside	4.7402e+07	W
 flash1	lucifer.toml	exit_power_per_slice	2.4560e+08	W
-flash1	lucifer.toml	exit_power_slice_max	2.8771e+09	W
-flash1	lucifer.toml	exit_power_slice_spread	2.2640e+00	
+flash1	lucifer.toml	exit_power_slice_max	2.8773e+09	W
+flash1	lucifer.toml	exit_power_slice_spread	2.2641e+00	
 flash1	lucifer.toml	exit_pulse_energy	4.7273e-05	J
 flash1	lucifer.toml	exit_sigma_energy	4.7200e+05	eV
 flash1	lucifer.toml	exit_window_energy	4.7273e-05	J
@@ -357,7 +357,7 @@ flash1	lucifer.toml	gain_length	1.1254e+00	m
 flash1	lucifer.toml	grid_cell	1.5748e-05	m
 flash1	lucifer.toml	grid_derived	no	
 flash1	lucifer.toml	grid_n_pts	128	
-flash1	lucifer.toml	initial_bunching	1.1244e-01	
+flash1	lucifer.toml	initial_bunching	1.3509e-01	
 flash1	lucifer.toml	initial_energy	6.6851e+08	eV
 flash1	lucifer.toml	initial_sigma_energy	2.8714e+05	eV
 flash1	lucifer.toml	mode_peak_inside	8.6158e+10	W
@@ -367,30 +367,30 @@ flash1	lucifer.toml	n_record	361
 flash1	lucifer.toml	n_slice	351	
 flash1	lucifer.toml	peak_power	8.6205e+10	W
 flash1	lucifer.toml	peak_power_s	3.1577e+01	m
-flash1	lucifer.toml	power_after_first_element	3.3560e+05	W
-flash1	lucifer.toml	power_after_first_element_per_slice	9.5613e+02	W
-flash1	lucifer.toml	slice_power_max_at_bunching_max	2.7894e+09	W
+flash1	lucifer.toml	power_after_first_element	3.3569e+05	W
+flash1	lucifer.toml	power_after_first_element_per_slice	9.5638e+02	W
+flash1	lucifer.toml	slice_power_max_at_bunching_max	2.7896e+09	W
 flash1	lucifer.toml	slice_spacing	1.6440e-07	m
 flash1	lucifer.toml	split_angle	8.1754e-05	rad
-flash1	lucifer.toml	wide_angle_ratio	5.5005e-04	
-flash1	lucifer.toml	wide_angle_ratio_exit	5.5005e-04	
-frames	lucifer.toml	bunching_max	5.8875e-02	
+flash1	lucifer.toml	wide_angle_ratio	5.5018e-04	
+flash1	lucifer.toml	wide_angle_ratio_exit	5.5018e-04	
+frames	lucifer.toml	bunching_max	5.8879e-02	
 frames	lucifer.toml	bunching_max_s	8.7400e+00	m
-frames	lucifer.toml	bunching_peak	3.7415e-02	
-frames	lucifer.toml	energy_change	6.2637e+03	eV
-frames	lucifer.toml	exit_bunching	5.8875e-02	
-frames	lucifer.toml	exit_bunching_max	3.5821e-01	
+frames	lucifer.toml	bunching_peak	3.7418e-02	
+frames	lucifer.toml	energy_change	6.2621e+03	eV
+frames	lucifer.toml	exit_bunching	5.8879e-02	
+frames	lucifer.toml	exit_bunching_max	3.5822e-01	
 frames	lucifer.toml	exit_energy	5.8038e+09	eV
-frames	lucifer.toml	exit_energy_span	9.2083e+04	eV
-frames	lucifer.toml	exit_power	1.5236e+05	W
-frames	lucifer.toml	exit_power_inside	1.4797e+05	W
-frames	lucifer.toml	exit_power_outside	4.3915e+03	W
-frames	lucifer.toml	exit_power_per_slice	1.9045e+04	W
-frames	lucifer.toml	exit_power_slice_max	2.7294e+04	W
-frames	lucifer.toml	exit_power_slice_spread	4.4252e-01	
-frames	lucifer.toml	exit_pulse_energy	5.0964e-12	J
-frames	lucifer.toml	exit_sigma_energy	5.2519e+05	eV
-frames	lucifer.toml	exit_window_energy	1.5247e-13	J
+frames	lucifer.toml	exit_energy_span	9.2081e+04	eV
+frames	lucifer.toml	exit_power	1.5320e+05	W
+frames	lucifer.toml	exit_power_inside	1.4878e+05	W
+frames	lucifer.toml	exit_power_outside	4.4165e+03	W
+frames	lucifer.toml	exit_power_per_slice	1.9150e+04	W
+frames	lucifer.toml	exit_power_slice_max	2.7434e+04	W
+frames	lucifer.toml	exit_power_slice_spread	4.4247e-01	
+frames	lucifer.toml	exit_pulse_energy	5.1245e-12	J
+frames	lucifer.toml	exit_sigma_energy	5.2520e+05	eV
+frames	lucifer.toml	exit_window_energy	1.5331e-13	J
 frames	lucifer.toml	fel_steps	178	
 frames	lucifer.toml	filter_edge	3.0742e-06	rad
 frames	lucifer.toml	filter_mode_angle	3.0740e-06	rad
@@ -399,23 +399,23 @@ frames	lucifer.toml	filter_rho_angle	2.6430e-06	rad
 frames	lucifer.toml	grid_cell	3.1500e-06	m
 frames	lucifer.toml	grid_derived	no	
 frames	lucifer.toml	grid_n_pts	128	
-frames	lucifer.toml	initial_bunching	9.8485e-03	
+frames	lucifer.toml	initial_bunching	9.9277e-03	
 frames	lucifer.toml	initial_energy	5.8038e+09	eV
 frames	lucifer.toml	initial_sigma_energy	5.2351e+05	eV
-frames	lucifer.toml	mode_peak_inside	1.4797e+05	W
+frames	lucifer.toml	mode_peak_inside	1.4878e+05	W
 frames	lucifer.toml	mode_peak_s	8.7400e+00	m
 frames	lucifer.toml	n_particle	1024	
 frames	lucifer.toml	n_record	12	
 frames	lucifer.toml	n_slice	8	
-frames	lucifer.toml	peak_power	1.6735e+05	W
+frames	lucifer.toml	peak_power	1.6803e+05	W
 frames	lucifer.toml	peak_power_s	5.7811e+00	m
-frames	lucifer.toml	power_after_first_element	4.0678e+04	W
-frames	lucifer.toml	power_after_first_element_per_slice	5.0847e+03	W
-frames	lucifer.toml	slice_power_max_at_bunching_max	2.7294e+04	W
+frames	lucifer.toml	power_after_first_element	4.1297e+04	W
+frames	lucifer.toml	power_after_first_element_per_slice	5.1621e+03	W
+frames	lucifer.toml	slice_power_max_at_bunching_max	2.7434e+04	W
 frames	lucifer.toml	slice_spacing	3.0000e-10	m
 frames	lucifer.toml	split_angle	3.0742e-06	rad
-frames	lucifer.toml	wide_angle_ratio	2.9678e-02	
-frames	lucifer.toml	wide_angle_ratio_exit	2.9678e-02	
+frames	lucifer.toml	wide_angle_ratio	2.9684e-02	
+frames	lucifer.toml	wide_angle_ratio_exit	2.9684e-02	
 harmonics	lucifer.toml	bunching_max	1.1071e-01	
 harmonics	lucifer.toml	bunching_max_s	3.9600e+00	m
 harmonics	lucifer.toml	bunching_peak	3.9886e-17	
@@ -454,222 +454,222 @@ harmonics	lucifer.toml	slice_spacing	1.0000e-10	m
 harmonics	lucifer.toml	split_angle	2.7594e-06	rad
 harmonics	lucifer.toml	wide_angle_ratio	1.5550e-06	
 harmonics	lucifer.toml	wide_angle_ratio_exit	6.7825e-03	
-import	lucifer.toml	bunching_max	7.7367e-02	
-import	lucifer.toml	bunching_max_s	3.8941e+01	m
-import	lucifer.toml	bunching_peak	6.7908e-03	
-import	lucifer.toml	energy_change	1.2734e+02	eV
-import	lucifer.toml	exit_bunching	6.1271e-02	
-import	lucifer.toml	exit_bunching_max	4.0166e-01	
+import	lucifer.toml	bunching_max	8.2006e-02	
+import	lucifer.toml	bunching_max_s	3.9076e+01	m
+import	lucifer.toml	bunching_peak	6.5248e-03	
+import	lucifer.toml	energy_change	1.4751e+02	eV
+import	lucifer.toml	exit_bunching	6.4561e-02	
+import	lucifer.toml	exit_bunching_max	4.1939e-01	
 import	lucifer.toml	exit_energy	5.8038e+09	eV
-import	lucifer.toml	exit_energy_span	1.5102e+06	eV
-import	lucifer.toml	exit_power	4.1816e+04	W
-import	lucifer.toml	exit_power_inside	4.0194e+04	W
-import	lucifer.toml	exit_power_outside	1.6223e+03	W
-import	lucifer.toml	exit_power_per_slice	1.2299e+03	W
-import	lucifer.toml	exit_power_slice_max	7.0747e+03	W
-import	lucifer.toml	exit_power_slice_spread	1.6403e+00	
-import	lucifer.toml	exit_pulse_energy	7.7667e-12	J
-import	lucifer.toml	exit_sigma_energy	4.5632e+05	eV
-import	lucifer.toml	exit_window_energy	4.1845e-14	J
+import	lucifer.toml	exit_energy_span	1.5100e+06	eV
+import	lucifer.toml	exit_power	4.6605e+04	W
+import	lucifer.toml	exit_power_inside	4.4743e+04	W
+import	lucifer.toml	exit_power_outside	1.8623e+03	W
+import	lucifer.toml	exit_power_per_slice	1.3707e+03	W
+import	lucifer.toml	exit_power_slice_max	7.8454e+03	W
+import	lucifer.toml	exit_power_slice_spread	1.6266e+00	
+import	lucifer.toml	exit_pulse_energy	8.6279e-12	J
+import	lucifer.toml	exit_sigma_energy	4.5640e+05	eV
+import	lucifer.toml	exit_window_energy	4.6638e-14	J
 import	lucifer.toml	fel_steps	1068	
 import	lucifer.toml	filter_edge	2.9794e-06	rad
 import	lucifer.toml	filter_mode_angle	2.9790e-06	rad
 import	lucifer.toml	filter_ratio	1.1400e+00	
 import	lucifer.toml	filter_rho_angle	2.6200e-06	rad
-import	lucifer.toml	gain_length	4.7782e+00	m
+import	lucifer.toml	gain_length	4.9842e+00	m
 import	lucifer.toml	grid_cell	1.5690e-06	m
 import	lucifer.toml	grid_derived	no	
 import	lucifer.toml	grid_n_pts	256	
-import	lucifer.toml	initial_bunching	6.4530e-02	
+import	lucifer.toml	initial_bunching	6.5450e-02	
 import	lucifer.toml	initial_energy	5.8038e+09	eV
 import	lucifer.toml	initial_sigma_energy	4.5587e+05	eV
-import	lucifer.toml	mode_peak_inside	1.5995e+05	W
-import	lucifer.toml	mode_peak_s	4.2510e+01	m
+import	lucifer.toml	mode_peak_inside	1.7745e+05	W
+import	lucifer.toml	mode_peak_s	4.7260e+01	m
 import	lucifer.toml	n_particle	40320	
 import	lucifer.toml	n_record	1105	
 import	lucifer.toml	n_slice	34	
-import	lucifer.toml	peak_power	1.9034e+05	W
+import	lucifer.toml	peak_power	2.0960e+05	W
 import	lucifer.toml	peak_power_s	4.5574e+01	m
-import	lucifer.toml	power_after_first_element	9.0333e+04	W
-import	lucifer.toml	power_after_first_element_per_slice	2.6568e+03	W
-import	lucifer.toml	slice_power_max_at_bunching_max	8.7907e+03	W
+import	lucifer.toml	power_after_first_element	1.0833e+05	W
+import	lucifer.toml	power_after_first_element_per_slice	3.1862e+03	W
+import	lucifer.toml	slice_power_max_at_bunching_max	9.9946e+03	W
 import	lucifer.toml	slice_spacing	3.0000e-10	m
 import	lucifer.toml	split_angle	2.9795e-06	rad
-import	lucifer.toml	wide_angle_ratio	2.1939e-02	
-import	lucifer.toml	wide_angle_ratio_exit	4.0363e-02	
-import	lucifer_from_file.toml	bunching_max	3.2907e-02	
-import	lucifer_from_file.toml	bunching_max_s	4.6740e+01	m
-import	lucifer_from_file.toml	bunching_peak	1.1126e-02	
-import	lucifer_from_file.toml	energy_change	5.2606e+01	eV
-import	lucifer_from_file.toml	exit_bunching	3.2346e-02	
-import	lucifer_from_file.toml	exit_bunching_max	1.9869e-01	
+import	lucifer.toml	wide_angle_ratio	2.0531e-02	
+import	lucifer.toml	wide_angle_ratio_exit	4.1622e-02	
+import	lucifer_from_file.toml	bunching_max	3.6791e-02	
+import	lucifer_from_file.toml	bunching_max_s	7.2157e+00	m
+import	lucifer_from_file.toml	bunching_peak	1.1373e-02	
+import	lucifer_from_file.toml	energy_change	8.2656e+01	eV
+import	lucifer_from_file.toml	exit_bunching	3.1076e-02	
+import	lucifer_from_file.toml	exit_bunching_max	1.5175e-01	
 import	lucifer_from_file.toml	exit_energy	5.8038e+09	eV
 import	lucifer_from_file.toml	exit_energy_span	1.0896e+06	eV
-import	lucifer_from_file.toml	exit_power	1.2662e+05	W
-import	lucifer_from_file.toml	exit_power_inside	1.2331e+05	W
-import	lucifer_from_file.toml	exit_power_outside	3.3116e+03	W
-import	lucifer_from_file.toml	exit_power_per_slice	3.7241e+03	W
-import	lucifer_from_file.toml	exit_power_slice_max	1.9041e+04	W
-import	lucifer_from_file.toml	exit_power_slice_spread	1.7012e+00	
-import	lucifer_from_file.toml	exit_pulse_energy	1.2769e-11	J
-import	lucifer_from_file.toml	exit_sigma_energy	4.3222e+05	eV
-import	lucifer_from_file.toml	exit_window_energy	1.2671e-13	J
+import	lucifer_from_file.toml	exit_power	1.3223e+05	W
+import	lucifer_from_file.toml	exit_power_inside	1.2872e+05	W
+import	lucifer_from_file.toml	exit_power_outside	3.5184e+03	W
+import	lucifer_from_file.toml	exit_power_per_slice	3.8892e+03	W
+import	lucifer_from_file.toml	exit_power_slice_max	1.9801e+04	W
+import	lucifer_from_file.toml	exit_power_slice_spread	1.6915e+00	
+import	lucifer_from_file.toml	exit_pulse_energy	1.3315e-11	J
+import	lucifer_from_file.toml	exit_sigma_energy	4.3230e+05	eV
+import	lucifer_from_file.toml	exit_window_energy	1.3233e-13	J
 import	lucifer_from_file.toml	fel_steps	1068	
 import	lucifer_from_file.toml	filter_edge	2.9331e-06	rad
 import	lucifer_from_file.toml	filter_mode_angle	2.9330e-06	rad
 import	lucifer_from_file.toml	filter_ratio	1.1200e+00	
 import	lucifer_from_file.toml	filter_rho_angle	2.6150e-06	rad
-import	lucifer_from_file.toml	gain_length	4.1375e+00	m
+import	lucifer_from_file.toml	gain_length	4.1791e+00	m
 import	lucifer_from_file.toml	grid_cell	1.5690e-06	m
 import	lucifer_from_file.toml	grid_derived	no	
 import	lucifer_from_file.toml	grid_n_pts	256	
-import	lucifer_from_file.toml	initial_bunching	2.7378e-02	
+import	lucifer_from_file.toml	initial_bunching	2.9157e-02	
 import	lucifer_from_file.toml	initial_energy	5.8038e+09	eV
 import	lucifer_from_file.toml	initial_sigma_energy	4.3215e+05	eV
-import	lucifer_from_file.toml	mode_peak_inside	3.1287e+05	W
-import	lucifer_from_file.toml	mode_peak_s	5.6680e+01	m
+import	lucifer_from_file.toml	mode_peak_inside	3.2501e+05	W
+import	lucifer_from_file.toml	mode_peak_s	5.6760e+01	m
 import	lucifer_from_file.toml	n_particle	2048	
 import	lucifer_from_file.toml	n_record	1105	
 import	lucifer_from_file.toml	n_slice	34	
-import	lucifer_from_file.toml	peak_power	3.2105e+05	W
+import	lucifer_from_file.toml	peak_power	3.3360e+05	W
 import	lucifer_from_file.toml	peak_power_s	5.6240e+01	m
-import	lucifer_from_file.toml	power_after_first_element	1.2557e+05	W
-import	lucifer_from_file.toml	power_after_first_element_per_slice	3.6931e+03	W
-import	lucifer_from_file.toml	slice_power_max_at_bunching_max	1.2290e+04	W
+import	lucifer_from_file.toml	power_after_first_element	1.3268e+05	W
+import	lucifer_from_file.toml	power_after_first_element_per_slice	3.9022e+03	W
+import	lucifer_from_file.toml	slice_power_max_at_bunching_max	8.5055e+03	W
 import	lucifer_from_file.toml	slice_spacing	3.0000e-10	m
 import	lucifer_from_file.toml	split_angle	2.9331e-06	rad
-import	lucifer_from_file.toml	wide_angle_ratio	2.6153e-02	
-import	lucifer_from_file.toml	wide_angle_ratio_exit	2.6856e-02	
-lcls	lucifer.toml	bunching_max	3.9853e-01	
+import	lucifer_from_file.toml	wide_angle_ratio	2.6452e-02	
+import	lucifer_from_file.toml	wide_angle_ratio_exit	2.7335e-02	
+lcls	lucifer.toml	bunching_max	3.9850e-01	
 lcls	lucifer.toml	bunching_max_s	6.3920e+01	m
-lcls	lucifer.toml	bunching_peak	1.3656e-01	
-lcls	lucifer.toml	energy_change	-9.4466e+06	eV
-lcls	lucifer.toml	exit_bunching	1.3656e-01	
-lcls	lucifer.toml	exit_bunching_max	4.1949e-01	
+lcls	lucifer.toml	bunching_peak	1.3639e-01	
+lcls	lucifer.toml	energy_change	-9.4456e+06	eV
+lcls	lucifer.toml	exit_bunching	1.3639e-01	
+lcls	lucifer.toml	exit_bunching_max	4.1689e-01	
 lcls	lucifer.toml	exit_energy	1.3591e+10	eV
-lcls	lucifer.toml	exit_energy_span	1.4736e+07	eV
-lcls	lucifer.toml	exit_power	7.4069e+12	W
-lcls	lucifer.toml	exit_power_inside	7.4032e+12	W
-lcls	lucifer.toml	exit_power_outside	3.6539e+09	W
-lcls	lucifer.toml	exit_power_per_slice	2.4690e+10	W
-lcls	lucifer.toml	exit_power_slice_max	1.0445e+11	W
-lcls	lucifer.toml	exit_power_slice_spread	8.0064e-01	
-lcls	lucifer.toml	exit_pulse_energy	2.7830e-04	J
-lcls	lucifer.toml	exit_sigma_energy	1.1106e+07	eV
-lcls	lucifer.toml	exit_window_energy	2.5367e-04	J
+lcls	lucifer.toml	exit_energy_span	1.4716e+07	eV
+lcls	lucifer.toml	exit_power	7.4061e+12	W
+lcls	lucifer.toml	exit_power_inside	7.4025e+12	W
+lcls	lucifer.toml	exit_power_outside	3.6502e+09	W
+lcls	lucifer.toml	exit_power_per_slice	2.4687e+10	W
+lcls	lucifer.toml	exit_power_slice_max	1.0444e+11	W
+lcls	lucifer.toml	exit_power_slice_spread	8.0031e-01	
+lcls	lucifer.toml	exit_pulse_energy	2.7827e-04	J
+lcls	lucifer.toml	exit_sigma_energy	1.1103e+07	eV
+lcls	lucifer.toml	exit_window_energy	2.5365e-04	J
 lcls	lucifer.toml	fel_steps	1254	
 lcls	lucifer.toml	filter_edge	4.5125e-06	rad
 lcls	lucifer.toml	filter_mode_angle	4.5130e-06	rad
 lcls	lucifer.toml	filter_ratio	1.8600e+00	
 lcls	lucifer.toml	filter_rho_angle	2.4240e-06	rad
-lcls	lucifer.toml	gain_length	3.5577e+00	m
+lcls	lucifer.toml	gain_length	3.5578e+00	m
 lcls	lucifer.toml	grid_cell	3.0140e-06	m
 lcls	lucifer.toml	grid_derived	yes	
 lcls	lucifer.toml	grid_derived_from	127	
 lcls	lucifer.toml	grid_n_pts	128	
-lcls	lucifer.toml	initial_bunching	1.0387e-03	
+lcls	lucifer.toml	initial_bunching	1.0395e-03	
 lcls	lucifer.toml	initial_energy	1.3600e+10	eV
 lcls	lucifer.toml	initial_sigma_energy	1.7674e+06	eV
-lcls	lucifer.toml	mode_peak_inside	7.4032e+12	W
+lcls	lucifer.toml	mode_peak_inside	7.4025e+12	W
 lcls	lucifer.toml	mode_peak_s	1.3220e+02	m
 lcls	lucifer.toml	n_particle	4096	
 lcls	lucifer.toml	n_record	1351	
 lcls	lucifer.toml	n_slice	300	
-lcls	lucifer.toml	peak_power	7.4069e+12	W
+lcls	lucifer.toml	peak_power	7.4061e+12	W
 lcls	lucifer.toml	peak_power_s	1.3220e+02	m
-lcls	lucifer.toml	power_after_first_element	2.6729e+07	W
-lcls	lucifer.toml	power_after_first_element_per_slice	8.9096e+04	W
-lcls	lucifer.toml	slice_power_max_at_bunching_max	3.4381e+10	W
+lcls	lucifer.toml	power_after_first_element	2.6772e+07	W
+lcls	lucifer.toml	power_after_first_element_per_slice	8.9239e+04	W
+lcls	lucifer.toml	slice_power_max_at_bunching_max	3.4408e+10	W
 lcls	lucifer.toml	slice_spacing	1.0267e-08	m
 lcls	lucifer.toml	split_angle	4.5125e-06	rad
-lcls	lucifer.toml	wide_angle_ratio	4.9356e-04	
-lcls	lucifer.toml	wide_angle_ratio_exit	4.9356e-04	
-migration	lucifer.toml	bunching_max	3.5969e-02	
+lcls	lucifer.toml	wide_angle_ratio	4.9310e-04	
+lcls	lucifer.toml	wide_angle_ratio_exit	4.9310e-04	
+migration	lucifer.toml	bunching_max	3.5982e-02	
 migration	lucifer.toml	bunching_max_s	5.7000e+01	m
-migration	lucifer.toml	bunching_peak	3.3399e-02	
-migration	lucifer.toml	energy_change	1.3336e+03	eV
-migration	lucifer.toml	exit_bunching	3.5969e-02	
-migration	lucifer.toml	exit_bunching_max	2.5376e-01	
+migration	lucifer.toml	bunching_peak	3.3505e-02	
+migration	lucifer.toml	energy_change	1.4458e+03	eV
+migration	lucifer.toml	exit_bunching	3.5982e-02	
+migration	lucifer.toml	exit_bunching_max	2.5093e-01	
 migration	lucifer.toml	exit_energy	5.8038e+09	eV
-migration	lucifer.toml	exit_energy_span	7.0280e+05	eV
-migration	lucifer.toml	exit_power	7.7178e+07	W
-migration	lucifer.toml	exit_power_inside	7.5568e+07	W
-migration	lucifer.toml	exit_power_outside	1.6106e+06	W
-migration	lucifer.toml	exit_power_per_slice	8.0394e+05	W
-migration	lucifer.toml	exit_power_slice_max	4.5555e+06	W
-migration	lucifer.toml	exit_power_slice_spread	1.5880e+00	
-migration	lucifer.toml	exit_pulse_energy	3.0336e-09	J
-migration	lucifer.toml	exit_sigma_energy	5.4336e+05	eV
-migration	lucifer.toml	exit_window_energy	7.7232e-11	J
+migration	lucifer.toml	exit_energy_span	7.2606e+05	eV
+migration	lucifer.toml	exit_power	7.7912e+07	W
+migration	lucifer.toml	exit_power_inside	7.6281e+07	W
+migration	lucifer.toml	exit_power_outside	1.6305e+06	W
+migration	lucifer.toml	exit_power_per_slice	8.1158e+05	W
+migration	lucifer.toml	exit_power_slice_max	4.5904e+06	W
+migration	lucifer.toml	exit_power_slice_spread	1.5866e+00	
+migration	lucifer.toml	exit_pulse_energy	3.0689e-09	J
+migration	lucifer.toml	exit_sigma_energy	5.4348e+05	eV
+migration	lucifer.toml	exit_window_energy	7.7966e-11	J
 migration	lucifer.toml	fel_steps	1068	
 migration	lucifer.toml	filter_edge	3.0037e-06	rad
 migration	lucifer.toml	filter_mode_angle	3.0040e-06	rad
 migration	lucifer.toml	filter_ratio	1.1500e+00	
 migration	lucifer.toml	filter_rho_angle	2.6220e-06	rad
-migration	lucifer.toml	gain_length	5.2960e+00	m
+migration	lucifer.toml	gain_length	5.2963e+00	m
 migration	lucifer.toml	grid_cell	3.1500e-06	m
 migration	lucifer.toml	grid_derived	no	
 migration	lucifer.toml	grid_n_pts	128	
-migration	lucifer.toml	initial_bunching	6.7994e-03	
+migration	lucifer.toml	initial_bunching	6.8420e-03	
 migration	lucifer.toml	initial_energy	5.8038e+09	eV
 migration	lucifer.toml	initial_sigma_energy	5.0587e+05	eV
-migration	lucifer.toml	mode_peak_inside	1.2941e+08	W
+migration	lucifer.toml	mode_peak_inside	1.3050e+08	W
 migration	lucifer.toml	mode_peak_s	5.6760e+01	m
 migration	lucifer.toml	n_particle	1024	
 migration	lucifer.toml	n_record	1105	
 migration	lucifer.toml	n_slice	96	
-migration	lucifer.toml	peak_power	1.3276e+08	W
+migration	lucifer.toml	peak_power	1.3388e+08	W
 migration	lucifer.toml	peak_power_s	5.6016e+01	m
-migration	lucifer.toml	power_after_first_element	7.9371e+06	W
-migration	lucifer.toml	power_after_first_element_per_slice	8.2678e+04	W
-migration	lucifer.toml	slice_power_max_at_bunching_max	4.5555e+06	W
+migration	lucifer.toml	power_after_first_element	8.0464e+06	W
+migration	lucifer.toml	power_after_first_element_per_slice	8.3817e+04	W
+migration	lucifer.toml	slice_power_max_at_bunching_max	4.5904e+06	W
 migration	lucifer.toml	slice_spacing	3.0000e-10	m
 migration	lucifer.toml	split_angle	3.0037e-06	rad
-migration	lucifer.toml	wide_angle_ratio	2.2562e-02	
-migration	lucifer.toml	wide_angle_ratio_exit	2.1313e-02	
-migration	lucifer_no_migrate.toml	bunching_max	2.7499e-02	
-migration	lucifer_no_migrate.toml	bunching_max_s	5.6760e+01	m
-migration	lucifer_no_migrate.toml	bunching_peak	2.7499e-02	
-migration	lucifer_no_migrate.toml	energy_change	-7.5451e+03	eV
-migration	lucifer_no_migrate.toml	exit_bunching	2.7499e-02	
-migration	lucifer_no_migrate.toml	exit_bunching_max	1.2279e-01	
+migration	lucifer.toml	wide_angle_ratio	2.2613e-02	
+migration	lucifer.toml	wide_angle_ratio_exit	2.1375e-02	
+migration	lucifer_no_migrate.toml	bunching_max	2.7621e-02	
+migration	lucifer_no_migrate.toml	bunching_max_s	5.7000e+01	m
+migration	lucifer_no_migrate.toml	bunching_peak	2.7620e-02	
+migration	lucifer_no_migrate.toml	energy_change	-7.6429e+03	eV
+migration	lucifer_no_migrate.toml	exit_bunching	2.7621e-02	
+migration	lucifer_no_migrate.toml	exit_bunching_max	1.2297e-01	
 migration	lucifer_no_migrate.toml	exit_energy	5.8038e+09	eV
-migration	lucifer_no_migrate.toml	exit_energy_span	1.8223e+05	eV
-migration	lucifer_no_migrate.toml	exit_power	1.1167e+08	W
-migration	lucifer_no_migrate.toml	exit_power_inside	1.0968e+08	W
-migration	lucifer_no_migrate.toml	exit_power_outside	1.9929e+06	W
-migration	lucifer_no_migrate.toml	exit_power_per_slice	1.1632e+06	W
-migration	lucifer_no_migrate.toml	exit_power_slice_max	6.3168e+06	W
-migration	lucifer_no_migrate.toml	exit_power_slice_spread	1.5114e+00	
-migration	lucifer_no_migrate.toml	exit_pulse_energy	2.7608e-09	J
-migration	lucifer_no_migrate.toml	exit_sigma_energy	5.4046e+05	eV
-migration	lucifer_no_migrate.toml	exit_window_energy	1.1175e-10	J
+migration	lucifer_no_migrate.toml	exit_energy_span	1.8193e+05	eV
+migration	lucifer_no_migrate.toml	exit_power	1.1282e+08	W
+migration	lucifer_no_migrate.toml	exit_power_inside	1.1080e+08	W
+migration	lucifer_no_migrate.toml	exit_power_outside	2.0173e+06	W
+migration	lucifer_no_migrate.toml	exit_power_per_slice	1.1752e+06	W
+migration	lucifer_no_migrate.toml	exit_power_slice_max	6.3706e+06	W
+migration	lucifer_no_migrate.toml	exit_power_slice_spread	1.5107e+00	
+migration	lucifer_no_migrate.toml	exit_pulse_energy	2.7959e-09	J
+migration	lucifer_no_migrate.toml	exit_sigma_energy	5.4088e+05	eV
+migration	lucifer_no_migrate.toml	exit_window_energy	1.1290e-10	J
 migration	lucifer_no_migrate.toml	fel_steps	1068	
 migration	lucifer_no_migrate.toml	filter_edge	3.0037e-06	rad
 migration	lucifer_no_migrate.toml	filter_mode_angle	3.0040e-06	rad
 migration	lucifer_no_migrate.toml	filter_ratio	1.1500e+00	
 migration	lucifer_no_migrate.toml	filter_rho_angle	2.6220e-06	rad
-migration	lucifer_no_migrate.toml	gain_length	3.7737e+00	m
+migration	lucifer_no_migrate.toml	gain_length	3.7802e+00	m
 migration	lucifer_no_migrate.toml	grid_cell	3.1500e-06	m
 migration	lucifer_no_migrate.toml	grid_derived	no	
 migration	lucifer_no_migrate.toml	grid_n_pts	128	
-migration	lucifer_no_migrate.toml	initial_bunching	6.7994e-03	
+migration	lucifer_no_migrate.toml	initial_bunching	6.8420e-03	
 migration	lucifer_no_migrate.toml	initial_energy	5.8038e+09	eV
 migration	lucifer_no_migrate.toml	initial_sigma_energy	5.0587e+05	eV
-migration	lucifer_no_migrate.toml	mode_peak_inside	1.9062e+08	W
+migration	lucifer_no_migrate.toml	mode_peak_inside	1.9235e+08	W
 migration	lucifer_no_migrate.toml	mode_peak_s	5.6760e+01	m
 migration	lucifer_no_migrate.toml	n_particle	1024	
 migration	lucifer_no_migrate.toml	n_record	1105	
 migration	lucifer_no_migrate.toml	n_slice	96	
-migration	lucifer_no_migrate.toml	peak_power	1.9402e+08	W
-migration	lucifer_no_migrate.toml	peak_power_s	5.6680e+01	m
-migration	lucifer_no_migrate.toml	power_after_first_element	7.9371e+06	W
-migration	lucifer_no_migrate.toml	power_after_first_element_per_slice	8.2678e+04	W
-migration	lucifer_no_migrate.toml	slice_power_max_at_bunching_max	9.8914e+06	W
+migration	lucifer_no_migrate.toml	peak_power	1.9579e+08	W
+migration	lucifer_no_migrate.toml	peak_power_s	5.6760e+01	m
+migration	lucifer_no_migrate.toml	power_after_first_element	8.0464e+06	W
+migration	lucifer_no_migrate.toml	power_after_first_element_per_slice	8.3817e+04	W
+migration	lucifer_no_migrate.toml	slice_power_max_at_bunching_max	6.3706e+06	W
 migration	lucifer_no_migrate.toml	slice_spacing	3.0000e-10	m
 migration	lucifer_no_migrate.toml	split_angle	3.0037e-06	rad
-migration	lucifer_no_migrate.toml	wide_angle_ratio	1.7833e-02	
-migration	lucifer_no_migrate.toml	wide_angle_ratio_exit	1.8171e-02	
+migration	lucifer_no_migrate.toml	wide_angle_ratio	1.7874e-02	
+migration	lucifer_no_migrate.toml	wide_angle_ratio_exit	1.8206e-02	
 mixed_line	lucifer.toml	bunching_max	2.3638e-01	
 mixed_line	lucifer.toml	bunching_max_s	3.7760e+01	m
 mixed_line	lucifer.toml	bunching_peak	2.3538e-01	
@@ -746,92 +746,92 @@ mixed_line	lucifer_averaged.toml	slice_spacing	1.0000e-10	m
 mixed_line	lucifer_averaged.toml	split_angle	2.9077e-06	rad
 mixed_line	lucifer_averaged.toml	wide_angle_ratio	4.1176e-01	
 mixed_line	lucifer_averaged.toml	wide_angle_ratio_exit	3.3550e+00	
-sase	lucifer.toml	bunching_max	1.5717e-02	
+sase	lucifer.toml	bunching_max	1.5838e-02	
 sase	lucifer.toml	bunching_max_s	5.6240e+01	m
-sase	lucifer.toml	bunching_peak	1.5668e-02	
-sase	lucifer.toml	energy_change	-2.1499e+03	eV
-sase	lucifer.toml	exit_bunching	1.5675e-02	
-sase	lucifer.toml	exit_bunching_max	6.2565e-02	
+sase	lucifer.toml	bunching_peak	1.5777e-02	
+sase	lucifer.toml	energy_change	-2.1751e+03	eV
+sase	lucifer.toml	exit_bunching	1.5794e-02	
+sase	lucifer.toml	exit_bunching_max	6.2753e-02	
 sase	lucifer.toml	exit_energy	5.8038e+09	eV
-sase	lucifer.toml	exit_energy_span	1.5478e+05	eV
-sase	lucifer.toml	exit_power	3.3963e+07	W
-sase	lucifer.toml	exit_power_inside	3.3335e+07	W
-sase	lucifer.toml	exit_power_outside	6.2773e+05	W
-sase	lucifer.toml	exit_power_per_slice	3.5378e+05	W
-sase	lucifer.toml	exit_power_slice_max	1.9297e+06	W
-sase	lucifer.toml	exit_power_slice_spread	1.3124e+00	
-sase	lucifer.toml	exit_pulse_energy	8.4538e-10	J
-sase	lucifer.toml	exit_sigma_energy	5.1684e+05	eV
-sase	lucifer.toml	exit_window_energy	3.3986e-11	J
+sase	lucifer.toml	exit_energy_span	1.5472e+05	eV
+sase	lucifer.toml	exit_power	3.4697e+07	W
+sase	lucifer.toml	exit_power_inside	3.4057e+07	W
+sase	lucifer.toml	exit_power_outside	6.4007e+05	W
+sase	lucifer.toml	exit_power_per_slice	3.6143e+05	W
+sase	lucifer.toml	exit_power_slice_max	1.9610e+06	W
+sase	lucifer.toml	exit_power_slice_spread	1.3080e+00	
+sase	lucifer.toml	exit_pulse_energy	8.5753e-10	J
+sase	lucifer.toml	exit_sigma_energy	5.1701e+05	eV
+sase	lucifer.toml	exit_window_energy	3.4721e-11	J
 sase	lucifer.toml	fel_steps	1068	
 sase	lucifer.toml	filter_edge	2.9625e-06	rad
 sase	lucifer.toml	filter_mode_angle	2.9620e-06	rad
 sase	lucifer.toml	filter_ratio	1.1300e+00	
 sase	lucifer.toml	filter_rho_angle	2.6100e-06	rad
-sase	lucifer.toml	gain_length	5.2559e+00	m
+sase	lucifer.toml	gain_length	5.2445e+00	m
 sase	lucifer.toml	grid_cell	1.5690e-06	m
 sase	lucifer.toml	grid_derived	no	
 sase	lucifer.toml	grid_n_pts	256	
-sase	lucifer.toml	initial_bunching	5.6750e-03	
+sase	lucifer.toml	initial_bunching	5.7485e-03	
 sase	lucifer.toml	initial_energy	5.8038e+09	eV
 sase	lucifer.toml	initial_sigma_energy	5.0577e+05	eV
-sase	lucifer.toml	mode_peak_inside	5.8352e+07	W
-sase	lucifer.toml	mode_peak_s	5.6760e+01	m
+sase	lucifer.toml	mode_peak_inside	5.9417e+07	W
+sase	lucifer.toml	mode_peak_s	5.6680e+01	m
 sase	lucifer.toml	n_particle	2048	
 sase	lucifer.toml	n_record	1105	
 sase	lucifer.toml	n_slice	96	
-sase	lucifer.toml	peak_power	5.9252e+07	W
-sase	lucifer.toml	peak_power_s	5.6760e+01	m
-sase	lucifer.toml	power_after_first_element	6.0902e+06	W
-sase	lucifer.toml	power_after_first_element_per_slice	6.3440e+04	W
-sase	lucifer.toml	slice_power_max_at_bunching_max	3.1217e+06	W
+sase	lucifer.toml	peak_power	6.0334e+07	W
+sase	lucifer.toml	peak_power_s	5.6680e+01	m
+sase	lucifer.toml	power_after_first_element	6.2463e+06	W
+sase	lucifer.toml	power_after_first_element_per_slice	6.5065e+04	W
+sase	lucifer.toml	slice_power_max_at_bunching_max	3.1595e+06	W
 sase	lucifer.toml	slice_spacing	3.0000e-10	m
 sase	lucifer.toml	split_angle	2.9625e-06	rad
-sase	lucifer.toml	wide_angle_ratio	1.5419e-02	
-sase	lucifer.toml	wide_angle_ratio_exit	1.8831e-02	
-sase_wake	lucifer.toml	bunching_max	1.4149e-02	
+sase	lucifer.toml	wide_angle_ratio	1.5434e-02	
+sase	lucifer.toml	wide_angle_ratio_exit	1.8794e-02	
+sase_wake	lucifer.toml	bunching_max	1.4286e-02	
 sase_wake	lucifer.toml	bunching_max_s	5.7000e+01	m
-sase_wake	lucifer.toml	bunching_peak	1.4066e-02	
-sase_wake	lucifer.toml	energy_change	-4.2328e+06	eV
-sase_wake	lucifer.toml	exit_bunching	1.4149e-02	
-sase_wake	lucifer.toml	exit_bunching_max	4.6745e-02	
+sase_wake	lucifer.toml	bunching_peak	1.4203e-02	
+sase_wake	lucifer.toml	energy_change	-4.2329e+06	eV
+sase_wake	lucifer.toml	exit_bunching	1.4286e-02	
+sase_wake	lucifer.toml	exit_bunching_max	4.7012e-02	
 sase_wake	lucifer.toml	exit_energy	5.7996e+09	eV
-sase_wake	lucifer.toml	exit_energy_span	6.8405e+06	eV
-sase_wake	lucifer.toml	exit_power	2.7890e+07	W
-sase_wake	lucifer.toml	exit_power_inside	2.7577e+07	W
-sase_wake	lucifer.toml	exit_power_outside	3.1333e+05	W
-sase_wake	lucifer.toml	exit_power_per_slice	2.9052e+05	W
-sase_wake	lucifer.toml	exit_power_slice_max	1.2272e+06	W
-sase_wake	lucifer.toml	exit_power_slice_spread	1.1168e+00	
-sase_wake	lucifer.toml	exit_pulse_energy	7.9246e-10	J
-sase_wake	lucifer.toml	exit_sigma_energy	5.1382e+05	eV
-sase_wake	lucifer.toml	exit_window_energy	2.7909e-11	J
+sase_wake	lucifer.toml	exit_energy_span	6.8404e+06	eV
+sase_wake	lucifer.toml	exit_power	2.8521e+07	W
+sase_wake	lucifer.toml	exit_power_inside	2.8201e+07	W
+sase_wake	lucifer.toml	exit_power_outside	3.1917e+05	W
+sase_wake	lucifer.toml	exit_power_per_slice	2.9709e+05	W
+sase_wake	lucifer.toml	exit_power_slice_max	1.2501e+06	W
+sase_wake	lucifer.toml	exit_power_slice_spread	1.1140e+00	
+sase_wake	lucifer.toml	exit_pulse_energy	8.0888e-10	J
+sase_wake	lucifer.toml	exit_sigma_energy	5.1398e+05	eV
+sase_wake	lucifer.toml	exit_window_energy	2.8540e-11	J
 sase_wake	lucifer.toml	fel_steps	1068	
 sase_wake	lucifer.toml	filter_edge	2.9625e-06	rad
 sase_wake	lucifer.toml	filter_mode_angle	2.9620e-06	rad
 sase_wake	lucifer.toml	filter_ratio	1.1300e+00	
 sase_wake	lucifer.toml	filter_rho_angle	2.6100e-06	rad
-sase_wake	lucifer.toml	gain_length	5.9703e+00	m
+sase_wake	lucifer.toml	gain_length	6.0164e+00	m
 sase_wake	lucifer.toml	grid_cell	1.5690e-06	m
 sase_wake	lucifer.toml	grid_derived	no	
 sase_wake	lucifer.toml	grid_n_pts	256	
-sase_wake	lucifer.toml	initial_bunching	5.6750e-03	
+sase_wake	lucifer.toml	initial_bunching	5.7485e-03	
 sase_wake	lucifer.toml	initial_energy	5.8038e+09	eV
 sase_wake	lucifer.toml	initial_sigma_energy	5.0577e+05	eV
-sase_wake	lucifer.toml	mode_peak_inside	4.1557e+07	W
+sase_wake	lucifer.toml	mode_peak_inside	4.2428e+07	W
 sase_wake	lucifer.toml	mode_peak_s	5.6760e+01	m
 sase_wake	lucifer.toml	n_particle	2048	
 sase_wake	lucifer.toml	n_record	1105	
 sase_wake	lucifer.toml	n_slice	96	
-sase_wake	lucifer.toml	peak_power	4.2003e+07	W
+sase_wake	lucifer.toml	peak_power	4.2881e+07	W
 sase_wake	lucifer.toml	peak_power_s	5.6760e+01	m
-sase_wake	lucifer.toml	power_after_first_element	6.0771e+06	W
-sase_wake	lucifer.toml	power_after_first_element_per_slice	6.3303e+04	W
-sase_wake	lucifer.toml	slice_power_max_at_bunching_max	1.2272e+06	W
+sase_wake	lucifer.toml	power_after_first_element	6.2330e+06	W
+sase_wake	lucifer.toml	power_after_first_element_per_slice	6.4927e+04	W
+sase_wake	lucifer.toml	slice_power_max_at_bunching_max	1.2501e+06	W
 sase_wake	lucifer.toml	slice_spacing	3.0000e-10	m
 sase_wake	lucifer.toml	split_angle	2.9625e-06	rad
-sase_wake	lucifer.toml	wide_angle_ratio	1.0737e-02	
-sase_wake	lucifer.toml	wide_angle_ratio_exit	1.1362e-02	
+sase_wake	lucifer.toml	wide_angle_ratio	1.0684e-02	
+sase_wake	lucifer.toml	wide_angle_ratio_exit	1.1317e-02	
 space_charge	lucifer.toml	bunching_max	3.1327e-13	
 space_charge	lucifer.toml	bunching_max_s	5.6760e+01	m
 space_charge	lucifer.toml	bunching_peak	3.2578e-13	

@@ -112,12 +112,45 @@ where the two builds agree to every printed digit.
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 2 | 4.8221e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 3 | 4.8408e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet: the loader warns of beamlets under one electron |  | same | holds |
+| shot noise, kick from J1, uniform weights, 146.4 electrons a beamlet | 1.0040e+00 | same | 9.5504e-01 to 1.0484e+00 |
+| shot noise, kick from J1, uniform weights, 146.4 electrons a beamlet, harmonic 1 | 1.0182e+00 | same | 9.1649e-01 to 1.0774e+00 |
+| shot noise, kick from J1, uniform weights, 146.4 electrons a beamlet, harmonic 2 | 9.8133e-01 | same | 9.2507e-01 to 1.0875e+00 |
+| shot noise, kick from J1, uniform weights, 146.4 electrons a beamlet, harmonic 3 | 1.0124e+00 | same | 9.2107e-01 to 1.0828e+00 |
+| shot noise, uniform weights, 146.4 electrons a beamlet: the gain of the kick from J1 on the first-order kick's draws | 1.3980e-02 | same | 1.3103e-02 to 1.4653e-02 |
+| shot noise, kick from J1, uniform weights, 50 electrons a beamlet | 1.0106e+00 | same | 9.5955e-01 to 1.0533e+00 |
+| shot noise, kick from J1, uniform weights, 50 electrons a beamlet, harmonic 1 | 1.0125e+00 | same | 9.1086e-01 to 1.0708e+00 |
+| shot noise, kick from J1, uniform weights, 50 electrons a beamlet, harmonic 2 | 9.9086e-01 | same | 9.3339e-01 to 1.0972e+00 |
+| shot noise, kick from J1, uniform weights, 50 electrons a beamlet, harmonic 3 | 1.0284e+00 | same | 9.3143e-01 to 1.0949e+00 |
+| shot noise, uniform weights, 50 electrons a beamlet: the gain of the kick from J1 on the first-order kick's draws | 4.2535e-02 | same | 3.9539e-02 to 4.4627e-02 |
+| shot noise, kick from J1, uniform weights, 18 electrons a beamlet | 1.0093e+00 | same | 9.5491e-01 to 1.0482e+00 |
+| shot noise, kick from J1, uniform weights, 18 electrons a beamlet, harmonic 1 | 9.9222e-01 | same | 8.9177e-01 to 1.0483e+00 |
+| shot noise, kick from J1, uniform weights, 18 electrons a beamlet, harmonic 2 | 9.9068e-01 | same | 9.2526e-01 to 1.0877e+00 |
+| shot noise, kick from J1, uniform weights, 18 electrons a beamlet, harmonic 3 | 1.0451e+00 | same | 9.4522e-01 to 1.1111e+00 |
+| shot noise, uniform weights, 18 electrons a beamlet: the gain of the kick from J1 on the first-order kick's draws | 1.1101e-01 | same | 1.0183e-01 to 1.1769e-01 |
+| shot noise, kick from J1, uniform weights, 10 electrons a beamlet | 9.1743e-01 | same | 8.6640e-01 to 9.5107e-01 |
+| shot noise, kick from J1, uniform weights, 10 electrons a beamlet, harmonic 1 | 9.3549e-01 | same | 8.3891e-01 to 9.8617e-01 |
+| shot noise, kick from J1, uniform weights, 10 electrons a beamlet, harmonic 2 | 8.9130e-01 | same | 8.2521e-01 to 9.7007e-01 |
+| shot noise, kick from J1, uniform weights, 10 electrons a beamlet, harmonic 3 | 9.2550e-01 | same | 8.4211e-01 to 9.8994e-01 |
+| shot noise, uniform weights, 10 electrons a beamlet: the gain of the kick from J1 on the first-order kick's draws | 1.2250e-01 | same | 1.0797e-01 to 1.3371e-01 |
+| shot noise, kick from J1, uniform weights, 1 electron a beamlet | 1.5930e-01 | same | 1.5077e-01 to 1.6550e-01 |
+| shot noise, kick from J1, uniform weights, 1 electron a beamlet, harmonic 1 | 2.2237e-01 | same | 2.0139e-01 to 2.3674e-01 |
+| shot noise, kick from J1, uniform weights, 1 electron a beamlet, harmonic 2 | 1.2571e-01 | same | 1.1766e-01 to 1.3832e-01 |
+| shot noise, kick from J1, uniform weights, 1 electron a beamlet, harmonic 3 | 1.2983e-01 | same | 1.1707e-01 to 1.3762e-01 |
+| shot noise, uniform weights, 1 electron a beamlet: the gain of the kick from J1 on the first-order kick's draws | 2.1186e-02 | same | 1.4295e-02 to 2.7924e-02 |
+| shot noise, the level the loader states for the first-order kick against the closed form | 4.3469e-05 | same | <= 1.0000e-04 |
+| shot noise, the level the loader states for the kick from J1 against the closed form | 4.2536e-05 | same | <= 1.0000e-04 |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice's charge is the charge with the key at 0 |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: no beamlet is under the limit where the slice holds it |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: the loader states the slices with fewer beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, fewer beamlets | 1.4938e-01 | same | 1.3425e-01 to 1.6016e-01 |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default, the input file's beamlets | 7.5206e-01 | same | 7.0908e-01 to 8.0375e-01 |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: each slice's charge is the charge with the key at 0 |  | same | holds |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: no beamlet is under the limit where the slice holds it |  | same | holds |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default: the loader states the slices with fewer beamlets |  | same | holds |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default, fewer beamlets | 1.6778e-01 | same | 1.5330e-01 to 1.8338e-01 |
+| shot noise, Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default, the input file's beamlets | 8.1701e-01 | same | 7.7170e-01 to 8.7369e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: each slice's charge is the charge with the key at 0 |  | same | holds |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more: no beamlet is under the limit where the slice holds it |  | same | holds |
@@ -133,16 +166,34 @@ where the two builds agree to every printed digit.
 | shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.0199e+00 | same | 7.3882e-01 to 1.2281e+00 |
 | shot noise, keep mode, beamlets of a generated bunch, harmonic 2 | 9.3672e-01 | same | 7.4512e-01 to 1.2386e+00 |
 | shot noise, keep mode, beamlets of a generated bunch, harmonic 3 | 9.7771e-01 | same | 7.4233e-01 to 1.2339e+00 |
+| shot noise, keep load, kick from J1: the noise reported on the beamlets the loader made |  | same | holds |
+| shot noise, keep mode, beamlets of a generated bunch, kick from J1 | 9.9200e-01 | same | 8.5783e-01 to 1.1456e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, kick from J1, harmonic 1 | 1.0345e+00 | same | 7.4894e-01 to 1.2449e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, kick from J1, harmonic 2 | 9.4993e-01 | same | 7.5594e-01 to 1.2566e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, kick from J1, harmonic 3 | 9.9153e-01 | same | 7.5268e-01 to 1.2511e+00 |
+| shot noise, keep mode, beamlets of a generated bunch: the gain of the kick from J1 on the first-order kick's draws | 1.3892e-02 | same | 1.1081e-02 to 1.6678e-02 |
 | shot noise, copies load: the noise reported on particles sharing their transverse coordinates |  | same | holds |
 | shot noise, copies made outside the loader | 9.8365e-01 | same | 7.4239e-01 to 1.2332e+00 |
 | shot noise, copies made outside the loader, harmonic 1 | 9.6382e-01 | same | 5.6025e-01 to 1.4067e+00 |
 | shot noise, copies made outside the loader, harmonic 2 | 1.0216e+00 | same | 5.6503e-01 to 1.4187e+00 |
 | shot noise, copies made outside the loader, harmonic 3 | 9.6553e-01 | same | 5.6291e-01 to 1.4134e+00 |
+| shot noise, copies load, kick from J1: the noise reported on particles sharing their transverse coordinates |  | same | holds |
+| shot noise, copies made outside the loader, kick from J1 | 9.9741e-01 | same | 7.5283e-01 to 1.2506e+00 |
+| shot noise, copies made outside the loader, kick from J1, harmonic 1 | 9.7670e-01 | same | 5.6792e-01 to 1.4259e+00 |
+| shot noise, copies made outside the loader, kick from J1, harmonic 2 | 1.0362e+00 | same | 5.7323e-01 to 1.4393e+00 |
+| shot noise, copies made outside the loader, kick from J1, harmonic 3 | 9.7932e-01 | same | 5.7076e-01 to 1.4331e+00 |
+| shot noise, copies made outside the loader: the gain of the kick from J1 on the first-order kick's draws | 1.3755e-02 | same | 9.8621e-03 to 1.7897e-02 |
 | shot noise, cells load: the noise reported on the occupants of each deposit cell |  | same | holds |
 | shot noise, the occupants of each deposit cell | 9.6999e-01 | same | 7.4336e-01 to 1.2349e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 1 | 1.0530e+00 | same | 5.6387e-01 to 1.4158e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 2 | 9.4860e-01 | same | 5.6663e-01 to 1.4227e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 3 | 9.0833e-01 | same | 5.5990e-01 to 1.4058e+00 |
+| shot noise, cells load, kick from J1: the noise reported on the occupants of each deposit cell |  | same | holds |
+| shot noise, the occupants of each deposit cell, kick from J1 | 9.7983e-01 | same | 7.4970e-01 to 1.2454e+00 |
+| shot noise, the occupants of each deposit cell, kick from J1, harmonic 1 | 1.0627e+00 | same | 5.6859e-01 to 1.4276e+00 |
+| shot noise, the occupants of each deposit cell, kick from J1, harmonic 2 | 9.5994e-01 | same | 5.7163e-01 to 1.4353e+00 |
+| shot noise, the occupants of each deposit cell, kick from J1, harmonic 3 | 9.1686e-01 | same | 5.6458e-01 to 1.4175e+00 |
+| shot noise, the occupants of each deposit cell: the gain of the kick from J1 on the first-order kick's draws | 9.8454e-03 | same | 3.5820e-03 to 1.3275e-02 |
 | mode split against the dump's far field | 0.0000e+00 | 3.3676e-16 | <= 1.0000e-06 |
 
 (val-levels-load)=
@@ -160,6 +211,7 @@ where the two builds agree to every printed digit.
 | refused, a negative window.n_wavelength |  | same | holds |
 | in-cone startup, Gaussian bunch in sample mode | 4.3086e-02 | same | <= 3.5000e-01 |
 | in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge | 2.1414e-01 | same | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode, the kick sized from J1 | 2.2173e-01 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`
@@ -942,6 +994,7 @@ where the two builds agree to every printed digit.
 | a list entry longer than an element is refused, 61 characters in dump_field_at |  | same | holds |
 | every key with a set of names has a refusal check here |  | same | holds |
 | a name outside the set is refused with the set, beam.load_mode = "all" |  | same | holds |
+| a name outside the set is refused with the set, beam.shot_noise_kick = "second_order" |  | same | holds |
 | a name outside the set is refused with the set, beam.z_distribution = "gauss" |  | same | holds |
 | a name outside the set is refused with the set, field.propagator = "spectra" |  | same | holds |
 | a name outside the set is refused with the set, field.seed_polarization = "z" |  | same | holds |

@@ -55,7 +55,7 @@ character(400) beam_file, write_genesis_dist, write_openpmd_file
 character(16) load_mode
 character(400) out_root
 character(400) field_file(9)
-logical quiet_start, shot_noise, gen_test_weights, resample_split_weights, skip_empty
+logical quiet_start, shot_noise, gen_test_weights, resample_split_weights, skip_empty, bessel_kick
 logical split_weights, swap_beam_xy, err
 integer beamlet_size, ran_seed, is
 real(rp) beamlet_min_electrons
@@ -92,6 +92,7 @@ if (run%bparam%shot_noise .and. run%bparam%quiet_start) beamlet_min_electrons = 
 ! such a slice then has particles of zero weight.
 
 skip_empty = run%bparam%beamlet_min_electrons > 0
+bessel_kick = (run%bparam%shot_noise_kick /= 'first_order')
 shot_noise = run%bparam%shot_noise
 gen_test_weights = run%bparam%gen_test_weights
 resample_split_weights = run%bparam%resample_split_weights
@@ -567,11 +568,11 @@ do is_g = 1, nslice_gen
   if (shot_noise .and. wsum > 0) then
 
     ! fel_impose_noise, shared by every loader, finds the quiet floor and imposes the
-    ! noise. The groups here are beamlets, so fel_fawley_noise runs unchanged. Its draw
-    ! order is two ran_uniform per harmonic per beamlet, which the recorded levels assume.
+    ! noise. The groups here are beamlets, so fel_fawley_noise runs. Its draw order is
+    ! two ran_uniform per harmonic per beamlet, which the recorded levels assume.
 
     call fel_impose_noise (sl, theta_work, n_s, quiet_start, beamlet_size, grid_half_width, &
-                           grid_n_pts, is_g, tally, rule, floor_nl, err_flag)
+                           grid_n_pts, is_g, bessel_kick, tally, rule, floor_nl, err_flag)
     if (err_flag) return
     rule_seen = max(rule_seen, rule)
     floor_max = max(floor_max, floor_nl)
@@ -756,6 +757,7 @@ if (.not. resample%use_beam_init) then
 endif
 resample%beamlet_min_electrons = beamlet_min_electrons
 resample%skip_empty = skip_empty
+resample%bessel_kick = bessel_kick
 
 call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, resample, quiet_start, shot_noise, &
                        grid_half_width, grid_n_pts, fbeam, err_i, moments)
@@ -1104,7 +1106,7 @@ do k = 1, sl%n
   theta_k(k) = sl%z(k) * ks_l / beta_k(k)
 enddo
 call fel_impose_noise (sl, theta_k, sl%n, quiet_start, nbins, grid_half_width, grid_n_pts, &
-                       is_g, tally, rule, floor_nl, err_flag)
+                       is_g, bessel_kick, tally, rule, floor_nl, err_flag)
 if (err_flag) return
 rule_seen = max(rule_seen, rule)
 floor_max = max(floor_max, floor_nl)

@@ -73,6 +73,7 @@ TD_EXTRA = """  beam.bunch_charge = 1.601107656951e-14
   beam.z_max = 1.200000e-09
   seed_power = 0
   shot_noise = T
+  shot_noise_kick = "first_order"
   beamlet_size = 8
   window_length = 2.4e-9
   n_wavelength = 3

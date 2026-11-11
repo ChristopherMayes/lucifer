@@ -97,7 +97,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 |---|---|---|
 | exit power | 8.6205e+10 | W |
 | exit power per slice | 2.4560e+08 | W |
-| exit power, rms over mean across slices | 2.2640e+00 |  |
+| exit power, rms over mean across slices | 2.2641e+00 |  |
 | exit window energy | 4.7273e-05 | J |
 | exit pulse energy, the window's and the light slipped out of it | 4.7273e-05 | J |
 | peak power | 8.6205e+10 | W |
@@ -105,21 +105,21 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | mode peak, power inside the split | 8.6158e+10 | W |
 | s of the mode peak | 3.1577e+01 | m |
 | exit power inside the split | 8.6158e+10 | W |
-| exit power outside the split | 4.7391e+07 | W |
-| outside over inside, the run's maximum | 5.5005e-04 |  |
-| outside over inside at the exit | 5.5005e-04 |  |
+| exit power outside the split | 4.7402e+07 | W |
+| outside over inside, the run's maximum | 5.5018e-04 |  |
+| outside over inside at the exit | 5.5018e-04 |  |
 | split angle | 8.1754e-05 | rad |
 | gain length, the shortest e-folding length over five consecutive records | 1.1254e+00 | m |
-| power at the first element end | 3.3560e+05 | W |
-| power per slice at the first element end | 9.5613e+02 | W |
-| initial bunching, mean |b| over slices | 1.1244e-01 |  |
-| exit bunching, mean |b| over slices | 1.9356e-01 |  |
-| exit bunching, the largest slice | 7.6472e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 2.0297e-01 |  |
+| power at the first element end | 3.3569e+05 | W |
+| power per slice at the first element end | 9.5638e+02 | W |
+| initial bunching, mean |b| over slices | 1.3509e-01 |  |
+| exit bunching, mean |b| over slices | 2.1603e-01 |  |
+| exit bunching, the largest slice | 8.1875e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 2.2545e-01 |  |
 | s of the bunching maximum | 3.0044e+01 | m |
 | bunching at the mode peak | 2.0444e-01 |  |
-| power of the largest slice at the bunching maximum | 2.7894e+09 | W |
-| exit power of the largest slice | 2.8771e+09 | W |
+| power of the largest slice at the bunching maximum | 2.7896e+09 | W |
+| exit power of the largest slice | 2.8773e+09 | W |
 | mean slice energy at the start | 6.6851e+08 | eV |
 | mean slice energy at the exit | 6.6831e+08 | eV |
 | mean slice energy, exit minus start | -1.9320e+05 | eV |

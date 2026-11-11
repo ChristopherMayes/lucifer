@@ -107,6 +107,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   window_length = 8e-10
   n_wavelength = 1
   shot_noise = T
+  shot_noise_kick = "first_order"
   ran_seed = 999
   keep_escaped_field = T
   write_escaped = T
@@ -142,6 +143,7 @@ FRAME_NML = """! flat keys; routed into the input file's tables by lucifer.flat.
   window_length = 8e-10
   n_wavelength = 1
   shot_noise = T
+  shot_noise_kick = "first_order"
   ran_seed = 999
 {extra}&end
 """
@@ -171,6 +173,7 @@ PRE_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to
   window_length = 8e-10
   n_wavelength = 1
   shot_noise = T
+  shot_noise_kick = "first_order"
   ran_seed = 999
 {extra}&end
 """

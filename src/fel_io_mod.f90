@@ -916,6 +916,14 @@ block
   if (run%bparam%shot_noise) then
     write (line, '(a, i0, a)') '             Shot noise on harmonics 1 to ', nharm_noise, &
           ', which is (beamlet_size - 1)/2.'
+    call out_io (s_blank$, r_name, trim(line))
+    if (run%bparam%shot_noise_kick == 'bessel') then
+      line = '             The kick is sized from the bunching it gives, J1 ' // &
+            '(beam.shot_noise_kick = "bessel").'
+    else
+      line = '             The kick is of first order in its size, as in Genesis4 ' // &
+            '(beam.shot_noise_kick = "first_order").'
+    endif
   else
     write (line, '(a, i0, a)') '             No shot noise. The quiet start leaves no bunching ' // &
           'below harmonic ', run%bparam%beamlet_size, '.'

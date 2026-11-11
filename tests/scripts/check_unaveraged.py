@@ -184,6 +184,7 @@ TDID = """! flat keys; routed into the input file's tables by lucifer.flat.to_to
   window_length = 8e-10
   n_wavelength = 1
   shot_noise = T
+  shot_noise_kick = "first_order"
   ran_seed = 999
   write_diag = T
 &end
