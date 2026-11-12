@@ -192,26 +192,46 @@ Q_INCONE = I_PEAK * np.sqrt(2 * np.pi) * SIG_Z / bunchfile.C_LIGHT
 WINDOW = 8 * SIG_Z + 2 * 24 * INCONE_SAMPLE * LAMBDA0
 
 
+INCONE_WEIGHT_SEEDS = (777, 778, 779, 780)
+
+
 def incone(exe, wd):
-    """The in-cone start-up power of a Gaussian bunch in sample mode, three times. The first
+    """The in-cone start-up power of a Gaussian bunch in sample mode, three ways. The first
     run gives every slice the same beamlets, beam.beamlet_min_electrons = 0. The second takes
     the default, which loads the slices of little charge with fewer beamlets, 52 of the 85
     here. The two are different shots at one seed, since the random numbers after the first
     such slice differ. Both take the first-order kick, which the target was measured with.
-    The third is the second with the kick sized from J1, beam.shot_noise_method at its
-    default: the same draws with larger kicks."""
+    The third is the default, the weight load, as the mean of INCONE_WEIGHT_SEEDS. Its counts
+    are drawn one after another from probabilities that end in rounding, so one seed is a
+    different shot in another build, and one shot has a spread of 0.2 of the target."""
     ok = True
-    for root, limit, kick, name in (("ldcone", "  beam.beamlet_min_electrons = 0\n", "first_order",
-                                     "in-cone startup, Gaussian bunch in sample mode"),
-                                    ("ldconef", "", "first_order",
-                                     "in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge"),
-                                    ("ldconeb", "", "bessel",
-                                     "in-cone startup, Gaussian bunch in sample mode, the kick sized from J1")):
-        ok = incone_run(exe, wd, root, limit, kick, name) and ok
+    for root, limit, kick, seeds, name in (
+            ("ldcone", "  beam.beamlet_min_electrons = 0\n", "first_order", (777,),
+             "in-cone startup, Gaussian bunch in sample mode"),
+            ("ldconef", "", "first_order", (777,),
+             "in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge"),
+            ("ldconew", "", "weight", INCONE_WEIGHT_SEEDS,
+             f"in-cone startup, Gaussian bunch in sample mode, the weight load, mean of {len(INCONE_WEIGHT_SEEDS)} seeds")):
+        runs = [incone_run(exe, wd, root if len(seeds) == 1 else f"{root}{seed}", limit, kick, seed) for seed in seeds]
+        if any(r is None for r in runs):
+            ok = False
+            continue
+        per_3ka = float(np.mean([r[0] for r in runs]))
+        angle, edge, n_record = runs[0][1], max(r[2] for r in runs), runs[0][3]
+        rel = abs(per_3ka / INCONE_TARGET - 1)
+        good = rel <= 0.35 and abs(angle - INCONE_CUT) <= 1e-9 and edge < 1e-3
+        print(f"  {name}: {per_3ka:.4e} W per 3 kA slice inside "
+              f"{angle:.1e} rad at the end of the first undulator, summed over {n_record} records "
+              f"(edge records carry {edge:.1e} of the peak), against {INCONE_TARGET:.3e} W: "
+              f"relative {rel:.3f} (check <= 0.35)  {'ok' if good else 'FAIL'}")
+        record(name, rel, 0.35, "max", good)
+        ok = good and ok
     return ok
 
 
-def incone_run(exe, wd, root, limit, kick, name):
+def incone_run(exe, wd, root, limit, kick, seed):
+    """One in-cone run: the power per 3 kA slice, the split angle, the edge share and the records,
+    or None when the run failed."""
     bextra = f"""  beam.n_particle = 1024
   beam.a_norm_emit = 4e-7
   beam.b_norm_emit = 4e-7
@@ -230,11 +250,11 @@ def incone_run(exe, wd, root, limit, kick, name):
     # this check reads against it is the difference between this Gaussian bunch and the
     # page's flat window. The parity of this input file moves its in-cone power by 3.4 percent
     # of itself (docs/validation.md, the transverse grid).
-    rc, out = run(exe, wd, root, bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
+    rc, out = run(exe, wd, root, bextra, pextra=pextra, lat="aramis.bmad", ngrid=256, seed=seed,
                   sample=INCONE_SAMPLE)
     if rc != 0:
         print(f"FAIL: the in-cone run {root} exited {rc}:\n{out[-1500:]}")
-        return False
+        return None
     with h5py.File(wd / f"{root}.stats.h5") as h:
         angle = float(np.ravel(h["field/total/split_angle"][()])[0])
         p_in = np.asarray(h["field/total/power_inside_angle"])
@@ -243,14 +263,7 @@ def incone_run(exe, wd, root, limit, kick, name):
     last = np.where(np.isfinite(p_in).any(axis=1))[0][-1]
     edge = max(p_tot[last, 0], p_tot[last, -1]) / p_tot[last].max()
     per_3ka = float(np.nansum(p_in[last]) / np.sum(cur / I_PEAK))
-    rel = abs(per_3ka / INCONE_TARGET - 1)
-    good = rel <= 0.35 and abs(angle - INCONE_CUT) <= 1e-9 and edge < 1e-3
-    print(f"  {name}: {per_3ka:.4e} W per 3 kA slice inside "
-          f"{angle:.1e} rad at the end of the first undulator, summed over {p_in.shape[1]} records "
-          f"(edge records carry {edge:.1e} of the peak), against {INCONE_TARGET:.3e} W: "
-          f"relative {rel:.3f} (check <= 0.35)  {'ok' if good else 'FAIL'}")
-    record(name, rel, 0.35, "max", good)
-    return good
+    return per_3ka, angle, edge, p_in.shape[1]
 
 
 def refusals(exe, wd):

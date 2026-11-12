@@ -130,8 +130,7 @@ end type
 ! (fel_shot_ratio), so a slice loads sum_g N_g R(N_g) against its own N_lambda. The low
 ! sums are over the slices that hold one electron or more and have a group under one.
 ! A slice that holds less than one electron in all is counted apart, since no load of
-! it has a physical level. Under the kick sized from J1 a draw can ask for more bunching
-! than a kick gives. Such a draw is held at the largest, and the held sums count them.
+! it has a physical level.
 !-
 
 type fel_noise_tally_struct
@@ -144,17 +143,15 @@ type fel_noise_tally_struct
   integer :: n_slice_sub = 0       ! Slices that hold less than one electron in all.
   integer :: n_slice_thin = 0      ! Slices loaded with fewer beamlets than the input file's count.
   integer :: n_beamlet_min = huge(1)  ! Fewest beamlets in a slice that carries noise.
-  real(rp) :: n_electron_held = 0  ! Electrons in the slices with a draw held at fel_kick_b_max$.
-  integer(8) :: n_draw_held = 0    ! Draws held there.
-  integer :: method = 2            ! How the noise was imposed, fel_noise_bessel$ and its like.
+  integer :: method = 1            ! How the noise was imposed, fel_noise_first_order$ or fel_noise_weight$.
   real(rp) :: n_counted = 0        ! Electrons counted into weights by the weight load.
   real(rp) :: q_unit = 0           ! The charge of one of them in the sample mode [C].
 end type
 
-! How the shot noise is imposed, beam.shot_noise_method (docs/shot-noise.md): by a kick of
-! the phases sized to first order or from J1, or through the weights.
+! How the shot noise is imposed, beam.shot_noise_method (docs/shot-noise.md): through the
+! weights, or by a kick of the phases sized to first order.
 
-integer, parameter :: fel_noise_first_order$ = 1, fel_noise_bessel$ = 2, fel_noise_weight$ = 3
+integer, parameter :: fel_noise_first_order$ = 1, fel_noise_weight$ = 2
 
 !+
 ! Struct fel_weight_draw_struct
@@ -173,12 +170,6 @@ type fel_weight_draw_struct
   real(rp) :: q_total = 0    ! The bunch's charge [C].
   logical :: kept = .false.  ! Keep mode: each group holds its own charge.
 end type
-
-! The largest bunching a sinusoidal kick gives a group of evenly spaced phases, the first
-! maximum of J1, and the kick it is reached at (docs/shot-noise.md).
-
-real(rp), parameter :: fel_kick_z_max$ = 1.8411837813406593_rp
-real(rp), parameter :: fel_kick_b_max$ = 0.5818652242815963_rp
 
 ! This program's metadata sits under the root group lucifer, in a subgroup named for its
 ! role (fel_private_group): frame for where a frame was taken (fel_frame_attributes),
@@ -1308,7 +1299,7 @@ end subroutine fel_slice_reallocate
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_fawley_noise (theta, weight, n, beamlet_size, bessel_kick, n_clamp, n_held)
+! Subroutine fel_fawley_noise (theta, weight, n, beamlet_size, n_clamp)
 !
 ! Routine to impose Fawley-style shot noise on a quiet-loaded slice. Transcribed from
 ! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights.
@@ -1324,37 +1315,25 @@ end subroutine fel_slice_reallocate
 ! Note: Weights must be uniform within a beamlet, since the quiet cancellation is per
 ! beamlet. The first particle's weight speaks for its beamlet.
 !
-! The draw asks for a bunching of sqrt(x/nbl) at harmonic h, x exponential. A kick of size
-! z at that harmonic gives the beamlet the bunching J1(z). With bessel_kick the kick is
-! the z that gives the bunching asked for (fel_bessel_kick), and a draw that asks for more
-! than the maximum of J1 is held there and counted. Without it the kick is the first-order
-! z = 2 sqrt(x/nbl), Genesis's, which loads less than the shot noise (docs/shot-noise.md).
-! The draws are the same either way.
-!
-! Note: Under the first-order kick Genesis's silent nbl < 1 clamp is kept, and counted
-! into n_clamp for the caller to report. The kick from J1 has no such clamp, since the
-! maximum bounds it.
+! Note: Genesis's silent nbl < 1 clamp is kept, and counted into n_clamp for the caller
+! to report.
 !
 ! Input:
 !   theta(:)    -- real(rp): Quiet-loaded ponderomotive phases [rad], beamlet-contiguous.
 !   weight(:)   -- real(rp): Macroparticle charges [C], uniform within each beamlet.
 !   n            -- integer: Number of particles in the slice (a multiple of beamlet_size).
 !   beamlet_size -- integer: Beamlet size.
-!   bessel_kick  -- logical: Size the kick from J1? False gives the first-order kick.
 !   n_clamp      -- integer: Running count of nbl < 1 clamps, accumulated across calls.
-!   n_held       -- integer: Running count of draws held at the maximum of J1.
 !
 ! Output:
 !   theta(:)    -- real(rp): Phases with the noise kicks added.
 !   n_clamp     -- integer: Incremented once per clamped (harmonic, beamlet) draw.
-!   n_held      -- integer: Incremented once per held (harmonic, beamlet) draw.
 !-
 
-subroutine fel_fawley_noise (theta, weight, n, beamlet_size, bessel_kick, n_clamp, n_held)
+subroutine fel_fawley_noise (theta, weight, n, beamlet_size, n_clamp)
 
 real(rp) theta(:), weight(:)
-integer n, beamlet_size, n_clamp, n_held
-logical bessel_kick
+integer n, beamlet_size, n_clamp
 
 real(rp), allocatable :: kick(:)
 real(rp) nbl, u, phi, an
@@ -1371,22 +1350,15 @@ kick = 0
 do ih = 0, nharm - 1
   do ib = 1, mbase
     nbl = beamlet_size * weight((ib-1)*beamlet_size + 1) / e_charge
-    if (bessel_kick) then
-      call ran_uniform (u)
-      phi = twopi * u
-      call ran_uniform (u)
-      an = fel_draw_kick (-log(u), nbl, n_held) / real(ih+1, rp)
-    else
-      if (nbl < 1) then
-        nbl = 1
-        n_clamp = n_clamp + 1
-      endif
-      call ran_uniform (u)
-      phi = twopi * u
-      call ran_uniform (u)
-      an = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
-      if (an > twopi) an = mod(an, twopi)
+    if (nbl < 1) then
+      nbl = 1
+      n_clamp = n_clamp + 1
     endif
+    call ran_uniform (u)
+    phi = twopi * u
+    call ran_uniform (u)
+    an = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
+    if (an > twopi) an = mod(an, twopi)
     do im = 1, beamlet_size
       ip = (ib-1)*beamlet_size + im
       kick(ip) = kick(ip) - an * sin(theta(ip) * (ih+1) + phi)
@@ -1402,7 +1374,7 @@ end subroutine fel_fawley_noise
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, bessel_kick, n_clamp, n_held)
+! Subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, n_clamp)
 !
 ! Routine to impose physical shot noise on a load whose groups are not contiguous
 ! beamlets (fel-physics.md sec-noise). The algorithm is that of fel_fawley_noise. For
@@ -1418,21 +1390,16 @@ end subroutine fel_fawley_noise
 !   group(:)   -- integer: Group index of each particle, 1..n_group.
 !   n_group    -- integer: Group count.
 !   nharm      -- integer: Harmonics imposed, 1..nharm.
-!   bessel_kick -- logical: Size the kick from J1? False gives the first-order kick.
-!   n_clamp    -- integer: Running count of draws whose electron count was under one.
-!   n_held     -- integer: Running count of draws held at the maximum of J1.
 !
 ! Output:
 !   theta(:)   -- real(rp): Phases with the noise imposed.
-!   n_clamp    -- integer: Incremented per first-order draw whose electron count was under one.
-!   n_held     -- integer: Incremented per draw held at the maximum of J1.
+!   n_clamp    -- integer: Incremented per group whose electron count was under one.
 !-
 
-subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, bessel_kick, n_clamp, n_held)
+subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, n_clamp)
 
 real(rp) theta(:), weight(:)
-integer n, group(:), n_group, nharm, n_clamp, n_held
-logical bessel_kick
+integer n, group(:), n_group, nharm, n_clamp
 
 real(rp), allocatable :: kick(:), wgroup(:), an(:), phi(:)
 real(rp) u, nbl
@@ -1454,22 +1421,15 @@ enddo
 do ih = 0, nharm - 1
   do ig = 1, n_group
     nbl = wgroup(ig) / e_charge
-    if (bessel_kick) then
-      call ran_uniform (u)
-      phi(ig) = twopi * u
-      call ran_uniform (u)
-      an(ig) = fel_draw_kick (-log(u), nbl, n_held) / real(ih+1, rp)
-    else
-      if (nbl < 1) then
-        nbl = 1
-        n_clamp = n_clamp + 1
-      endif
-      call ran_uniform (u)
-      phi(ig) = twopi * u
-      call ran_uniform (u)
-      an(ig) = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
-      if (an(ig) > twopi) an(ig) = mod(an(ig), twopi)
+    if (nbl < 1) then
+      nbl = 1
+      n_clamp = n_clamp + 1
     endif
+    call ran_uniform (u)
+    phi(ig) = twopi * u
+    call ran_uniform (u)
+    an(ig) = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
+    if (an(ig) > twopi) an(ig) = mod(an(ig), twopi)
   enddo
   do ip = 1, n
     kick(ip) = kick(ip) - an(group(ip)) * sin(theta(ip) * (ih+1) + phi(group(ip)))
@@ -1479,99 +1439,6 @@ enddo
 theta(1:n) = theta(1:n) + kick(1:n)
 
 end subroutine fel_group_noise
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Function fel_bessel_kick (bunching) result (z)
-!
-! Routine to give the kick z, between 0 and the first maximum of J1, at which
-! J1(z) = bunching. A kick of size z at harmonic h gives a group of evenly spaced phases
-! the bunching J1(z) at that harmonic (docs/shot-noise.md eq-shot-j1). J1 rises from 0 to
-! fel_kick_b_max$ over the range, so the root is the only one. It is found by Newton's
-! method from the third-order inverse, with a bisection wherever a step leaves the
-! bracket, until the iterate no longer moves.
-!
-! Input:
-!   bunching -- real(rp): Bunching wanted, |b_h|.
-!
-! Output:
-!   z        -- real(rp): The kick [rad]. fel_kick_z_max$ where bunching is fel_kick_b_max$
-!                or more, and 0 where it is 0 or less.
-!-
-
-function fel_bessel_kick (bunching) result (z)
-
-real(rp) bunching, z, z_lo, z_hi, z_new, f, df
-integer i
-
-!
-
-z = fel_kick_z_max$
-if (bunching >= fel_kick_b_max$) return
-z = 0
-if (bunching <= 0) return
-
-z_lo = 0
-z_hi = fel_kick_z_max$
-z = min(bunching * (2 + bunching**2), z_hi)
-
-do i = 1, 200
-  f = bessel_j1(z) - bunching
-  if (f > 0) then
-    z_hi = z
-  else
-    z_lo = z
-  endif
-  df = bessel_j0(z) - bessel_j1(z) / z
-  z_new = z
-  if (df > 0) z_new = z - f / df
-  if (z_new == z .and. df > 0) exit
-  if (df <= 0 .or. z_new < z_lo .or. z_new > z_hi) z_new = 0.5_rp * (z_lo + z_hi)
-  if (z_new == z) exit
-  z = z_new
-enddo
-
-end function fel_bessel_kick
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Function fel_draw_kick (x, n_electron, n_held) result (z)
-!
-! Routine to size one draw's kick from J1. The draw asks a group of n_electron electrons
-! for the bunching sqrt(x/n_electron), whose square has the shot-noise mean 1/n_electron
-! when x is exponential. The kick is the z that gives it (fel_bessel_kick). No kick gives
-! more than fel_kick_b_max$, so a draw that asks for more is held there and counted. The
-! kick at harmonic h is z/h.
-!
-! Input:
-!   x          -- real(rp): The exponential draw, -log(u).
-!   n_electron -- real(rp): Real electrons the group stands for.
-!   n_held     -- integer: Running count of held draws.
-!
-! Output:
-!   z          -- real(rp): The kick's size at its own harmonic [rad].
-!   n_held     -- integer: Incremented if the draw was held.
-!-
-
-function fel_draw_kick (x, n_electron, n_held) result (z)
-
-real(rp) x, n_electron, z
-integer n_held
-
-!
-
-if (x >= fel_kick_b_max$**2 * n_electron) then
-  n_held = n_held + 1
-  z = fel_kick_z_max$
-else
-  z = fel_bessel_kick (sqrt(x / n_electron))
-endif
-
-end function fel_draw_kick
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1640,8 +1507,8 @@ end function beamlet_groups
 !   grid_half_width -- real(rp): The field grid's half width [m], for the cell rule.
 !   grid_n_pts      -- integer: The field grid's points per side, for the cell rule.
 !   islice          -- integer: Slice index, for the message.
-!   method          -- integer: beam.shot_noise_method: fel_noise_first_order$,
-!                       fel_noise_bessel$ or fel_noise_weight$.
+!   method          -- integer: beam.shot_noise_method: fel_noise_weight$ or
+!                       fel_noise_first_order$.
 !   draw            -- fel_weight_draw_struct: The weight load's state, from
 !                       fel_weight_start. Not read by the kicks.
 !
@@ -1650,8 +1517,8 @@ end function beamlet_groups
 !                       drawn. The phases are not moved.
 !   draw            -- fel_weight_draw_struct: With the slice's share taken.
 !   theta(:)        -- real(rp): Phases with the noise imposed.
-!   tally           -- fel_noise_tally_struct: The slice's electrons, the noise power
-!                       its groups load and its held draws are added to the running sums.
+!   tally           -- fel_noise_tally_struct: The slice's electrons and the noise power
+!                       its groups load are added to the running sums.
 !   rule            -- integer: Which grouping was used: 1 beamlets, 2 copies, 3 cells.
 !   floor_n_lambda  -- real(rp): The floor times N_lambda, for the caller's report.
 !   err_flag        -- logical: Set True if the load is too loud to carry noise.
@@ -1664,8 +1531,8 @@ type (fel_slice_struct) sl
 type (fel_noise_tally_struct) tally
 type (fel_weight_draw_struct) draw
 real(rp) theta(:), grid_half_width, floor_n_lambda
-integer n, beamlet_size, grid_n_pts, islice, method, n_clamp, n_held, rule
-logical quiet_start, bessel_kick, err_flag
+integer n, beamlet_size, grid_n_pts, islice, method, n_clamp, rule
+logical quiet_start, err_flag
 
 integer, allocatable :: group(:)
 real(rp) wsum, n_lambda, floor_b2, dx
@@ -1698,8 +1565,6 @@ endif
 
 nharm = max(1, (beamlet_size - 1) / 2)
 n_clamp = 0
-n_held = 0
-bessel_kick = (method == fel_noise_bessel$)
 
 ! The weight load counts electrons into the weights of the beamlets this loader made, and
 ! leaves the phases where the quiet start put them.
@@ -1708,7 +1573,7 @@ if (method == fel_noise_weight$) then
   if (.not. quiet_start .or. mod(n, max(1, beamlet_size)) /= 0) then
     call out_io (s_error$, r_name, 'SLICE \i0\ : beam.shot_noise_method = "weight" COUNTS ELECTRONS INTO THE', &
                  'WEIGHTS OF THE BEAMLETS THE LOADER MAKES, AND THIS LOAD HAS NONE.', &
-                 'POSSIBLE SOLUTION: quiet_start = true, OR shot_noise_method = "bessel".', i_array = [islice])
+                 'POSSIBLE SOLUTION: quiet_start = true, OR shot_noise_method = "first_order".', i_array = [islice])
     return
   endif
   rule = 1
@@ -1719,9 +1584,8 @@ endif
 
 if (quiet_start .and. mod(n, max(1, beamlet_size)) == 0) then
   rule = 1
-  call fel_fawley_noise (theta(1:n), sl%weight(1:n), n, beamlet_size, bessel_kick, n_clamp, n_held)
-  call fel_tally_noise (tally, sl%weight, n, beamlet_groups(n, beamlet_size), n / beamlet_size, nharm, &
-                        bessel_kick, n_held)
+  call fel_fawley_noise (theta(1:n), sl%weight(1:n), n, beamlet_size, n_clamp)
+  call fel_tally_noise (tally, sl%weight, n, beamlet_groups(n, beamlet_size), n / beamlet_size, nharm)
   err_flag = .false.
   return
 endif
@@ -1744,8 +1608,8 @@ else
   call compress_groups (group, n, n_group)
 endif
 
-call fel_group_noise (theta, sl%weight, n, group, n_group, nharm, bessel_kick, n_clamp, n_held)
-call fel_tally_noise (tally, sl%weight, n, group, n_group, nharm, bessel_kick, n_held)
+call fel_group_noise (theta, sl%weight, n, group, n_group, nharm, n_clamp)
+call fel_tally_noise (tally, sl%weight, n, group, n_group, nharm)
 err_flag = .false.
 
 !------------------------------------------------------------------------------
@@ -2266,116 +2130,44 @@ end function fel_beamlet_count
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Function fel_shot_ratio (n_electron, n_copy, n_harm, harmonic, bessel_kick) result (ratio)
+! Function fel_shot_ratio (n_electron, n_copy, n_harm, harmonic) result (ratio)
 !
 ! Routine to give the noise power the kick of fel_fawley_noise loads on a group, over
 ! the shot-noise power of the group's electrons (docs/shot-noise.md eq-shot-rh). The
 ! group is n_copy evenly spaced phases that stand for N electrons, kicked at harmonics
-! 1 to n_harm. The mean over the phases of the draws leaves a sum over the M phase
-! differences,
-!   R_h(N) = (N/M) sum_j cos(2 pi j h/M) prod_k g(2 (h/k) |sin(pi j k/M)|)
-! with j = 0 to M-1 and k = 1 to n_harm, where g(q) is the mean of J0(q z) over the
-! kick's size z at its own harmonic.
-!
-! The first-order kick has z = 2 sqrt(x/N) with x exponential, and g(q) = exp(-q^2/N).
-! Below one electron that kick is the kick at one electron, so the ratio is N R_h(1).
-!
-! The kick from J1 has J1(z) = sqrt(x/N), held at fel_kick_z_max$ where x is above
-! x_c = fel_kick_b_max$^2 N. With x = N J1(z)^2 the mean is an integral over z,
-!   g(q) = integral_0^z_max 2 N J1(z) J1'(z) exp(-N J1(z)^2) J0(q z) dz + exp(-x_c) J0(q z_max)
-! which has no closed form. It is taken by Gauss-Legendre quadrature, 16 points in each
-! of 4 panels. Where x_c is above 40 the range ends at the z of x = 40, and what is left
-! out is under exp(-40). A group of more than 64 phases is taken as 64, which differs
-! at the 63rd order of the kick.
+! 1 to n_harm:
+!   R_h(N) = (N/M) sum_j cos(2 pi j h/M) exp(-(2 h^2/N) sum_k (1 - cos(2 pi j k/M))/k^2)
+! with j = 0 to M-1 and k = 1 to n_harm. Below one electron the kick is the kick at one
+! electron, so the ratio is N R_h(1).
 !
 ! Input:
-!   n_electron  -- real(rp): Real electrons the group stands for.
-!   n_copy      -- integer: Phases in the group, M.
-!   n_harm      -- integer: Harmonics kicked.
-!   harmonic    -- integer: Harmonic h the ratio is wanted at.
-!   bessel_kick -- logical: The kick is sized from J1? False is the first-order kick.
+!   n_electron -- real(rp): Real electrons the group stands for.
+!   n_copy     -- integer: Phases in the group, M.
+!   n_harm     -- integer: Harmonics kicked.
+!   harmonic   -- integer: Harmonic h the ratio is wanted at.
 !
 ! Output:
-!   ratio       -- real(rp): Loaded power over shot-noise power.
+!   ratio      -- real(rp): Loaded power over shot-noise power.
 !-
 
-function fel_shot_ratio (n_electron, n_copy, n_harm, harmonic, bessel_kick) result (ratio)
-
-! The positive nodes and the weights of the 16-point Gauss-Legendre rule on (-1, 1).
-
-integer, parameter :: n_gl = 8, n_panel = 4, x_cut = 40
-real(rp), parameter :: gl_x(n_gl) = [0.09501250983763744_rp, 0.2816035507792589_rp, &
-                                     0.45801677765722737_rp, 0.6178762444026438_rp, &
-                                     0.7554044083550031_rp, 0.8656312023878316_rp, &
-                                     0.9445750230732326_rp, 0.9894009349916499_rp]
-real(rp), parameter :: gl_w(n_gl) = [0.18945061045506859_rp, 0.1826034150449236_rp, &
-                                     0.16915651939500262_rp, 0.14959598881657665_rp, &
-                                     0.12462897125553395_rp, 0.095158511682493_rp, &
-                                     0.06225352393864761_rp, 0.027152459411754055_rp]
+function fel_shot_ratio (n_electron, n_copy, n_harm, harmonic) result (ratio)
 
 real(rp) n_electron, ratio, n_kick, beta
-real(rp) z(2*n_gl*n_panel), w(2*n_gl*n_panel), z_top, tail, half, mid, j1z, q, g, prod
-integer n_copy, n_harm, harmonic, j, k, i, ip, m
-logical bessel_kick
+integer n_copy, n_harm, harmonic, j, k
 
 !
 
 ratio = 0
 if (n_electron <= 0 .or. n_copy < 1) return
-
-if (.not. bessel_kick) then
-  n_kick = max(n_electron, 1.0_rp)
-  do j = 0, n_copy - 1
-    beta = 0
-    do k = 1, n_harm
-      beta = beta + (1 - cos(twopi * j * k / n_copy)) / real(k, rp)**2
-    enddo
-    ratio = ratio + cos(twopi * j * harmonic / n_copy) * exp(-2 * harmonic**2 * beta / n_kick)
-  enddo
-  ratio = n_electron * ratio / n_copy
-  return
-endif
-
-! The nodes in z, each with its Gauss-Legendre weight times the density of the kick's
-! size, 2 N J1 J1' exp(-N J1^2). J1'(z) = J0(z) - J1(z)/z.
-
-if (fel_kick_b_max$**2 * n_electron <= x_cut) then
-  z_top = fel_kick_z_max$
-  tail = exp(-fel_kick_b_max$**2 * n_electron)
-else
-  z_top = fel_bessel_kick (sqrt(x_cut / n_electron))
-  tail = 0
-endif
-
-half = 0.5_rp * z_top / n_panel
-do ip = 1, n_panel
-  mid = (2 * ip - 1) * half
-  do i = 1, n_gl
-    z(2*n_gl*(ip-1) + 2*i - 1) = mid - half * gl_x(i)
-    z(2*n_gl*(ip-1) + 2*i)     = mid + half * gl_x(i)
-    w(2*n_gl*(ip-1) + 2*i - 1) = half * gl_w(i)
-    w(2*n_gl*(ip-1) + 2*i)     = half * gl_w(i)
-  enddo
-enddo
-do i = 1, size(z)
-  j1z = bessel_j1(z(i))
-  w(i) = w(i) * 2 * n_electron * j1z * (bessel_j0(z(i)) - j1z / z(i)) * exp(-n_electron * j1z**2)
-enddo
-
-m = min(n_copy, 64)
-do j = 0, m - 1
-  prod = 1
+n_kick = max(n_electron, 1.0_rp)
+do j = 0, n_copy - 1
+  beta = 0
   do k = 1, n_harm
-    q = 2 * real(harmonic, rp) / k * abs(sin(pi * j * k / m))
-    g = tail * bessel_j0(q * fel_kick_z_max$)
-    do i = 1, size(z)
-      g = g + w(i) * bessel_j0(q * z(i))
-    enddo
-    prod = prod * g
+    beta = beta + (1 - cos(twopi * j * k / n_copy)) / real(k, rp)**2
   enddo
-  ratio = ratio + cos(twopi * j * harmonic / m) * prod
+  ratio = ratio + cos(twopi * j * harmonic / n_copy) * exp(-2 * harmonic**2 * beta / n_kick)
 enddo
-ratio = n_electron * ratio / m
+ratio = n_electron * ratio / n_copy
 
 end function fel_shot_ratio
 
@@ -2383,12 +2175,11 @@ end function fel_shot_ratio
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_tally_noise (tally, weight, n, group, n_group, n_harm, bessel_kick, n_held)
+! Subroutine fel_tally_noise (tally, weight, n, group, n_group, n_harm)
 !
-! Routine to add one slice to a load's noise tally: its electrons, the noise power
-! its groups load at the fundamental by fel_shot_ratio, and its draws held at the
-! largest bunching a kick gives. A group's phase count is its member count. No random
-! number is drawn.
+! Routine to add one slice to a load's noise tally under the first-order kick: its
+! electrons, and the noise power its groups load at the fundamental by fel_shot_ratio.
+! A group's phase count is its member count. No random number is drawn.
 !
 ! Input:
 !   tally      -- fel_noise_tally_struct: The running sums.
@@ -2397,19 +2188,16 @@ end function fel_shot_ratio
 !   group(:)   -- integer: Group index of each particle, 1..n_group.
 !   n_group    -- integer: Group count.
 !   n_harm     -- integer: Harmonics the noise was imposed at.
-!   bessel_kick -- logical: The kick was sized from J1? False is the first-order kick.
-!   n_held     -- integer: Draws of the slice held at fel_kick_b_max$.
 !
 ! Output:
 !   tally      -- fel_noise_tally_struct: The sums with the slice added.
 !-
 
-subroutine fel_tally_noise (tally, weight, n, group, n_group, n_harm, bessel_kick, n_held)
+subroutine fel_tally_noise (tally, weight, n, group, n_group, n_harm)
 
 type (fel_noise_tally_struct) tally
 real(rp) weight(:)
-integer n, group(:), n_group, n_harm, n_held
-logical bessel_kick
+integer n, group(:), n_group, n_harm
 
 real(rp), allocatable :: wgroup(:)
 real(rp) n_slice_e, power, n_g, n_last, r_last
@@ -2436,7 +2224,7 @@ do ig = 1, n_group
   if (n_g <= 0) cycle
   if (n_g /= n_last .or. member(ig) /= m_last) then
     n_last = n_g;  m_last = member(ig)
-    r_last = fel_shot_ratio (n_g, member(ig), n_harm, 1, bessel_kick)
+    r_last = fel_shot_ratio (n_g, member(ig), n_harm, 1)
   endif
   power = power + n_g * r_last
   if (n_g < 1) low = .true.
@@ -2446,11 +2234,7 @@ tally%n_slice = tally%n_slice + 1
 tally%n_electron = tally%n_electron + n_slice_e
 tally%power = tally%power + power
 tally%n_beamlet_min = min(tally%n_beamlet_min, n_group)
-tally%method = merge(fel_noise_bessel$, fel_noise_first_order$, bessel_kick)
-if (n_held > 0) then
-  tally%n_draw_held = tally%n_draw_held + n_held
-  tally%n_electron_held = tally%n_electron_held + n_slice_e
-endif
+tally%method = fel_noise_first_order$
 if (n_slice_e < 1) then
   tally%n_slice_sub = tally%n_slice_sub + 1
 elseif (low) then
@@ -2512,8 +2296,6 @@ if (tally%n_slice > 0 .and. tally%n_electron > 0) then
   select case (tally%method)
   case (fel_noise_weight$)
     lines(nl) = '  imposed through the weights, a whole number of electrons each (beam.shot_noise_method = "weight").'
-  case (fel_noise_bessel$)
-    lines(nl) = '  kick sized from the bunching it gives, J1 (beam.shot_noise_method = "bessel").'
   case default
     lines(nl) = '  kick of first order in its size (beam.shot_noise_method = "first_order").'
   end select
@@ -2530,12 +2312,6 @@ if (tally%n_slice > 0 .and. tally%n_electron > 0) then
       write (lines(nl), '(a, es13.6, a)') '  ', tally%n_counted, &
             ' electrons counted, every particle of the bunch at its own charge.'
     endif
-  endif
-  if (tally%n_draw_held > 0) then
-    nl = nl + 1
-    write (lines(nl), '(a, i0, a, f6.3, a, es9.2, a)') '  ', tally%n_draw_held, &
-          ' draws asked for more bunching than a kick gives,', fel_kick_b_max$, &
-          ', and are held there, in slices with', tally%n_electron_held / tally%n_electron, ' of the charge.'
   endif
   if (tally%method == fel_noise_weight$) then
     if (tally%n_slice_thin > 0) then

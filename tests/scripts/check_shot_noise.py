@@ -26,17 +26,9 @@ the fundamental's ratio is 0.98, 0.95, 0.87 and 0.56. A last charge leaves a qua
 electron to a beamlet. The loader then draws the kick for one electron and warns, and
 the ratio is a quarter of the ratio at one electron, 0.040 at the fundamental. These
 loads set beam.beamlet_min_electrons = 0, which gives every slice the same beamlets, so
-that the count a beamlet holds is the one stated. They set the first-order kick, which
-their levels were recorded with.
-
-The kick sized from J1, the default, is then loaded with uniform weights at 146, 50, 18,
-10 and 1 electrons a beamlet and held to its own closed form the same way. The draws of
-the two kicks are the same, so a seed's two loads are one shot kicked twice. The
-difference of their statistics, slice by slice, has a far smaller spread than either,
-and its mean is held to the difference of the closed forms within five standard
-deviations of the mean, taken from the samples. The level the loader prints for each
-load, which fel_shot_ratio computes, is held to shot_noise_ratio.py's to the four
-decimals it prints.
+that the count a beamlet holds is the one stated, and the first-order kick. The level
+the loader prints for each load, which fel_shot_ratio computes, is held to
+shot_noise_ratio.py's to the four decimals it prints.
 
 A Gaussian bunch is then loaded with the key at its default and at 18 electrons. Its
 peak slice holds 50 electrons a beamlet and its last slices two electrons in all, so
@@ -47,7 +39,6 @@ statistic must agree with the closed form for the beamlets it has. The mean is h
 within five standard deviations of the mean, taken from the samples, since a slice of
 one beamlet is not a sum of many. A uniform load at 146 electrons a beamlet, where no
 slice has fewer, must be the same bits with the key at its default as with the key at 0.
-The Gaussian bunch runs under both kicks.
 
 The weight load, beam.shot_noise_method = "weight", counts a whole number of electrons
 into every macroparticle and moves no phase. It runs at 146, 18, 4 and 1 electrons a
@@ -78,8 +69,7 @@ The same statistic then runs on the loads that do not draw their own beamlets
   noise goes on the particles sharing their transverse coordinates.
 - The same copies with their coordinates jittered so none coincide. The noise goes on
   the occupants of each deposit cell.
-The loader's message must name the grouping it used. Each runs under both kicks, with
-the paired difference held as above.
+The loader's message must name the grouping it used.
 
 Last, the stats file's mode split, the power within split_angle of the axis, is checked
 against the same quantity taken from a field dump to 1e-6.
@@ -127,15 +117,11 @@ N_PARTICLE = 1024
 ELECTRONS = 146.4
 SCAN = (ELECTRONS, 50.0, 18.0, 4.0, 0.25)
 
-# The same for the kick sized from J1, with uniform weights. At one electron seven draws
-# in ten ask for more bunching than a kick gives.
-BESSEL_SCAN = (ELECTRONS, 50.0, 18.0, 10.0, 1.0)
-
 # The loader's own statement of its level at the fundamental, from fel_shot_ratio, and
-# the worst difference from shot_noise_ratio.py over the scans of each kick. The line
-# prints four decimals.
+# the worst difference from shot_noise_ratio.py over the scans of the first-order kick.
+# The line prints four decimals.
 STATED = re.compile(r"noise power loaded over the shot-noise power, fundamental:\s+([0-9.]+)")
-stated_worst = {"first_order": 0.0, "bessel": 0.0}
+stated_worst = {"first_order": 0.0}
 
 # The electrons a beamlet holds in each scan of the weight load, and the harmonics its
 # statistic is held at: every harmonic below the beamlet size.
@@ -211,7 +197,7 @@ def cell_groups(sl):
     return iy * GRID_N_PTS + ix
 
 
-def b2_samples(dump_file, harmonics, cells=False, kick="first_order"):
+def b2_samples(dump_file, harmonics, cells=False):
     """Charge-weighted |b(h)|^2 * N_lambda for every slice and harmonic, each with the
     value the closed form expects of that slice.
 
@@ -222,7 +208,7 @@ def b2_samples(dump_file, harmonics, cells=False, kick="first_order"):
     A particle's group holds BEAMLET_SIZE times its weight over e electrons, which is the
     count the loader draws the kick on. With cells set the group is the deposit cell's
     occupants, whose copies stand at many base phases, and the expected value is the
-    closed form's for dense phases. kick is the load's beam.shot_noise_method.
+    closed form's for dense phases. The load is under the first-order kick.
 
     |b(h)| is invariant under a constant shift of theta, which is what a dump's missing
     reference phase amounts to. This statistic is therefore unaffected by it."""
@@ -242,14 +228,14 @@ def b2_samples(dump_file, harmonics, cells=False, kick="first_order"):
         for h in harmonics:
             b = np.sum(w * np.exp(-1j * h * theta)) / np.sum(w)
             out.append(abs(b) ** 2 * n_lambda)
-            want.append(shot_noise_ratio.slice_ratio(electrons, h, m, (BEAMLET_SIZE - 1) // 2, kick))
+            want.append(shot_noise_ratio.slice_ratio(electrons, h, m, (BEAMLET_SIZE - 1) // 2))
     return out, want
 
 
-def run_mode(exe, lat, workdir, seeds, test_weights, electrons, kick="first_order"):
+def run_mode(exe, lat, workdir, seeds, test_weights, electrons):
     """The generated load over the seeds, at the given electrons a beamlet."""
     samples = {h: ([], []) for h in (1, 2, 3)}
-    tag = f"{'w' if test_weights else 'u'}{'b' if kick == 'bessel' else ''}{electrons:g}".replace(".", "p")
+    tag = f"{'w' if test_weights else 'u'}{electrons:g}".replace(".", "p")
     clamped = False
     for seed in range(1, seeds + 1):
         root = f"sn_{tag}_{seed}"
@@ -259,7 +245,7 @@ def run_mode(exe, lat, workdir, seeds, test_weights, electrons, kick="first_orde
                                              z_min=-N_SLICE * SPACING / 2, z_max=N_SLICE * SPACING / 2,
                                              charge=electrons * E_CHARGE * N_SLICE * N_PARTICLE / BEAMLET_SIZE,
                                              grid_n_pts=GRID_N_PTS, grid_half_width=GRID_HALF_WIDTH,
-                                             beamlet_size=BEAMLET_SIZE, kick=kick,
+                                             beamlet_size=BEAMLET_SIZE, kick="first_order",
                                              testw="T" if test_weights else "F")))
         r = subprocess.run([str(exe), nml.name], cwd=workdir,
                            capture_output=True, text=True)
@@ -268,12 +254,13 @@ def run_mode(exe, lat, workdir, seeds, test_weights, electrons, kick="first_orde
             sys.exit(1)
         clamped = clamped or "noise group of less than one real electron" in r.stdout
         dump = workdir / f"{root}-initial.beam.h5"
-        vals, want = b2_samples(dump, (1, 2, 3), kick=kick)
+        vals, want = b2_samples(dump, (1, 2, 3))
         said = STATED.search(r.stdout)
         if not said:
             print(f"FAIL: loader run {root} did not state its noise level:\n{r.stdout[-2000:]}")
             sys.exit(1)
-        stated_worst[kick] = max(stated_worst[kick], abs(float(said.group(1)) - float(np.mean(want[0::3]))))
+        stated_worst["first_order"] = max(stated_worst["first_order"],
+                                          abs(float(said.group(1)) - float(np.mean(want[0::3]))))
         # The scan runs 150 seeds at 25 MB of particles and 4 MB of field each.
         dump.unlink()
         (workdir / f"{root}-initial.wf.h5").unlink(missing_ok=True)
@@ -607,10 +594,11 @@ def gauss_text(lat, root, seed, limit, kick):
                             limit="" if limit is None else f"  beam.beamlet_min_electrons = {limit:g}\n")
 
 
-def fewer_beamlets(exe, lat, workdir, seeds, limit, label, kick="first_order"):
+def fewer_beamlets(exe, lat, workdir, seeds, limit, label):
     """The Gaussian bunch with the fewest electrons a beamlet may hold at limit, None
     being the key left at its default, which the load is then held to as one electron.
-    kick is the load's beam.shot_noise_method."""
+    The load is under the first-order kick, which the rule is for."""
+    kick = "first_order"
     n_min = 1.0 if limit is None else limit
     mbase = N_PARTICLE // BEAMLET_SIZE
     names = ("one beamlet, under the limit", "fewer beamlets", "the input file's beamlets")
@@ -618,7 +606,7 @@ def fewer_beamlets(exe, lat, workdir, seeds, limit, label, kick="first_order"):
     want = {k: [] for k in names}
     worst_charge, count_ok, floor_ok, said_ok, n_fewer = 0.0, True, True, True, 0
     for seed in range(1, seeds + 1):
-        tag = ("b" if kick == "bessel" else "") + ("d" if limit is None else f"{limit:g}")
+        tag = "d" if limit is None else f"{limit:g}"
         _, ref = run_load(exe, workdir, f"sn_g0_{tag}_{seed}",
                           gauss_text(lat, f"sn_g0_{tag}_{seed}", 3000 + 7 * seed, 0, kick))
         out, dump = run_load(exe, workdir, f"sn_g_{tag}_{seed}",
@@ -643,7 +631,7 @@ def fewer_beamlets(exe, lat, workdir, seeds, limit, label, kick="first_order"):
                 b = np.sum(w * np.exp(-1j * h * theta)) / np.sum(w)
                 vals[key].append(abs(b) ** 2 * n_e)
                 want[key].append(shot_noise_ratio.slice_ratio(np.full(beamlets, per), h, BEAMLET_SIZE,
-                                                              (BEAMLET_SIZE - 1) // 2, kick))
+                                                              (BEAMLET_SIZE - 1) // 2))
         n_fewer += fewer_seed
         said_ok = said_ok and f": {fewer_seed} slices have fewer beamlets for it" in out
         ref.unlink()
@@ -764,13 +752,13 @@ KEEP_BUNCH = """  beam.n_particle = 2048
 """
 
 
-def run_keep(exe, lat, workdir, seeds, label, source, quiet, want, cells=False, kick="first_order"):
+def run_keep(exe, lat, workdir, seeds, label, source, quiet, want, cells=False):
     """The statistic on a load the loader did not make the beamlets of, or made in keep mode."""
     samples = {h: ([], []) for h in (1, 2, 3)}
     for seed in range(1, seeds + 1):
-        root = f"sn_{label}{'_b' if kick == 'bessel' else ''}_{seed}"
+        root = f"sn_{label}_{seed}"
         (workdir / f"{root}.toml").write_text(to_toml(KEEP_NML.format(lat=lat, root=root, seed=2000 + 7 * seed,
-                                                              quiet=quiet, source=source, kick=kick,
+                                                              quiet=quiet, source=source, kick="first_order",
                                                               grid_n_pts=GRID_N_PTS,
                                                               grid_half_width=GRID_HALF_WIDTH,
                                                               beamlet_size=BEAMLET_SIZE)))
@@ -778,12 +766,12 @@ def run_keep(exe, lat, workdir, seeds, label, source, quiet, want, cells=False, 
         if r.returncode != 0:
             print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
             sys.exit(1)
-        said = f"shot noise, {label} load{', kick from J1' if kick == 'bessel' else ''}: the noise reported on {want}"
+        said = f"shot noise, {label} load: the noise reported on {want}"
         if want not in r.stdout:
             record(said, None, None, "bool", False)
             print(f"FAIL: {root} did not report the noise on {want!r}:\n{r.stdout[-2000:]}")
             sys.exit(1)
-        vals, expect = b2_samples(workdir / f"{root}-initial.beam.h5", (1, 2, 3), cells, kick)
+        vals, expect = b2_samples(workdir / f"{root}-initial.beam.h5", (1, 2, 3), cells)
         for k, h in enumerate((1, 2, 3)):
             samples[h][0].extend(vals[k::3])
             samples[h][1].extend(expect[k::3])
@@ -791,23 +779,6 @@ def run_keep(exe, lat, workdir, seeds, label, source, quiet, want, cells=False, 
     # Every seed's message named the grouping, or the run exited above.
     record(said, None, None, "bool", True)
     return samples
-
-
-def paired(bessel, first, label):
-    """The kick from J1 against the first-order kick on the same draws: the mean difference
-    of the two statistics, slice by slice over the three harmonics, against the difference
-    of the closed forms. The bound is five standard deviations of the mean difference."""
-    d = np.concatenate([np.asarray(bessel[h][0]) - np.asarray(first[h][0]) for h in (1, 2, 3)])
-    want = float(np.mean(np.concatenate([np.asarray(bessel[h][1]) - np.asarray(first[h][1]) for h in (1, 2, 3)])))
-    m = d.mean()
-    bound = 5 * d.std() / np.sqrt(len(d))
-    good = abs(m - want) < bound
-    print(f"--- shot noise, {label}: the kick from J1 over the first-order kick on the same draws, "
-          f"<|b(h)|^2 * N_lambda> higher by {m:.4f} (closed forms {want:.4f} +- {bound:.4f}, {len(d)} samples)  "
-          f"{'ok' if good else 'FAIL'}")
-    record(f"shot noise, {label}: the gain of the kick from J1 on the first-order kick's draws", m,
-           [want - bound, want + bound], "range", good)
-    return good
 
 
 def judge(samples, label):
@@ -837,15 +808,11 @@ def judge(samples, label):
 
 def other_loads(exe, lat, workdir, seeds):
     """Keep mode, then copies and cells made outside the loader from one written bunch,
-    each under the first-order kick and under the kick from J1."""
+    under the first-order kick."""
     ok = True
 
     def both(label, name, src, quiet, want, n_seed, cells=False):
-        first = run_keep(exe, lat, workdir, n_seed, label, src, quiet, want, cells)
-        good = judge(first, name)
-        bessel = run_keep(exe, lat, workdir, n_seed, label, src, quiet, want, cells, "bessel")
-        good = judge(bessel, f"{name}, kick from J1") and good
-        return paired(bessel, first, name) and good
+        return judge(run_keep(exe, lat, workdir, n_seed, label, src, quiet, want, cells), name)
 
     src = KEEP_BUNCH + '  write_openpmd_file = "sn_bunch.h5"\n'
     ok = both("keep", "keep mode, beamlets of a generated bunch", src, "T", "the beamlets the loader made", seeds) and ok
@@ -948,12 +915,9 @@ def main():
     exe = pathlib.Path(PARSED.exe).resolve()
 
     ok = True
-    first_order = {}
     for electrons in SCAN:
         for test_weights, label in ((False, "uniform weights"), (True, "nonuniform weights (0.25x/1.75x)")):
             samples, clamped = run_mode(exe, PARSED.lat, workdir, PARSED.seeds, test_weights, electrons)
-            if not test_weights:
-                first_order[electrons] = samples
             if electrons != ELECTRONS:
                 label += f", {electrons:g} electrons a beamlet"
             ok = judge(samples, label) and ok
@@ -971,22 +935,12 @@ def main():
                 record(f"shot noise, {label}: the loader warns of beamlets under one electron",
                        None, None, "bool", clamped)
 
-    for electrons in BESSEL_SCAN:
-        count = f"{electrons:g} electron{'' if electrons == 1 else 's'} a beamlet"
-        label = f"kick from J1, uniform weights, {count}"
-        samples, _ = run_mode(exe, PARSED.lat, workdir, PARSED.seeds, False, electrons, "bessel")
-        ok = judge(samples, label) and ok
-        if electrons not in first_order:
-            first_order[electrons], _ = run_mode(exe, PARSED.lat, workdir, PARSED.seeds, False, electrons)
-        ok = paired(samples, first_order[electrons], f"uniform weights, {count}") and ok
-
-    for kick, name in (("first_order", "the first-order kick"), ("bessel", "the kick from J1")):
-        good = stated_worst[kick] <= 1e-4
-        ok = ok and good
-        print(f"--- the level the loader states for {name} against the closed form: worst {stated_worst[kick]:.1e} "
-              f"over the scans (check <= 1e-4)  {'ok' if good else 'FAIL'}")
-        record(f"shot noise, the level the loader states for {name} against the closed form",
-               stated_worst[kick], 1e-4, "max", good)
+    good = stated_worst["first_order"] <= 1e-4
+    ok = ok and good
+    print(f"--- the level the loader states for the first-order kick against the closed form: worst "
+          f"{stated_worst['first_order']:.1e} over the scans (check <= 1e-4)  {'ok' if good else 'FAIL'}")
+    record("shot noise, the level the loader states for the first-order kick against the closed form",
+           stated_worst["first_order"], 1e-4, "max", good)
 
     ok = weight_scan(exe, PARSED.lat, workdir, PARSED.seeds) and ok
     ok = weight_gauss(exe, PARSED.lat, workdir, PARSED.seeds) and ok
@@ -995,8 +949,6 @@ def main():
 
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, None,
                         "Gaussian bunch, beam.beamlet_min_electrons at its default") and ok
-    ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, None,
-                        "Gaussian bunch, kick from J1, beam.beamlet_min_electrons at its default", "bessel") and ok
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, 18.0,
                         "Gaussian bunch, beamlets of 18 electrons or more") and ok
     ok = same_bits(exe, PARSED.lat, workdir) and ok

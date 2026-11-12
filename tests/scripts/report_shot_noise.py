@@ -5,14 +5,12 @@ Write the tables of docs/shot-noise.md from the closed form of the shot-noise lo
 The tables are arithmetic on shot_noise_ratio.py and take no run. The keystone
 regenerates the file and requires no difference, so the page quotes no ratio by hand.
 
-    tab-shot-ratio   what the first-order kick delivers of the shot-noise power against
-                     the electrons a beamlet holds, for one harmonic and for the default
-                     beamlet's three
-    tab-shot-bessel  the same for the kick sized from J1, with the share of the draws held
-                     at the largest bunching a kick gives
-    tab-shot-three   the fundamental under the three ways of imposing the noise
-    tab-shot-floor   the fewest electrons a beamlet may hold for the load to be within a
-                     stated fraction of the shot noise, under each kick
+    tab-shot-methods  the fundamental under the two values of beam.shot_noise_method
+    tab-shot-ratio    what the first-order kick delivers of the shot-noise power against the
+                      electrons a beamlet holds, for one harmonic and for the default
+                      beamlet's three
+    tab-shot-floor    the fewest electrons a beamlet may hold under that kick for a stated
+                      deficit
 
 Usage: report_shot_noise.py --out docs/generated/shot-noise.md
 """
@@ -20,6 +18,7 @@ Usage: report_shot_noise.py --out docs/generated/shot-noise.md
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import sys
 
@@ -51,8 +50,8 @@ def table_ratio():
     rows = []
     for n in COUNTS:
         first = f"{1 - 2 / n:.3f}" if n >= 4 else ""
-        rows.append([f"{n:g}", first, f"{float(snr.ratio_one_harmonic(n, 'first_order')):.3f}"]
-                    + [f"{float(snr.ratio(n, h, M, kick='first_order')):.3f}" for h in HARMONICS])
+        rows.append([f"{n:g}", first, f"{float(snr.ratio_one_harmonic(n)):.3f}"]
+                    + [f"{float(snr.ratio(n, h, M)):.3f}" for h in HARMONICS])
     return block("tab-shot-ratio",
                  "The mean square bunching the first-order kick imposes, over the shot-noise value, against "
                  "the electrons one beamlet holds. The first two columns kick one harmonic. The "
@@ -62,74 +61,64 @@ def table_ratio():
                  + [f"default beamlet, $h = {h}$" for h in HARMONICS], rows)
 
 
-def table_bessel():
+def table_methods():
     rows = []
     for n in COUNTS:
-        rows.append([f"{n:g}", f"{np.exp(-snr.B_MAX**2 * n):.3f}", f"{float(snr.ratio_one_harmonic(n)):.3f}"]
-                    + [f"{float(snr.ratio(n, h, M)):.3f}" for h in HARMONICS])
-    return block("tab-shot-bessel",
-                 "The mean square bunching the kick sized from $J_1$ imposes, over the shot-noise value, against "
-                 "the electrons one beamlet holds. The second column is the share of the draws that ask for more "
-                 "bunching than a kick gives and are held at the largest. The third kicks one harmonic. The "
-                 f"last three are the default beamlet's, {M} macroparticles with {len(HARMONICS)} harmonics "
-                 "kicked together.",
-                 ["electrons a beamlet", "draws held", "one harmonic"]
-                 + [f"default beamlet, $h = {h}$" for h in HARMONICS], rows)
-
-
-def table_three():
-    rows = []
-    for n in COUNTS:
-        rows.append([f"{n:g}", f"{float(snr.ratio(n, 1, M, kick='first_order')):.3f}",
-                     f"{float(snr.ratio(n, 1, M)):.3f}", "1.000", f"{float(snr.ratio_weight_kept(n)):.3f}"])
-    return block("tab-shot-three",
+        rows.append([f"{n:g}", "1.000", f"{float(snr.ratio_weight_kept(n)):.3f}", f"{float(snr.ratio(n, 1, M)):.3f}"])
+    return block("tab-shot-methods",
                  "The noise power loaded at the fundamental over the shot-noise power, against the electrons one "
-                 "beamlet holds, under the three values of `beam.shot_noise_method`. The weight load's columns "
+                 "beamlet holds, under the two values of `beam.shot_noise_method`. The weight load's columns "
                  "hold at every harmonic below the beamlet size. In the keep mode a particle under one electron "
                  "is counted as one electron.",
-                 ["electrons a beamlet", "`first_order`", "`bessel`", "`weight`, sample mode", "`weight`, keep mode"],
+                 ["electrons a beamlet", '`"weight"`, sample mode', '`"weight"`, keep mode', '`"first_order"`'],
                  rows)
 
 
-def floor(fraction, h, kick):
-    """The fewest electrons at and above which the default beamlet's ratio stays within the
-    fraction of 1. The last count outside it is found on 100 counts a decade from 1 to
-    1e4, and the crossing above it by bisection."""
-    n = np.logspace(0, 4, 401)
-    out = np.nonzero(np.abs(snr.ratio(n, h, M, kick=kick) - 1) > fraction)[0]
-    if not len(out):
-        return n[0]
-    lo, hi = n[out[-1]], n[out[-1] + 1]
-    for _ in range(40):
-        mid = 0.5 * (lo + hi)
-        if abs(float(snr.ratio(mid, h, M, kick=kick)) - 1) > fraction:
-            lo = mid
-        else:
-            hi = mid
-    return hi
+def floor(deficit, h):
+    """The fewest electrons at and above which the default beamlet's ratio stays within the deficit."""
+    n = np.logspace(0, 4, 40001)
+    low = np.nonzero(snr.ratio(n, h, M) < 1 - deficit)[0]
+    return n[low[-1] + 1] if len(low) else n[0]
 
 
 def table_floor():
-    rows = [[f"{100 * d:g}%"] + [f"{int(np.ceil(floor(d, h, kick)))}" for kick in ("first_order", "bessel")
-                                 for h in HARMONICS] for d in DEFICITS]
+    rows = [[f"{100 * d:g}%"] + [f"{int(np.ceil(floor(d, h)))}" for h in HARMONICS] for d in DEFICITS]
     return block("tab-shot-floor",
                  "The fewest electrons a beamlet may hold for the imposed noise power to be "
-                 f"within the stated fraction of the shot-noise power, for the default beamlet of {M} macroparticles "
-                 "under each kick.",
-                 ["within"] + [f"{name}, $h = {h}$" for name in ("first order", "from $J_1$") for h in HARMONICS], rows)
+                 f"within the stated fraction of the shot-noise power under the first-order kick, for the default "
+                 f"beamlet of {M} macroparticles.",
+                 ["deficit"] + [f"$h = {h}$" for h in HARMONICS], rows)
+
+
+def table_bands(record):
+    """The mean spectrum in the record's bands, from shot_noise_spectrum.py's committed record."""
+    names = (("weight", '`"weight"`'), ("first_order", '`"first_order"`'), ("quiet", "`shot_noise = false`"))
+    rows = []
+    for i, (lo, hi) in enumerate(record["bands"]):
+        rows.append([f"{lo:g} to {hi:g}"] + [f"{record['methods'][key]['bands'][i]:.3g}" for key, _ in names])
+    return block("tab-shot-bands",
+                 f"The mean of $|S(k)|^2/N$ of [](#fig-shot-bunch)'s bunch in six bands of the wavenumber over "
+                 f"the resonant one, {record['seeds']} seeds. The real beam's value is 1. "
+                 f"`shot_noise_spectrum.py` holds the weight load within {record['bound']:g} of 1 in every band.",
+                 ["$k/k_r$"] + [label for _, label in names], rows)
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--out", required=True, help="The Markdown file to write")
+    p.add_argument("--record", help="shot_noise_spectrum.py's record, by default shot-noise/spectrum.json beside --out")
     a = p.parse_args()
+    out = pathlib.Path(a.out)
+    record = pathlib.Path(a.record) if a.record else out.parent / "shot-noise" / "spectrum.json"
+    if not record.is_file():
+        print(f"report_shot_noise.py: no record at {record}. Run tests/scripts/shot_noise_spectrum.py.", file=sys.stderr)
+        return 1
     L = ["<!-- Generated by tests/scripts/report_shot_noise.py from shot_noise_ratio.py. "
          "Do not edit. -->", ""]
+    L += table_bands(json.loads(record.read_text()))
+    L += table_methods()
     L += table_ratio()
-    L += table_bessel()
-    L += table_three()
     L += table_floor()
-    out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(L))
     print(f"wrote {a.out}: {sum(1 for x in L if x.startswith('<!-- begin'))} tables")

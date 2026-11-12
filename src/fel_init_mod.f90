@@ -84,11 +84,8 @@ beamlet_size = run%bparam%beamlet_size
 
 ! How the noise is imposed (docs/shot-noise.md).
 
-select case (run%bparam%shot_noise_method)
-case ('weight');      noise_method = fel_noise_weight$
-case ('first_order'); noise_method = fel_noise_first_order$
-case default;         noise_method = fel_noise_bessel$
-end select
+noise_method = fel_noise_weight$
+if (run%bparam%shot_noise_method == 'first_order') noise_method = fel_noise_first_order$
 
 ! Fewer beamlets in a slice of little charge is a rule about the kicks, so it acts only
 ! where a kick is imposed on beamlets this loader makes. The weight load counts electrons
