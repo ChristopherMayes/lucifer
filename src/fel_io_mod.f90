@@ -927,9 +927,12 @@ block
     call out_io (s_blank$, r_name, trim(line))
     line = '             The kick is of first order in its size, as in Genesis4 ' // &
           '(beam.shot_noise_method = "first_order").'
-  else
+  elseif (run%bparam%quiet_start) then
     write (line, '(a, i0, a)') '             No shot noise. The quiet start leaves no bunching ' // &
           'below harmonic ', run%bparam%beamlet_size, '.'
+  else
+    line = '             No shot noise and no quiet start. The load has the noise of its ' // &
+          'macroparticles at random phases.'
   endif
   call out_io (s_blank$, r_name, trim(line))
 end block

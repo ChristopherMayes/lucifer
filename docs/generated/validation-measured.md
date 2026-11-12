@@ -113,15 +113,15 @@ where the two builds agree to every printed digit.
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 3 | 4.8408e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet: the loader warns of beamlets under one electron |  | same | holds |
 | shot noise, the level the loader states for the first-order kick against the closed form | 4.2903e-05 | same | <= 1.0000e-04 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet | 9.9985e-01 | same | 9.6950e-01 to 1.0305e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 1 | 1.0151e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 2 | 9.8694e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 3 | 1.0210e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 4 | 9.9865e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 5 | 9.9776e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 6 | 1.0120e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 7 | 9.6753e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, 146.4 electrons a beamlet: the variance of the slices' counts over the binomial variance | 1.0232e+00 | same | 8.8589e-01 to 1.1141e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet | 1.0015e+00 | same | 9.6950e-01 to 1.0305e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 1 | 1.0205e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 2 | 9.8898e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 3 | 1.0257e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 4 | 9.9247e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 5 | 9.9995e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 6 | 1.0132e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 7 | 9.7013e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, 146.4 electrons a beamlet: the variance of the slices' counts over the binomial variance | 1.0237e+00 | same | 8.8589e-01 to 1.1141e+00 |
 | shot noise, weight load, uniform weights, 18 electrons a beamlet | 9.8888e-01 | same | 9.6950e-01 to 1.0305e+00 |
 | shot noise, weight load, uniform weights, 18 electrons a beamlet, harmonic 1 | 9.9440e-01 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, uniform weights, 18 electrons a beamlet, harmonic 2 | 9.8757e-01 | same | 9.1931e-01 to 1.0807e+00 |
@@ -140,42 +140,42 @@ where the two builds agree to every printed digit.
 | shot noise, weight load, uniform weights, 4 electrons a beamlet, harmonic 6 | 1.0073e+00 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, uniform weights, 4 electrons a beamlet, harmonic 7 | 9.8585e-01 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, 4 electrons a beamlet: the variance of the slices' counts over the binomial variance | 9.8566e-01 | same | 8.8589e-01 to 1.1141e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet | 1.0060e+00 | same | 9.6950e-01 to 1.0305e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 1 | 1.0208e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 2 | 1.0082e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 3 | 1.0371e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 4 | 9.8118e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 5 | 9.8774e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 6 | 9.7989e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 7 | 1.0274e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet | 1.0059e+00 | same | 9.6950e-01 to 1.0305e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 1 | 1.0207e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 2 | 1.0079e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 3 | 1.0358e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 4 | 9.8015e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 5 | 9.8755e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 6 | 9.8160e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 1 electron a beamlet, harmonic 7 | 1.0278e+00 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, 1 electron a beamlet: the variance of the slices' counts over the binomial variance | 9.5160e-01 | same | 8.8589e-01 to 1.1141e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet | 9.9872e-01 | same | 9.6950e-01 to 1.0305e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 1 | 1.0205e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 2 | 9.5769e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 3 | 1.0143e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 4 | 9.8590e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 5 | 9.9829e-01 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 6 | 1.0130e+00 | same | 9.1931e-01 to 1.0807e+00 |
-| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 7 | 1.0013e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet | 9.9828e-01 | same | 9.6950e-01 to 1.0305e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 1 | 1.0199e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 2 | 9.5666e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 3 | 1.0137e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 4 | 9.8449e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 5 | 9.9997e-01 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 6 | 1.0116e+00 | same | 9.1931e-01 to 1.0807e+00 |
+| shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 7 | 1.0017e+00 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, 0.25 electrons a beamlet: the variance of the slices' counts over the binomial variance | 1.0374e+00 | same | 8.8589e-01 to 1.1141e+00 |
 | shot noise, weight load, the loaded charge against the input file's, worst over the scans | 2.2809e-13 | same | <= 1.0000e-12 |
 | shot noise, weight load, the level the loader states against the closed form | 4.1691e-08 | same | <= 1.0000e-04 |
 | shot noise, weight load, every weight is a whole number of counted electrons, in whole beamlets |  | same | holds |
-| shot noise, weight load, Gaussian bunch, the slices with particles | 9.9525e-01 | 9.9527e-01 | 9.6863e-01 to 1.0314e+00 (debug), 9.6864e-01 to 1.0314e+00 (production) |
+| shot noise, weight load, Gaussian bunch, the slices with particles | 9.9492e-01 | same | 9.6862e-01 to 1.0314e+00 |
 | shot noise, weight load, Gaussian bunch: a slice that drew no electron has no particles |  | same | holds |
 | shot noise, weight load, Gaussian bunch: the loaded electrons are a whole number | 2.7285e-12 | 1.8190e-12 | <= 1.0000e-06 |
 | shot noise, weight load, keep mode | 9.2015e-01 | same | 8.3913e-01 to 1.1609e+00 |
 | shot noise, weight load, keep mode: every particle of the bunch is present at its own charge | 1.3139e-16 | same | <= 1.0000e-12 |
-| shot noise, slices of 3 wavelengths, weight: noise power at the multiples of k_r/n that are not harmonics | 1.0103e+00 | same | 9.3028e-01 to 1.0697e+00 (debug), 9.3027e-01 to 1.0697e+00 (production) |
-| shot noise, slices of 3 wavelengths, weight: the spread of a period's electrons over the binomial spread | 1.0730e+00 | 1.0740e+00 | 8.7537e-01 to 1.1246e+00 |
+| shot noise, slices of 3 wavelengths, weight: noise power at the multiples of k_r/n that are not harmonics | 1.0116e+00 | same | 9.2935e-01 to 1.0707e+00 |
+| shot noise, slices of 3 wavelengths, weight: the spread of a period's electrons over the binomial spread | 1.0763e+00 | same | 8.7543e-01 to 1.1246e+00 |
 | shot noise, slices of 3 wavelengths, first_order: noise power at the multiples of k_r/n that are not harmonics | 3.6096e-01 | same | >= 0.0000e+00 |
 | shot noise, slices of 3 wavelengths, no noise: bunching of a slice at the multiples of k_r/n that are not harmonics | 2.0127e-16 | 2.0456e-16 | <= 1.0000e-12 |
-| shot noise, slices of 12 wavelengths, weight: noise power at the multiples of k_r/n that are not harmonics | 9.9905e-01 | 9.9851e-01 | 9.7036e-01 to 1.0296e+00 (debug), 9.7033e-01 to 1.0297e+00 (production) |
-| shot noise, slices of 12 wavelengths, weight: the spread of a period's electrons over the binomial spread | 1.0327e+00 | 1.0313e+00 | 9.3760e-01 to 1.0624e+00 (debug), 9.3766e-01 to 1.0623e+00 (production) |
+| shot noise, slices of 12 wavelengths, weight: noise power at the multiples of k_r/n that are not harmonics | 9.9951e-01 | same | 9.7050e-01 to 1.0295e+00 |
+| shot noise, slices of 12 wavelengths, weight: the spread of a period's electrons over the binomial spread | 1.0286e+00 | same | 9.3763e-01 to 1.0624e+00 |
 | shot noise, slices of 12 wavelengths, first_order: noise power at the multiples of k_r/n that are not harmonics | 4.6390e-01 | same | >= 0.0000e+00 |
 | shot noise, slices of 12 wavelengths, no noise: bunching of a slice at the multiples of k_r/n that are not harmonics | 8.2284e-16 | 7.9150e-16 | <= 1.0000e-12 |
-| shot noise, slices of 3 wavelengths after a tracked segment, without migration: the spread of a period's charge over that of its macroparticles placed at random | 5.6401e-01 | 5.6434e-01 | <= 1.2784e+00 |
-| shot noise, slices of 3 wavelengths after a tracked segment, with migration: the spread of a period's charge over that of its macroparticles placed at random | 5.7878e-01 | 5.7922e-01 | <= 1.2765e+00 |
+| shot noise, slices of 3 wavelengths after a tracked segment, without migration: the spread of a period's charge over that of its macroparticles placed at random | 5.7353e-01 | same | <= 1.2784e+00 |
+| shot noise, slices of 3 wavelengths after a tracked segment, with migration: the spread of a period's charge over that of its macroparticles placed at random | 5.9239e-01 | same | <= 1.2778e+00 |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice's charge is the charge with the key at 0 |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: each slice has min(n/M, max(1, floor(N/n_min))) beamlets |  | same | holds |
 | shot noise, Gaussian bunch, beam.beamlet_min_electrons at its default: no beamlet is under the limit where the slice holds it |  | same | holds |
@@ -224,7 +224,7 @@ where the two builds agree to every printed digit.
 | refused, a negative window.n_wavelength |  | same | holds |
 | in-cone startup, Gaussian bunch in sample mode | 4.3087e-02 | same | <= 3.5000e-01 |
 | in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge | 2.1412e-01 | same | <= 3.5000e-01 |
-| in-cone startup, Gaussian bunch in sample mode, the weight load, mean of 4 seeds | 4.4152e-02 | 3.4095e-03 | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode, the weight load, mean of 4 seeds | 3.1388e-02 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`

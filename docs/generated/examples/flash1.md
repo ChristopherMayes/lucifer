@@ -95,37 +95,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | Unit |
 |---|---|---|
-| exit power | 8.2146e+10 | W |
-| exit power per slice | 2.3403e+08 | W |
-| exit power, rms over mean across slices | 2.7094e+00 |  |
-| exit window energy | 4.5047e-05 | J |
-| exit pulse energy, the window's and the light slipped out of it | 4.5047e-05 | J |
-| peak power | 8.2146e+10 | W |
+| exit power | 9.6663e+10 | W |
+| exit power per slice | 2.7539e+08 | W |
+| exit power, rms over mean across slices | 3.0638e+00 |  |
+| exit window energy | 5.3008e-05 | J |
+| exit pulse energy, the window's and the light slipped out of it | 5.3008e-05 | J |
+| peak power | 9.6663e+10 | W |
 | s of the peak power | 3.1577e+01 | m |
-| mode peak, power inside the split | 8.2097e+10 | W |
-| s of the mode peak | 3.1577e+01 | m |
-| exit power inside the split | 8.2097e+10 | W |
-| exit power outside the split | 4.9095e+07 | W |
-| outside over inside, the run's maximum | 5.9802e-04 |  |
-| outside over inside at the exit | 5.9802e-04 |  |
-| split angle | 8.1770e-05 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 1.0630e+00 | m |
-| power at the first element end | 3.0317e+05 | W |
-| power per slice at the first element end | 8.6374e+02 | W |
-| initial bunching, mean |b| over slices | 6.2172e-02 |  |
-| exit bunching, mean |b| over slices | 1.2111e-01 |  |
+| mode peak, power inside the split | 9.6607e+10 | W |
+| s of the mode peak | 3.1477e+01 | m |
+| exit power inside the split | 9.6607e+10 | W |
+| exit power outside the split | 5.6176e+07 | W |
+| outside over inside, the run's maximum | 5.8149e-04 |  |
+| outside over inside at the exit | 5.8149e-04 |  |
+| split angle | 8.1278e-05 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 1.0463e+00 | m |
+| power at the first element end | 3.2657e+05 | W |
+| power per slice at the first element end | 9.3041e+02 | W |
+| initial bunching, mean |b| over slices | 6.3151e-02 |  |
+| exit bunching, mean |b| over slices | 1.2415e-01 |  |
 | exit bunching, the largest slice | 1.0000e+00 |  |
-| bunching, the maximum along the line of the mean |b| | 1.4006e-01 |  |
-| s of the bunching maximum | 2.4904e+01 | m |
-| bunching at the mode peak | 1.8839e-01 |  |
-| power of the largest slice at the bunching maximum | 2.7670e+09 | W |
-| exit power of the largest slice | 3.8245e+09 | W |
-| mean slice energy at the start | 6.6850e+08 | eV |
-| mean slice energy at the exit | 6.6833e+08 | eV |
-| mean slice energy, exit minus start | -1.7295e+05 | eV |
-| slice energy spread at the start | 2.9023e+05 | eV |
-| slice energy spread at the exit | 4.6646e+05 | eV |
-| span of the slice energies at the exit, head to tail | 1.8835e+06 | eV |
+| bunching, the maximum along the line of the mean |b| | 1.4105e-01 |  |
+| s of the bunching maximum | 2.4412e+01 | m |
+| bunching at the mode peak | 1.4918e-01 |  |
+| power of the largest slice at the bunching maximum | 3.7934e+09 | W |
+| exit power of the largest slice | 5.4698e+09 | W |
+| mean slice energy at the start | 6.6849e+08 | eV |
+| mean slice energy at the exit | 6.6827e+08 | eV |
+| mean slice energy, exit minus start | -2.1970e+05 | eV |
+| slice energy spread at the start | 2.8806e+05 | eV |
+| slice energy spread at the exit | 4.7696e+05 | eV |
+| span of the slice energies at the exit, head to tail | 2.3975e+06 | eV |
 | slices | 351 |  |
 | records | 361 |  |
 | slice spacing | 1.6440e-07 | m |
@@ -134,10 +134,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5748e-05 | m |
 | grid derived by setup | no |  |
 | FEL steps | 330 |  |
-| source filter, mode angle | 8.1770e-05 | rad |
-| source filter, rho angle | 4.4460e-05 | rad |
-| source filter, ratio of the angles | 1.8400e+00 |  |
-| source filter, edge | 8.1770e-05 | rad |
+| source filter, mode angle | 8.1280e-05 | rad |
+| source filter, rho angle | 4.4370e-05 | rad |
+| source filter, ratio of the angles | 1.8300e+00 |  |
+| source filter, edge | 8.1278e-05 | rad |
 
 ## The input files
 

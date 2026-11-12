@@ -200,6 +200,17 @@ def _methods(lp):
     return (("first_order", '"first_order"', lp.COLORS[2], "^"), ("weight", '"weight"', lp.COLORS[1], "o"))
 
 
+# The load with neither the quiet start nor the shot noise, which has the noise of its
+# macroparticles. The gray curve of the spectrum is the quiet start with no shot noise.
+def _LOUD(lp):
+    return ("loud", "quiet_start = false", lp.COLORS[3], "s")
+
+
+def _above(ax, ncol):
+    """The legend above the axes, where no curve crosses it."""
+    ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=ncol)
+
+
 def _slices(ax, lp, rec):
     """The noise power of each slice at the fundamental against its place along the bunch."""
     n_slice, spacing = rec["n_slice"], rec["n_wavelength"] * rec["lambda0"]
@@ -207,12 +218,12 @@ def _slices(ax, lp, rec):
     peak = rec["peak_electrons_a_beamlet"] * rec["n_particle"] / rec["beamlet_size"]
     zz = np.linspace(z[0], z[-1], 600)
     ax.plot(zz, peak * np.exp(-(zz * 1e-9) ** 2 / (2 * rec["sig_z"] ** 2)), color=lp.INK, lw=1.2, label=r"$N_\lambda$")
-    for key, label, color, mark in _methods(lp):
+    for key, label, color, mark in (_LOUD(lp),) + _methods(lp):
         s = np.array(rec["methods"][key]["slice_power"])
         m = s > 0
         ax.plot(z[m], s[m], mark, color=color, ms=2.6, mew=0, label=label)
     ax.set_yscale("log")
-    ax.set_ylim(1e-7, 1e4)
+    ax.set_ylim(1e-7, 1e5)
     ax.set_xlim(z[0], z[-1])
     ax.set_xlabel("$z$ (nm)")
     ax.set_ylabel(r"$\langle |S_1|^2 \rangle$")
@@ -225,6 +236,8 @@ def _spectrum(ax, lp, rec, k_max=None, binned=False):
     if not binned:
         ax.plot(k[m], np.array(rec["methods"]["quiet"]["spectrum"])[m], color=lp.GRAY, lw=0.5,
                 label="shot_noise = false")
+        key, label, color, _ = _LOUD(lp)
+        ax.plot(k[m], np.array(rec["methods"][key]["spectrum"])[m], color=color, lw=0.5, label=label)
     for key, label, color, mark in _methods(lp):
         sp = np.array(rec["methods"][key]["spectrum"])
         if binned:
@@ -251,27 +264,27 @@ def draw_bunch(plt, lp, out, rec):
     """slices.svg, spectrum.svg, spectrum-low.svg and bunch.svg from the record."""
     fig, ax = plt.subplots(figsize=(6.8, 4.2), layout="constrained")
     _slices(ax, lp, rec)
-    ax.legend(frameon=False, loc="lower center")
+    _above(ax, 4)
     lp.save(fig, out / "slices.svg")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(6.8, 4.4), layout="constrained")
     _spectrum(ax, lp, rec)
-    fig.legend(*ax.get_legend_handles_labels(), frameon=False, loc="outside upper center", ncol=3)
+    _above(ax, 4)
     lp.save(fig, out / "spectrum.svg")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(6.8, 4.4), layout="constrained")
     _spectrum(ax, lp, rec, k_max=2.2, binned=True)
-    fig.legend(*ax.get_legend_handles_labels(), frameon=False, loc="outside upper center", ncol=2)
+    _above(ax, 2)
     lp.save(fig, out / "spectrum-low.svg")
     plt.close(fig)
 
     fig, axes = plt.subplots(2, 1, figsize=(6.8, 8.2), layout="constrained")
     _slices(axes[0], lp, rec)
-    axes[0].legend(frameon=False, loc="lower center")
+    _above(axes[0], 4)
     _spectrum(axes[1], lp, rec)
-    axes[1].legend(frameon=False, loc="lower right", ncol=3)
+    _above(axes[1], 4)
     lp.save(fig, out / "bunch.svg")
     plt.close(fig)
 

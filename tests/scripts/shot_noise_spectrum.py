@@ -6,7 +6,8 @@ and across wavelength, for the figures and the band table of docs/shot-noise.md.
 The bunch is N_SLICE slices of N_WAVELENGTH wavelengths in a window of twelve rms lengths,
 PEAK electrons a beamlet in its peak slice, so its last slices hold 1e-5 of an electron.
 It is loaded with run.load_only under beam.shot_noise_method = "weight", under
-"first_order" and with shot_noise = false, at --seeds seeds each. From every particle
+"first_order", with shot_noise = false, and with quiet_start = false and
+shot_noise = false, at --seeds seeds each. From every particle
 dump two things are taken, with S the sum of w exp(-i phase) over particles and w a
 particle's electrons:
 
@@ -20,18 +21,21 @@ A real beam has |S_1|^2 equal to a slice's electrons and a spectrum of 1. The re
 carries the mean spectrum in BANDS. A record whose weight load is outside BOUND of 1 in
 any band is refused, and nothing is written.
 
-The loads and the sums take about twenty minutes, so the script runs on demand and the
+The loads and the sums take a few minutes on a dozen cores, one process a seed, so the
+script runs on demand and the
 record is committed. shot_noise_figures.py draws from it and report_shot_noise.py writes
 its band table, both in the keystone's regeneration.
 
-Usage: shot_noise_spectrum.py --exe <lucifer> --workdir <dir> [--seeds 48]
+Usage: shot_noise_spectrum.py --exe <lucifer> --workdir <dir> [--seeds 48] [--jobs N]
                               --out docs/generated/shot-noise/spectrum.json
 """
 
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -58,7 +62,8 @@ CHARGE = PEAK * (N_PARTICLE / BEAMLET_SIZE) * E_CHARGE * np.sqrt(2 * np.pi) * SI
 
 METHODS = {"weight": '  shot_noise = T\n  shot_noise_method = "weight"\n',
            "first_order": '  shot_noise = T\n  shot_noise_method = "first_order"\n',
-           "quiet": "  shot_noise = F\n"}
+           "quiet": "  shot_noise = F\n",
+           "loud": "  quiet_start = F\n  shot_noise = F\n"}
 
 TEXT = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
@@ -83,15 +88,51 @@ TEXT = """! flat keys; routed into the input file's tables by lucifer.flat.to_to
 """
 
 
+def one_seed(args):
+    """One load and its sums: the spectrum, the slices' |S_1|^2 and the slices' electrons."""
+    exe, workdir, lat, name, noise, seed, k = args
+    root = f"spec_{name}_{seed}"
+    (workdir / f"{root}.toml").write_text(to_toml(TEXT.format(
+        lat=lat, root=root, lambda0=LAMBDA0, n_particle=N_PARTICLE, charge=CHARGE, sig_z=SIG_Z,
+        beamlet_size=BEAMLET_SIZE, window=N_SLICE * SPACING, n_wavelength=N_WAVELENGTH, noise=noise,
+        seed=100 + seed)))
+    r = subprocess.run([exe, f"{root}.toml"], cwd=workdir, capture_output=True, text=True,
+                       env={**os.environ, "OMP_NUM_THREADS": "1"})
+    if r.returncode != 0:
+        print(f"FAIL: the load {root} exited {r.returncode}:\n{r.stdout[-2000:]}", flush=True)
+        return None
+    spectrum = np.zeros(len(k))
+    slices = np.zeros(N_SLICE)
+    electrons = np.zeros(N_SLICE)
+    phase, weight = [], []
+    for i, sl in enumerate(beamio.read_slices(workdir / f"{root}-initial.beam.h5", LAMBDA0, SPACING)):
+        n = sl["n"]
+        if n == 0:
+            continue
+        w = sl["weight"][:n] / E_CHARGE
+        theta = sl["theta"][:n]
+        slices[i] = abs(np.sum(w * np.exp(-1j * theta))) ** 2
+        electrons[i] = w.sum()
+        phase.append(theta + 2 * np.pi * N_WAVELENGTH * i)
+        weight.append(w)
+    phase, weight = np.concatenate(phase), np.concatenate(weight)
+    for j in range(0, len(k), 128):
+        spectrum[j:j + 128] = np.abs(np.exp(-1j * np.outer(k[j:j + 128], phase)) @ weight) ** 2 / weight.sum()
+    for f in workdir.glob(f"{root}[-.]*"):
+        f.unlink()
+    return spectrum, slices, electrons
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--exe", required=True)
     p.add_argument("--workdir", required=True, help="A directory that holds the lattice")
     p.add_argument("--lat", default="aramis_1seg.bmad")
     p.add_argument("--seeds", type=int, default=48)
+    p.add_argument("--jobs", type=int, default=os.cpu_count(), help="Loads run at once")
     p.add_argument("--out", required=True, help="The record to write")
     a = p.parse_args()
-    workdir = pathlib.Path(a.workdir)
+    workdir = pathlib.Path(a.workdir).resolve()
     exe = str(pathlib.Path(a.exe).resolve())
 
     # The window's own frequencies, in resonant wavenumbers.
@@ -104,32 +145,16 @@ def main():
         spectrum = np.zeros(len(k))
         slices = np.zeros(N_SLICE)
         electrons = np.zeros(N_SLICE)
-        for seed in range(1, a.seeds + 1):
-            root = f"spec_{name}_{seed}"
-            (workdir / f"{root}.toml").write_text(to_toml(TEXT.format(
-                lat=a.lat, root=root, lambda0=LAMBDA0, n_particle=N_PARTICLE, charge=CHARGE, sig_z=SIG_Z,
-                beamlet_size=BEAMLET_SIZE, window=N_SLICE * SPACING, n_wavelength=N_WAVELENGTH, noise=noise,
-                seed=100 + seed)))
-            r = subprocess.run([exe, f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
-            if r.returncode != 0:
-                print(f"FAIL: the load {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
-                return 1
-            phase, weight = [], []
-            for i, sl in enumerate(beamio.read_slices(workdir / f"{root}-initial.beam.h5", LAMBDA0, SPACING)):
-                n = sl["n"]
-                if n == 0:
-                    continue
-                w = sl["weight"][:n] / E_CHARGE
-                theta = sl["theta"][:n]
-                slices[i] += abs(np.sum(w * np.exp(-1j * theta))) ** 2
-                electrons[i] += w.sum()
-                phase.append(theta + 2 * np.pi * N_WAVELENGTH * i)
-                weight.append(w)
-            phase, weight = np.concatenate(phase), np.concatenate(weight)
-            for j in range(0, len(k), 128):
-                spectrum[j:j + 128] += np.abs(np.exp(-1j * np.outer(k[j:j + 128], phase)) @ weight) ** 2 / weight.sum()
-            for f in workdir.glob(f"{root}*"):
-                f.unlink()
+        # One process a seed. The sums are added in the order of the seeds, so the record
+        # does not depend on the number of processes.
+        with concurrent.futures.ProcessPoolExecutor(a.jobs) as pool:
+            for one in pool.map(one_seed, [(exe, workdir, a.lat, name, noise, seed, k)
+                                           for seed in range(1, a.seeds + 1)]):
+                if one is None:
+                    return 1
+                spectrum += one[0]
+                slices += one[1]
+                electrons += one[2]
         spectrum /= a.seeds
         bands = [float(spectrum[(k >= lo) & (k < hi)].mean()) for lo, hi in BANDS]
         record["methods"][name] = {"spectrum": [float(f"{x:.5g}") for x in spectrum],

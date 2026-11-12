@@ -4,14 +4,14 @@
 ```{table} The mean of $|S(k)|^2/N$ for the bunch of [](#fig-shot-bunch) in six bands of the wavenumber, in units of the resonant wavenumber, with 48 seeds. The value for the real beam is 1. The script `shot_noise_spectrum.py` requires the weight load to be within 0.05 of 1 in every band.
 :name: tab-shot-bands
 
-| $k/k_r$ | `"weight"` | `"first_order"` | `shot_noise = false` |
-|---|---|---|---|
-| 0.01 to 0.3 | 0.996 | 0.00369 | 3.36e-15 |
-| 0.4 to 0.6 | 0.986 | 0.0575 | 8.93e-19 |
-| 0.9 to 1.1 | 1 | 0.87 | 0.00259 |
-| 1.4 to 1.6 | 0.985 | 0.975 | 9.26e-20 |
-| 4 to 5 | 1 | 3.51 | 7.86e-05 |
-| 8 to 8.6 | 1.01 | 4.32 | 1.98e-05 |
+| $k/k_r$ | `"weight"` | `"first_order"` | `shot_noise = false` | `quiet_start = false`, `shot_noise = false` |
+|---|---|---|---|---|
+| 0.01 to 0.3 | 0.995 | 0.00369 | 3.36e-15 | 2.23 |
+| 0.4 to 0.6 | 0.988 | 0.0575 | 8.93e-19 | 4.25 |
+| 0.9 to 1.1 | 1 | 0.87 | 0.00259 | 4.28 |
+| 1.4 to 1.6 | 0.992 | 0.975 | 9.26e-20 | 4.31 |
+| 4 to 5 | 1 | 3.51 | 7.86e-05 | 4.35 |
+| 8 to 8.6 | 1.01 | 4.32 | 1.98e-05 | 4.42 |
 ```
 <!-- end tab-shot-bands -->
 
