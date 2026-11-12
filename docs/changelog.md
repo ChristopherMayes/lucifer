@@ -9,6 +9,30 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-11 Changed: `docs/shot-noise.md` is rewritten in the register of a physics text, and it
+  leads with the quiet start. A new section derives the noise of macroparticles at random phases,
+  which is the shot-noise power multiplied by the number of electrons per macroparticle, and the
+  page's first figure and its table of bands show a fourth load, `quiet_start = false` with
+  `shot_noise = false`: on the page's Gaussian bunch its spectrum is 4.3 to 4.4 times the shot noise
+  above a third of the resonant wavenumber, where the closed form gives 4.42, its peak slice has
+  about 6 times its shot noise, and a slice four rms bunch lengths from the peak has 0.002 of it.
+  `tests/scripts/shot_noise_spectrum.py` runs one process a seed and takes 3.4 minutes on 16 cores
+  where it took 20, and the three loads it recorded before are the same numbers. Fixed: the header
+  of a run with `quiet_start = false` and `shot_noise = false` stated that the quiet start leaves no
+  bunching below harmonic `beamlet_size`. It now states that the load has the noise of its
+  macroparticles at random phases. Fixed: under the weight load one `ran_seed` gave different shots
+  in the debug and the release build. `fel_ran_binomial` chose between its two algorithms by
+  comparing the expected count with ten and the probability with one half, and in a load those are
+  often ratios of whole numbers, ten electrons left for each macroparticle left or one of two equal
+  weights left, which round to either side. On a Gaussian bunch of 85 slices the two builds drew
+  different counts in 29 slices at one seed of four. The comparisons are now made with a margin, a
+  kept particle of a whole number of electrons to rounding is counted as that number, and the two
+  builds assign the same electrons to every macroparticle at eight seeds. A run under the weight
+  load, the default, is a different shot at the same seed than before, and the examples are rerun.
+  The spectrum record and the page's table of four loads at six seeds are remeasured with the
+  corrected draw: the weight load is 0.988 to 1.006 of the shot noise in the six bands, and the sase
+  example and FLASH1 start 1.08 +- 0.08 and 0.990 +- 0.019 times as high as under the first-order
+  kick.
 - 2026-11-11 Changed: `beam.shot_noise_method = "bessel"` is removed. The key is `"weight"`, the
   default, or `"first_order"`, and an input file that set `"bessel"` is refused with the two values
   in the message. It sets `"weight"` for the shot noise at every electron count, or `"first_order"`

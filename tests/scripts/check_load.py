@@ -201,9 +201,8 @@ def incone(exe, wd):
     the default, which loads the slices of little charge with fewer beamlets, 52 of the 85
     here. The two are different shots at one seed, since the random numbers after the first
     such slice differ. Both take the first-order kick, which the target was measured with.
-    The third is the default, the weight load, as the mean of INCONE_WEIGHT_SEEDS. Its counts
-    are drawn one after another from probabilities that end in rounding, so one seed is a
-    different shot in another build, and one shot has a spread of 0.2 of the target."""
+    The third is the default, the weight load, as the mean of INCONE_WEIGHT_SEEDS, since one
+    shot has a spread of 0.2 of the target."""
     ok = True
     for root, limit, kick, seeds, name in (
             ("ldcone", "  beam.beamlet_min_electrons = 0\n", "first_order", (777,),

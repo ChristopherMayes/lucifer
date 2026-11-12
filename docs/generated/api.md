@@ -722,6 +722,14 @@ against one uniform number. Above, it is the transformed rejection of W. Hormann
 generation of binomial random variates", J. Stat. Comput. Simul. 46, 101 (1993),
 algorithm BTRS, which takes about 1.2 pairs of uniform numbers a draw. The counts are
 reals so that n may pass the largest default integer, and are whole to 2^53.
+
+The two comparisons that choose how the draw is made, p against one half and n p
+against ten, are made against half_margin and inversion_below. A caller's p is often a
+ratio of whole numbers in rounded arithmetic, one of two equal weights left or ten
+electrons left for each macroparticle left, and stands a rounding error to either side
+of one half or of ten. Compared with those numbers themselves, such a p took one
+algorithm in a build and the other in another build, and the two builds drew different
+shots from one seed. The two constants are not ratios of whole numbers a load makes.
 ```
 
 ```

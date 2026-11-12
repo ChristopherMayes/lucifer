@@ -1758,6 +1758,14 @@ end subroutine fel_slice_fill
 ! algorithm BTRS, which takes about 1.2 pairs of uniform numbers a draw. The counts are
 ! reals so that n may pass the largest default integer, and are whole to 2^53.
 !
+! The two comparisons that choose how the draw is made, p against one half and n p
+! against ten, are made against half_margin and inversion_below. A caller's p is often a
+! ratio of whole numbers in rounded arithmetic, one of two equal weights left or ten
+! electrons left for each macroparticle left, and stands a rounding error to either side
+! of one half or of ten. Compared with those numbers themselves, such a p took one
+! algorithm in a build and the other in another build, and the two builds drew different
+! shots from one seed. The two constants are not ratios of whole numbers a load makes.
+!
 ! Input:
 !   n -- real(rp): Trials, a whole number.
 !   p -- real(rp): Probability of one success, 0 to 1.
@@ -1769,6 +1777,8 @@ end subroutine fel_slice_fill
 function fel_ran_binomial (n, p) result (k)
 
 real(rp) n, p, k, pp, q, r, u, v, us, f, log_q, spq, a, b, c, v_r, alpha, m, h
+real(rp), parameter :: half_margin = 0.5_rp + 3.14159265e-10_rp
+real(rp), parameter :: inversion_below = 10 - 3.14159265e-7_rp
 logical flip
 
 !
@@ -1778,12 +1788,13 @@ if (n < 1 .or. p <= 0) return
 k = n
 if (p >= 1) return
 
-flip = (p > 0.5_rp)
-pp = min(p, 1 - p)
+flip = (p > half_margin)
+pp = p
+if (flip) pp = 1 - p
 q = 1 - pp
 r = pp / q
 
-if (n * pp < 10) then
+if (n * pp < inversion_below) then
 
   ! log(1 - p) by its series where 1 - p rounds.
 
@@ -1965,7 +1976,10 @@ if (draw%kept) then
     q_one = sum(weight(i0+1:i0+beamlet_size))
     n_group = q_one / e_charge
     if (q_one <= 0) cycle
-    n_floor = floor(n_group)
+    ! A group of a whole number of electrons to rounding is that number, so that it is
+    ! counted alike whichever way its charge rounded.
+
+    n_floor = floor(n_group * (1 + 1e-12_rp))
     if (n_floor < 1) then
       count = 1
       power = power + n_group**2

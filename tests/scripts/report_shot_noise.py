@@ -92,7 +92,8 @@ def table_floor():
 
 def table_bands(record):
     """The mean spectrum in the record's bands, from shot_noise_spectrum.py's committed record."""
-    names = (("weight", '`"weight"`'), ("first_order", '`"first_order"`'), ("quiet", "`shot_noise = false`"))
+    names = (("weight", '`"weight"`'), ("first_order", '`"first_order"`'), ("quiet", "`shot_noise = false`"),
+             ("loud", "`quiet_start = false`, `shot_noise = false`"))
     rows = []
     for i, (lo, hi) in enumerate(record["bands"]):
         rows.append([f"{lo:g} to {hi:g}"] + [f"{record['methods'][key]['bands'][i]:.3g}" for key, _ in names])

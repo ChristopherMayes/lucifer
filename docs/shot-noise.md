@@ -3,7 +3,9 @@ title: "The shot-noise load: the noise power of a beamlet"
 short_title: Shot-noise load
 ---
 
-Self-amplified spontaneous emission (SASE) starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at independent random phases have a mean square bunching of $1/N$. Before tracking begins, Lucifer generates the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice). This set of macroparticles is called the [load](glossary.md#gl-load), and the routines that generate it are called the loader. The loader first constructs a load that has no bunching, in which the macroparticles are arranged in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases (the [quiet start](glossary.md#gl-quiet-start)). It then imposes the shot noise by one of two methods, selected by `beam.shot_noise_method`:
+Self-amplified spontaneous emission (SASE) starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at independent random phases have a mean square bunching of $1/N$. Before tracking begins, Lucifer generates the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice). This set of macroparticles is called the [load](glossary.md#gl-load), and the routines that generate it are called the loader.
+
+A slice is represented by far fewer macroparticles than it has electrons. Macroparticles at random phases have a noise of their own, which is determined by their number and not by the beam. The loader therefore proceeds in two steps. It first constructs a load that has no bunching, in which the macroparticles are arranged in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases. This is the [quiet start](glossary.md#gl-quiet-start), `quiet_start = true`, which is the default ([](#shot-quiet)). It then imposes the shot noise of the real beam, `shot_noise = true`, by one of two methods selected by `beam.shot_noise_method`:
 
 - `"weight"`, the default, assigns to every macroparticle a whole number of electrons and leaves the phases unchanged ([](#shot-weight)). The noise power of the load is equal to the shot-noise power at every harmonic below the beamlet size, for any number of electrons, and at the wavelengths between the harmonics. The charge of the bunch is preserved exactly.
 - `"first_order"` is the algorithm of Fawley ([](references.md#ref-fawley)), which displaces every phase by a small random amount, the [kick](glossary.md#gl-kick-noise) ([](#shot-kick)). It is the method of Genesis4. Its noise power is less than the shot-noise power when a beamlet represents few electrons: 0.95 of the shot-noise power at 50 electrons per beamlet and 0.16 at one. Away from the harmonics at which the kick is applied, its noise power ranges from 0.004 of the shot-noise power to 4 times the shot-noise power.
@@ -12,8 +14,8 @@ The default method is recommended. The method `"first_order"` is intended for co
 
 :::{figure} generated/shot-noise/bunch.svg
 :name: fig-shot-bunch
-:alt: Two plots. Top: the noise power of each slice of a Gaussian bunch as a function of position along the bunch, on a logarithmic axis of eleven decades. The points for the weight load lie on the line for the real beam down to a tenth of an electron. The points for the first-order kick fall below the line in the tails, by three decades at five rms bunch lengths. Bottom: the bunching spectrum of the whole bunch as a function of the wavenumber in units of the resonant wavenumber, from zero to 8.6, on a logarithmic axis. The spectrum of the weight load is constant at one. The spectrum of the first-order kick decreases to zero below the fundamental and is between three and four above the fourth harmonic. The spectrum of the load without noise consists of narrow lines at every third of the resonant wavenumber, the first of height one and the others lower, with nothing between them.
-A Gaussian bunch of 384 slices, each three wavelengths long, with 50 electrons per beamlet in the peak slice, loaded with 48 seeds by each method. Top: the mean of $|S_1|^2$ in each slice as a function of the position of the slice, where $S_1$ is the sum of $e^{-i\theta}$ over the electrons of the slice ([](#eq-shot-s)). The solid line is the value for the real beam, which is the number of electrons $N_\lambda$ in the slice. Bottom: the mean of $|S(k)|^2$ divided by the number of electrons $N$ in the bunch, computed from the positions of the particles along the bunch, as a function of the wavenumber in units of the resonant wavenumber, at the frequencies of the [window](glossary.md#gl-window). The value for the real beam is 1 at every wavenumber (black line). The gray curve is the load without noise. Its lines arise from the steps in the current between adjacent slices ([](#shot-spectrum)).
+:alt: Two plots. Top: the noise power of each slice of a Gaussian bunch as a function of position along the bunch, on a logarithmic axis of twelve decades. The points for the weight load lie on the line for the real beam down to a tenth of an electron. The points for the first-order kick fall below the line in the tails, by three decades at five rms bunch lengths. The points for the load without the quiet start lie above the line in the core, by a factor of six at the peak, and below it in the tails. Bottom: the bunching spectrum of the whole bunch as a function of the wavenumber in units of the resonant wavenumber, from zero to 8.6, on a logarithmic axis. The spectrum of the weight load is constant at one. The spectrum of the first-order kick decreases to zero below the fundamental and is between three and four above the fourth harmonic. The spectrum of the load without the quiet start is constant near 4.4 above a third of the resonant wavenumber. The spectrum of the quiet load without shot noise consists of narrow lines at every third of the resonant wavenumber, the first of height one and the others lower, with nothing between them.
+A Gaussian bunch of 384 slices, each three wavelengths long, with 256 macroparticles per slice and 50 electrons per beamlet in the peak slice, loaded with 48 seeds in each of four ways: with the quiet start and each of the two shot-noise methods, with the quiet start and no shot noise (`shot_noise = false`), and with neither (`quiet_start = false`). Top: the mean of $|S_1|^2$ in each slice as a function of the position of the slice, where $S_1$ is the sum of $e^{-i\theta}$ over the electrons of the slice ([](#eq-shot-s)). The solid line is the value for the real beam, which is the number of electrons $N_\lambda$ in the slice. The quiet load without shot noise is zero to rounding error and is not shown. Bottom: the mean of $|S(k)|^2$ divided by the number of electrons $N$ in the bunch, computed from the positions of the particles along the bunch, as a function of the wavenumber in units of the resonant wavenumber, at the frequencies of the [window](glossary.md#gl-window). The value for the real beam is 1 at every wavenumber (black line). The quiet load without shot noise (gray) vanishes except for narrow lines that arise from the steps in the current between adjacent slices ([](#shot-spectrum)).
 :::
 
 ```{include} generated/shot-noise.md
@@ -26,7 +28,7 @@ The load, its switches and its grouping rules are described in [](fel-physics.md
 (shot-counts)=
 ## Macroparticles and electrons
 
-Four numbers enter the discussion: the number of electrons $N_\lambda$ in a slice, the number of macroparticles $n_p$ in a slice, the number of macroparticles $M$ in a beamlet, and the number of electrons $N$ that a beamlet represents. The last two must be carefully distinguished.
+Four numbers enter the discussion: the number of electrons $N_\lambda$ in a slice, the number of macroparticles $n_p$ in a slice, the number of macroparticles $M$ in a beamlet, and the number of electrons $N$ that a beamlet represents. The first two are defined here and the last two in [](#shot-quiet). The last two must be carefully distinguished.
 
 A slice is one longitudinal sample of the beam. Its length is a whole number of radiation wavelengths, and its macroparticles are distributed over all of those wavelengths ([](fel-physics.md#sec-quiet)). A slice of current $I$ and length $\Delta$ contains
 
@@ -36,7 +38,20 @@ $$ (eq-shot-nlambda)
 
 electrons. The load represents the slice by $n_p$ macroparticles (`beam.n_particle`), each of which carries a weight equal to the charge that it represents.
 
-The macroparticles are generated in beamlets. A beamlet consists of $M$ macroparticles (`beamlet_size`, 8 by default) that have the same transverse coordinates and the same energy. Their phases are evenly spaced over one radiation period,
+(shot-quiet)=
+## The noise of the macroparticles and the quiet start
+
+Let macroparticle $j$ of a slice represent $\nu_j$ electrons and have the phase $\theta_j$. Its contribution to the radiation source at harmonic $h$ is $\nu_j\,e^{-ih\theta_j}$. With `quiet_start = false` the phases are independent and uniformly distributed over $2\pi$. The cross terms of the squared sum then vanish on average, and
+
+$$
+  \Bigl\langle \Bigl| \sum_j \nu_j\, e^{-ih\theta_j} \Bigr|^2 \Bigr\rangle = \sum_j \nu_j^2 = \frac{N_\lambda^2}{n_p} ,
+$$ (eq-shot-loud)
+
+where the second equality holds for uniform weights. It is shown in [](#shot-real) that the corresponding quantity for the real beam is $N_\lambda$. The noise power of the macroparticles therefore differs from the shot-noise power by the factor $N_\lambda/n_p$, the number of electrons per macroparticle. This factor has no physical significance, since it changes with `beam.n_particle`. It exceeds 1 wherever a slice contains more electrons than macroparticles, and it is less than 1 in the tails of a bunch.
+
+Both regimes appear in [](#fig-shot-bunch), where the slices have 256 macroparticles. In the peak slice, which contains 1600 electrons, the noise power of the load with `quiet_start = false` is about 6 times the shot-noise power. It is equal to the shot-noise power two rms bunch lengths from the peak, where a slice contains about 256 electrons, and it is $2\times10^{-3}$ of the shot-noise power at four rms bunch lengths. The spectrum of this load is nearly constant above $k_r/3$, between 4.3 and 4.4. This value is the charge-weighted mean of the number of electrons per macroparticle, for which [](#eq-shot-loud) gives 4.42. Below $k_r/3$ the spectrum decreases toward zero, because the charge of each slice of three wavelengths is fixed. Shot noise cannot be added to such a load: with `quiet_start = false` and `shot_noise = true` the loader measures the bunching of the load and refuses a load that already has noise ([](fel-physics.md#sec-noise)).
+
+The quiet start removes this noise. With `quiet_start = true` the macroparticles are generated in beamlets. A beamlet consists of $M$ macroparticles (`beamlet_size`, 8 by default) that have the same transverse coordinates and the same energy. Their phases are evenly spaced over one radiation period,
 
 $$
   \theta_j = \theta_0 + \frac{2\pi j}{M}, \qquad j = 0 \ldots M-1 ,
@@ -52,7 +67,7 @@ $$ (eq-shot-n)
 
 where $w$ is the weight of one of its macroparticles in the quiet load. For uniform weights, $N = N_\lambda M / n_p$. The quantity $N$ is a number of electrons. It is not the number of macroparticles in the beamlet, which is $M$. At a given current, $N$ increases with the length of the slice (`window.n_wavelength`) and decreases with `beam.n_particle`.
 
-As an example, a slice one wavelength long, at a wavelength of 1 Å and a current of 3 kA, contains $N_\lambda = 6246$ electrons. With 1024 macroparticles in beamlets of 8, the slice has 128 beamlets, each of which represents $N = 48.8$ electrons. A slice in the tail of the same bunch, at $10^{-3}$ of that current, contains 6 electrons, or 0.049 of an electron for each of its 128 beamlets. These two slices are referred to below as the core slice and the tail slice.
+As an example, a slice one wavelength long, at a wavelength of 1 Å and a current of 3 kA, contains $N_\lambda = 6246$ electrons. With 1024 macroparticles in beamlets of 8, the slice has 128 beamlets, each of which represents $N = 48.8$ electrons. A slice in the tail of the same bunch, at $10^{-3}$ of that current, contains 6 electrons, or 0.049 of an electron for each of its 128 beamlets. These two slices are referred to below as the core slice and the tail slice. Without the quiet start the noise power of the core slice would be 6.1 times its shot-noise power, and that of the tail slice 0.006 of its shot-noise power.
 
 (shot-real)=
 ## The shot noise of N electrons
@@ -71,7 +86,7 @@ $$ (eq-shot-real)
 
 This result holds at every harmonic and at every wavelength between the harmonics. For a slice it becomes $\langle|b_h|^2\rangle = 1/N_\lambda$, and the start-up power of a SASE run is proportional to this quantity.
 
-A set of $n_p$ macroparticles at random phases has a noise of its own, $1/n_p$, which exceeds the noise of the real beam by the factor $N_\lambda/n_p$. The quiet start removes this noise, and the loader then imposes the noise of the real beam. Throughout this page a load is characterized by the ratio $R_h(N)$ of the noise power that it imposes to the shot-noise power of the real beam.
+The quiet start removes the noise of the macroparticles ([](#shot-quiet)), and the loader then imposes the noise of the real beam. Throughout this page a load is characterized by the ratio $R_h(N)$ of the noise power that it imposes to the shot-noise power of the real beam.
 
 (shot-weight)=
 ## Shot noise imposed through the weights
@@ -113,7 +128,7 @@ at every harmonic and in every slice. The ratio $R$ differs from 1 by at most $1
 
 The number of electrons in a slice is a binomial variable with mean $N_\lambda$ and variance $N_\lambda (1 - N_\lambda/n)$. The charge of a slice therefore fluctuates from shot to shot with a relative standard deviation of $1/\sqrt{N_\lambda}$, as it does in a real beam. This fluctuation is 0.7% for the 18740 electrons in a slice of `examples/sase`, and it constitutes the noise of the load at wavelengths longer than the fundamental. On average, the current profile of the load is that of the bunch.
 
-The routine `fel_weight_noise` performs the multinomial draw sequentially. Each slice in turn receives a binomially distributed share of the electrons that remain, and each macroparticle receives a binomially distributed share of the electrons that remain in its slice. The binomial generator `fel_ran_binomial` is exact in distribution. It uses the transformed rejection method of Hörmann ([](references.md#ref-hormann)) when ten or more successes are expected, and otherwise sums the probabilities upward from zero successes. Because the draw is sequential, a probability that differs in its last digit can alter one of the numbers and, with it, every subsequent number. A given `ran_seed` can therefore produce a different shot with another compiler or another build.
+The routine `fel_weight_noise` performs the multinomial draw sequentially. Each slice in turn receives a binomially distributed share of the electrons that remain, and each macroparticle receives a binomially distributed share of the electrons that remain in its slice. The binomial generator `fel_ran_binomial` is exact in distribution. It uses the transformed rejection method of Hörmann ([](references.md#ref-hormann)) when ten or more successes are expected, and otherwise sums the probabilities upward from zero successes. The generator chooses between the two algorithms by comparing the expected number of successes with ten, and it compares the probability with one half. In a load these quantities are often ratios of whole numbers, and they then lie within rounding error of ten or of one half. Both comparisons are therefore made with a small margin, so that the same algorithm is chosen in every build and a given `ran_seed` gives the same shot. The debug and the release build assign the same number of electrons to every macroparticle of the Gaussian bunch of `check_load.py` at eight seeds.
 
 A beamlet in which no macroparticle receives an electron is omitted from the load, so that a slice with few electrons contains approximately one beamlet for each electron. A macroparticle that receives no electron, in a beamlet that is retained, is kept with zero weight, so that the slice still consists of complete beamlets. A slice that receives no electron contains no particles.
 
@@ -143,7 +158,7 @@ The ratio $R_1(N)$ at the fundamental as a function of the number of electrons p
 
 :::{figure} generated/shot-noise/slices.svg
 :name: fig-shot-slices
-:alt: The noise power of each slice of a Gaussian bunch as a function of position along the bunch in nanometers, on a logarithmic axis from 1e-7 to 1e4. The points for the weight load lie on the line for the real beam. The points for the first-order kick fall below it in the tails.
+:alt: The noise power of each slice of a Gaussian bunch as a function of position along the bunch in nanometers, on a logarithmic axis from 1e-7 to 1e5. The points for the weight load lie on the line for the real beam. The points for the first-order kick fall below it in the tails. The points for the load without the quiet start lie above it in the core and below it in the tails.
 The upper plot of [](#fig-shot-bunch): 384 slices of three wavelengths, 48 seeds. For the weight load, the value in each slice is equal to the number of electrons in the slice, down to the slices in which a single electron was drawn in 48 shots. For the first-order kick, the value in a slice of the tails is the number of electrons multiplied by the ratio of [](#shot-clamp).
 :::
 
@@ -151,7 +166,7 @@ The weight load reproduces the noise of the real beam in every slice that receiv
 
 :::{figure} generated/shot-noise/spectrum.svg
 :name: fig-shot-spectrum
-:alt: The bunching spectrum of the whole bunch from zero to 8.6 resonant wavenumbers on a logarithmic axis. The spectrum of the weight load fluctuates about 1 at every wavenumber. The spectrum of the first-order kick rises from zero to 1 at the fundamental, falls to 0.04 below the second harmonic and is near 4 above the fifth. The spectrum of the load without noise consists of narrow lines at the thirds of the resonant wavenumber.
+:alt: The bunching spectrum of the whole bunch from zero to 8.6 resonant wavenumbers on a logarithmic axis. The spectrum of the weight load fluctuates about 1 at every wavenumber. The spectrum of the first-order kick rises from zero to 1 at the fundamental, falls to 0.04 below the second harmonic and is near 4 above the fifth. The spectrum of the load without the quiet start is constant near 4.4. The spectrum of the quiet load without shot noise consists of narrow lines at the thirds of the resonant wavenumber.
 The lower plot of [](#fig-shot-bunch), at the frequencies of the window and without binning. The fluctuation about the mean is the statistical fluctuation of 48 shots.
 :::
 
@@ -163,16 +178,16 @@ The spectrum below 2.2 resonant wavenumbers on a linear scale. The curves with m
 
 The spectrum of the weight load is white, and the table that follows [](#fig-shot-bunch) gives its mean in six bands. The spectrum of the first-order kick is not white. Below the fundamental it decreases toward zero, because the charge of a slice does not fluctuate, and its mean is 0.004 of the shot noise below $0.3\,k_r$. It is 0.87 in the band centered on the fundamental, 0.04 at $1.33\,k_r$ and 2 at $1.7\,k_r$. Above the fourth harmonic it lies between 3 and 4.4, as a result of the higher orders of the kick.
 
-Without noise, the spectrum is below $10^{-14}$ between the multiples of $k_r/3$ and vanishes at the multiples themselves, because the macroparticles of a slice lie on a uniform grid that spans the slice ([](fel-physics.md#sec-quiet)). On either side of each multiple $m\,k_r/3$ there is a narrow line. The two lines are separated by $0.003\,k_r$, and their height is 1.2 for $m = 1$ and decreases as $1/m^2$, to 0.13 at the fundamental. These lines arise from the representation of the current, which is constant over each slice of three wavelengths and changes discontinuously from one slice to the next. They are present in the two loads with noise as well.
+With the quiet start and without shot noise, the spectrum is below $10^{-14}$ between the multiples of $k_r/3$ and vanishes at the multiples themselves, because the macroparticles of a slice lie on a uniform grid that spans the slice ([](fel-physics.md#sec-quiet)). On either side of each multiple $m\,k_r/3$ there is a narrow line. The two lines are separated by $0.003\,k_r$, and their height is 1.2 for $m = 1$ and decreases as $1/m^2$, to 0.13 at the fundamental. These lines arise from the representation of the current, which is constant over each slice of three wavelengths and changes discontinuously from one slice to the next. They are present in the two loads with shot noise as well. The load without the quiet start is discussed in [](#shot-quiet).
 
 The script `tests/scripts/shot_noise_monte_carlo.py` draws the numbers $c_j$ directly, without running the program, in three forms: independent Poisson numbers for a single beamlet, a slice of 16 beamlets with a fixed total, and a particle in the keep mode. At 150, 18, 4, 3.76, 1 and 0.25 electrons per beamlet, with $10^8$ draws of the first and third forms and $1.25\times10^7$ of the second, the means at harmonics 1 to 7 agree with the expressions above to within 2.7 standard errors of the mean at all 126 points (2026-11-11). The standard error lies between $1.4\times10^{-4}$ and $2.8\times10^{-4}$, and the largest difference is $5\times10^{-4}$. At 3.76 electrons per beamlet, the slice of 16 beamlets contains 60.16 electrons and is represented by 60. Its mean lies between 1.0024 and 1.0031, and [](#eq-shot-weight-ratio) gives 1.0027.
 
 | load | electrons per beamlet | noise power of the load over shot-noise power, `"first_order"` | `"weight"` | start-up power, `"weight"` over `"first_order"` | ratio of the two levels | exit pulse energy, `"first_order"` | `"weight"` | run time, `"first_order"` | `"weight"` |
 |---|---|---|---|---|---|---|---|---|---|
-| import, kept bunch | 3.76 | 0.5452 | 1.0000 | 1.85 ± 0.18 | 1.83 | 8.10 ± 0.27 pJ | 14.82 ± 0.67 pJ | 53.9 s | 53.0 s |
-| sase | 73.2 | 0.9673 | 1.0000 | 1.11 ± 0.09 | 1.034 | 3.40 ± 0.91 nJ | 2.41 ± 0.55 nJ | 40.2 s | 40.0 s |
-| FLASH1 | 16700 at the peak | 0.9995 | 1.0000 | 1.035 ± 0.024 | 1.0005 | 48.4 ± 0.9 µJ | 48.9 ± 1.9 µJ | 19.1 s | 19.0 s |
-| LCLS | 1250 at the peak | 0.9981 | 1.0000 | 1.011 ± 0.011 | 1.0019 | 278.9 ± 1.2 µJ | 277.4 ± 1.7 µJ | 63.1 s | 63.1 s |
+| import, kept bunch | 3.76 | 0.5452 | 1.0000 | 1.85 ± 0.18 | 1.83 | 8.10 ± 0.27 pJ | 14.82 ± 0.67 pJ | 53.9 s | 52.9 s |
+| sase | 73.2 | 0.9673 | 1.0000 | 1.08 ± 0.08 | 1.034 | 3.40 ± 0.91 nJ | 2.11 ± 0.70 nJ | 39.9 s | 39.8 s |
+| FLASH1 | 16700 at the peak | 0.9995 | 1.0000 | 0.990 ± 0.019 | 1.0005 | 48.4 ± 0.9 µJ | 50.5 ± 1.9 µJ | 18.9 s | 18.9 s |
+| LCLS | 1250 at the peak | 0.9981 | 1.0000 | 1.011 ± 0.011 | 1.0019 | 278.9 ± 1.2 µJ | 277.4 ± 1.7 µJ | 62.2 s | 63.3 s |
 
 The table gives four cases, each tracked with `run.ran_seed` 1 to 6 by each method on 2026-11-11. The entries are means over the six shots with their standard errors. The start-up power is the power summed over the window one gain length into the undulator line, and the run time is a median on 12 threads. With the weight load each case starts at the level given by the closed forms, to within the spread of six shots. The run time is unchanged, and the charge of the load is equal to that of the input file to rounding error. For these reasons the weight load is the default.
 
