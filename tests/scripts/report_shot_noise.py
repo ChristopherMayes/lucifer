@@ -53,11 +53,11 @@ def table_ratio():
         rows.append([f"{n:g}", first, f"{float(snr.ratio_one_harmonic(n)):.3f}"]
                     + [f"{float(snr.ratio(n, h, M)):.3f}" for h in HARMONICS])
     return block("tab-shot-ratio",
-                 "The mean square bunching the first-order kick imposes, over the shot-noise value, against "
-                 "the electrons one beamlet holds. The first two columns kick one harmonic. The "
-                 f"last three are the default beamlet's, {M} macroparticles with {len(HARMONICS)} harmonics "
-                 "kicked together. Below one electron the kick is the one for one electron.",
-                 ["electrons a beamlet", "$1 - 2/N$", "one harmonic"]
+                 "The ratio of the mean square bunching imposed by the first-order kick to the shot-noise value, "
+                 "as a function of the number of electrons per beamlet. The first two columns are for a kick at a "
+                 f"single harmonic. The last three are for the default beamlet of {M} macroparticles, with kicks at "
+                 f"{len(HARMONICS)} harmonics together. Below one electron the kick is that for one electron.",
+                 ["electrons per beamlet", "$1 - 2/N$", "one harmonic"]
                  + [f"default beamlet, $h = {h}$" for h in HARMONICS], rows)
 
 
@@ -66,11 +66,11 @@ def table_methods():
     for n in COUNTS:
         rows.append([f"{n:g}", "1.000", f"{float(snr.ratio_weight_kept(n)):.3f}", f"{float(snr.ratio(n, 1, M)):.3f}"])
     return block("tab-shot-methods",
-                 "The noise power loaded at the fundamental over the shot-noise power, against the electrons one "
-                 "beamlet holds, under the two values of `beam.shot_noise_method`. The weight load's columns "
-                 "hold at every harmonic below the beamlet size. In the keep mode a particle under one electron "
-                 "is counted as one electron.",
-                 ["electrons a beamlet", '`"weight"`, sample mode', '`"weight"`, keep mode', '`"first_order"`'],
+                 "The ratio of the noise power of the load at the fundamental to the shot-noise power, as a function "
+                 "of the number of electrons per beamlet, for the two values of `beam.shot_noise_method`. The columns "
+                 "for the weight load apply at every harmonic below the beamlet size. In the keep mode a particle "
+                 "of less than one electron is represented by one electron.",
+                 ["electrons per beamlet", '`"weight"`, sample mode', '`"weight"`, keep mode', '`"first_order"`'],
                  rows)
 
 
@@ -84,9 +84,9 @@ def floor(deficit, h):
 def table_floor():
     rows = [[f"{100 * d:g}%"] + [f"{int(np.ceil(floor(d, h)))}" for h in HARMONICS] for d in DEFICITS]
     return block("tab-shot-floor",
-                 "The fewest electrons a beamlet may hold for the imposed noise power to be "
-                 f"within the stated fraction of the shot-noise power under the first-order kick, for the default "
-                 f"beamlet of {M} macroparticles.",
+                 "The smallest number of electrons per beamlet for which the noise power imposed by the first-order "
+                 f"kick is within the stated fraction of the shot-noise power, for the default beamlet of {M} "
+                 "macroparticles.",
                  ["deficit"] + [f"$h = {h}$" for h in HARMONICS], rows)
 
 
@@ -97,9 +97,10 @@ def table_bands(record):
     for i, (lo, hi) in enumerate(record["bands"]):
         rows.append([f"{lo:g} to {hi:g}"] + [f"{record['methods'][key]['bands'][i]:.3g}" for key, _ in names])
     return block("tab-shot-bands",
-                 f"The mean of $|S(k)|^2/N$ of [](#fig-shot-bunch)'s bunch in six bands of the wavenumber over "
-                 f"the resonant one, {record['seeds']} seeds. The real beam's value is 1. "
-                 f"`shot_noise_spectrum.py` holds the weight load within {record['bound']:g} of 1 in every band.",
+                 f"The mean of $|S(k)|^2/N$ for the bunch of [](#fig-shot-bunch) in six bands of the wavenumber, "
+                 f"in units of the resonant wavenumber, with {record['seeds']} seeds. The value for the real beam "
+                 f"is 1. The script `shot_noise_spectrum.py` requires the weight load to be within "
+                 f"{record['bound']:g} of 1 in every band.",
                  ["$k/k_r$"] + [label for _, label in names], rows)
 
 
