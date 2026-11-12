@@ -59,6 +59,18 @@ $$ (eq-shot-quiet)
 
 to each of which a multiple of $2\pi$ is added when the slice is several wavelengths long. This multiple has no effect at any harmonic. The sum of $e^{-ih\theta_j}$ over $j$ vanishes unless $h$ is a multiple of $M$, so that the beamlet has no bunching at any harmonic below $M$. A slice composed of $n_p/M$ such beamlets therefore does not radiate.
 
+:::{figure} generated/shot-noise/phasors-quiet.svg
+:name: fig-shot-phasors-quiet
+:alt: Two unit circles with eight points each. On the left the points are at irregular phases and a bunching phasor is drawn from the center. On the right the points are evenly spaced and the bunching is zero.
+Eight macroparticles of equal weight on the unit circle, each at $e^{-i\theta_j}$. The arrow is their mean, the bunching phasor $b$ at the fundamental. Left: independent phases, as with `quiet_start = false`. The rms length of the phasor is $1/\sqrt{8} = 0.35$, and it is 0.30 for the phases shown. Right: the quiet beamlet of [](#eq-shot-quiet), for which the points sum to zero.
+:::
+
+:::{figure} generated/shot-noise/slice-fill.svg
+:name: fig-shot-slice-fill
+:alt: Two panels with position in the slice on the horizontal axis, from 0 to 3 wavelengths. In the upper panel six rows of eight evenly spaced points lie within the first wavelength, each row displaced slightly from the one below. In the lower panel the same six rows are distributed over three wavelengths, two rows in each wavelength. A bottom row in each panel shows all 48 points on one even grid.
+The positions of the macroparticles of a quiet slice of 6 beamlets of 8 macroparticles. Each row is one beamlet, the macroparticles of which have the same transverse coordinates and the same energy. The bottom row shows all 48 macroparticles, which lie on a single even grid over the slice. Upper panel: a slice one wavelength long (`window.n_wavelength = 1`). Each beamlet extends over the wavelength, with a spacing of $\lambda_r/8$. Lower panel: a slice three wavelengths long. Each beamlet lies within one wavelength, with the same spacing, and the beamlets are distributed equally among the three wavelengths.
+:::
+
 The noise of a beamlet is determined by the number of electrons that it represents,
 
 $$
@@ -107,6 +119,12 @@ $$
 $$ (eq-shot-weight)
 
 This is the result [](#eq-shot-real) for the real beam, and its derivation involves no approximation. The bunching is linear in the numbers $c_j$, so that no expansion in a small parameter is required. The result holds for any $N$, integral or not, and at every harmonic below $M$, which for the default beamlet are the harmonics 1 to 7. When a beamlet represents about one electron, most of its macroparticles are assigned no electron and a few are assigned one. In that limit the load consists of the individual electrons, each at one of $M$ phases.
+
+:::{figure} generated/shot-noise/phasors-weight.svg
+:name: fig-shot-phasors-weight
+:alt: Two unit circles, each with eight evenly spaced points labeled by a whole number. On the left the numbers are between 2 and 8 and the points have areas in proportion. On the right two points are labeled 1 and six open circles are labeled 0. A bunching phasor is drawn from each center.
+The quiet beamlet of 8 macroparticles under the weight load. The phases are those of [](#fig-shot-phasors-quiet). The number beside each macroparticle is the number of electrons $c_j$ assigned to it, and the area of its marker is proportional to that number. Left: a beamlet of $N = 40$ electrons, in which the mean count is 5. Right: a beamlet of $N = 2$ electrons, in which two macroparticles are assigned one electron each and the open circles are assigned none. The arrow is the bunching phasor at the fundamental, $b = S_1/\sum_j c_j$. Its rms length is $1/\sqrt{N}$, which is 0.16 on the left and 0.71 on the right.
+:::
 
 ### Conservation of the bunch charge
 
