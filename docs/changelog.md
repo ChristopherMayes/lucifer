@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-12 Fixed: `.github/workflows/lucifer-docs.yml` installs Node 22, where it installed Node 20.
+  The workflow installs the current mystmd from npm, and mystmd 1.13.0, released 2026-11-12, requires
+  Node 22 or later and stops before the build under Node 20, so the site was neither built nor
+  deployed.
 - 2026-11-11 Changed: `docs/shot-noise.md` is rewritten in the register of a physics text, and it
   leads with the quiet start. A new section derives the noise of macroparticles at random phases,
   which is the shot-noise power multiplied by the number of electrons per macroparticle, and the

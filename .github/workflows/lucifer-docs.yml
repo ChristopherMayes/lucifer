@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "22"
 
       # npm and pip rather than conda-forge here, which is the opposite of the rule for a
       # workstation. A runner is thrown away after the job, so there is no shared
