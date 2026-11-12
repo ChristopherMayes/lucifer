@@ -245,9 +245,9 @@ call add ('beam', 'beamlet_min_electrons', key_real$, 'electrons', 'beamlet elec
       'particles. 0 gives every slice n_particle.', lo = 0.0_rp)
 call add ('beam', 'shot_noise_method', key_string$, '', 'shot-noise method', &
       'How the shot noise is imposed: weight, a whole number of electrons counted into each ' // &
-      'macroparticle with the bunch charge held, bessel, a phase kick sized from the bunching J1 ' // &
-      'that a kick gives, or first_order, a kick of twice the bunching asked for, as Genesis4.', &
-      allowed = [character(16) :: 'weight', 'bessel', 'first_order'])
+      'macroparticle with the bunch charge held, or first_order, a phase kick of twice the ' // &
+      'bunching asked for, as Fawley''s algorithm and Genesis4.', &
+      allowed = [character(16) :: 'weight', 'first_order'])
 call add ('beam', 'write_genesis_dist', key_path$, '', 'genesis distribution', &
       'Write the bunch as a Genesis4 importdistribution file.')
 call add ('beam', 'write_openpmd_file', key_path$, '', 'openPMD bunch', &

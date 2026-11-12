@@ -340,10 +340,9 @@ type fel_beam_init_param_struct
   real(rp) :: beamlet_min_electrons = 1
   ! How the shot noise is imposed on the quiet load (docs/shot-noise.md).
   ! "weight" counts electrons into the weights of the beamlets and leaves the phases
-  ! (fel_weight_noise). The other two kick the phases. A draw asks a group for a bunching,
-  ! and a kick of size z gives it J1(z). "bessel" takes the z that gives the bunching
-  ! asked for (fel_bessel_kick). "first_order" takes z = twice the bunching, the
-  ! small-kick form, which is Genesis4's and loads less than the shot noise.
+  ! (fel_weight_noise). "first_order" kicks the phases by Fawley's algorithm, with a kick
+  ! of twice the bunching a draw asks for, which is Genesis4's and loads less than the
+  ! shot noise (fel_fawley_noise).
   character(16) :: shot_noise_method = 'weight'
   ! Check instruments, set by the validation suite. They are not physics inputs.
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.

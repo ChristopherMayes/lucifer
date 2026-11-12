@@ -54,7 +54,7 @@ type fel_resample_param_struct
   real(rp) :: beamlet_min_electrons = 0  ! Fewest electrons a beamlet stands for. 0: one count
                                          !   in every slice (fel_beamlet_count).
   logical :: skip_empty = .false.        ! Load a slice with no charge with no particles.
-  integer :: noise_method = fel_noise_bessel$   ! How the shot noise is imposed (beam.shot_noise_method).
+  integer :: noise_method = fel_noise_weight$   ! How the shot noise is imposed (beam.shot_noise_method).
   integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
   ! For validation only: resample a bunch Bmad generated from beam_init, and not one read
   ! from a file. So the SDDSBeam transcription can be checked on a known bunch. A

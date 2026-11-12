@@ -9,6 +9,41 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-11 Changed: `beam.shot_noise_method = "bessel"` is removed. The key is `"weight"`, the
+  default, or `"first_order"`, and an input file that set `"bessel"` is refused with the two values
+  in the message. It sets `"weight"` for the shot noise at every electron count, or `"first_order"`
+  for Fawley's and Genesis4's kick. Under the two values that stay every load is the same bits as
+  before, and no recorded level moves. `"bessel"` sized the kick at each harmonic as the z at which
+  J1(z) is the bunching the draw asks for, and held a draw that asked for more than J1's maximum,
+  0.5819 at z = 1.8412, at that kick. With one harmonic kicked its level was 1 - exp(-0.3386 N) for
+  a beamlet of N electrons. With the three kicks of the default beamlet it was 1 - 4/(9N), 1 +
+  0.99/N and 1 + 0.00/N at harmonics 1 to 3 to first order in 1/N: 0.991 at 48.8 electrons a
+  beamlet, 0.91 at 10 and 0.22 at one, where the first-order kick has 0.951, 0.79 and 0.16. The
+  share of the draws held was exp(-0.3386 N): 0.2% at 18 electrons a beamlet, 3.4% at 10 and 71% at
+  one. A Monte Carlo of 4e8 beamlets at each of six electron counts agreed with its closed form
+  within two standard errors of 5e-5. A kick that gave a beamlet the three bunchings asked for at
+  once was looked for by Newton's method and exists for every one of 2000 beamlets at 150 electrons
+  a beamlet, for 90% at 50, for 42% at 18 and for 16% at 10, so it was not taken. The method is
+  removed because it is a kick. On a Gaussian bunch of 384 slices of three wavelengths, 50 electrons
+  a beamlet at its peak, at 12 seeds, it loaded 1.06 times what `"first_order"` loads up to the
+  third harmonic and shared the rest with it: 1e-4 of a slice's shot noise at five rms lengths from
+  the peak, 0.004 of the shot noise below 0.3 of the resonant wavenumber and 5 times it at the
+  eighth harmonic. The weight load is the shot noise in each of those places. `docs/shot-noise.md`
+  is put in the order of use, the default first, and opens with the two measurements as figures: the
+  noise power of every slice of that bunch against its place, and the bunching spectrum of the bunch
+  from zero to 8.6 resonant wavenumbers, at 48 seeds under each method and with no noise.
+  `tests/scripts/shot_noise_spectrum.py` runs the loads on demand and writes the record
+  `docs/generated/shot-noise/spectrum.json`, which it refuses to write when the weight load's
+  spectrum is more than 0.05 from the shot noise in one of six bands. The record has the weight load
+  at 0.985 to 1.007 in the six, and the first-order kick at 0.0037 below 0.3 resonant wavenumbers,
+  0.87 about the fundamental and 4.3 above the eighth harmonic. `report_shot_noise.py` writes the
+  page's table of the bands from the record and `shot_noise_figures.py` draws its figures from it.
+  With no noise the spectrum is under 1e-14 between the multiples of a third of the resonant
+  wavenumber. Beside each multiple it has a pair of narrow lines, 1.2 times the shot noise at the
+  first and falling as the inverse square of the multiple, which are the steps of the current from
+  one slice of three wavelengths to the next. `tests/scripts/shot_noise_monte_carlo.py` loses its
+  `--joint` and `--weight` options: it draws the weight load's counts, and with `--kick` the first-
+  order kick.
 - 2026-11-11 Fixed: a slice of several wavelengths was loaded with all its particles in one of its
   periods. A slice is `window.n_wavelength` wavelengths long and holds the charge of all of them,
   and the generator, the resampler and the keep mode each stood its particles in the first: with
@@ -55,7 +90,7 @@ of that history. The entries before that date describe that branch.
   harmonic field may now start from noise up to harmonic `beamlet_size - 1`. Every example with
   shot noise is rerun.
 - 2026-11-11 Changed: the shot-noise kick is sized from the bunching it gives, and the new key
-  `beam.shot_noise_kick` selects it ([](shot-noise.md#shot-bessel)). A kick of size z gives a
+  `beam.shot_noise_kick` selects it. A kick of size z gives a
   beamlet the bunching J1(z). The loader sized it as z/2, the first-order form of Fawley's
   algorithm, so a beamlet of N electrons started with less than its shot noise: low by about
   2.4/N at the fundamental, 0.95 of it at 50 electrons a beamlet and 0.16 at one. With

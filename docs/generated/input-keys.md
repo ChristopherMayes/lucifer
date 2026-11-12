@@ -91,7 +91,7 @@
 | `beamlet_size` | integer | `8` |  | from 1 | Copies per beamlet, and the harmonics the noise resolves. |
 | `shot_noise` | true/false | false |  |  | Impose the physical noise on the load's groups. Time-dependent windows only. |
 | `beamlet_min_electrons` | real | `1` | electrons | from 0 | Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice with too little charge is loaded with fewer beamlets, and a slice with none with no particles. 0 gives every slice n_particle. |
-| `shot_noise_method` | string | `"weight"` |  | `"weight"`, `"bessel"`, `"first_order"` | How the shot noise is imposed: weight, a whole number of electrons counted into each macroparticle with the bunch charge held, bessel, a phase kick sized from the bunching J1 that a kick gives, or first_order, a kick of twice the bunching a |
+| `shot_noise_method` | string | `"weight"` |  | `"weight"`, `"first_order"` | How the shot noise is imposed: weight, a whole number of electrons counted into each macroparticle with the bunch charge held, or first_order, a phase kick of twice the bunching asked for, as Fawley's algorithm and Genesis4. |
 | `write_genesis_dist` | string | `""` |  |  | Write the bunch as a Genesis4 importdistribution file. |
 | `write_openpmd_file` | string | `""` |  |  | Write the bunch as openPMD-beamphysics. |
 | `split_weights` | true/false | false |  |  | Check instrument: coincident copies carrying 1/3 and 2/3 of each weight after loading. |
