@@ -2,6 +2,12 @@
 """
 Draw the figures of docs/shot-noise.md.
 
+    phasors-quiet.svg   eight macroparticles on the unit circle at independent phases and
+                  as a quiet beamlet, with the bunching phasor of each
+    slice-fill.svg  the places of a quiet slice's macroparticles, a row a beamlet, in a
+                  slice of one wavelength and in one of three (fel_slice_fill)
+    phasors-weight.svg  the quiet beamlet with a whole number of electrons on each
+                  macroparticle, at 40 electrons a beamlet and at 2
     beamlet.svg   a beamlet's phases on the unit circle before and after the kick, with
                   the bunching phasor the kick leaves
     kick.svg      J1(z) against z/2, under the distribution of the kick z at 150, 18 and
@@ -82,24 +88,152 @@ def measured(levels):
     return out
 
 
+# The phases drawn for a beamlet of independent macroparticles in phasors-quiet.svg, in
+# units of 2 pi. They are fixed numbers, so that the figure is the same at every drawing.
+LOUD_DRAWN = (0.02, 0.09, 0.14, 0.27, 0.31, 0.55, 0.78, 0.88)
+
+# The electron counts drawn in phasors-weight.svg for a beamlet of 40 electrons and for
+# one of 2, each a sample of independent Poisson counts of mean N / M.
+COUNTS_DRAWN = ((40, (3, 7, 6, 8, 4, 5, 2, 5)), (2, (1, 0, 0, 1, 0, 0, 0, 0)))
+
+
+def _quiet_phases():
+    return 2 * np.pi * np.arange(M) / M + 0.25
+
+
+def _circle(ax, title):
+    """The unit circle and its axes, on which a macroparticle of phase theta is at exp(-i theta)."""
+    circle = np.linspace(0, 2 * np.pi, 361)
+    ax.plot(np.cos(circle), np.sin(circle), color="0.6", lw=1)
+    ax.plot([-1.15, 1.15], [0, 0], color="0.6", lw=0.6)
+    ax.plot([0, 0], [-1.15, 1.15], color="0.6", lw=0.6)
+    ax.set_aspect("equal")
+    ax.set_xlim(-1.4, 1.4)
+    ax.set_ylim(-1.4, 1.4)
+    ax.axis("off")
+    ax.set_title(title, fontsize=10, pad=8)
+
+
+def _phasor(ax, lp, b, label):
+    """The bunching phasor from the center, or a point at the center where it vanishes."""
+    if abs(b) < 1e-9:
+        ax.plot(0, 0, "o", color=lp.COLORS[1], ms=4, zorder=4)
+        ax.text(0.08, 0.08, label, color=lp.COLORS[1])
+        return
+    ax.annotate("", xy=(b.real, b.imag), xytext=(0, 0), zorder=4,
+                arrowprops=dict(arrowstyle="-|>", color=lp.COLORS[1], lw=2, shrinkA=0, shrinkB=0))
+    u = b / abs(b)
+    at = b + 0.2 * u if abs(b) > 0.45 else b + 0.42 * u
+    ax.text(at.real, at.imag, label, color=lp.COLORS[1], ha="center", va="center",
+            bbox=dict(fc="white", ec="none", pad=1, alpha=0.8))
+
+
+# The slices drawn in slice-fill.svg: beamlets a slice, and the wavelengths of the two slices.
+FILL_BEAMLETS = 6
+FILL_PERIODS = (1, 3)
+
+
+def slice_fill(n_beamlet, n_period):
+    """The places of a quiet slice's macroparticles, in wavelengths from the slice's tail.
+
+    Returns an array [n_beamlet, M]. It is fel_slice_fill of src/fel_beam_mod.f90 where the
+    slice's one even grid divides into beamlets, which holds for the slices drawn."""
+    n_tot = n_beamlet * M
+    g = int(np.gcd(n_period, n_tot))
+    if n_beamlet % g:
+        raise SystemExit(f"slice_fill: {n_beamlet} beamlets do not divide over {n_period} wavelengths")
+    place = np.full((n_beamlet, M), -1.0)
+    seen = np.zeros((n_beamlet // g, M), int)
+    for j in range(n_tot):
+        q = ((2 * j + 1) * n_period) % (2 * n_tot)
+        copy, key = divmod(q, 2 * n_beamlet)
+        cls = key // (2 * g)
+        place[cls * g + seen[cls, copy], copy] = (2 * j + 1) * n_period / (2 * n_tot)
+        seen[cls, copy] += 1
+    if (place < 0).any():
+        raise SystemExit("slice_fill: a macroparticle has no place")
+    return place
+
+
+def draw_slice_fill(plt, lp, path):
+    """slice-fill.svg: the beamlets of a slice one wavelength long and of one three wavelengths long."""
+    fig, axes = plt.subplots(len(FILL_PERIODS), 1, figsize=(7.2, 4.6), layout="constrained", sharex=True)
+    n_max = max(FILL_PERIODS)
+    for ax, n in zip(axes, FILL_PERIODS):
+        place = slice_fill(FILL_BEAMLETS, n)
+        ax.axvspan(0, n, color="0.93", lw=0)
+        for k in range(n_max + 1):
+            ax.axvline(k, color="0.6", lw=0.6)
+        for b in range(FILL_BEAMLETS):
+            ax.plot(place[b], np.full(M, b + 1), "o", color=lp.COLORS[b % len(lp.COLORS)], ms=6, zorder=3)
+            ax.plot(np.sort(place[b]), np.full(M, b + 1), color=lp.COLORS[b % len(lp.COLORS)], lw=0.6, zorder=2)
+        ax.plot(place.ravel(), np.zeros(place.size), "|", color=lp.INK2, ms=9, zorder=3)
+        ax.set_yticks(range(FILL_BEAMLETS + 1), ["all"] + [f"beamlet {b + 1}" for b in range(FILL_BEAMLETS)])
+        ax.set_ylim(-0.6, FILL_BEAMLETS + 0.6)
+        ax.set_xlim(-0.05, n_max + 0.05)
+        ax.tick_params(axis="y", length=0)
+        ax.text(1.01, 0.5, f"n_wavelength = {n}", transform=ax.transAxes, rotation=270, va="center", fontsize=9)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+    axes[-1].set_xticks(range(n_max + 1))
+    axes[-1].set_xlabel(r"position in the slice, $\zeta/\lambda_r$")
+    lp.save(fig, path)
+    plt.close(fig)
+
+
+def draw_phasors_quiet(plt, lp, path):
+    """phasors-quiet.svg: a beamlet's worth of macroparticles at independent phases, and the quiet beamlet."""
+    loud = 2 * np.pi * np.array(LOUD_DRAWN)
+    quiet = _quiet_phases()
+    b_loud = np.exp(-1j * loud).mean()
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.7), layout="constrained")
+    _circle(axes[0], "quiet_start = false")
+    axes[0].plot(np.cos(loud), -np.sin(loud), "o", color=lp.COLORS[0], ms=7, zorder=3)
+    _phasor(axes[0], lp, b_loud, f"$|b| = {abs(b_loud):.2f}$")
+    _circle(axes[1], "quiet_start = true")
+    axes[1].plot(np.cos(quiet), -np.sin(quiet), "o", color=lp.COLORS[0], ms=7, zorder=3)
+    _phasor(axes[1], lp, 0j, "$b = 0$")
+    lp.save(fig, path)
+    plt.close(fig)
+    return abs(b_loud)
+
+
+def draw_phasors_weight(plt, lp, path):
+    """phasors-weight.svg: the quiet beamlet with whole electron counts on its macroparticles."""
+    theta = _quiet_phases()
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.7), layout="constrained")
+    out = []
+    for ax, (n, counts) in zip(axes, COUNTS_DRAWN):
+        c = np.array(counts, float)
+        _circle(ax, f"$N = {n}$")
+        x, y = np.cos(theta), -np.sin(theta)
+        has = c > 0
+        # The area of a marker is proportional to its count, and the mean count N / M has one
+        # size in both panels, or one electron where N / M is less.
+        size = 10 * np.sqrt(c / max(n / M, 1.0))
+        ax.plot(x[~has], y[~has], "o", mfc="white", mec="0.6", ms=10, zorder=3)
+        ax.scatter(x[has], y[has], s=size[has] ** 2, color=lp.COLORS[0], zorder=3, linewidths=0)
+        for xi, yi, ci in zip(x, y, counts):
+            ax.text(1.27 * xi, 1.27 * yi, f"{ci}", ha="center", va="center", fontsize=9,
+                    color=lp.INK2 if ci else "0.6")
+        b = (c * np.exp(-1j * theta)).sum() / c.sum()
+        _phasor(ax, lp, b, f"$|b| = {abs(b):.2f}$")
+        out.append(abs(b))
+    lp.save(fig, path)
+    plt.close(fig)
+    return out
+
+
 def draw_beamlet(plt, lp, path):
-    theta = 2 * np.pi * np.arange(M) / M + 0.25
+    theta = _quiet_phases()
     kicked = theta - Z_DRAWN * np.sin(theta + PHI_DRAWN)
     b = np.exp(-1j * kicked).mean()
-    circle = np.linspace(0, 2 * np.pi, 361)
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.7), layout="constrained")
     for ax, ph, title in ((axes[0], theta, "quiet"), (axes[1], kicked, "after the kick")):
-        ax.plot(np.cos(circle), np.sin(circle), color=lp.GRAY, lw=1)
-        ax.plot([-1.15, 1.15], [0, 0], color=lp.GRAY, lw=0.6)
-        ax.plot([0, 0], [-1.15, 1.15], color=lp.GRAY, lw=0.6)
-        ax.set_aspect("equal")
-        ax.set_xlim(-1.3, 1.3)
-        ax.set_ylim(-1.3, 1.3)
-        ax.axis("off")
-        ax.set_title(title, fontsize=10)
+        _circle(ax, title)
         ax.plot(np.cos(ph), -np.sin(ph), "o", color=lp.COLORS[0], ms=7, zorder=3)
     ax = axes[1]
-    ax.plot(np.cos(theta), -np.sin(theta), "o", mfc="none", mec=lp.GRAY, ms=7, zorder=2)
+    ax.plot(np.cos(theta), -np.sin(theta), "o", mfc="none", mec="0.6", ms=7, zorder=2)
     for t0, t1 in zip(theta, kicked):
         if abs(t1 - t0) < 0.12:
             continue
@@ -108,12 +242,8 @@ def draw_beamlet(plt, lp, path):
         ax.annotate("", xy=(1.13 * np.cos(arc[-1]), -1.13 * np.sin(arc[-1])),
                     xytext=(1.13 * np.cos(arc[-3]), -1.13 * np.sin(arc[-3])),
                     arrowprops=dict(arrowstyle="-|>", color=lp.INK2, lw=0.9, shrinkA=0, shrinkB=0))
-    ax.annotate("", xy=(b.real, b.imag), xytext=(0, 0),
-                arrowprops=dict(arrowstyle="-|>", color=lp.COLORS[1], lw=2, shrinkA=0, shrinkB=0))
-    ax.text(b.real + 0.06, b.imag + 0.1, r"$|b| = J_1(z)$", color=lp.COLORS[1],
-            ha="center", va="bottom")
-    axes[0].plot(0, 0, "o", color=lp.COLORS[1], ms=4)
-    axes[0].text(0.08, 0.08, r"$b = 0$", color=lp.COLORS[1])
+    _phasor(ax, lp, b, r"$|b| = J_1(z)$")
+    _phasor(axes[0], lp, 0j, "$b = 0$")
     lp.save(fig, path)
     plt.close(fig)
     return abs(b)
@@ -309,12 +439,16 @@ def main():
         raise SystemExit(f"{record}: no record of the loaded bunch. Run shot_noise_spectrum.py first.")
     rec = json.loads(record.read_text())
     with lp._style():
+        draw_slice_fill(plt, lp, out / "slice-fill.svg")
+        b_loud = draw_phasors_quiet(plt, lp, out / "phasors-quiet.svg")
+        b_weight = draw_phasors_weight(plt, lp, out / "phasors-weight.svg")
         b = draw_beamlet(plt, lp, out / "beamlet.svg")
         draw_kick(plt, lp, out / "kick.svg")
         draw_ratio(plt, lp, out / "ratio.svg", points)
         draw_weight(plt, lp, out / "weight.svg", points_weight)
         draw_bunch(plt, lp, out, rec)
-    print(f"wrote {out}: 8 figures, the drawn kick of {Z_DRAWN:g} rad leaves |b| = {b:.4f}, "
+    print(f"wrote {out}: 11 figures, |b| = {b_loud:.4f} at the independent phases drawn and "
+          f"{b_weight[0]:.4f}, {b_weight[1]:.4f} at the counts drawn, the drawn kick of {Z_DRAWN:g} rad leaves |b| = {b:.4f}, "
           f"J1 = {float(j1(Z_DRAWN)):.4f}")
     return 0
 
