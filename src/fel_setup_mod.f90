@@ -213,9 +213,10 @@ enddo
 ! harmonic from 2 to 3e2 times its power, one of exactly twice gives 1.1 to 1.6 times,
 ! and one above does not differ from a beamlet of twice the size. A size the input file
 ! did not set is twice the highest harmonic plus 2, which is 4 for the fundamental
-! alone, 8 with the third harmonic and 12 with the fifth. An unaveraged element
-! resolves every wavelength, and its load was measured at 8, so the size is 8 at least
-! there. In the sample mode a slice holds beam.n_particle macroparticles in whole
+! alone, 8 with the third harmonic and 12 with the fifth. The unaveraged mode carries
+! the fundamental alone and takes the same size: over the Aramis line its gain length at
+! beamlets of 4 and of 8 is the same to 2 parts in 1e4 at equal beamlets. In the sample
+! mode a slice holds beam.n_particle macroparticles in whole
 ! beamlets, so the size is the smallest divisor of that count at or above the size
 ! wanted. A size the input file set is honored above twice the highest harmonic and
 ! refused at or under it, where a harmonic is carried.
@@ -223,7 +224,6 @@ enddo
 h_max = maxval(harmonics)
 if (run%bparam%beamlet_size == 0) then
   m_size = 2 * h_max + 2
-  if (any(fel_mode == unaveraged$ .and. is_fel)) m_size = max(m_size, 8)
   if (run%bparam%quiet_start .and. run%bparam%load_mode == 'sample' .and. &
       .not. run%resample%use_beam_init) then
     do

@@ -338,8 +338,7 @@ type fel_beam_init_param_struct
   ! by independent phasors per group. With both off the beam is taken as it came.
   logical :: quiet_start = .true.
   ! Copies per beamlet, a loading parameter only. 0 derives it from the harmonics the
-  ! field set carries: twice the highest plus 2, 8 at least with an unaveraged element,
-  ! and in the sample mode the smallest divisor of beam.n_particle at or above that
+  ! field set carries: twice the highest plus 2, and in the sample mode the smallest divisor of beam.n_particle at or above that
   ! (fel_setup_lattice, docs/shot-noise.md). A beamlet not above twice the highest
   ! harmonic carried is refused, since the bunching at a lower harmonic appears at that one.
   integer :: beamlet_size = 0

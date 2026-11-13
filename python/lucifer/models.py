@@ -157,7 +157,7 @@ class Beam:
     quiet_start: bool = True
     """Load beamlets of beamlet_size phase copies, quiet below that harmonic."""
     beamlet_size: int = 0
-    """Copies per beamlet. 0 derives it: twice the highest harmonic of field.harmonics plus 2, 8 at least with an unaveraged element, and in the sample mode the smallest divisor of n_particle at or above that. A size not above twice the highest ha Bounds: from 0."""
+    """Copies per beamlet. 0 derives it: twice the highest harmonic of field.harmonics plus 2, and in the sample mode the smallest divisor of n_particle at or above that. A size not above twice the highest harmonic is refused. Bounds: from 0."""
     shot_noise: bool = False
     """Impose the physical noise on the load's groups. Time-dependent windows only."""
     beamlet_min_electrons: float = 1.0
