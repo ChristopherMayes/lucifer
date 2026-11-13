@@ -27,12 +27,17 @@ of that history. The entries before that date describe that branch.
   separating the members of a beamlet: 0.011 to 0.027 of the SASE power at 8192 macroparticles a
   slice in the example `sase` and 0.09 to 0.21 at 1024, a share of the start-up that the amplified
   radiation outgrows, with the test, the same input with `shot_noise = false`.
-  `check_shot_noise.py` holds the derived count, a set count and the header's note.
+  `check_shot_noise.py` holds the derived count, a set count and the header's note. The unaveraged
+  mode takes the same beamlet size as the averaged, 4 for the fundamental, where it took 8 at least:
+  over the Aramis line in that mode the gain length at beamlets of 4 and of 8 is 2.4219 and 2.4223 m
+  with 512 beamlets, and the maximum power agrees to 2%. The averaged twins of the examples
+  `unaveraged` and `mixed_line` no longer set `beamlet_size`, both runs of each pair deriving 4.
 - 2026-11-12 Changed: `beam.beamlet_size` is derived from the harmonics the run carries where the
   input file does not set it. It is twice the highest harmonic of `field.harmonics` plus 2, which is
   4 for the fundamental alone, 8 with the third harmonic and 12 with the fifth, where it was 8 in
   every run. In the sample mode it is the smallest divisor of `beam.n_particle` at or above that, 16
-  for the fifth harmonic at 4096 macroparticles, and with an unaveraged element it is 8 at least. The
+  for the fifth harmonic at 4096 macroparticles, and with an unaveraged element it was 8 at least until the
+  entry above. The
   header states the size, whether it was derived or set, and the highest harmonic a field may be
   carried at. On evenly spaced phases harmonic M - h of a beamlet of M is not distinguished from
   harmonic h, so the bunching of the fundamental appears at harmonic M - 1 of each beamlet,

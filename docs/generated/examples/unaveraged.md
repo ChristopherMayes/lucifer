@@ -33,34 +33,34 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | `lucifer_averaged.toml` | Unit |
 |---|---|---|---|
-| exit power | 4.4185e+03 | 4.4159e+03 | W |
-| exit power per slice | 4.4185e+03 | 4.4159e+03 | W |
-| exit window energy | 1.4738e-15 | 1.4730e-15 | J |
-| exit pulse energy, the window's and the light slipped out of it | 1.4738e-15 | 1.4730e-15 | J |
-| peak power | 5.0000e+03 | 5.0000e+03 | W |
+| exit power | 4.4242e+03 | 4.4245e+03 | W |
+| exit power per slice | 4.4242e+03 | 4.4245e+03 | W |
+| exit window energy | 1.4757e-15 | 1.4759e-15 | J |
+| exit pulse energy, the window's and the light slipped out of it | 1.4757e-15 | 1.4759e-15 | J |
+| peak power | 5.0001e+03 | 5.0000e+03 | W |
 | s of the peak power | 2.6899e-01 | 1.3449e-01 | m |
 | mode peak, power inside the split | 5.0000e+03 | 5.0000e+03 | W |
 | s of the mode peak | 0.0000e+00 | 0.0000e+00 | m |
-| exit power inside the split | 4.2156e+03 | 4.1988e+03 | W |
-| exit power outside the split | 2.0288e+02 | 2.1709e+02 | W |
-| outside over inside, the run's maximum | 2.2985e-07 | 2.2985e-07 |  |
-| outside over inside at the exit | 4.8127e-02 | 5.1702e-02 |  |
-| split angle | 2.9077e-06 | 2.9077e-06 | rad |
-| power at the first element end | 4.4185e+03 | 4.4159e+03 | W |
-| power per slice at the first element end | 4.4185e+03 | 4.4159e+03 | W |
-| initial bunching, mean |b| over slices | 3.6362e-17 | 3.6362e-17 |  |
-| exit bunching, mean |b| over slices | 5.9004e-04 | 5.9416e-04 |  |
-| exit bunching, the largest slice | 5.9004e-04 | 5.9416e-04 |  |
-| bunching, the maximum along the line of the mean |b| | 5.9004e-04 | 5.9416e-04 |  |
+| exit power inside the split | 4.3255e+03 | 4.3191e+03 | W |
+| exit power outside the split | 9.8688e+01 | 1.0539e+02 | W |
+| outside over inside, the run's maximum | 1.0404e-07 | 1.0404e-07 |  |
+| outside over inside at the exit | 2.2816e-02 | 2.4401e-02 |  |
+| split angle | 3.0007e-06 | 3.0007e-06 | rad |
+| power at the first element end | 4.4242e+03 | 4.4245e+03 | W |
+| power per slice at the first element end | 4.4242e+03 | 4.4245e+03 | W |
+| initial bunching, mean |b| over slices | 4.4450e-17 | 4.4450e-17 |  |
+| exit bunching, mean |b| over slices | 6.2174e-04 | 6.2626e-04 |  |
+| exit bunching, the largest slice | 6.2174e-04 | 6.2626e-04 |  |
+| bunching, the maximum along the line of the mean |b| | 6.2174e-04 | 6.2626e-04 |  |
 | s of the bunching maximum | 3.9900e+00 | 3.9900e+00 | m |
-| bunching at the mode peak | 3.6362e-17 | 3.6362e-17 |  |
-| power of the largest slice at the bunching maximum | 4.4185e+03 | 4.4159e+03 | W |
-| exit power of the largest slice | 4.4185e+03 | 4.4159e+03 | W |
+| bunching at the mode peak | 4.4450e-17 | 4.4450e-17 |  |
+| power of the largest slice at the bunching maximum | 4.4242e+03 | 4.4245e+03 | W |
+| exit power of the largest slice | 4.4242e+03 | 4.4245e+03 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
-| mean slice energy, exit minus start | 1.9411e-01 | 1.9024e-01 | eV |
-| slice energy spread at the start | 5.0869e+05 | 5.0869e+05 | eV |
-| slice energy spread at the exit | 5.0871e+05 | 5.0871e+05 | eV |
+| mean slice energy, exit minus start | 1.9219e-01 | 1.9024e-01 | eV |
+| slice energy spread at the start | 5.0149e+05 | 5.0149e+05 | eV |
+| slice energy spread at the exit | 5.0151e+05 | 5.0151e+05 | eV |
 | span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 |  |
 | records | 90 | 90 |  |
@@ -70,10 +70,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 3.1500e-06 | 3.1500e-06 | m |
 | grid derived by setup | no | no |  |
 | FEL steps | 5340 | 89 |  |
-| source filter, mode angle | 2.9080e-06 |  | rad |
-| source filter, rho angle | 2.5940e-06 |  | rad |
-| source filter, ratio of the angles | 1.1200e+00 |  |  |
-| source filter, edge | 2.9077e-06 |  | rad |
+| source filter, mode angle | 3.0010e-06 |  | rad |
+| source filter, rho angle | 2.6210e-06 |  | rad |
+| source filter, ratio of the angles | 1.1400e+00 |  |  |
+| source filter, edge | 3.0007e-06 |  | rad |
 
 ## The input files
 
@@ -116,8 +116,6 @@ write_diag = true
 
 [beam]
 n_particle = 2048
-# The unaveraged run loads beamlets of 8, and its averaged twin loads the same beam.
-beamlet_size = 8
 bunch_charge = 1.000692285594e-15
 sig_z = 0
 sig_pz = 8.804506566858e-5

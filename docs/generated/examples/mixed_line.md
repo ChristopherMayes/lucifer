@@ -41,35 +41,35 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | `lucifer_averaged.toml` | Unit |
 |---|---|---|---|
-| exit power | 1.6598e+09 | 1.6863e+09 | W |
-| exit power per slice | 1.6598e+09 | 1.6863e+09 | W |
-| exit window energy | 5.5366e-10 | 5.6247e-10 | J |
-| exit pulse energy, the window's and the light slipped out of it | 5.5366e-10 | 5.6247e-10 | J |
-| peak power | 1.6722e+09 | 1.6863e+09 | W |
-| s of the peak power | 3.7760e+01 | 5.6760e+01 | m |
-| mode peak, power inside the split | 1.1880e+09 | 1.1814e+09 | W |
+| exit power | 1.1706e+09 | 1.1750e+09 | W |
+| exit power per slice | 1.1706e+09 | 1.1750e+09 | W |
+| exit window energy | 3.9046e-10 | 3.9195e-10 | J |
+| exit pulse energy, the window's and the light slipped out of it | 3.9046e-10 | 3.9195e-10 | J |
+| peak power | 1.6701e+09 | 1.6560e+09 | W |
+| s of the peak power | 3.7760e+01 | 3.8000e+01 | m |
+| mode peak, power inside the split | 1.4559e+09 | 1.4404e+09 | W |
 | s of the mode peak | 3.8000e+01 | 3.8000e+01 | m |
-| exit power inside the split | 3.8097e+08 | 3.8720e+08 | W |
-| exit power outside the split | 1.2789e+09 | 1.2991e+09 | W |
-| outside over inside, the run's maximum | 4.0755e-01 | 4.1176e-01 |  |
-| outside over inside at the exit | 3.3569e+00 | 3.3550e+00 |  |
-| split angle | 2.9077e-06 | 2.9077e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 1.8661e+00 | 1.8661e+00 | m |
-| power at the first element end | 4.4159e+03 | 4.4159e+03 | W |
-| power per slice at the first element end | 4.4159e+03 | 4.4159e+03 | W |
-| initial bunching, mean |b| over slices | 3.6362e-17 | 3.6362e-17 |  |
-| exit bunching, mean |b| over slices | 1.1891e-01 | 1.1251e-01 |  |
-| exit bunching, the largest slice | 1.1891e-01 | 1.1251e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 2.3638e-01 | 2.3623e-01 |  |
-| s of the bunching maximum | 3.7760e+01 | 3.7760e+01 | m |
-| bunching at the mode peak | 2.3538e-01 | 2.3527e-01 |  |
-| power of the largest slice at the bunching maximum | 1.6722e+09 | 1.6678e+09 | W |
-| exit power of the largest slice | 1.6598e+09 | 1.6863e+09 | W |
+| exit power inside the split | 5.7442e+08 | 5.7822e+08 | W |
+| exit power outside the split | 5.9616e+08 | 5.9681e+08 | W |
+| outside over inside, the run's maximum | 1.4711e-01 | 1.4973e-01 |  |
+| outside over inside at the exit | 1.0379e+00 | 1.0322e+00 |  |
+| split angle | 3.0007e-06 | 3.0007e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 2.0435e+00 | 2.0435e+00 | m |
+| power at the first element end | 4.4245e+03 | 4.4245e+03 | W |
+| power per slice at the first element end | 4.4245e+03 | 4.4245e+03 | W |
+| initial bunching, mean |b| over slices | 4.4450e-17 | 4.4450e-17 |  |
+| exit bunching, mean |b| over slices | 1.9914e-01 | 1.9550e-01 |  |
+| exit bunching, the largest slice | 1.9914e-01 | 1.9550e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 2.6083e-01 | 2.6029e-01 |  |
+| s of the bunching maximum | 3.7240e+01 | 3.7240e+01 | m |
+| bunching at the mode peak | 2.5561e-01 | 2.5530e-01 |  |
+| power of the largest slice at the bunching maximum | 1.6701e+09 | 1.6560e+09 | W |
+| exit power of the largest slice | 1.1706e+09 | 1.1750e+09 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
-| mean slice energy at the exit | 5.8032e+09 | 5.8032e+09 | eV |
-| mean slice energy, exit minus start | -6.2473e+05 | -6.3359e+05 | eV |
-| slice energy spread at the start | 5.0869e+05 | 5.0869e+05 | eV |
-| slice energy spread at the exit | 2.4231e+06 | 2.4181e+06 | eV |
+| mean slice energy at the exit | 5.8034e+09 | 5.8034e+09 | eV |
+| mean slice energy, exit minus start | -4.2596e+05 | -4.2764e+05 | eV |
+| slice energy spread at the start | 5.0149e+05 | 5.0149e+05 | eV |
+| slice energy spread at the exit | 2.5499e+06 | 2.5534e+06 | eV |
 | span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 |  |
 | records | 1105 | 1105 |  |
@@ -120,8 +120,6 @@ source_filter = false
 
 [beam]
 n_particle = 2048
-# The line with the unaveraged segment loads beamlets of 8, and its averaged twin loads the same beam.
-beamlet_size = 8
 bunch_charge = 1.000692285594e-15
 sig_z = 0
 sig_pz = 8.804506566858e-5
