@@ -269,12 +269,11 @@ end type
 ! both constants on three machines a hundred times apart in wavelength.
 
 real(rp), parameter :: fel_cells_per_sigma$ = 7
-! The beamlets in a slice where the input file states no beam.n_particle, and the count
-! under which the header says what was measured there (docs/shot-noise.md). Seeded runs
-! of nine machines have a gain length short by 0.5 to 5% at 512 beamlets, under 2% on
-! the three real ones, and the error falls as one over the count.
+! The beamlets in a slice where the input file states no beam.n_particle
+! (docs/shot-noise.md). Seeded runs of nine machines have a gain length short by 0.5 to
+! 5% at 512 beamlets, under 2% on the three real ones, and the error falls as one over
+! the count.
 integer, parameter :: fel_beamlets_default$ = 512
-integer, parameter :: fel_beamlets_warn$ = 256
 real(rp), parameter :: fel_widths_per_sigma$ = 9
 
 !+

@@ -12,8 +12,7 @@ of that history. The entries before that date describe that branch.
 - 2026-11-12 Changed: `beam.n_particle` is derived where the input file does not set it in the
   sample mode: 512 beamlets of the beamlet size, 2048 macroparticles for a run that carries the
   fundamental alone and 4096 with the third harmonic. The header states the count and its origin. A
-  set count is loaded as set, and under 256 beamlets the header states the count and the error in
-  gain length measured there on three machines. The keep mode, where the key counts the particles of
+  set count is loaded as set. The keep mode, where the key counts the particles of
   the bunch, and a run from a dump are unchanged. The result follows the beamlets in a slice and not
   the macroparticles. In seeded steady-state runs of nine machines, three real and six scaled from
   them, the gain length is short by an amount inversely proportional to the beamlets: by 0.5% for
@@ -27,7 +26,7 @@ of that history. The entries before that date describe that branch.
   separating the members of a beamlet: 0.011 to 0.027 of the SASE power at 8192 macroparticles a
   slice in the example `sase` and 0.09 to 0.21 at 1024, a share of the start-up that the amplified
   radiation outgrows, with the test, the same input with `shot_noise = false`.
-  `check_shot_noise.py` holds the derived count, a set count and the header's note. The unaveraged
+  `check_shot_noise.py` holds the derived count and a set count. The unaveraged
   mode takes the same beamlet size as the averaged, 4 for the fundamental, where it took 8 at least:
   over the Aramis line in that mode the gain length at beamlets of 4 and of 8 is 2.4219 and 2.4223 m
   with 512 beamlets, and the maximum power agrees to 2%. The averaged twins of the examples

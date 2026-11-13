@@ -159,6 +159,8 @@ WORDS = {"exit_power": "exit power", "exit_power_per_slice": "exit power per sli
          "n_slice": "slices", "n_record": "records", "slice_spacing": "slice spacing",
          "n_particle": "macroparticles per slice", "grid_n_pts": "grid points", "grid_cell": "grid cell",
          "grid_derived": "grid derived by setup", "grid_derived_from": "grid rounded up from",
+         "n_particle_derived": "macroparticles per slice derived by setup", "beamlet_size": "beamlet size",
+         "beamlet_size_derived": "beamlet size derived by setup",
          "fel_steps": "FEL steps", "filter_mode_angle": "source filter, mode angle",
          "filter_rho_angle": "source filter, rho angle", "filter_ratio": "source filter, ratio of the angles",
          "filter_edge": "source filter, edge"}
