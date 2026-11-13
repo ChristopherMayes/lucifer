@@ -32,37 +32,37 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | Unit |
 |---|---|---|
-| exit power | 5.0888e+07 | W |
-| exit power per slice | 5.3008e+05 | W |
-| exit power, rms over mean across slices | 1.2946e+00 |  |
-| exit window energy | 5.0923e-11 | J |
-| exit pulse energy, the window's and the light slipped out of it | 1.6114e-09 | J |
-| peak power | 1.4726e+08 | W |
-| s of the peak power | 5.2010e+01 | m |
-| mode peak, power inside the split | 1.4638e+08 | W |
-| s of the mode peak | 5.1930e+01 | m |
-| exit power inside the split | 5.0112e+07 | W |
-| exit power outside the split | 7.7583e+05 | W |
-| outside over inside, the run's maximum | 6.0474e-03 |  |
-| outside over inside at the exit | 1.5482e-02 |  |
-| split angle | 2.9859e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 3.9737e+00 | m |
-| power at the first element end | 5.9075e+06 | W |
-| power per slice at the first element end | 6.1537e+04 | W |
-| initial bunching, mean |b| over slices | 6.2551e-03 |  |
-| exit bunching, mean |b| over slices | 1.4179e-02 |  |
-| exit bunching, the largest slice | 4.7215e-02 |  |
-| bunching, the maximum along the line of the mean |b| | 1.4342e-02 |  |
-| s of the bunching maximum | 5.1490e+01 | m |
-| bunching at the mode peak | 1.4290e-02 |  |
-| power of the largest slice at the bunching maximum | 5.4660e+06 | W |
-| exit power of the largest slice | 2.5974e+06 | W |
+| exit power | 1.9122e+07 | W |
+| exit power per slice | 1.9919e+05 | W |
+| exit power, rms over mean across slices | 1.1180e+00 |  |
+| exit window energy | 1.9135e-11 | J |
+| exit pulse energy, the window's and the light slipped out of it | 1.3268e-09 | J |
+| peak power | 8.6271e+07 | W |
+| s of the peak power | 4.1900e+01 | m |
+| mode peak, power inside the split | 8.5258e+07 | W |
+| s of the mode peak | 4.1990e+01 | m |
+| exit power inside the split | 1.8708e+07 | W |
+| exit power outside the split | 4.1437e+05 | W |
+| outside over inside, the run's maximum | 1.0564e-02 |  |
+| outside over inside at the exit | 2.2149e-02 |  |
+| split angle | 2.9826e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 3.5879e+00 | m |
+| power at the first element end | 5.4594e+06 | W |
+| power per slice at the first element end | 5.6868e+04 | W |
+| initial bunching, mean |b| over slices | 6.6356e-03 |  |
+| exit bunching, mean |b| over slices | 1.1175e-02 |  |
+| exit bunching, the largest slice | 2.8220e-02 |  |
+| bunching, the maximum along the line of the mean |b| | 1.1181e-02 |  |
+| s of the bunching maximum | 5.6760e+01 | m |
+| bunching at the mode peak | 1.0962e-02 |  |
+| power of the largest slice at the bunching maximum | 9.8173e+05 | W |
+| exit power of the largest slice | 7.9583e+05 | W |
 | mean slice energy at the start | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.7996e+09 | eV |
-| mean slice energy, exit minus start | -4.2345e+06 | eV |
-| slice energy spread at the start | 5.1009e+05 | eV |
-| slice energy spread at the exit | 5.2886e+05 | eV |
-| span of the slice energies at the exit, head to tail | 6.7604e+06 | eV |
+| mean slice energy, exit minus start | -4.2362e+06 | eV |
+| slice energy spread at the start | 5.1039e+05 | eV |
+| slice energy spread at the exit | 5.2593e+05 | eV |
+| span of the slice energies at the exit, head to tail | 6.7769e+06 | eV |
 | slices | 96 |  |
 | records | 1105 |  |
 | slice spacing | 3.0000e-10 | m |
@@ -71,10 +71,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5690e-06 | m |
 | grid derived by setup | no |  |
 | FEL steps | 1068 |  |
-| source filter, mode angle | 2.9860e-06 | rad |
-| source filter, rho angle | 2.6230e-06 | rad |
+| source filter, mode angle | 2.9830e-06 | rad |
+| source filter, rho angle | 2.6260e-06 | rad |
 | source filter, ratio of the angles | 1.1400e+00 |  |
-| source filter, edge | 2.9859e-06 | rad |
+| source filter, edge | 2.9826e-06 | rad |
 
 ## The input files
 

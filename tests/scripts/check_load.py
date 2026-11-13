@@ -72,6 +72,7 @@ INPUT = """[run]
 """
 
 BUNCH = """  beam.n_particle = 40000
+  beamlet_size = 8
   beam.a_norm_emit = 4e-7
   beam.b_norm_emit = 4e-7
   beam.sig_z = 3e-10
@@ -284,7 +285,7 @@ def refusals(exe, wd):
     bunchfile.write_bunch(wd / "load_bunch.h5", wd / "load_copies.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING))
     rc, out = run(exe, wd, "ldcopies", '  beam.position_file = "load_copies.h5"\n'
-                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n',
+                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n  beamlet_size = 8\n',
                   pextra="  run.load_only = T\n")
     good = rc == 0 and "particles sharing their transverse coordinates" in out
     fl = re.search(r"worst quiet floor before imposing, \|b\|\^2 \* N_lambda:\s*([0-9.E+-]+)", out)
@@ -298,7 +299,7 @@ def refusals(exe, wd):
     bunchfile.write_bunch(wd / "load_bunch.h5", wd / "load_shifted.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING, shift=1.0))
     rc, out = run(exe, wd, "ldshift", '  beam.position_file = "load_shifted.h5"\n'
-                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n',
+                  '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n  beamlet_size = 8\n',
                   pextra="  run.load_only = T\n")
     m = floor_re.search(out)
     good = rc != 0 and "NOT QUIET ENOUGH" in out and m is not None
@@ -309,7 +310,7 @@ def refusals(exe, wd):
 
     # A slice dump is not a bunch.
     rc, out = run(exe, wd, "lddump", '  beam.position_file = "ldkeep-initial.beam.h5"\n'
-                  '  load_mode = "keep"\n', pextra="  run.load_only = T\n")
+                  '  load_mode = "keep"\n  beamlet_size = 8\n', pextra="  run.load_only = T\n")
     good = rc != 0 and "BEAM DUMP IN SLICES" in out
     print(f"  refused, a slice dump through beam.position_file: {'ok' if good else 'MISSED'}")
     record("refused, a slice dump through beam.position_file", None, None, "bool", good)

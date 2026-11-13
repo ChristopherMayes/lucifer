@@ -151,6 +151,7 @@ NML_TWIN = """[run]
 {extra}/
 [beam]
   beam.n_particle = 2048
+  beam.beamlet_size = 8
   beam.bunch_charge = 1.000692285594e-15
   beam.sig_z = 0
   beam.sig_pz = 8.804506566858e-5
@@ -840,6 +841,7 @@ def main():
 {field}/
 """
     gen_beam = """  beam.n_particle = 1024
+  beam.beamlet_size = 8
   beam.bunch_charge = 2.401661485427e-14
   beam.z_distribution = "GRID"
   beam.z_min = -1.2e-9
@@ -1038,6 +1040,7 @@ def main():
                           "UND3: UND\nD2: pipe, l = 0.30\nSEG: line = (UND, D, UND2, D2, UND3)")
     (wd / "mw.bmad").write_text(mw_lat)
     mw_beam = """  beam.n_particle = 1024
+  beam.beamlet_size = 8
   beam.bunch_charge = 2.401661485427e-14
   beam.z_distribution = "RAN_GAUSS"
   beam.sig_z = 1.0e-9
@@ -1260,6 +1263,7 @@ def main():
         return out
 
     ew_beam = """  beam.n_particle = 1024
+  beam.beamlet_size = 8
   beam.bunch_charge = 2.401661485427e-14
   beam.z_distribution = "RAN_GAUSS"
   beam.sig_z = 1.0e-9
@@ -1426,6 +1430,7 @@ use, SEG
                                                     "UNDB: UNDA, fel_method = unaveraged\nUNDS: UNDA\nMK: marker, superimpose, ref = UNDS\n")
                                            .replace("SEG: line = (UNDA, P1, UNDB, P1, UNDA)", "SEG: line = (UNDS, P1, UNDB, P1, UNDA)"))
     uv_beam = """  beam.n_particle = 1024
+  beam.beamlet_size = 8
   beam.bunch_charge = 2.401661485427e-14
   beam.z_distribution = "RAN_GAUSS"
   beam.sig_z = 1.0e-9

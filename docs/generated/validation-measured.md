@@ -189,6 +189,21 @@ where the two builds agree to every printed digit.
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, one beamlet, under the limit | 6.1763e-01 | same | 5.6027e-01 to 7.1029e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, fewer beamlets | 9.0567e-01 | same | 8.4096e-01 to 9.5976e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, the input file's beamlets | 9.2958e-01 | same | 8.7360e-01 to 1.0174e+00 |
+| beamlet size, harmonics 1, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 4, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 9.9288e-01 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 8, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 9.7400e-01 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 3 over the shot noise | 1.0025e+00 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: derived as 12, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 1.0021e+00 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 3 over the shot noise | 9.8938e-01 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 5 over the shot noise | 1.0448e+00 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 16, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 9.5694e-01 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 3 over the shot noise | 1.0204e+00 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 5 over the shot noise | 9.6103e-01 | same | 8.1958e-01 to 1.1804e+00 |
+| beamlet size, harmonic 3 carried: 6 refused with the size accepted, 7 loaded |  | same | holds |
+| beamlet size, harmonic 5 carried: 10 refused with the size accepted, 11 loaded |  | same | holds |
 | shot noise, no slice with fewer beamlets: the same bits as with beam.beamlet_min_electrons = 0 |  | same | holds |
 | shot noise, a slice with no charge is loaded with no particles |  | same | holds |
 | shot noise, the slices with charge beside slices with none keep their particles and charge |  | same | holds |

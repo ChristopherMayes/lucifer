@@ -7,8 +7,8 @@ regenerates the file and requires no difference, so the page quotes no ratio by 
 
     tab-shot-methods  the fundamental under the two values of beam.shot_noise_method
     tab-shot-ratio    what the first-order kick delivers of the shot-noise power against the
-                      electrons a beamlet holds, for one harmonic and for the default
-                      beamlet's three
+                      electrons a beamlet holds, for one harmonic and for the three of a
+                      beamlet of 8
     tab-shot-floor    the fewest electrons a beamlet may hold under that kick for a stated
                       deficit
 
@@ -27,7 +27,8 @@ import numpy as np
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import shot_noise_ratio as snr  # noqa: E402
 
-# The default beamlet, beamlet_size = 8, and the harmonics fel_fawley_noise kicks on it.
+# A beamlet of 8, the size the loader derives with the third harmonic carried, and the
+# harmonics fel_fawley_noise kicks on it.
 M = 8
 HARMONICS = (1, 2, 3)
 
@@ -55,10 +56,10 @@ def table_ratio():
     return block("tab-shot-ratio",
                  "The ratio of the mean square bunching imposed by the first-order kick to the shot-noise value, "
                  "as a function of the number of electrons per beamlet. The first two columns are for a kick at a "
-                 f"single harmonic. The last three are for the default beamlet of {M} macroparticles, with kicks at "
+                 f"single harmonic. The last three are for a beamlet of {M} macroparticles, with kicks at "
                  f"{len(HARMONICS)} harmonics together. Below one electron the kick is that for one electron.",
                  ["electrons per beamlet", "$1 - 2/N$", "one harmonic"]
-                 + [f"default beamlet, $h = {h}$" for h in HARMONICS], rows)
+                 + [f"beamlet of {M}, $h = {h}$" for h in HARMONICS], rows)
 
 
 def table_methods():
@@ -75,7 +76,7 @@ def table_methods():
 
 
 def floor(deficit, h):
-    """The fewest electrons at and above which the default beamlet's ratio stays within the deficit."""
+    """The fewest electrons at and above which the ratio of a beamlet of 8 stays within the deficit."""
     n = np.logspace(0, 4, 40001)
     low = np.nonzero(snr.ratio(n, h, M) < 1 - deficit)[0]
     return n[low[-1] + 1] if len(low) else n[0]
@@ -85,7 +86,7 @@ def table_floor():
     rows = [[f"{100 * d:g}%"] + [f"{int(np.ceil(floor(d, h)))}" for h in HARMONICS] for d in DEFICITS]
     return block("tab-shot-floor",
                  "The smallest number of electrons per beamlet for which the noise power imposed by the first-order "
-                 f"kick is within the stated fraction of the shot-noise power, for the default beamlet of {M} "
+                 f"kick is within the stated fraction of the shot-noise power, for a beamlet of {M} "
                  "macroparticles.",
                  ["deficit"] + [f"$h = {h}$" for h in HARMONICS], rows)
 

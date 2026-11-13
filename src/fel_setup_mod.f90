@@ -60,7 +60,7 @@ character(16) interlude_model
 character(1) seed_polarization
 logical migrate, reference_run, err
 integer harmonics(9)
-integer n_harm, ih
+integer n_harm, ih, h_max, m_size
 character(*), parameter :: r_name = 'fel_setup_lattice'
 
 !
@@ -203,6 +203,39 @@ do ih = 2, 9
     err_flag = .true.;  return
   endif
 enddo
+! The beamlet size (docs/shot-noise.md). On a beamlet of M evenly spaced phases the sum
+! of exp(-i h theta) at harmonic h is the conjugate of the sum at M - h, so the bunching
+! that grows at a harmonic h appears at M - h as well. The fundamental's appears at
+! M - 1 and a harmonic's at M - h, and a field carried at such a harmonic is driven by
+! bunching that is not its own. At M = 2 h the harmonic is its own conjugate, and a
+! beamlet holds one quadrature of it. Measured on FLASH1, LCLS and a seeded amplifier
+! (docs/shot-noise.md): a beamlet under twice the highest carried harmonic gives that
+! harmonic from 2 to 3e2 times its power, one of exactly twice gives 1.1 to 1.6 times,
+! and one above does not differ from a beamlet of twice the size. A size the input file
+! did not set is twice the highest harmonic plus 2, which is 4 for the fundamental
+! alone, 8 with the third harmonic and 12 with the fifth. An unaveraged element
+! resolves every wavelength, and its load was measured at 8, so the size is 8 at least
+! there. In the sample mode a slice holds beam.n_particle macroparticles in whole
+! beamlets, so the size is the smallest divisor of that count at or above the size
+! wanted. A size the input file set is honored above twice the highest harmonic and
+! refused at or under it, where a harmonic is carried.
+
+h_max = maxval(harmonics)
+if (run%bparam%beamlet_size == 0) then
+  m_size = 2 * h_max + 2
+  if (any(fel_mode == unaveraged$ .and. is_fel)) m_size = max(m_size, 8)
+  if (run%bparam%quiet_start .and. run%bparam%load_mode == 'sample' .and. &
+      .not. run%resample%use_beam_init) then
+    do
+      if (m_size >= run%beam_init%n_particle) exit
+      if (mod(run%beam_init%n_particle, m_size) == 0) exit
+      m_size = m_size + 1
+    enddo
+  endif
+  run%bparam%beamlet_size = m_size
+  run%bparam%beamlet_size_derived = .true.
+endif
+
 ! The load has to carry the harmonic it is asked to start. The quiet start leaves no
 ! bunching below harmonic beamlet_size. fel_fawley_noise then imposes the physical level
 ! on harmonics 1 through (beamlet_size - 1)/2. A harmonic field above that starts from a
@@ -217,7 +250,7 @@ if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
     call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
                  'NOISE AT, WHICH IS BEAMLET_SIZE - 1 = \i0\ UNDER shot_noise_method = "weight".', &
                  'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE.', &
-                 i_array = [maxval(harmonics), run%bparam%beamlet_size - 1, maxval(harmonics) + 1])
+                 i_array = [maxval(harmonics), run%bparam%beamlet_size - 1, merge(2 * h_max + 1, 2, h_max > 1)])
     err_flag = .true.;  return
   endif
 elseif (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size - 1) / 2) then
@@ -226,6 +259,19 @@ elseif (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size
                'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE.', &
                i_array = [maxval(harmonics), (run%bparam%beamlet_size - 1) / 2, &
                           run%bparam%beamlet_size, 2 * maxval(harmonics) + 1])
+  err_flag = .true.;  return
+endif
+
+! The beamlet at or under twice the highest harmonic, after the refusals above, whose
+! sizes are this one's. A dump (beam.file) is loaded as it was written, so the size in
+! the input file says nothing about it.
+
+if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. h_max > 1 .and. &
+    run%bparam%beamlet_size < 2 * h_max + 1) then
+  call out_io (s_error$, r_name, 'BEAM.BEAMLET_SIZE = \i0\ IS NOT ABOVE TWICE THE HIGHEST HARMONIC CARRIED, ' // &
+               '\i0\ . THE BUNCHING AT A LOWER', 'HARMONIC WOULD APPEAR AT THAT ONE. ' // &
+               'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE, OR LEAVE IT UNSET.', &
+               i_array = [run%bparam%beamlet_size, h_max, 2 * h_max + 1])
   err_flag = .true.;  return
 endif
 

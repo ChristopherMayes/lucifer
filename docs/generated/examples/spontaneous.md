@@ -23,11 +23,11 @@ The plot shows it in the beam-energy panel, where the mean falls in a straight l
 
 | run | d\<E\>/ds per metre of undulator | against the analytic rate |
 |---|---|---|
-| `lucifer_damping_only.toml` | -0.03071 m_e c^2 | 100.3% |
-| `lucifer.toml`, both switches | -0.03103 m_e c^2 | 101.4% |
-| `../steady_state`, neither switch | -0.00008 m_e c^2 | 0.25% |
+| `lucifer_damping_only.toml` | -0.03073 m_e c^2 | 100.4% |
+| `lucifer.toml`, both switches | -0.03053 m_e c^2 | 99.7% |
+| `../steady_state`, neither switch | -0.00006 m_e c^2 | 0.19% |
 
-The classical rate `(2/3) r_e gamma^2 k_u^2 a_w^2` is 0.030616 m_e c^2 per metre of undulator at these parameters, and the damping run reproduces it to 0.3%. The last row is the control. With both switches off the same fit finds a quarter of a percent of that rate, which is the FEL's own start-up extraction and not radiation. Over the whole line the analytic loss is 1.47 m_e c^2 across 47.88 m of undulator. By then the FEL is extracting far more than radiation is, so the pre-gain slope is where the two can be told apart.
+The classical rate `(2/3) r_e gamma^2 k_u^2 a_w^2` is 0.030616 m_e c^2 per metre of undulator at these parameters, and the damping run reproduces it to 0.4%. The last row is the control. With both switches off the same fit finds a fifth of a percent of that rate, which is the FEL's own start-up extraction and not radiation. Over the whole line the analytic loss is 1.47 m_e c^2 across 47.88 m of undulator. By then the FEL is extracting far more than radiation is, so the pre-gain slope is where the two can be told apart.
 
 The validation suite makes the same comparison without any FEL model, tracking the wiggler with Bmad's own `runge_kutta`, and reproduces the analytic rate to 1.0e-4 ([validation](../../validation.md), the spontaneous-emission section). That check also measures what the averaged FEL mode does not do. Its field gains `2S` while the particles are kicked by `E`, so the `|S|^2` part of the field energy is created rather than taken from the beam. Genesis 1.3 Version 4 (Genesis4) carries an optional `&sponrad` module for the same reason, off by default.
 
@@ -43,35 +43,35 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | `lucifer_damping_only.toml` | Unit |
 |---|---|---|---|
-| exit power | 5.5527e+08 | 5.5672e+08 | W |
-| exit power per slice | 5.5527e+08 | 5.5672e+08 | W |
-| exit window energy | 1.8522e-10 | 1.8570e-10 | J |
-| exit pulse energy, the window's and the light slipped out of it | 1.8522e-10 | 1.8570e-10 | J |
-| peak power | 1.1534e+09 | 1.1543e+09 | W |
-| s of the peak power | 3.8045e+01 | 3.8045e+01 | m |
-| mode peak, power inside the split | 1.1510e+09 | 1.1521e+09 | W |
-| s of the mode peak | 3.8000e+01 | 3.7680e+01 | m |
-| exit power inside the split | 5.5181e+08 | 5.5366e+08 | W |
-| exit power outside the split | 3.4624e+06 | 3.0631e+06 | W |
-| outside over inside, the run's maximum | 1.9120e-03 | 1.8648e-03 |  |
-| outside over inside at the exit | 6.2746e-03 | 5.5325e-03 |  |
-| split angle | 2.9661e-06 | 2.9661e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 2.1402e+00 | 2.1360e+00 | m |
-| power at the first element end | 4.1206e+03 | 4.1251e+03 | W |
-| power per slice at the first element end | 4.1206e+03 | 4.1251e+03 | W |
-| initial bunching, mean |b| over slices | 3.9886e-17 | 3.9886e-17 |  |
-| exit bunching, mean |b| over slices | 2.2699e-01 | 2.3541e-01 |  |
-| exit bunching, the largest slice | 2.2699e-01 | 2.3541e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 2.8189e-01 | 2.8165e-01 |  |
-| s of the bunching maximum | 3.8672e+01 | 3.8628e+01 | m |
-| bunching at the mode peak | 2.7861e-01 | 2.7895e-01 |  |
-| power of the largest slice at the bunching maximum | 1.1304e+09 | 1.1337e+09 | W |
-| exit power of the largest slice | 5.5527e+08 | 5.5672e+08 | W |
+| exit power | 5.4129e+08 | 4.9879e+08 | W |
+| exit power per slice | 5.4129e+08 | 4.9879e+08 | W |
+| exit window energy | 1.8055e-10 | 1.6638e-10 | J |
+| exit pulse energy, the window's and the light slipped out of it | 1.8055e-10 | 1.6638e-10 | J |
+| peak power | 1.0834e+09 | 1.0996e+09 | W |
+| s of the peak power | 3.8045e+01 | 3.7240e+01 | m |
+| mode peak, power inside the split | 1.0822e+09 | 1.0984e+09 | W |
+| s of the mode peak | 3.8000e+01 | 3.8000e+01 | m |
+| exit power inside the split | 5.3814e+08 | 4.9627e+08 | W |
+| exit power outside the split | 3.1509e+06 | 2.5192e+06 | W |
+| outside over inside, the run's maximum | 9.6864e-04 | 1.0640e-03 |  |
+| outside over inside at the exit | 5.8552e-03 | 5.0762e-03 |  |
+| split angle | 2.9849e-06 | 2.9849e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 2.1578e+00 | 2.1557e+00 | m |
+| power at the first element end | 4.0265e+03 | 4.0291e+03 | W |
+| power per slice at the first element end | 4.0265e+03 | 4.0291e+03 | W |
+| initial bunching, mean |b| over slices | 3.9308e-17 | 3.9308e-17 |  |
+| exit bunching, mean |b| over slices | 2.2935e-01 | 2.0584e-01 |  |
+| exit bunching, the largest slice | 2.2935e-01 | 2.0584e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 2.9086e-01 | 2.9229e-01 |  |
+| s of the bunching maximum | 3.9390e+01 | 3.9300e+01 | m |
+| bunching at the mode peak | 2.8180e-01 | 2.8338e-01 |  |
+| power of the largest slice at the bunching maximum | 1.0044e+09 | 1.0154e+09 | W |
+| exit power of the largest slice | 5.4129e+08 | 4.9879e+08 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8029e+09 | 5.8029e+09 | eV |
-| mean slice energy, exit minus start | -9.3367e+05 | -9.3633e+05 | eV |
-| slice energy spread at the start | 5.0879e+05 | 5.0879e+05 | eV |
-| slice energy spread at the exit | 2.3323e+06 | 2.3430e+06 | eV |
+| mean slice energy, exit minus start | -9.2710e+05 | -9.1501e+05 | eV |
+| slice energy spread at the start | 5.0137e+05 | 5.0137e+05 | eV |
+| slice energy spread at the exit | 2.3262e+06 | 2.2936e+06 | eV |
 | span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 |  |
 | records | 1105 | 1105 |  |
@@ -81,10 +81,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5690e-06 | 1.5690e-06 | m |
 | grid derived by setup | no | no |  |
 | FEL steps | 1068 | 1068 |  |
-| source filter, mode angle | 2.9660e-06 | 2.9660e-06 | rad |
-| source filter, rho angle | 2.6110e-06 | 2.6110e-06 | rad |
+| source filter, mode angle | 2.9850e-06 | 2.9850e-06 | rad |
+| source filter, rho angle | 2.6170e-06 | 2.6170e-06 | rad |
 | source filter, ratio of the angles | 1.1400e+00 | 1.1400e+00 |  |
-| source filter, edge | 2.9661e-06 | 2.9661e-06 | rad |
+| source filter, edge | 2.9849e-06 | 2.9849e-06 | rad |
 
 ## The input files
 

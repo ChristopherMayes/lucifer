@@ -619,6 +619,7 @@ def grid_parity(exe, wd, examples):
     power = {}
     for n in (256, 255):
         text = input_text.replace('out_root = "steady_state"', f'out_root = "gp{n}"')
+        text = text.replace("n_particle = 8192", "n_particle = 8192\nbeamlet_size = 8")
         if n == 255:
             text = text.replace("grid_n_pts = 256", "grid_n_pts = 255")
             text = text.replace("grid_half_width = 2e-4", f"grid_half_width = {2e-4 * 254 / 255:.12e}")

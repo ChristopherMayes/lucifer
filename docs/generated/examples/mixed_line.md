@@ -120,6 +120,8 @@ source_filter = false
 
 [beam]
 n_particle = 2048
+# The line with the unaveraged segment loads beamlets of 8, and its averaged twin loads the same beam.
+beamlet_size = 8
 bunch_charge = 1.000692285594e-15
 sig_z = 0
 sig_pz = 8.804506566858e-5

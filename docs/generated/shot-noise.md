@@ -37,10 +37,10 @@
 <!-- end tab-shot-methods -->
 
 <!-- begin tab-shot-ratio -->
-```{table} The ratio of the mean square bunching imposed by the first-order kick to the shot-noise value, as a function of the number of electrons per beamlet. The first two columns are for a kick at a single harmonic. The last three are for the default beamlet of 8 macroparticles, with kicks at 3 harmonics together. Below one electron the kick is that for one electron.
+```{table} The ratio of the mean square bunching imposed by the first-order kick to the shot-noise value, as a function of the number of electrons per beamlet. The first two columns are for a kick at a single harmonic. The last three are for a beamlet of 8 macroparticles, with kicks at 3 harmonics together. Below one electron the kick is that for one electron.
 :name: tab-shot-ratio
 
-| electrons per beamlet | $1 - 2/N$ | one harmonic | default beamlet, $h = 1$ | default beamlet, $h = 2$ | default beamlet, $h = 3$ |
+| electrons per beamlet | $1 - 2/N$ | one harmonic | beamlet of 8, $h = 1$ | beamlet of 8, $h = 2$ | beamlet of 8, $h = 3$ |
 |---|---|---|---|---|---|
 | 0.25 |  | 0.054 | 0.040 | 0.031 | 0.031 |
 | 0.5 |  | 0.108 | 0.081 | 0.062 | 0.062 |
@@ -58,7 +58,7 @@
 <!-- end tab-shot-ratio -->
 
 <!-- begin tab-shot-floor -->
-```{table} The smallest number of electrons per beamlet for which the noise power imposed by the first-order kick is within the stated fraction of the shot-noise power, for the default beamlet of 8 macroparticles.
+```{table} The smallest number of electrons per beamlet for which the noise power imposed by the first-order kick is within the stated fraction of the shot-noise power, for a beamlet of 8 macroparticles.
 :name: tab-shot-floor
 
 | deficit | $h = 1$ | $h = 2$ | $h = 3$ |

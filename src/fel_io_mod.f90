@@ -885,6 +885,27 @@ block
           n_few / max(1, run%bparam%beamlet_size), '.'
   endif
   call out_io (s_blank$, r_name, trim(line))
+
+  ! Where the beamlet size came from, and the harmonics a field may be carried at with it
+  ! (fel_setup_lattice). Without the quiet start there are no beamlets.
+
+  if (run%bparam%quiet_start) then
+    if (run%bparam%beamlet_size_derived) then
+      write (line, '(a, i0, a, i0, a)') '             The beamlet size ', run%bparam%beamlet_size, &
+            ' is derived from the highest harmonic carried, ', maxval(run%winit%harmonics), '.'
+    else
+      write (line, '(a, i0, a)') '             The beamlet size ', run%bparam%beamlet_size, &
+            ' is set in the input file (beam.beamlet_size).'
+    endif
+    call out_io (s_blank$, r_name, trim(line))
+    if (run%bparam%beamlet_size < 7) then
+      line = '             With this size a field is carried at the fundamental alone.'
+    else
+      write (line, '(a, i0, a)') '             With this size a field may be carried at harmonics up to ', &
+            (run%bparam%beamlet_size - 1) / 2, '.'
+    endif
+    call out_io (s_blank$, r_name, trim(line))
+  endif
   if (n_empty > 0) then
     if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
       write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &

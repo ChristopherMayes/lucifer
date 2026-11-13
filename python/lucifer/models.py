@@ -156,8 +156,8 @@ class Beam:
     """How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, or keep, every particle kept with the counts following the charge."""
     quiet_start: bool = True
     """Load beamlets of beamlet_size phase copies, quiet below that harmonic."""
-    beamlet_size: int = 8
-    """Copies per beamlet, and the harmonics the noise resolves. Bounds: from 1."""
+    beamlet_size: int = 0
+    """Copies per beamlet. 0 derives it: twice the highest harmonic of field.harmonics plus 2, 8 at least with an unaveraged element, and in the sample mode the smallest divisor of n_particle at or above that. A size not above twice the highest ha Bounds: from 0."""
     shot_noise: bool = False
     """Impose the physical noise on the load's groups. Time-dependent windows only."""
     beamlet_min_electrons: float = 1.0

@@ -331,7 +331,13 @@ type fel_beam_init_param_struct
   ! below beamlet_size. shot_noise imposes the physical level on whatever load there is,
   ! by independent phasors per group. With both off the beam is taken as it came.
   logical :: quiet_start = .true.
-  integer :: beamlet_size = 8             ! Copies per beamlet. A loading parameter only.
+  ! Copies per beamlet, a loading parameter only. 0 derives it from the harmonics the
+  ! field set carries: twice the highest plus 2, 8 at least with an unaveraged element,
+  ! and in the sample mode the smallest divisor of beam.n_particle at or above that
+  ! (fel_setup_lattice, docs/shot-noise.md). A beamlet not above twice the highest
+  ! harmonic carried is refused, since the bunching at a lower harmonic appears at that one.
+  integer :: beamlet_size = 0
+  logical :: beamlet_size_derived = .false.   ! Set by fel_setup_lattice. Not an input key.
   logical :: shot_noise = .false.         ! Impose physical shot noise on the load.
   ! The fewest real electrons a beamlet stands for in the sample mode. A slice with too
   ! little charge for its beamlets gets fewer of them (fel_beamlet_count). 0 gives every

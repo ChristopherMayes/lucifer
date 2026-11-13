@@ -14,11 +14,11 @@ The plot shows it in the beam-energy panel, where the mean falls in a straight l
 
 | run | d\<E\>/ds per metre of undulator | against the analytic rate |
 |---|---|---|
-| `lucifer_damping_only.toml` | -0.03071 m_e c^2 | 100.3% |
-| `lucifer.toml`, both switches | -0.03103 m_e c^2 | 101.4% |
-| `../steady_state`, neither switch | -0.00008 m_e c^2 | 0.25% |
+| `lucifer_damping_only.toml` | -0.03073 m_e c^2 | 100.4% |
+| `lucifer.toml`, both switches | -0.03053 m_e c^2 | 99.7% |
+| `../steady_state`, neither switch | -0.00006 m_e c^2 | 0.19% |
 
-The classical rate `(2/3) r_e gamma^2 k_u^2 a_w^2` is 0.030616 m_e c^2 per metre of undulator at these parameters, and the damping run reproduces it to 0.3%. The last row is the control. With both switches off the same fit finds a quarter of a percent of that rate, which is the FEL's own start-up extraction and not radiation. Over the whole line the analytic loss is 1.47 m_e c^2 across 47.88 m of undulator. By then the FEL is extracting far more than radiation is, so the pre-gain slope is where the two can be told apart.
+The classical rate `(2/3) r_e gamma^2 k_u^2 a_w^2` is 0.030616 m_e c^2 per metre of undulator at these parameters, and the damping run reproduces it to 0.4%. The last row is the control. With both switches off the same fit finds a fifth of a percent of that rate, which is the FEL's own start-up extraction and not radiation. Over the whole line the analytic loss is 1.47 m_e c^2 across 47.88 m of undulator. By then the FEL is extracting far more than radiation is, so the pre-gain slope is where the two can be told apart.
 
 The validation suite makes the same comparison without any FEL model, tracking the wiggler with Bmad's own `runge_kutta`, and reproduces the analytic rate to 1.0e-4 ([validation](../../docs/validation.md), the spontaneous-emission section). That check also measures what the averaged FEL mode does not do. Its field gains `2S` while the particles are kicked by `E`, so the `|S|^2` part of the field energy is created rather than taken from the beam. Genesis 1.3 Version 4 (Genesis4) carries an optional `&sponrad` module for the same reason, off by default.
 
