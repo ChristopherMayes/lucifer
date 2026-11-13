@@ -69,7 +69,7 @@
       "properties": {
         "file": {"type": "string", "default": "", "description": "An openPMD particle dump to start from, already in slices. Blank loads a bunch instead."},
         "position_file": {"type": "string", "default": "", "description": "An openPMD-beamphysics bunch to load, read whole and then sliced by load_mode."},
-        "n_particle": {"type": "integer", "default": 0, "minimum": 1, "description": "Macroparticles per slice after the phase copies, a positive multiple of beamlet_size. In the keep mode, the particles of the generated bunch."},
+        "n_particle": {"type": "integer", "default": 0, "minimum": 0, "description": "Macroparticles per slice after the phase copies, a multiple of beamlet_size. 0 in the sample mode derives it, 512 beamlets of beamlet_size. In the keep mode, the particles of the generated bunch."},
         "bunch_charge": {"type": "number", "default": 0.0, "minimum": 0.0, "description": "Total bunch charge. The current is derived from it and never input. [C]"},
         "sig_z": {"type": "number", "default": 0.0, "minimum": 0.0, "description": "Bunch length, read with z_distribution. 0 is the steady state of one slice. [m]"},
         "sig_pz": {"type": "number", "default": 0.0, "minimum": 0.0, "description": "Fractional momentum spread dP/P0."},

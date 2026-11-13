@@ -9,6 +9,25 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-12 Changed: `beam.n_particle` is derived where the input file does not set it in the
+  sample mode: 512 beamlets of the beamlet size, 2048 macroparticles for a run that carries the
+  fundamental alone and 4096 with the third harmonic. The header states the count and its origin. A
+  set count is loaded as set, and under 256 beamlets the header states the count and the error in
+  gain length measured there on three machines. The keep mode, where the key counts the particles of
+  the bunch, and a run from a dump are unchanged. The result follows the beamlets in a slice and not
+  the macroparticles. In seeded steady-state runs of nine machines, three real and six scaled from
+  them, the gain length is short by an amount inversely proportional to the beamlets: by 0.5% for
+  LCLS, 0.7% for FLASH1 and 1.7% for Aramis at 512, and by 3 to 5% for the two most
+  emittance-dominated scalings ([](shot-noise.md#shot-count)). The error grows with the beam
+  emittance over the radiation's and falls with the current, and it does not follow the Rayleigh
+  length over the gain length. The gain length of one seeded run varies between seeds by 3 to 5% at
+  512 beamlets. In a seeded run the third harmonic's power before saturation is 4.7 times too high at
+  512 beamlets of 8. The LCLS example states no `beam.n_particle` and loads 2048 macroparticles
+  where it loaded 4096. `docs/fel-physics.md` states the radiation that slice migration produces by
+  separating the members of a beamlet: 0.011 to 0.027 of the SASE power at 8192 macroparticles a
+  slice in the example `sase` and 0.09 to 0.21 at 1024, a share of the start-up that the amplified
+  radiation outgrows, with the test, the same input with `shot_noise = false`.
+  `check_shot_noise.py` holds the derived count, a set count and the header's note.
 - 2026-11-12 Changed: `beam.beamlet_size` is derived from the harmonics the run carries where the
   input file does not set it. It is twice the highest harmonic of `field.harmonics` plus 2, which is
   4 for the fundamental alone, 8 with the third harmonic and 12 with the fifth, where it was 8 in

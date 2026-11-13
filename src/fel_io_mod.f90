@@ -753,6 +753,7 @@ endif
 block
   real(rp) n_pstep, n_gpt, secs
   integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise, n_load, n_few, n_empty
+  character(8) pct_lo, pct_hi
   character(16) backend
   character(64) ramp_str
 
@@ -885,6 +886,26 @@ block
           n_few / max(1, run%bparam%beamlet_size), '.'
   endif
   call out_io (s_blank$, r_name, trim(line))
+
+  ! Where the macroparticle count came from, and what was measured under
+  ! fel_beamlets_warn$ beamlets (fel_setup_lattice, docs/shot-noise.md).
+
+  if (run%bparam%n_particle_derived) then
+    write (line, '(a, i0, a, i0, a, i0, a)') '             The ', run%beam_init%n_particle, &
+          ' macroparticles are derived: ', fel_beamlets_default$, ' beamlets of ', &
+          run%bparam%beamlet_size, ' (beam.n_particle).'
+    call out_io (s_blank$, r_name, trim(line))
+  else if (run%bparam%quiet_start .and. run%bparam%load_mode == 'sample' .and. &
+           run%bparam%beam_file == '' .and. nbeamlet < fel_beamlets_warn$) then
+    write (line, '(a, i0, a, i0, a)') '             ', nbeamlet, ' beamlets in a slice, under ', &
+          fel_beamlets_warn$, '. The gain length of seeded runs was measured short by'
+    call out_io (s_blank$, r_name, trim(line))
+    write (pct_lo, '(f6.1)') 260.0_rp / max(1, nbeamlet)
+    write (pct_hi, '(f6.1)') 880.0_rp / max(1, nbeamlet)
+    line = '             ' // trim(adjustl(pct_lo)) // ' to ' // trim(adjustl(pct_hi)) // &
+          ' percent at this count on three machines (docs/shot-noise.md).'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
 
   ! Where the beamlet size came from, and the harmonics a field may be carried at with it
   ! (fel_setup_lattice). Without the quiet start there are no beamlets.

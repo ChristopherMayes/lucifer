@@ -73,8 +73,8 @@ Every value is measured on this machine. The grid, the slice count, the macropar
 - `window.n_wavelength` is 68, two slices per cooperation length. Half the spacing over twice the slices, the same window at twice the sampling, moves the gain length and the saturation point by about a percent, at twice the wall clock.
 - `window.n_slice` holds 5.4 times the whole line's slippage.
 - `ds_step` in the lattice is 0.09 m, three periods and 38 steps per segment. One period gives the same gain length and an exit power inside the seed spread, at over twice the wall clock.
-- `beam.n_particle` is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
-- `beamlet_size` is 8, the default.
+- `beam.n_particle`: the input file states none. Setup takes 512 beamlets of the beamlet size, 2048 macroparticles, and prints it. 512 beamlets is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
+- `beamlet_size`: the input file states none. Setup takes 4, twice the highest harmonic carried plus 2.
 - `run.source_filter` is T, the default. At its derived edge it removes about a hundred times the wide-angle power and moves the mode power a few percent, since the macroparticle count has already converged.
 
 The run's own convergence report puts the power outside the split angle at a small fraction of the power inside it, so the total field power is the mode. With the filter off the same input file reports about a hundred times that fraction outside the mode.
@@ -93,50 +93,50 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 | Quantity | `lucifer.toml` | Unit |
 |---|---|---|
-| exit power | 6.9786e+12 | W |
-| exit power per slice | 2.3262e+10 | W |
-| exit power, rms over mean across slices | 7.5698e-01 |  |
-| exit window energy | 2.3901e-04 | J |
-| exit pulse energy, the window's and the light slipped out of it | 2.6448e-04 | J |
-| peak power | 6.9786e+12 | W |
+| exit power | 7.8277e+12 | W |
+| exit power per slice | 2.6092e+10 | W |
+| exit power, rms over mean across slices | 7.9701e-01 |  |
+| exit window energy | 2.6809e-04 | J |
+| exit pulse energy, the window's and the light slipped out of it | 2.8537e-04 | J |
+| peak power | 7.8277e+12 | W |
 | s of the peak power | 1.3220e+02 | m |
-| mode peak, power inside the split | 6.9759e+12 | W |
+| mode peak, power inside the split | 7.8229e+12 | W |
 | s of the mode peak | 1.3220e+02 | m |
-| exit power inside the split | 6.9759e+12 | W |
-| exit power outside the split | 2.6801e+09 | W |
-| outside over inside, the run's maximum | 3.8420e-04 |  |
-| outside over inside at the exit | 3.8420e-04 |  |
-| split angle | 4.5172e-06 | rad |
-| gain length, the shortest e-folding length over five consecutive records | 3.5163e+00 | m |
-| power at the first element end | 2.7243e+07 | W |
-| power per slice at the first element end | 9.0811e+04 | W |
-| initial bunching, mean |b| over slices | 1.1042e-03 |  |
-| exit bunching, mean |b| over slices | 1.4966e-01 |  |
-| exit bunching, the largest slice | 3.9848e-01 |  |
-| bunching, the maximum along the line of the mean |b| | 4.1923e-01 |  |
-| s of the bunching maximum | 6.3920e+01 | m |
-| bunching at the mode peak | 1.4966e-01 |  |
-| power of the largest slice at the bunching maximum | 3.2119e+10 | W |
-| exit power of the largest slice | 8.6695e+10 | W |
+| exit power inside the split | 7.8229e+12 | W |
+| exit power outside the split | 4.8059e+09 | W |
+| outside over inside, the run's maximum | 6.1433e-04 |  |
+| outside over inside at the exit | 6.1433e-04 |  |
+| split angle | 4.5178e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 3.5490e+00 | m |
+| power at the first element end | 2.6684e+07 | W |
+| power per slice at the first element end | 8.8946e+04 | W |
+| initial bunching, mean |b| over slices | 1.0907e-03 |  |
+| exit bunching, mean |b| over slices | 1.5489e-01 |  |
+| exit bunching, the largest slice | 4.0605e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 3.9600e-01 |  |
+| s of the bunching maximum | 6.5200e+01 | m |
+| bunching at the mode peak | 1.5488e-01 |  |
+| power of the largest slice at the bunching maximum | 3.7004e+10 | W |
+| exit power of the largest slice | 1.1123e+11 | W |
 | mean slice energy at the start | 1.3600e+10 | eV |
-| mean slice energy at the exit | 1.3591e+10 | eV |
-| mean slice energy, exit minus start | -8.9930e+06 | eV |
-| slice energy spread at the start | 1.7666e+06 | eV |
-| slice energy spread at the exit | 1.0895e+07 | eV |
-| span of the slice energies at the exit, head to tail | 1.4451e+07 | eV |
+| mean slice energy at the exit | 1.3590e+10 | eV |
+| mean slice energy, exit minus start | -9.7124e+06 | eV |
+| slice energy spread at the start | 1.7689e+06 | eV |
+| slice energy spread at the exit | 1.1200e+07 | eV |
+| span of the slice energies at the exit, head to tail | 1.5145e+07 | eV |
 | slices | 300 |  |
 | records | 1351 |  |
 | slice spacing | 1.0267e-08 | m |
-| macroparticles per slice | 4096 |  |
+| macroparticles per slice | 2048 |  |
 | grid points | 128 |  |
 | grid cell | 3.0140e-06 | m |
 | grid derived by setup | yes |  |
 | grid rounded up from | 127 |  |
 | FEL steps | 1254 |  |
-| source filter, mode angle | 4.5170e-06 | rad |
+| source filter, mode angle | 4.5180e-06 | rad |
 | source filter, rho angle | 2.4270e-06 | rad |
 | source filter, ratio of the angles | 1.8600e+00 |  |
-| source filter, edge | 4.5172e-06 | rad |
+| source filter, edge | 4.5178e-06 | rad |
 
 ## The input files
 
@@ -155,7 +155,6 @@ n_wavelength = 68
 n_slice = 300
 
 [beam]
-n_particle = 4096
 bunch_charge = 3.082369e-11
 sig_pz = 1.3e-4
 a_norm_emit = 4e-7

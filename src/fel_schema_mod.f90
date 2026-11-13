@@ -210,8 +210,9 @@ call add ('beam', 'file', key_path$, '', 'beam file', &
 call add ('beam', 'position_file', key_path$, '', 'position file', &
       'An openPMD-beamphysics bunch to load, read whole and then sliced by load_mode.')
 call add ('beam', 'n_particle', key_int$, '', 'particles per slice', &
-      'Macroparticles per slice after the phase copies, a positive multiple of beamlet_size. ' // &
-      'In the keep mode, the particles of the generated bunch.', lo = 1.0_rp)
+      'Macroparticles per slice after the phase copies, a multiple of beamlet_size. 0 in ' // &
+      'the sample mode derives it, 512 beamlets of beamlet_size. In the keep mode, the ' // &
+      'particles of the generated bunch.', lo = 0.0_rp)
 call add ('beam', 'bunch_charge', key_real$, 'C', 'charge', &
       'Total bunch charge. The current is derived from it and never input.', lo = 0.0_rp)
 call add ('beam', 'sig_z', key_real$, 'm', 'bunch length', &

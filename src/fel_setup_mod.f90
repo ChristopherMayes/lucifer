@@ -236,6 +236,18 @@ if (run%bparam%beamlet_size == 0) then
   run%bparam%beamlet_size_derived = .true.
 endif
 
+! The macroparticles in a slice, where the input file states none and the sample mode
+! loads a described bunch or a bunch file: fel_beamlets_default$ beamlets of the size
+! above (docs/shot-noise.md). The result of a run follows the beamlets in a slice and
+! not the macroparticles. The keep mode and the validation route count the particles of
+! a bunch in beam.n_particle, and a dump has its own, so none of those is derived.
+
+if (run%beam_init%n_particle == 0 .and. run%bparam%load_mode == 'sample' .and. &
+    run%bparam%beam_file == '' .and. .not. run%resample%use_beam_init) then
+  run%beam_init%n_particle = fel_beamlets_default$ * run%bparam%beamlet_size
+  run%bparam%n_particle_derived = .true.
+endif
+
 ! The load has to carry the harmonic it is asked to start. The quiet start leaves no
 ! bunching below harmonic beamlet_size. fel_fawley_noise then imposes the physical level
 ! on harmonics 1 through (beamlet_size - 1)/2. A harmonic field above that starts from a

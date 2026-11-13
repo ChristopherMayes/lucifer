@@ -126,7 +126,32 @@ where $h_{\max}$ is the highest harmonic of `field.harmonics`. This is 4 for the
 | | | 16 | | 1 |
 :::
 
-At the fundamental the result depends on the number of beamlets in a slice and not on $M$. In a seeded steady-state run with 1024 beamlets the gain length is 0.989, 0.989 and 1.004 of its converged value for $M = 8$, 4 and 2, and with 256 beamlets it is 0.921, 0.919 and 0.945. In SASE runs of LCLS and FLASH1 the exit pulse energy for $M = 2$, 4 and 8 agrees at an equal number of beamlets, to 1% on LCLS. With fewer than 256 beamlets per slice the exit pulse energy of a SASE run is too large: by 2 to 5% with 128 beamlets on LCLS, 9% with 64, 21% with 32 and 45% with 16. A smaller beamlet therefore gives the same result with fewer macroparticles. A run that carries only the fundamental, with $M = 4$ and half the macroparticles of a run with $M = 8$, has the same number of beamlets, and its run time is shorter by a factor of 1.4 for FLASH1 and LCLS at 4096 macroparticles per slice and of 1.09 for the example `sase` at 2048.
+(shot-count)=
+### The number of beamlets in a slice
+
+At the fundamental the result depends on the number of beamlets in a slice, $N_b$, and not on $M$. In a seeded steady-state run with 1024 beamlets the gain length is 0.989, 0.989 and 1.004 of its converged value for $M = 8$, 4 and 2, and in SASE runs of LCLS and FLASH1 the exit pulse energy for $M = 2$, 4 and 8 agrees at an equal number of beamlets, to 1% on LCLS. A smaller beamlet therefore gives the same result with fewer macroparticles. A run that carries only the fundamental, with $M = 4$ and half the macroparticles of a run with $M = 8$, has the same number of beamlets, and its run time is shorter by a factor of 1.4 for FLASH1 and LCLS at 4096 macroparticles per slice and of 1.09 for the example `sase` at 2048.
+
+With too few beamlets the gain length is too short and the power too large. The error is inversely proportional to $N_b$: [](#tab-shot-count) gives the product of the relative error of the gain length and $N_b$ for seeded steady-state runs of nine machines, three of them real and six obtained from these by scaling the emittance and the current. The product increases with the ratio of the beam emittance to that of the radiation, $4\pi\epsilon/\lambda$, and at a given emittance it decreases as the current is raised. It does not follow the ratio of the Rayleigh length of the beam to the gain length: the last two rows of the table are one beam at two currents, and the product is larger where that ratio is smaller. This suggests that the beamlets undersample the spread in resonance that the emittance produces, in proportion to the size of that spread relative to the gain bandwidth. No expression in one parameter has been found that reproduces the nine values to better than a factor of two.
+
+:::{table} The relative error of the gain length multiplied by the number of beamlets per slice, in seeded steady-state runs with $M = 4$, from 16 seeds at 128 beamlets against 8 seeds at 8192. $Z_R = 4\pi\sigma_x^2/\lambda$ is the Rayleigh length of the beam and $L_g$ the gain length. The last column is the standard deviation of the gain length of a single run, multiplied by $\sqrt{N_b}$. Measured on 2026-11-12.
+:name: tab-shot-count
+
+| machine | $4\pi\epsilon/\lambda$ | $Z_R/L_g$ | error $\times N_b$ | scatter $\times \sqrt{N_b}$ |
+|---|---|---|---|---|
+| Aramis, emittance divided by 40 | 0.11 | 2.3 | 1.7 ± 0.7 | 0.2 |
+| Aramis, emittance divided by 16 | 0.28 | 4.7 | 1.9 ± 0.9 | 0.3 |
+| FLASH1 | 1.05 | 9.7 | 3.7 ± 1.8 | 0.6 |
+| LCLS | 1.25 | 10.3 | 2.6 ± 1.6 | 0.6 |
+| Aramis | 4.4 | 20.7 | 8.8 ± 3.3 | 1.1 |
+| FLASH1, emittance × 4, current × 8 | 4.2 | 50 | 6.9 ± 1.7 | 0.6 |
+| Aramis, current × 8 | 4.4 | 61 | 5.5 ± 1.7 | 0.6 |
+| FLASH1, emittance × 8, current × 32 | 8.4 | 139 | 15.3 ± 1.4 | 0.4 |
+| FLASH1, emittance × 8, current × 4 | 8.4 | 40 | 27.3 ± 2.8 | 0.7 |
+:::
+
+When `beam.n_particle` is not set in the sample mode, the loader takes 512 beamlets per slice, that is, $512\,M$ macroparticles. With 512 beamlets the gain length is short by 0.5% for LCLS, 0.7% for FLASH1 and 1.7% for Aramis, and by 3 to 5% for the last two rows of the table. For LCLS the error is 5.0 ± 1.4% with 32 beamlets, 2.0 ± 1.2% with 128 and 0.5 ± 0.7% with 512. The gain length of a single seeded run also varies from seed to seed, by 3% for LCLS and FLASH1 and by 5% for Aramis with 512 beamlets. This variation exceeds the error and decreases only as $1/\sqrt{N_b}$. In a SASE run with fewer than 256 beamlets per slice the exit pulse energy is too large: by 2 to 5% with 128 beamlets on LCLS, 9% with 64, 21% with 32 and 45% with 16. The header of a run states the count, and for a count below 256 beamlets it states the range of the error measured on the three real machines.
+
+One quantity requires more beamlets. In a seeded run the power of a harmonic before saturation is small, and the granularity of the load exceeds it: in a seeded FLASH1 run with $M = 8$ the power of the third harmonic in the exponential regime is 4.7 times its value for 8192 beamlets with 512 beamlets, and 66 times with 128, and its maximum is 19% too large with 512. In a SASE run the shot noise of the harmonic is far above this level, and no dependence was found between 256 and 512 beamlets.
 
 (shot-real)=
 ## The shot noise of N electrons

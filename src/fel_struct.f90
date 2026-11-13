@@ -269,6 +269,12 @@ end type
 ! both constants on three machines a hundred times apart in wavelength.
 
 real(rp), parameter :: fel_cells_per_sigma$ = 7
+! The beamlets in a slice where the input file states no beam.n_particle, and the count
+! under which the header says what was measured there (docs/shot-noise.md). Seeded runs
+! of nine machines have a gain length short by 0.5 to 5% at 512 beamlets, under 2% on
+! the three real ones, and the error falls as one over the count.
+integer, parameter :: fel_beamlets_default$ = 512
+integer, parameter :: fel_beamlets_warn$ = 256
 real(rp), parameter :: fel_widths_per_sigma$ = 9
 
 !+
@@ -338,6 +344,7 @@ type fel_beam_init_param_struct
   ! harmonic carried is refused, since the bunching at a lower harmonic appears at that one.
   integer :: beamlet_size = 0
   logical :: beamlet_size_derived = .false.   ! Set by fel_setup_lattice. Not an input key.
+  logical :: n_particle_derived = .false.     ! Likewise, for beam.n_particle.
   logical :: shot_noise = .false.         ! Impose physical shot noise on the load.
   ! The fewest real electrons a beamlet stands for in the sample mode. A slice with too
   ! little charge for its beamlets gets fewer of them (fel_beamlet_count). 0 gives every
