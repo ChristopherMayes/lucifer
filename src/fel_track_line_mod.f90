@@ -16,6 +16,7 @@ module fel_track_line_mod
 use fel_struct
 use fel_io_mod
 use fel_timer_mod
+use, intrinsic :: iso_fortran_env, only: output_unit
 use beam_mod
 use wake_mod
 
@@ -1054,9 +1055,11 @@ subroutine progress_line (at_element_end, i_step, n_step)
 logical at_element_end
 integer i_step, n_step
 integer(8) now
-real(rp) elapsed, pow, ene, bun
+real(rp) elapsed, pow, ene, bun, frac
 character(300) line
 character(12) step_str, ela_str
+character(:), allocatable :: bar
+integer n_full, i_bar
 
 !
 
@@ -1080,20 +1083,52 @@ else
         mod(int(elapsed) / 60, 60), ':', mod(int(elapsed), 60)
 endif
 
-! Header once, then the rows. s is the arc length along the reference orbit (meters).
+! The progress is one line rewritten in place, a bar and the row's numbers, or the rows
+! of a table, or nothing, as fel_print_com%progress has it (--progress). s is the arc length along the reference orbit (meters).
 ! Through a bending break it exceeds the chord the light takes, and light_corr accounts
 ! for the difference.
 
+if (fel_print_com%progress == 'none') return
+
+if (fel_print_com%progress == 'bar') then
+
+  ! A bar of 16 cells, the percent, s, the element, the power, the energy, the bunching
+  ! and the time, written to standard output with a carriage return and no line feed,
+  ! and with a line feed at the end of the line.
+
+  frac = max(0.0_rp, min(1.0_rp, z_now / lat_length))
+  n_full = nint(16 * frac)
+  bar = ''
+  do i_bar = 1, 16
+    if (fel_print_com%unicode) then
+      if (i_bar <= n_full) then
+        bar = bar // achar(226) // achar(150) // achar(136)
+      else
+        bar = bar // achar(226) // achar(150) // achar(145)
+      endif
+    else
+      bar = bar // merge('#', '.', i_bar <= n_full)
+    endif
+  enddo
+  write (line, '(f5.1, a, f8.3, 2a, 2(1x, a), f7.4, a7)') 100 * frac, '%', z_now, ' m ', ele%name(1:8), &
+        trim(adjustl(fel_si_micro(fel_si_str(pow, 'W')))), trim(adjustl(fel_si_micro(fel_si_str(ene, 'J')))), &
+        bun, trim(ela_str)
+  write (output_unit, '(4a)', advance = 'no') achar(13), ' ', bar, ' ' // stand_ins(trim(line)) // '  '
+  if (z_now >= lat_length .and. at_element_end) write (output_unit, '(a)') ''
+  flush (output_unit)
+  return
+endif
+
 if (.not. prog_header_done) then
   call out_io (s_blank$, r_name, &
-        '     %        s       ele       step          power         energy    <|b|>  elapsed  element')
+        '      %         s  element          step          power         energy   <|b|>    time')
   prog_header_done = .true.
 endif
 
-write (line, '(f7.1, f10.3, i7, a, i0, 2x, a9, 1x, a14, 1x, a14, f9.4, a8, 2x, a)') &
-      100 * z_now / lat_length, z_now, ie, '/', branch%n_ele_track, adjustr(step_str(1:9)), &
-      fel_si_str(pow, 'W'), fel_si_str(ene, 'J'), bun, trim(ela_str), trim(ele%name)
-call out_io (s_blank$, r_name, trim(line))
+write (line, '(f7.1, f10.3, 2x, a12, a9, 1x, a14, 1x, a14, f8.4, a8)') &
+      100 * z_now / lat_length, z_now, ele%name, adjustr(step_str(1:9)), &
+      fel_si_micro(fel_si_str(pow, 'W')), fel_si_micro(fel_si_str(ene, 'J')), bun, trim(ela_str)
+call fel_print_line (trim(line))
 
 end subroutine progress_line
 

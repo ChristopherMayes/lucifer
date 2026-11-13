@@ -62,7 +62,7 @@ character(*) input_file
 character(*), optional :: overrides(:)
 character(:), allocatable :: text, origin
 logical err_flag, found_lattice, bad
-integer i, j
+integer i, j, origin_now
 character(*), parameter :: r_name = 'fel_read_input'
 
 !
@@ -70,6 +70,10 @@ character(*), parameter :: r_name = 'fel_read_input'
 err_flag = .true.
 found_lattice = .false.
 call fel_schema_table (keys)
+if (allocated(run%key_origin)) deallocate (run%key_origin)
+allocate (run%key_origin(size(keys)))
+run%key_origin = fel_origin_default$
+run%input_file = input_file
 
 call toml_load (root, trim(input_file), error = terr)
 if (allocated(terr)) then
@@ -78,6 +82,7 @@ if (allocated(terr)) then
 endif
 
 origin = 'THE INPUT FILE'
+origin_now = fel_origin_file$
 if (.not. read_root()) return
 
 if (.not. found_lattice) then
@@ -103,6 +108,7 @@ if (present(overrides)) then
       return
     endif
     origin = 'THE OVERRIDES'
+    origin_now = fel_origin_command$
     if (.not. read_root()) return
   endif
 endif
@@ -140,6 +146,7 @@ do i = 1, size(tkeys)
   endif
   call fel_schema_set (run, keys(j), root, bad)
   if (bad) return
+  run%key_origin(j) = origin_now
   if (keys(j)%name == 'lattice') found_lattice = .true.
 enddo
 ok = .true.
@@ -230,6 +237,7 @@ do k = 1, size(ckeys)
   endif
   call fel_schema_set (run, keys(jj), tab, bad)
   if (bad) return
+  run%key_origin(jj) = origin_now
 enddo
 ok = .true.
 

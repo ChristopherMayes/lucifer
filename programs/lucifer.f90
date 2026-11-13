@@ -37,8 +37,10 @@
 ! keys of the input file, each table.key=value, read through the same schema after it.
 !
 ! Usage:
-!   lucifer <input.toml> [<table>.<key>=<value> ...]
-!   lucifer --schema <schema.json>
+!   lucifer [--ascii | --unicode] [--verbose] [--progress <mode>] <input.toml> [<table>.<key>=<value> ...]
+!   lucifer --schema <file>
+!   lucifer --version
+!   lucifer --help
 !-
 
 program lucifer
@@ -65,9 +67,10 @@ implicit none
 ! the input structs and act inside init and setup.
 
 type (fel_run_struct), target :: run
-integer n_arg, iu_k, i_k
-logical err, dev_usable
-character(400) param_file
+integer n_arg, iu_k, i_k, n_over, i_skip
+logical err, dev_usable, want_ascii, want_unicode, want_verbose
+character(400) param_file, arg
+character(400) :: progress = ''
 character(400), allocatable :: overrides(:)
 character(256) dev_reason
 character(64) dev_name
@@ -78,7 +81,8 @@ character(*), parameter :: r_name = 'lucifer'
 ! The first argument is the input file. The examples name it lucifer.toml by convention. No name
 ! is looked for here. The arguments after it are overrides, table.key=value, which
 ! fel_read_input applies after the input file. --schema <file> writes the input file's schema as JSON
-! Schema and stops. --version prints the Lucifer version and the Bmad version and stops.
+! Schema and stops. --version prints the Lucifer version, the Bmad version and the device
+! backend and stops, and --help prints the options and the files a run writes.
 
 ! The run clock starts before anything is read. So the footer's run total covers the
 ! whole process, and the work outside the walk is the difference.
@@ -86,17 +90,90 @@ character(*), parameter :: r_name = 'lucifer'
 call fel_timer_reset()
 
 n_arg = command_argument_count()
-if (n_arg == 1) then
-  call get_command_argument (1, param_file)
-  if (param_file == '--version') then
-    call out_io (s_blank$, r_name, 'Lucifer version ' // lucifer_version$)
-    call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
-    flush (output_unit)
-    stop
-  endif
+param_file = ''
+if (n_arg >= 1) call get_command_argument (1, param_file)
+
+! No argument is an error of use: the usage lines, and where the help is.
+
+if (n_arg == 0) then
+  call out_io (s_blank$, r_name, [ &
+        'Usage: lucifer [options] <input.toml> [<table>.<key>=<value> ...]', &
+        'Try "lucifer --help" for the options and the files a run writes. '])
+  flush (output_unit)
+  stop 2, quiet = .true.
 endif
+
+if (param_file == '--help' .or. param_file == '-h') then
+  call out_io (s_blank$, r_name, [ &
+        'Lucifer: FEL tracking in Bmad.                                                ', &
+        '                                                                              ', &
+        'Usage:                                                                        ', &
+        '  lucifer [options] <input.toml> [<table>.<key>=<value> ...]                  ', &
+        '  lucifer --schema <file>                                                     ', &
+        '  lucifer --version                                                           ', &
+        '  lucifer --help                                                              ', &
+        '                                                                              ', &
+        'Arguments:                                                                    ', &
+        '  <input.toml>             The input file. It names the lattice and holds the ', &
+        '                           tables [run], [window], [beam], [field], [wake],   ', &
+        '                           [space_charge] and [bmad].                         ', &
+        '  <table>.<key>=<value>    Set one key of the input file. It is applied after ', &
+        '                           the file is read and checked as the file is.       ', &
+        '                                                                              ', &
+        'Options:                                                                      ', &
+        '  --ascii                  Draw the boxes of the printout in ASCII.           ', &
+        '  --unicode                Draw the boxes of the printout in Unicode.         ', &
+        '                           Default: Unicode where the locale is UTF-8, ASCII  ', &
+        '                           otherwise.                                         ', &
+        '  --progress <mode>        How the tracking reports its progress:             ', &
+        '                             bar     one line, rewritten in place             ', &
+        '                             table   one row at each element end              ', &
+        '                             none    no report                                ', &
+        '                           Default: bar on a terminal, table otherwise.       ', &
+        '  --verbose                Also print the messages of setup and of the        ', &
+        '                           lattice parser.                                    ', &
+        '  -h, --help               Print this help and exit.                          ', &
+        '  --version                Print the Lucifer version, the Bmad version and the', &
+        '                           device backend, and exit.                          ', &
+        '  --schema <file>          Write the schema of the input file as JSON Schema  ', &
+        '                           and exit.                                          ', &
+        '                                                                              ', &
+        'Output files, named by run.out_root:                                          ', &
+        '  <out_root>.stats.h5        The record of the run, with every number the     ', &
+        '                             printout shows.                                  ', &
+        '  <out_root>.resolved.toml   The input file with every key filled. It         ', &
+        '                             reproduces the run.                              ', &
+        '  <out_root>-final.beam.h5   The beam at the exit.                            ', &
+        '  <out_root>-final.wf.h5     The field at the exit.                           ', &
+        '                                                                              ', &
+        'Examples:                                                                     ', &
+        '  lucifer lucifer.toml                                                        ', &
+        '  lucifer lucifer.toml beam.n_particle=4096 run.out_root=s7                   ', &
+        '  lucifer lucifer.toml run.load_only=true                                     ', &
+        '  lucifer --progress table lucifer.toml > run.log                             '])
+  flush (output_unit)
+  stop
+endif
+
+! The versions, and what run.device can be set to in this build. The backend is a
+! property of the build and the machine. Where there is none, the reason names the
+! toolchain requirement and not the platform. The validation suite takes the backend
+! from this option to decide whether the device checks can run.
+
+if (param_file == '--version') then
+  call out_io (s_blank$, r_name, 'Lucifer version ' // lucifer_version$)
+  call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
+  call fel_device_query (dev_usable, dev_name, dev_reason)
+  if (dev_usable) then
+    call out_io (s_blank$, r_name, 'Device backend: metal, on ' // trim(dev_name))
+  else
+    call out_io (s_blank$, r_name, 'Device backend: none. ' // trim(dev_reason))
+  endif
+  flush (output_unit)
+  stop
+endif
+
 if (n_arg == 2) then
-  call get_command_argument (1, param_file)
   if (param_file == '--schema') then
     call get_command_argument (2, param_file)
     open (newunit = iu_k, file = trim(param_file), action = 'write', status = 'replace', iostat = i_k)
@@ -110,46 +187,62 @@ if (n_arg == 2) then
     stop
   endif
 endif
-if (n_arg == 0) then
-  call out_io (s_blank$, r_name, [ &
-        'Usage:                                                                  ', &
-        '  lucifer <input.toml> [<table>.<key>=<value> ...]                      ', &
-        '  lucifer --schema <schema.json>                                        ', &
-        '  lucifer --version                                                     ', &
-        '                                                                        ', &
-        'One TOML input file names the lattice and holds the tables [run],       ', &
-        '[window], [beam], [field], [wake], [space_charge] and [bmad]. Any file  ', &
-        'name works. The examples name theirs lucifer.toml by convention, which  ', &
-        'is a convention rather than a default looked for here. An argument after', &
-        'the input file sets one key of it, beam.n_particle=4096 or              ', &
-        'run.out_root=s7, read after the input file through the same schema.     ', &
-        '--schema writes the schema as JSON Schema, and --version prints the two ', &
-        'versions below. docs/ documents every key, every output file and the    ', &
-        'lattice attributes.                                                     '])
-  ! Separate from the block above. A character array constructor needs every element the
-  ! same length, and the length of a version string is not known here.
-  call out_io (s_blank$, r_name, 'Lucifer version ' // lucifer_version$)
-  call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
-  ! Print what run.device can be set to in this build. The backend is a property of
-  ! the build and the machine. Where there is none, the reason names the toolchain
-  ! requirement and not the platform. The validation suite reads this line to decide whether
-  ! the device checks can run.
-  call fel_device_query (dev_usable, dev_name, dev_reason)
-  if (dev_usable) then
-    call out_io (s_blank$, r_name, 'Device backend: metal, on ' // trim(dev_name))
-  else
-    call out_io (s_blank$, r_name, 'Device backend: none. ' // trim(dev_reason))
+! The input file is the first argument that is not an option, and the arguments after it
+! that are not options are the overrides. --ascii and --unicode choose the characters the
+! boxes are drawn in, where the locale would otherwise decide, and --verbose prints the
+! setup's information lines, which are held back otherwise.
+
+param_file = ''
+allocate (overrides(n_arg))
+n_over = 0
+want_ascii = .false.;  want_unicode = .false.;  want_verbose = .false.
+i_skip = 0
+do i_k = 1, n_arg
+  if (i_k == i_skip) cycle
+  call get_command_argument (i_k, arg)
+  ! --progress takes its mode as the next argument or after an equals sign.
+  if (arg == '--progress' .or. arg(1:11) == '--progress=') then
+    if (arg == '--progress') then
+      progress = ''
+      if (i_k < n_arg) call get_command_argument (i_k + 1, progress)
+      i_skip = i_k + 1
+    else
+      progress = arg(12:)
+    endif
+    if (progress /= 'bar' .and. progress /= 'table' .and. progress /= 'none') then
+      call out_io (s_error$, r_name, '--progress TAKES bar, table OR none, AND WAS GIVEN: ' // trim(progress))
+      stop 2
+    endif
+    cycle
   endif
-  ! Flush before the stop. Otherwise the runtime's STOP line can reach the terminal first
-  ! and the usage text appears to follow the exit.
-  flush (output_unit)
+  select case (arg)
+  case ('--ascii');    want_ascii = .true.
+  case ('--unicode');  want_unicode = .true.
+  case ('--verbose');  want_verbose = .true.
+  case default
+    if (arg(1:1) == '-') then
+      call out_io (s_error$, r_name, 'UNKNOWN OPTION: ' // trim(arg), 'SEE "lucifer --help" FOR THE OPTIONS.')
+      stop 2
+    endif
+    if (param_file == '') then
+      param_file = arg
+    else
+      n_over = n_over + 1
+      overrides(n_over) = arg
+    endif
+  end select
+enddo
+if (param_file == '') then
+  call out_io (s_error$, r_name, 'NO INPUT FILE IS NAMED ON THE COMMAND LINE.')
   stop 1
 endif
-call get_command_argument (1, param_file)
-allocate (overrides(n_arg-1))
-do i_k = 2, n_arg
-  call get_command_argument (i_k, overrides(i_k-1))
-enddo
+overrides = overrides(1:n_over)
+
+call fel_print_setup (want_ascii, want_unicode, want_verbose, trim(progress))
+if (.not. want_verbose) then
+  call output_direct (print_and_capture = .false., min_level = s_info$, max_level = s_success$)
+  call output_direct (print_and_capture = .false., min_level = s_important$, max_level = s_important$)
+endif
 
 call fel_read_input (param_file, run, err, overrides)
 if (err) stop 1
@@ -166,6 +259,22 @@ if (err) stop 1
 call fel_setup_schedule (run, err)
 if (err) stop 1
 
+! The resolved input file: every key at the value the run uses, the derived ones and
+! the ones set on the command line marked in comments. Running it gives this run again.
+
+open (newunit = iu_k, file = trim(run%global%out_root) // '.resolved.toml', action = 'write', &
+      status = 'replace', iostat = i_k)
+if (i_k /= 0) then
+  call out_io (s_error$, r_name, 'CANNOT WRITE THE RESOLVED INPUT FILE: ' // trim(run%global%out_root) // '.resolved.toml')
+  stop 1
+endif
+call fel_schema_write_toml (run, iu_k)
+close (iu_k)
+
+! Where the beam's description gave no Pierce parameter, as for a bunch read from a
+! file, the header takes that of the beam as built.
+
+if (run%rho_1d <= 0) run%rho_1d = fel_pierce_of_beam(run)
 call fel_write_header (run)
 
 ! Check instrument: write the transcribed single-particle wake kernels for comparison
@@ -201,6 +310,8 @@ if (run%global%load_only) then
   call out_io (s_info$, r_name, 'load_only is set. The header above is the pre-run: what the input file ' // &
         'derives, what it will cost and where its load stands. The initial state is written and ' // &
         'nothing is tracked.')
+  call fel_write_stats_file (run, err)
+  if (err) stop 1
   stop 0
 endif
 

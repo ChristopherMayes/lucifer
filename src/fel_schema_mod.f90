@@ -299,14 +299,14 @@ call add ('field', 'propagator', key_string$, '', 'propagator', &
       'The field propagator: slices, one transverse transform per slice at the reference wavenumber and ' // &
       'the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode ' // &
       'diffracted at its own wavenumber and the slippage a continuous phase ramp, the light it carries ' // &
-      'past the head banked as the escaped field (docs/spectral-field.md).', &
+      'past the head banked as the escaped field.', &
       allowed = [character(16) :: 'slices', 'spectral'])
 call add ('field', 'n_wavelength', key_int$, 'wavelengths', 'field sampling', &
       'The field''s plane along tau, a whole multiple of window.n_wavelength. 0 takes the window''s slice ' // &
       'under the slice propagator, which holds one plane a slice and takes no other, and under the ' // &
       'spectral propagator derives a fraction of the cooperation length in whole slices, cut so the ' // &
-      'window keeps 8 planes. A stated value above the cliff the sweep found is refused ' // &
-      '(docs/spectral-field.md).', lo = 0.0_rp)
+      'window keeps 8 planes. A stated value above a quarter of the cooperation length is refused, ' // &
+      'unless it is the window''s own slice.', lo = 0.0_rp)
 
 ! [wake]: fel_chamber_wake_init_struct.
 
@@ -864,6 +864,44 @@ end function fel_schema_key
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_schema_mark (run, dotted, origin)
+!
+! Routine to record where a key's value came from, which the setup calls for a value it
+! derived. A derived value is marked as derived whatever set the key before, since an
+! input file may state the value that asks for the derivation, beam.beamlet_size = 0.
+!
+! Input:
+!   run    -- fel_run_struct: The run state.
+!   dotted -- character(*): The key as table.key, beam.n_particle.
+!   origin -- integer: fel_origin_derived$.
+!
+! Output:
+!   run    -- fel_run_struct: With key_origin set for the key.
+!-
+
+subroutine fel_schema_mark (run, dotted, origin)
+
+type (fel_run_struct), target :: run
+type (fel_key_struct), allocatable :: keys(:)
+character(*) dotted
+integer origin, i
+
+!
+
+if (.not. allocated(run%key_origin)) return
+call fel_schema_table (keys)
+do i = 1, size(keys)
+  if (trim(keys(i)%table) // '.' // trim(keys(i)%name) /= dotted) cycle
+  if (origin == fel_origin_derived$ .or. run%key_origin(i) == fel_origin_default$) run%key_origin(i) = origin
+  return
+enddo
+
+end subroutine fel_schema_mark
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_schema_value (run, key, rv, iv, lv, sv, ilist, slist)
 !
 ! Routine to fetch one key's value from run into the argument of its kind. This is the
@@ -1228,7 +1266,7 @@ call fel_schema_table (keys)
 
 do i = 1, size(keys)
   if (keys(i)%table /= '') cycle
-  write (iu, '(3a)') trim(keys(i)%name), ' = ', fel_schema_text(run, keys(i))
+  call write_key (i)
 enddo
 
 do it = 1, size(fel_schema_tables$)
@@ -1237,9 +1275,33 @@ do it = 1, size(fel_schema_tables$)
   write (iu, '(3a)') '[', trim(table), ']'
   do i = 1, size(keys)
     if (keys(i)%table /= table) cycle
-    write (iu, '(3a)') trim(keys(i)%name), ' = ', fel_schema_text(run, keys(i))
+    call write_key (i)
   enddo
 enddo
+
+!-------------------------------------------------------
+contains
+
+! write_key writes one key, with where its value came from in a comment when the run
+! recorded it and it is not the default.
+
+subroutine write_key (ik)
+
+integer ik
+character(:), allocatable :: line
+
+!
+
+line = trim(keys(ik)%name) // ' = ' // fel_schema_text(run, keys(ik))
+if (allocated(run%key_origin)) then
+  select case (run%key_origin(ik))
+  case (fel_origin_derived$);  line = line // '   # derived'
+  case (fel_origin_command$);  line = line // '   # command line'
+  end select
+endif
+write (iu, '(a)') line
+
+end subroutine write_key
 
 end subroutine fel_schema_write_toml
 

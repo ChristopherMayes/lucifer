@@ -1631,7 +1631,7 @@ write (fp32%iu, '(i8, 10es13.4)') fp32%istep, row, gulp
 if (gulp < 32) then
   call out_io (s_error$, r_name, 'FP32 RESIDUAL GUARD: THE MEDIAN PER-STEP PHASE INCREMENT IS \es10.2\ ULPS', &
         'OF THE RESIDUAL, BELOW THE FLOOR OF 32. AT THIS GRANULARITY FP32 ABSORBS THE PHYSICS', &
-        'SILENTLY AND A RUN LOOKS CLEAN WITH NO BUNCHING (docs/performance.md), SO IT REFUSES INSTEAD.', &
+        'SILENTLY AND A RUN LOOKS CLEAN WITH NO BUNCHING, SO THE RUN IS REFUSED.', &
         r_array = [gulp])
   err_flag = .true.
 endif

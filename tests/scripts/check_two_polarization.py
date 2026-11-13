@@ -271,7 +271,7 @@ def main():
 
     # 3c. The header states the bank's bytes before the run tracks, both components in each
     #     file. The run keeps the escaped file, so the statement is the two files.
-    n_rot, members = bank_bytes.stated(r_uv.stdout)
+    n_rot, members = bank_bytes.stated(wd / "p2t_uv.stats.h5")
     on_disk = sum(bank_bytes.kept(wd, "p2t_uv", 1))
     if 1 in members:
         check("crossed: the stated pulse and escaped files vs on disk, both polarizations, rel",

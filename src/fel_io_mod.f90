@@ -18,6 +18,8 @@ use fel_input_mod
 use fel_schema_mod
 use fel_timer_mod
 use fel_cost_mod
+use fel_print_mod
+use fel_record_mod
 use wavefront_openpmd_mod
 use, intrinsic :: ieee_arithmetic, only: ieee_is_finite, ieee_value, ieee_quiet_nan
 ! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read only in
@@ -30,6 +32,19 @@ use fel_version_mod, only: lucifer_version$
 !$ use omp_lib
 
 implicit none
+
+! The keys of the noise, which the header writes in a part of their own, the defaults it
+! shows beside the keys the input set, and the units that take a prefix.
+
+character(32), parameter, private :: noise_keys(4) = [character(32) :: &
+      'quiet_start', 'shot_noise', 'shot_noise_method', 'beamlet_min_electrons']
+character(48), parameter, private :: shown_defaults(14) = [character(48) :: &
+      'beam.load_mode', 'beam.quiet_start', 'beam.shot_noise', 'beam.shot_noise_method', &
+      'field.lambda0', 'field.harmonics', 'field.seed_power', 'run.out_root', 'run.ran_seed', &
+      'run.source_filter', 'run.migrate', 'bmad.sr_wakes_on', 'bmad.csr_and_space_charge_on', &
+      'bmad.radiation_damping_on']
+character(16), parameter, private :: scaled_units(9) = [character(16) :: &
+      'm', 'C', 'W', 'eV', 'rad', 'A', 'J', 's', 'm rad']
 
 contains
 
@@ -630,6 +645,174 @@ end subroutine fel_dump_field_set
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function si_text (value, unit) result (txt)
+!
+! Routine to write a value with its unit scaled to a prefix, for a box of the printout:
+! 30.824 pC, 150.992 pm. The mantissa keeps at most three decimals and loses its trailing
+! zeros down to one, the micro prefix is fel_micro$, which fel_print_line writes as the
+! micro sign or as u, and zero is written as 0 and the unit.
+!
+! Input:
+!   value -- real(rp): The value in the unit.
+!   unit  -- character(*): The unit, m or C.
+!
+! Output:
+!   txt   -- character(:), allocatable: The text.
+!-
+
+recursive function si_text (value, unit, sig) result (txt)
+
+real(rp) value, mant
+character(*) unit
+integer, optional :: sig
+character(:), allocatable :: txt, num, tail
+character(14) str
+character(12) short
+integer ib
+
+!
+
+if (value == 0) then
+  txt = '0 ' // unit
+  return
+endif
+
+! A unit of two words, m rad, takes its prefix on the first.
+
+ib = index(unit, ' ')
+if (ib > 0) then
+  txt = si_text(value, unit(1:ib-1), sig) // unit(ib:)
+  return
+endif
+
+str = adjustl(fel_si_str(value, unit))
+ib = index(trim(str), ' ')
+if (ib == 0) then
+  txt = trim(str)
+  return
+endif
+num = str(1:ib-1)
+tail = trim(adjustl(str(ib+1:)))
+if (index(num, '.') > 0 .and. scan(num, 'Ee') == 0) then
+  do
+    if (num(len(num):len(num)) /= '0') exit
+    if (num(len(num)-1:len(num)-1) == '.') exit
+    num = num(1:len(num)-1)
+  enddo
+endif
+if (len(tail) == len(unit) + 1) then
+  if (tail(1:1) == 'u') tail = fel_micro$ // tail(2:)
+endif
+
+! With sig, the mantissa is rounded to four significant digits, for a column that is
+! read at a glance.
+
+if (present(sig) .and. scan(num, 'Ee') == 0) then
+  read (num, *) mant
+  if (abs(mant) < 10) then
+    write (short, '(f0.3)') mant
+  elseif (abs(mant) < 100) then
+    write (short, '(f0.2)') mant
+  else
+    write (short, '(f0.1)') mant
+  endif
+  num = trim(short)
+  if (num(1:1) == '.') num = '0' // num
+endif
+txt = num // ' ' // tail
+
+end function si_text
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function number_text (x) result (txt)
+!
+! Routine to write a pure number compactly for a box of the printout: 0.19, 7.0, 22.3,
+! 1253, 5.90e-4, 6.41e5.
+!
+! Input:
+!   x   -- real(rp): The number.
+!
+! Output:
+!   txt -- character(:), allocatable: The text.
+!-
+
+function number_text (x) result (txt)
+
+real(rp) x, ax
+character(:), allocatable :: txt
+character(24) str
+integer ie, iexp
+
+!
+
+ax = abs(x)
+if (ax == 0) then
+  txt = '0'
+elseif (ax >= 1e4_rp .or. ax < 1e-2_rp) then
+  write (str, '(es10.2e3)') x
+  str = adjustl(str)
+  ie = index(str, 'E')
+  read (str(ie+1:), *) iexp
+  txt = str(1:ie-1) // 'e' // int_str(iexp)
+elseif (ax >= 100) then
+  txt = int_str(nint(x))
+elseif (ax >= 10) then
+  write (str, '(f0.1)') x
+  txt = trim(str)
+else
+  write (str, '(f0.2)') x
+  txt = trim(str)
+  if (txt(len(txt):len(txt)) == '0') txt = txt(1:len(txt)-1)
+endif
+if (txt(1:1) == '.') txt = '0' // txt
+if (len(txt) > 1) then
+  if (txt(1:2) == '-.') txt = '-0' // txt(2:)
+endif
+
+end function number_text
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function byte_text (bytes) result (txt)
+!
+! Routine to write a count of bytes in kB, MB or GB, a thousand to the step.
+!
+! Input:
+!   bytes -- real(rp): The bytes.
+!
+! Output:
+!   txt   -- character(:), allocatable: The text.
+!-
+
+function byte_text (bytes) result (txt)
+
+real(rp) bytes
+character(:), allocatable :: txt
+character(24) str
+
+!
+
+if (bytes >= 1e9_rp) then
+  write (str, '(f0.1, a)') bytes / 1e9_rp, ' GB'
+elseif (bytes >= 1e6_rp) then
+  write (str, '(f0.1, a)') bytes / 1e6_rp, ' MB'
+else
+  write (str, '(f0.1, a)') bytes / 1e3_rp, ' kB'
+endif
+txt = trim(str)
+if (txt(1:1) == '.') txt = '0' // txt
+
+end function byte_text
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_write_header (run)
 !
 ! Routine to print the run's configuration as one framed block for a human to read:
@@ -645,11 +828,20 @@ subroutine fel_write_header (run)
 
 type (fel_run_struct), target :: run
 type (branch_struct), pointer :: branch
-character(200) line
+type (fel_key_struct), allocatable :: keys(:)
+type (fel_column_struct) c_lat, c_win, c_beam, c_field, c_run, c_bmad, c_wake, c_sc, c_left, c_right
+character(400) line
 character(*), parameter :: r_name = 'lucifer'
-character(*), parameter :: rule = &
-      '================================================================================'
-integer nfel, n_omp, ie
+character(8) date
+character(10) time
+character(64) host
+character(:), allocatable :: stamp
+real(rp) n_pstep, n_gpt, secs, q_max, cur_peak, l_1d, l_coop, window, slip, dx, half, eps, ds_first
+real(rp) e_slice, e_beamlet, b_pulse, b_dev
+integer nfel, n_omp, ie, i, nstep, n_particle, ngrid, nstep_unavg, n_grid(3), is, is_max, nbeamlet, n_rot
+integer je_first, n_harm_lit
+logical any_segment, any_storage, any_warning
+character(16) backend
 
 !
 
@@ -657,359 +849,488 @@ branch => run%lat%branch(0)
 nfel = count(run%is_fel)
 n_omp = 1
 !$ n_omp = omp_get_max_threads()
+call fel_schema_table (keys)
 
-call out_io (s_blank$, r_name, rule)
-call out_io (s_blank$, r_name, ' Lucifer -- FEL tracking in Bmad, Bmad version ' // bmad_version_date)
-! The Lucifer version has a line of its own, which the sample output on the user guide's
-! page leaves out. The version moves with every commit and the page would move with it.
-call out_io (s_blank$, r_name, ' Lucifer version ' // lucifer_version$)
-call out_io (s_blank$, r_name, &
-      '--------------------------------------------------------------------------------')
+! The logo, with the versions, the time and the machine. The line with the versions
+! moves with every commit, and the sample output on the user guide's page leaves it out.
 
-write (line, '(a, a)') ' Lattice     ', trim(run%lat_file)
-call out_io (s_blank$, r_name, trim(line))
-write (line, '(a, i0, a, f0.3, a, i0, a)') '             ', branch%n_ele_track, ' elements, ', &
-      branch%ele(branch%n_ele_track)%s, ' m, ', nfel, ' FEL segments'
-call out_io (s_blank$, r_name, trim(line))
+call date_and_time (date, time)
+stamp = date(1:4) // '-' // date(5:6) // '-' // date(7:8) // ' ' // time(1:2) // ':' // time(3:4) // ':' // time(5:6)
+host = fel_print_host()
+if (host /= '') stamp = stamp // ' ' // fel_dot$ // ' ' // trim(host)
+call fel_print_logo ('FEL tracking in Bmad', &
+      trim(lucifer_version$) // ' ' // fel_dot$ // ' Bmad ' // trim(bmad_version_date), stamp)
+call out_io (s_blank$, r_name, '')
+
+! The files, each across the box, since a path may be long.
+
+call fel_box_rule (fel_rule_top$, 'files', '', .false., .false.)
+call fel_box_full ('input     ' // trim(run%input_file))
+call fel_box_full ('lattice   ' // trim(run%lat_file))
+call fel_box_full ('resolved  ' // trim(run%global%out_root) // '.resolved.toml')
+
+! The lattice's facts beside the window.
+
+call fel_column_add (c_lat, 'length', si_text(branch%ele(branch%n_ele_track)%s, 'm'))
+call fel_column_add (c_lat, 'elements', int_str(branch%n_ele_track))
+call fel_column_add (c_lat, 'FEL segments', int_str(nfel))
+write (line, '(f0.2)') run%gamma0
+call fel_column_add (c_lat, 'gamma0', trim(line))
+
+! The window as the run has it. A count the input file left to the program is marked.
+
+call fel_column_add (c_win, 'n_wavelength', int_str(run%fbeam%n_wavelength), &
+      origin_mark(key_index('window', 'n_wavelength'), .true.))
+call fel_column_add (c_win, 'n_slice', int_str(run%nslice), origin_mark(key_index('window', 'n_slice'), run%nslice > 1))
+call add_keys (c_win, 'window', '', skip = [character(32) :: 'n_wavelength', 'n_slice'])
+if (run%nslice > 1 .and. run%ffield(1)%n_per > 1) then
+  call fel_column_add (c_win, 'field planes', int_str(run%nfield))
+endif
+
+call fel_box_rule (fel_rule_mid$, 'lattice', 'window', .false., .true.)
+call fel_box_columns (c_lat, c_win)
 
 ! An FEL segment with an offset, a roll-off wavenumber or a kick says so, since each is
 ! read from the lattice and changes the tracking (fel-physics.md sec-element).
 
+any_segment = .false.
 do ie = 1, branch%n_ele_track
   if (.not. run%is_fel(ie)) cycle
   if (.not. run%und_of(ie)%field_general) cycle
-  write (line, '(3a, 2(es10.3, a), f0.3, a, 2(es10.3, a))') '             ', trim(branch%ele(ie)%name), &
-        ': x_offset ', run%und_of(ie)%ax, ' m, y_offset ', run%und_of(ie)%ay, ' m, kx ', run%und_of(ie)%kxb, &
-        ' /m, hkick ', run%und_of(ie)%hkick, ' rad, vkick ', run%und_of(ie)%vkick, ' rad'
-  call out_io (s_blank$, r_name, trim(line))
+  if (.not. any_segment) call fel_box_rule (fel_rule_mid$, 'segments', '', .true., .false.)
+  any_segment = .true.
+  write (line, '(a16, 4a)') branch%ele(ie)%name, 'x_offset ', si_text(run%und_of(ie)%ax, 'm'), &
+        '   y_offset ', si_text(run%und_of(ie)%ay, 'm')
+  call fel_box_full (trim(line))
+  write (line, '(16x, a, f0.3, 5a)') 'kx ', run%und_of(ie)%kxb, ' /m   hkick ', &
+        si_text(run%und_of(ie)%hkick, 'rad'), '   vkick ', si_text(run%und_of(ie)%vkick, 'rad')
+  call fel_box_full (trim(line))
 enddo
 
-if (run%nslice == 1) then
-  write (line, '(a, i0, a, f0.2)') ' Beam        1 slice x ', run%fbeam%slice(1)%n, &
-        ' particles, gamma0 = ', run%gamma0
-elseif (all(run%fbeam%slice%n == run%fbeam%slice(1)%n)) then
-  write (line, '(a, i0, a, i0, a, f0.2)') ' Beam        ', run%nslice, ' slices x ', &
-        run%fbeam%slice(1)%n, ' particles per slice, gamma0 = ', run%gamma0
-else
-  write (line, '(a, i0, a, i0, a, i0, a, i0, a, f0.2)') ' Beam        ', run%nslice, ' slices, ', &
-        sum(run%fbeam%slice%n), ' particles, ', minval(run%fbeam%slice%n), ' to ', &
-        maxval(run%fbeam%slice%n), ' per slice, gamma0 = ', run%gamma0
+! The beam beside the field, with the keys of the noise in a part of their own under
+! the field's.
+
+call add_keys (c_beam, 'beam', '', skip = noise_keys)
+call add_keys (c_beam, 'beam.resample', 'resample.')
+call add_keys (c_field, 'field', '')
+call fel_column_rule (c_field, 'noise')
+call add_keys (c_field, 'beam', '', only = noise_keys)
+
+call fel_box_rule (fel_rule_mid$, 'beam', 'field', .not. any_segment, .true.)
+call fel_box_columns (c_beam, c_field)
+
+call add_keys (c_run, 'run', '')
+call add_keys (c_bmad, 'bmad', '')
+call fel_box_rule (fel_rule_mid$, 'run', 'bmad', .true., .true.)
+call fel_box_columns (c_run, c_bmad)
+
+call add_keys (c_wake, 'wake', '')
+call add_keys (c_sc, 'space_charge', '')
+if (c_wake%n > 1 .or. c_sc%n > 1 .or. run%coll%wake%on) then
+  call fel_box_rule (fel_rule_mid$, 'wake', 'space_charge', .true., .true.)
+  call fel_box_columns (c_wake, c_sc)
 endif
-call out_io (s_blank$, r_name, trim(line))
 
-! The slippage the schedule applies over the line, and what a derived window holds of
-! it. Both come from fel_setup_slippage, and check_diagnostics.py holds the two printed
-! totals equal.
+! What follows from the settings: the quantities a reader would otherwise work out by
+! hand, with the ratios that say whether a setting is in proportion on the right.
 
+n_grid = wavefront_shape(run%ffield(1)%wf)
+dx = run%ffield(1)%wf%dx
+half = 0.5_rp * dx * (n_grid(1) - 1)
+
+q_max = 0;  is_max = 1
+do is = 1, run%nslice
+  if (sum(run%fbeam%slice(is)%weight(1:run%fbeam%slice(is)%n)) > q_max) then
+    q_max = sum(run%fbeam%slice(is)%weight(1:run%fbeam%slice(is)%n))
+    is_max = is
+  endif
+enddo
+cur_peak = 0
+if (run%fbeam%slice_spacing > 0) cur_peak = q_max * c_light / run%fbeam%slice_spacing
+e_slice = q_max / e_charge
+nbeamlet = run%fbeam%slice(is_max)%n / max(1, run%bparam%beamlet_size)
+
+je_first = 0
+do ie = 1, branch%n_ele_track
+  if (run%is_fel(ie)) then
+    je_first = ie
+    exit
+  endif
+enddo
+l_1d = 0;  l_coop = 0;  ds_first = 0
+if (run%rho_1d > 0 .and. je_first > 0) then
+  l_1d = twopi / (run%und_of(je_first)%ku * 4 * pi * sqrt(3.0_rp) * run%rho_1d)
+  l_coop = run%winit%lambda0 / (4 * pi * run%rho_1d)
+  ds_first = branch%ele(je_first)%value(ds_step$)
+endif
+window = run%nslice * run%fbeam%slice_spacing
+slip = 0
+if (run%nslice > 1 .and. allocated(run%ele_slip)) slip = (run%slip_und + sum(run%ele_slip)) * run%winit%lambda0
+eps = 0
+if (run%gamma0 > 0) eps = 0.5_rp * (run%beam_init%a_norm_emit + run%beam_init%b_norm_emit) / run%gamma0
+
+if (run%rho_1d > 0) then
+  call fel_column_add (c_left, 'rho (1D)', number_text(run%rho_1d))
+  call fel_column_add (c_right, 'gain length (1D)', si_text(l_1d, 'm', 4))
+endif
+call fel_column_add (c_left, 'peak current', si_text(cur_peak, 'A', 4))
+if (l_coop > 0) call fel_column_add (c_right, 'cooperation length', si_text(l_coop, 'm', 4))
+if (run%sigma_beam > 0) then
+  call fel_column_add (c_left, 'beam size', si_text(run%sigma_beam, 'm', 4))
+  if (eps > 0 .and. run%winit%lambda0 > 0) call fel_column_add (c_right, '4 pi emittance / lambda0', &
+        number_text(4 * pi * eps / run%winit%lambda0))
+endif
 if (run%nslice > 1) then
-  write (line, '(a, f0.6, a, f0.6, a, i0, a, i0, a)') ' Slippage    ', run%slip_und + sum(run%ele_slip), &
-        ' wavelengths over the line: ', run%slip_und, ' in undulator steps, ', run%slip_int, &
-        ' in interludes and at the end, ', run%slip_chic, ' in chicanes'
-  call out_io (s_blank$, r_name, trim(line))
-  if (run%slip_headroom > 0) then
-    write (line, '(a, i0, a, i0, a, f0.6, a)') ' Window      derived: ', run%nslice - run%n_headroom, &
-          ' slices for the bunch and ', run%n_headroom, ' of headroom for ', run%slip_headroom, &
-          ' wavelengths of slippage'
-    call out_io (s_blank$, r_name, trim(line))
+  call fel_column_add (c_left, 'window', si_text(window, 'm', 4))
+  call fel_column_add (c_right, 'slippage / window', number_text(slip / window))
+  call fel_column_add (c_left, 'slice spacing', si_text(run%fbeam%slice_spacing, 'm', 4))
+  if (l_coop > 0) call fel_column_add (c_right, 'cooperation length / slice', &
+        number_text(l_coop / run%fbeam%slice_spacing))
+endif
+call fel_column_add (c_left, 'grid cell', si_text(dx, 'm', 4))
+if (run%sigma_beam > 0) then
+  call fel_column_add (c_right, 'beam size / grid cell', number_text(run%sigma_beam / dx))
+  call fel_column_add (c_right, 'grid half width / beam size', number_text(half / run%sigma_beam))
+endif
+if (run%global%source_filter .and. run%filter_edge > 0) then
+  call fel_column_add (c_left, 'filter edge', si_text(run%filter_edge, 'rad', 4))
+endif
+call fel_column_add (c_left, 'electrons / slice', number_text(e_slice))
+call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
+call fel_column_add (c_left, 'macroparticles', int_str(n_particle))
+if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0) then
+  call fel_column_add (c_left, 'beamlets / slice', int_str(nbeamlet))
+  e_beamlet = e_slice / nbeamlet
+  call fel_column_add (c_right, 'electrons / beamlet', number_text(e_beamlet))
+endif
+if (l_1d > 0 .and. ds_first > 0) call fel_column_add (c_right, 'gain length / step', number_text(l_1d / ds_first))
+
+call fel_box_rule (fel_rule_mid$, 'derived', '', .true., .true.)
+call fel_box_columns (c_left, c_right)
+
+! The same numbers as values, for the stats file (fel_record_mod).
+
+call fel_record_real ('setup', 'rho_1d', '1', 'The Pierce parameter of the 1D theory, at the peak current.', run%rho_1d)
+call fel_record_real ('setup', 'gain_length_1d', 'm', 'The power gain length of the 1D theory, ' // &
+      'lambda_u / (4 pi sqrt(3) rho), in the first FEL element.', l_1d)
+call fel_record_real ('setup', 'cooperation_length', 'm', 'The cooperation length, lambda0 / (4 pi rho).', l_coop)
+call fel_record_real ('setup', 'peak_current', 'A', 'The current of the slice with the most charge.', cur_peak)
+call fel_record_real ('setup', 'beam_size', 'm', 'The rms beam size the grid was derived from.', run%sigma_beam)
+call fel_record_real ('setup', 'window', 'm', 'The length of the time window, n_slice times the slice spacing.', window)
+call fel_record_real ('setup', 'slippage', 'm', 'The slippage of the light over the line.', slip)
+call fel_record_real ('setup', 'slippage_undulator', '1', &
+      'The slippage in undulator steps (wavelengths).', run%slip_und)
+if (allocated(run%ele_slip)) call fel_record_real ('setup', 'slippage_wavelengths', '1', &
+      'The slippage of the light over the line (wavelengths), the sum the schedule applies.', &
+      run%slip_und + sum(run%ele_slip))
+call fel_record_int ('setup', 'slippage_interlude', 'The slippage in interludes and at the end (wavelengths).', &
+      run%slip_int)
+call fel_record_int ('setup', 'slippage_chicane', 'The slippage in chicanes (wavelengths).', run%slip_chic)
+call fel_record_real ('setup', 'headroom_wavelengths', '1', 'The slippage a derived window holds headroom ' // &
+      'for (wavelengths), 0 for a window the input set.', run%slip_headroom)
+call fel_record_int ('setup', 'n_slice_headroom', 'The slices of headroom in a derived window.', run%n_headroom)
+call fel_record_int ('setup', 'n_field_plane', 'The planes of the field over the window.', run%nfield)
+call fel_record_int ('setup', 'field_n_wavelength', 'The wavelengths one plane of the field spans.', &
+      run%ffield(1)%n_wavelength)
+call fel_record_int ('setup', 'n_pad_free', 'The free slots of the spectral propagator''s pad along tau.', &
+      run%spectral%n_free)
+call fel_record_int ('setup', 'n_pad_sponge', 'The sponge slots of the spectral propagator''s pad along tau.', &
+      run%spectral%n_sponge)
+call fel_record_int ('setup', 'slices_per_plane', 'The slices one plane of the field spans.', run%ffield(1)%n_per)
+call fel_record_int ('setup', 'n_interlude_piece', 'The pieces run.interlude_ds_step cuts interludes into, ' // &
+      '0 where every interlude is tracked whole.', merge(run%n_int_piece, 0, run%n_int_ele > 0))
+call fel_record_int ('setup', 'n_interlude_element', 'The elements run.interlude_ds_step cuts.', run%n_int_ele)
+call fel_record_real ('setup', 'grid_cell', 'm', 'The transverse grid''s cell.', dx)
+call fel_record_real ('setup', 'grid_half_width', 'm', 'The transverse grid''s half width.', half)
+call fel_record_int ('setup', 'grid_n_pts', 'The transverse grid''s points on a side.', n_grid(1))
+call fel_record_real ('setup', 'filter_edge', 'rad', 'The source filter''s edge angle, 0 with the filter off.', &
+      merge(run%filter_edge, 0.0_rp, run%global%source_filter))
+call fel_record_real ('setup', 'electrons_per_slice', '1', 'The electrons in the slice with the most charge.', e_slice)
+call fel_record_int ('setup', 'n_macroparticle', 'The macroparticles of the whole bunch.', n_particle)
+call fel_record_int ('setup', 'beamlets_per_slice', 'The beamlets in the slice with the most charge.', nbeamlet)
+call fel_record_int ('setup', 'beamlet_size', 'The macroparticles of one beamlet.', run%bparam%beamlet_size)
+call fel_record_real ('setup', 'step', 'm', 'The integration step of the first FEL element.', ds_first)
+
+! What the run will write and hold, stated before it tracks: the pulse, the frames, the
+! field's reductions and the device's resident bytes.
+
+call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
+call bank_bytes (n_rot, b_pulse, n_harm_lit)
+any_storage = .false.
+if (n_harm_lit > 0) then
+  call storage_rule ()
+  if (run%global%write_escaped) then
+    write (line, '(3a, i0, a)') 'pulse and escaped files   ', trim(byte_text(b_pulse)), '   ', n_rot, &
+          ' slices leave the window'
+  else
+    write (line, '(3a, i0, a)') 'pulse file   ', trim(byte_text(b_pulse)), '   ', n_rot, ' slices leave the window'
   endif
-  if (run%ffield(1)%n_per > 1) then
-    write (line, '(a, i0, a, i0, a, i0, a)') ' Field       ', run%nfield, ' planes of ', &
-          run%ffield(1)%n_wavelength, ' wavelengths over the window, ', run%ffield(1)%n_per, ' slices a plane'
-    call out_io (s_blank$, r_name, trim(line))
-  endif
+  call fel_box_full (trim(line))
+endif
+if (run%global%dump_at_comb) then
+  call storage_rule ()
+  write (line, '(3a, i0, a, i0, a)') 'frames   ', trim(byte_text(run%stats%nrec * frame_bytes())), '   ', &
+        run%stats%nrec, ' at the comb over ', run%dump_is2 - run%dump_is1 + 1, ' slices'
+  call fel_box_full (trim(line))
+endif
+if (run%stats%n_red > 0) then
+  call storage_rule ()
+  write (line, '(3a, i0, a)') 'reductions   ', trim(byte_text(8.0_rp * run%stats%nrec * run%stats%n_red * &
+        (real(ngrid, rp)**2 + 2.0_rp * run%nslice * ngrid))), '   ', run%stats%n_red, ' of the field set, in the stats file'
+  call fel_box_full (trim(line))
+endif
+if (run%dev%on) then
+  call storage_rule ()
+  call device_bytes (b_dev)
+  write (line, '(5a, i0, a)') 'device   ', trim(byte_text(b_dev)), ' resident on ', trim(run%dev%name), '   ', &
+        run%dev%nplane, ' planes'
+  call fel_box_full (trim(line))
+  write (line, '(a, es8.2, a, es8.2, a)') 'device   FP32 transform pair loss ', fel_dev_pair_loss(ngrid), &
+        ' a pair, ', fel_dev_pair_loss(ngrid) * nstep, ' over the line'
+  call fel_box_full (trim(line))
 endif
 
-! The grid is the built wavefront's and not the input's. A field read from a file
-! carries its own grid, and the input file then states none.
+! The work: the counts are exact, and the estimate is one machine's, which the row names
+! (fel_cost_mod). load_only stops after this block, so an input file's work can be seen
+! without tracking it.
 
-block
-  integer n_grid(3)
-  n_grid = wavefront_shape(run%ffield(1)%wf)
-  write (line, '(5a, i0, a, i0, 2a)') ' Radiation   lambda0 = ', &
-        trim(adjustl(fel_si_str(run%winit%lambda0, 'm'))), &
-        ', slice spacing ', trim(adjustl(fel_si_str(run%fbeam%slice_spacing, 'm'))), ', ', &
-        run%n_harm, ' field(s), grid ', n_grid(1), ' points of ', &
-        trim(adjustl(fel_si_str(run%ffield(1)%wf%dx, 'm')))
-end block
-call out_io (s_blank$, r_name, trim(line))
-
-! The spectral propagator, when the input file selects it (fel_spectral_mod).
-
-if (run%spectral%on) then
-  if (run%spectral%n_pad > 0) then
-    write (line, '(a, i0, a, i0, a)') ' Propagator  spectral: the kernel at k0 + kappa, the slippage as the phase ' // &
-          'ramp, a pad of ', run%spectral%n_free, ' free and ', run%spectral%n_sponge, &
-          ' sponge slices beyond the head feeding the bank'
-  else
-    line = ' Propagator  spectral: the kernel at k0 + kappa, a window of one slice that never slips'
-  endif
-  call out_io (s_blank$, r_name, trim(line))
+call fel_cost_estimate (run, secs, backend)
+call fel_record_int ('setup', 'n_slice_leaving', 'The slices of light that leave the window over the line.', n_rot)
+call fel_record_real ('setup', 'pulse_bytes', 'B', 'The size of the pulse files, as stated before tracking.', &
+      merge(b_pulse, 0.0_rp, n_harm_lit > 0))
+if (run%global%dump_at_comb) then
+  call fel_record_int ('setup', 'n_frame', 'The frames the run writes at the comb.', run%stats%nrec)
+  call fel_record_real ('setup', 'frame_bytes', 'B', 'The size of all frames together.', run%stats%nrec * frame_bytes())
 endif
+call fel_record_int ('timing', 'n_thread', 'The OpenMP threads of the run.', n_omp)
+call fel_record_int ('setup', 'n_fel_step', 'The FEL steps of the line.', nstep)
+call fel_record_int ('setup', 'n_unaveraged_substep', 'The substeps of the unaveraged elements.', nstep_unavg)
+if (run%dev%on) call fel_record_real ('setup', 'device_pair_loss', '1', 'The projected loss of field energy ' // &
+      'in one FP32 transform pair on the device.', fel_dev_pair_loss(ngrid))
+call fel_record_real ('setup', 'particle_steps', '1', 'Macroparticles times FEL steps.', n_pstep)
+call fel_record_real ('timing', 'estimate_walk', 's', 'The estimate of the walk''s time, on the machine ' // &
+      'estimate_machine names.', secs)
+call fel_record_str ('timing', 'estimate_path', 'The path the estimate is for, CPU or device.', trim(backend))
+call fel_record_str ('timing', 'estimate_machine', 'The machine the estimate''s rates were timed on.', fel_cost_machine$)
+call fel_box_rule (fel_rule_mid$, 'work', '', .not. any_storage, .false.)
+write (line, '(a, i0, a, i0, 2a)') 'threads ', n_omp, '      FEL steps ', nstep, &
+      '      particle-steps ', number_text(n_pstep)
+call fel_box_full (trim(line))
+call fel_box_full ('estimate ' // trim(fel_cost_secs_str(secs)) // ', ' // trim(backend) // &
+      ' path, as timed on ' // fel_cost_machine$)
+call fel_box_rule (fel_rule_bottom$, '', '', .false., .false.)
+call fel_print_line ('   * derived     ~ command line     (blank) input file or default')
 
-! What the run will do and how long it will take. The count is exact. The estimate is
-! one machine's, which the line says (fel_cost_mod). load_only stops after this block,
-! so an input file's cost can be seen without tracking it (docs/user-guide.md).
+call write_warnings ()
+call out_io (s_blank$, r_name, '')
 
-block
-  real(rp) n_pstep, n_gpt, secs
-  integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise, n_load, n_few, n_empty
-  character(16) backend
-  character(64) ramp_str
-
-  call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
-  write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Work        ', nstep, &
-        ' FEL steps, ', n_particle, ' macroparticles, ', n_pstep, ' particle-steps, ', &
-        n_gpt, ' grid points per step'
-  call out_io (s_blank$, r_name, trim(line))
-
-  ! The device's transform pair is single precision. It loses a fixed fraction of the
-  ! field's energy every time it runs, always in one direction. So what an input file loses is
-  ! set by how often the pair runs: once a record step in an averaged element, and nsub
-  ! times in an unaveraged one (nstep already counts the substeps). Nothing else in the
-  ! output says which regime an input file is in (validation.md, val-device-unaveraged).
-
-  if (run%dev%on) then
-    write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Device      FP32 transform pair ', nstep, &
-          ' times a field record (', nstep_unavg, ' unaveraged substeps), projected field-energy loss ', &
-          fel_dev_pair_loss(ngrid), ' a pair, ', fel_dev_pair_loss(ngrid) * nstep, ' over the line'
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-
-  ! The interlude's pieces, only when run.interlude_ds_step cuts them. A run that
-  ! tracks an interlude whole prints nothing here.
-
-  if (run%n_int_ele > 0) then
-    write (line, '(3a, i0, a, i0, a)') ' Interlude   steps of ', &
-          trim(adjustl(fel_si_str(run%global%interlude_ds_step, 'm'))), ': ', &
-          run%n_int_piece, ' pieces, ', run%n_int_ele, ' element(s) cut'
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-
-  ! The unaveraged elements' substeps and ramps, only when the line has one. The ramp
-  ! says where it came from, since a hard edge brings back the handoff's phase jump.
-
-  if (any(run%fel_mode == unaveraged$)) then
-    select case (run%global%unaveraged_ramp_periods)
-    case (-1)
-      ramp_str = 'a hard edge, the sentinel -1'
-    case (fel_ramp_periods_default$)
-      write (ramp_str, '(a, i0, a)') 'sin^2 ramps of ', run%global%unaveraged_ramp_periods, &
-            ' periods at each end, the default'
-    case default
-      write (ramp_str, '(a, i0, a)') 'sin^2 ramps of ', run%global%unaveraged_ramp_periods, &
-            ' periods at each end, as the input file sets'
-    end select
-    write (line, '(a, i0, 2a)') ' Unaveraged  ', run%global%unaveraged_steps_per_period, &
-          ' substeps a period, ', trim(ramp_str)
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-
-  call fel_cost_estimate (run, secs, backend)
-  write (line, '(5a)') ' Estimate    ', trim(fel_cost_secs_str(secs)), ' of walk on the ' // &
-        trim(backend) // ' path, for ', fel_cost_machine$, '.'
-  call out_io (s_blank$, r_name, trim(line))
-
-  ! The frame series, when it is on. A comb of zero on a long line is a frame per step.
-  ! So the bytes are stated before the run rather than discovered on a full disk. The
-  ! per-frame size is the beam's coordinates and the field set's grid, the two counts
-  ! above. Only the beam and the field carry the slice range, so their sizes scale with
-  ! it. The reductions are per record whether or not frames are on, and the transverse
-  ! projection is the grid's own size. So they are sized separately, and stated even
-  ! without a series.
-
-  block
-    real(rp) n_rng, b_frame, f_frame, red_bytes
-    integer nrng
-    character(12) lab
-    nrng = run%dump_is2 - run%dump_is1 + 1
-    n_rng = real(nrng, rp) / max(1, run%nslice)
-    ! 68 bytes a macroparticle (docs/performance.md): six coordinates, the time the phase
-    ! folds into, the offset that places the slice, the reference momentum and the
-    ! label. The writer stores a uniform weight and the zero z as constant records, which
-    ! cost nothing per particle.
-    b_frame = 68.0_rp * n_particle * n_rng
-    f_frame = 16.0_rp * n_gpt * n_rng
-    red_bytes = 0
-    if (run%stats%n_red > 0) red_bytes = 8.0_rp * run%stats%nrec * run%stats%n_red * &
-          (real(ngrid, rp)**2 + 2.0_rp * run%nslice * ngrid)
-
-    if (run%global%dump_at_comb) then
-      write (line, '(a, i0, a, i0, a, es8.2, a)') ' Frames      ', run%stats%nrec, &
-            ' at the comb over ', nrng, ' slices, about ', &
-            run%stats%nrec * (b_frame + f_frame), ' bytes of beam and field'
-      call out_io (s_blank$, r_name, trim(line))
-    endif
-    if (red_bytes > 0) then
-      lab = ' Reduced    '
-      if (run%global%dump_at_comb) lab = '            '
-      write (line, '(a, i0, a, es8.2, a)') lab // ' The field''s reductions over ', &
-            run%stats%n_red, ' of the field set, about ', red_bytes, &
-            ' bytes in the stats file'
-      call out_io (s_blank$, r_name, trim(line))
-    endif
-  end block
-
-  call write_bank_bytes ()
-  call write_device_bytes ()
-
-  ! The load against the floor of the filter's convergence: 1024 macroparticles per
-  ! slice in 128 beamlets. Below it, the mode power in the exponential regime rises on
-  ! its own (docs/fel-physics.md sec-convergence).
-
-  !
-  ! The sample mode gives a slice of little charge fewer beamlets on purpose
-  ! (fel_beamlet_count), and every other slice the input file's count. So there the load
-  ! is judged on that count, the largest, and the fewest is stated beside it.
-
-  ! There a slice with no charge has no particles, which is stated on a line of its own,
-  ! and the fewest is taken over the slices that have particles.
-
-  n_load = minval(run%fbeam%slice%n)
-  n_few = n_load
-  n_empty = 0
-  if (run%bparam%load_mode == 'sample') then
-    n_empty = count(run%fbeam%slice%n == 0)
-    if (n_empty < size(run%fbeam%slice)) n_few = minval(run%fbeam%slice%n, mask = run%fbeam%slice%n > 0)
-    n_load = n_few
-    if (run%bparam%beam_file == '') n_load = maxval(run%fbeam%slice%n)
-  endif
-  nbeamlet = n_load / max(1, run%bparam%beamlet_size)
-  if (n_load == n_few) then
-    write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', n_load, &
-          ' macroparticles in the thinnest slice, beamlets of ', run%bparam%beamlet_size, &
-          ', ', nbeamlet, ' beamlets.'
-  else
-    write (line, '(a, i0, a, i0, a, i0, a, i0, a)') ' Load        ', n_load, &
-          ' macroparticles in a slice, beamlets of ', run%bparam%beamlet_size, &
-          ', ', nbeamlet, ' beamlets. The slices of little charge have fewer, down to ', &
-          n_few / max(1, run%bparam%beamlet_size), '.'
-  endif
-  call out_io (s_blank$, r_name, trim(line))
-
-  ! Where the macroparticle count came from (fel_setup_lattice).
-
-  if (run%bparam%n_particle_derived) then
-    write (line, '(a, i0, a, i0, a, i0, a)') '             The ', run%beam_init%n_particle, &
-          ' macroparticles are derived: ', fel_beamlets_default$, ' beamlets of ', &
-          run%bparam%beamlet_size, ' (beam.n_particle).'
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-
-  ! Where the beamlet size came from, and the harmonics a field may be carried at with it
-  ! (fel_setup_lattice). Without the quiet start there are no beamlets.
-
-  if (run%bparam%quiet_start) then
-    if (run%bparam%beamlet_size_derived) then
-      write (line, '(a, i0, a, i0, a)') '             The beamlet size ', run%bparam%beamlet_size, &
-            ' is derived from the highest harmonic carried, ', maxval(run%winit%harmonics), '.'
-    else
-      write (line, '(a, i0, a)') '             The beamlet size ', run%bparam%beamlet_size, &
-            ' is set in the input file (beam.beamlet_size).'
-    endif
-    call out_io (s_blank$, r_name, trim(line))
-    if (run%bparam%beamlet_size < 7) then
-      line = '             With this size a field is carried at the fundamental alone.'
-    else
-      write (line, '(a, i0, a)') '             With this size a field may be carried at harmonics up to ', &
-            (run%bparam%beamlet_size - 1) / 2, '.'
-    endif
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-  if (n_empty > 0) then
-    if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
-      write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &
-            ' slices have no charge or drew no electron, and are loaded with no particles.'
-    else
-      write (line, '(a, i0, a, i0, a)') '             ', n_empty, ' of the ', size(run%fbeam%slice), &
-            ' slices have no charge and are loaded with no particles.'
-    endif
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-
-  if (.not. run%global%source_filter) then
-    call out_io (s_blank$, r_name, '             The source filter is off, and no estimate of the ' // &
-          'wide-angle share carries')
-    call out_io (s_blank$, r_name, '             between machines. The two tests are a run at twice ' // &
-          'this load and the')
-    call out_io (s_blank$, r_name, '             convergence report in this run''s footer.')
-  else if (n_load >= 1024 .and. nbeamlet >= 128) then
-    call out_io (s_blank$, r_name, '             This load is the one the filter''s convergence ' // &
-          'was measured on (fel-physics.md).')
-  else
-    call out_io (s_blank$, r_name, '             Under the measured load of 1024 macroparticles in ' // &
-          '128 beamlets, where the')
-    call out_io (s_blank$, r_name, '             exponential-regime mode power rises on its own and ' // &
-          'the filter is not')
-    call out_io (s_blank$, r_name, '             measured to remove it (fel-physics.md).')
-  endif
-
-  ! The beamlet size, stated by what it does. The quiet start leaves no bunching below
-  ! harmonic beamlet_size. fel_fawley_noise then imposes the physical level on harmonics
-  ! 1 through (beamlet_size - 1)/2.
-
-  nharm_noise = (run%bparam%beamlet_size - 1) / 2
-  if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
-    write (line, '(a, i0, a)') '             Shot noise on harmonics 1 to ', run%bparam%beamlet_size - 1, &
-          ', through the weights (beam.shot_noise_method = "weight").'
-  elseif (run%bparam%shot_noise) then
-    write (line, '(a, i0, a)') '             Shot noise on harmonics 1 to ', nharm_noise, &
-          ', which is (beamlet_size - 1)/2.'
-    call out_io (s_blank$, r_name, trim(line))
-    line = '             The kick is of first order in its size, as in Genesis4 ' // &
-          '(beam.shot_noise_method = "first_order").'
-  elseif (run%bparam%quiet_start) then
-    write (line, '(a, i0, a)') '             No shot noise. The quiet start leaves no bunching ' // &
-          'below harmonic ', run%bparam%beamlet_size, '.'
-  else
-    line = '             No shot noise and no quiet start. The load has the noise of its ' // &
-          'macroparticles at random phases.'
-  endif
-  call out_io (s_blank$, r_name, trim(line))
-end block
-
-write (line, '(a, l1, a, l1, a, l1)') ' Switches    sr wakes ', run%coll%wake%on, &
-      ', space charge ', any(run%sc_here), ', radiation damping ', bmad_com%radiation_damping_on
-call out_io (s_blank$, r_name, trim(line))
-
-write (line, '(3a, i0)') ' Output      out_root "', trim(run%global%out_root), '", threads ', n_omp
-call out_io (s_blank$, r_name, trim(line))
-call out_io (s_blank$, r_name, rule)
-
-!------------------------------------------------------------------------------
+!-------------------------------------------------------
 contains
 
 !+
-! Subroutine write_bank_bytes ()
+! Function key_index (table, name) result (ik)
 !
-! Routine to state, before the run tracks, what the escaped-field bank will write: the
-! slices that leave the window and, per member of the field set, the bytes of the files
-! the run keeps. The banked planes stream into those files as they leave
-! (fel_drain_bank), and nothing else is written, so the bytes kept are also the peak on
-! disk. So a pulse of gigabytes is stated before the run rather than discovered on a full
-! disk.
+! Routine to return a key's place in the schema's table, 0 where there is no such key.
+!-
+
+function key_index (table, name) result (ik)
+
+character(*) table, name
+integer ik
+
+!
+
+do ik = 1, size(keys)
+  if (keys(ik)%table == table .and. keys(ik)%name == name) return
+enddo
+ik = 0
+
+end function key_index
+
+!------------------------------------------------------------------------------
+!+
+! Function origin_mark (ik, computed) result (mark)
+!
+! Routine to return the provenance mark of key ik: * where the program derived its value,
+! ~ where the command line set it, and blank for the input file or a default. A key the
+! input left unset whose value the run computed, the slices of a derived window among
+! them, is marked derived when computed is true.
+!-
+
+function origin_mark (ik, computed) result (mark)
+
+integer ik
+logical computed
+character(1) mark
+
+!
+
+mark = ' '
+if (ik == 0 .or. .not. allocated(run%key_origin)) return
+select case (run%key_origin(ik))
+case (fel_origin_derived$);  mark = '*'
+case (fel_origin_command$);  mark = '~'
+case (fel_origin_default$);  if (computed) mark = '*'
+end select
+
+end function origin_mark
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine add_keys (col, table, prefix, skip, only)
+!
+! Routine to add the keys of one table to a column: every key the input file or the
+! command line set or the program derived, and the defaults of shown_defaults, which
+! decide how a run behaves. The value is written by key_text, from the key's own kind
+! and unit.
+!
+! Input:
+!   col    -- fel_column_struct: The column.
+!   table  -- character(*): The table.
+!   prefix -- character(*): Written before each key's name, resample. for the keys of
+!               [beam.resample].
+!   skip   -- character(32)(:), optional: Keys to leave out.
+!   only   -- character(32)(:), optional: The only keys to take.
+!-
+
+subroutine add_keys (col, table, prefix, skip, only)
+
+type (fel_column_struct) col
+character(*) table, prefix
+character(32), optional :: skip(:), only(:)
+integer ik
+character(48) dotted
+
+!
+
+do ik = 1, size(keys)
+  if (keys(ik)%table /= table) cycle
+  if (present(skip)) then
+    if (any(skip == keys(ik)%name)) cycle
+  endif
+  if (present(only)) then
+    if (.not. any(only == keys(ik)%name)) cycle
+  endif
+  dotted = trim(table) // '.' // trim(keys(ik)%name)
+  if (run%key_origin(ik) == fel_origin_default$ .and. .not. any(shown_defaults == dotted)) cycle
+  call fel_column_add (col, prefix // trim(keys(ik)%name), key_text(keys(ik)), origin_mark(ik, .false.))
+enddo
+
+end subroutine add_keys
+
+!------------------------------------------------------------------------------
+!+
+! Function key_text (key) result (txt)
+!
+! Routine to write a key's value for the header from its kind and its unit: a real with
+! a unit that takes a prefix scaled to it, a string without its quotes, a list with
+! commas, and anything else as the input file writes it.
+!-
+
+function key_text (key) result (txt)
+
+type (fel_key_struct) key
+character(:), allocatable :: txt, sv
+real(rp) rv
+integer iv, j
+logical lv
+integer, allocatable :: ilist(:)
+character(400), allocatable :: slist(:)
+
+!
+
+call fel_schema_value (run, key, rv, iv, lv, sv, ilist, slist)
+
+select case (key%kind)
+case (key_real$)
+  if (any(scaled_units == key%unit)) then
+    txt = si_text(rv, trim(key%unit))
+  else
+    txt = fel_schema_text(run, key)
+    if (key%unit /= '') txt = txt // ' ' // trim(key%unit)
+  endif
+case (key_string$, key_path$)
+  txt = sv
+case (key_int_list$)
+  txt = ''
+  do j = 1, size(ilist)
+    if (j > 1) txt = txt // ', '
+    txt = txt // int_str(ilist(j))
+  enddo
+case (key_string_list$)
+  txt = ''
+  do j = 1, size(slist)
+    if (j > 1) txt = txt // ', '
+    txt = txt // trim(slist(j))
+  enddo
+case default
+  txt = fel_schema_text(run, key)
+end select
+
+end function key_text
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine storage_rule ()
+!
+! Routine to write the rule above the first row of what the run stores, once.
+!-
+
+subroutine storage_rule ()
+
+if (any_storage) return
+call fel_box_rule (fel_rule_mid$, 'storage', '', .true., .false.)
+any_storage = .true.
+
+end subroutine storage_rule
+
+!------------------------------------------------------------------------------
+!+
+! Function frame_bytes () result (bytes)
+!
+! Routine to return the bytes of one frame of the series: 68 a macroparticle and 16 a
+! grid point, over the slice range the frames keep.
+!-
+
+function frame_bytes () result (bytes)
+
+real(rp) bytes, n_rng
+
+!
+
+n_rng = real(run%dump_is2 - run%dump_is1 + 1, rp) / max(1, run%nslice)
+bytes = (68.0_rp * n_particle + 16.0_rp * n_gpt) * n_rng
+
+end function frame_bytes
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine bank_bytes (n_rot, bytes, n_lit)
+!
+! Routine to return what the escaped-field bank will write: the slices that leave the
+! window over the tracked line, the bytes of the files the run keeps over the members of
+! the field set that carry light, and how many members those are. The banked planes
+! stream into those files as they leave (fel_drain_bank), so the bytes kept are also the
+! peak on disk.
 !
 ! The slices are the rotations the walk makes over the tracked elements, from the
 ! schedule's own slippage (fel_setup_slippage) and the residual a continuation starts
 ! with: the record rotates once |accuslip| passes 0.8 of a slice, so S wavelengths give
-! the least integer at or above S/n_wavelength - 0.8.
-! The k-th slice to leave is the window's slice nslice - k + 1 at the start, carried to
-! the head with what the beam there radiated into it. So light leaves only if one of the
-! last n_rot slices holds charge or field at the start. A derived window puts its headroom
-! there, and a run whose light stays in the window states nothing, as it writes nothing.
-!
-! A file holds 16 bytes a grid point a component, a plane per slice, and a row of 25
-! params a component and the transmission position per banked slice. The pulse holds the
-! window's slices too.
+! the least integer at or above S/n_wavelength - 0.8. Light leaves only if one of the
+! last n_rot slices holds charge or field at the start. A file holds 16 bytes a grid
+! point a component, a plane per slice, and a row of 25 params a component and the
+! transmission position per banked slice. The pulse holds the window's slices too.
 !-
 
-subroutine write_bank_bytes ()
+subroutine bank_bytes (n_rot, bytes, n_lit)
 
-real(rp) s_line, b_plane, b_rows, b_esc, b_pulse
-integer ihh, n_rot, is1, if1, is, n_grid(3), n_comp
-logical lit, any_lit
+real(rp) bytes, s_line, b_plane, b_rows
+integer n_rot, n_lit, ihh, is1, if1, js, ng(3), n_comp
+logical lit
 
 !
 
+n_rot = 0;  bytes = 0;  n_lit = 0
 if (.not. run%global%keep_escaped_field .or. run%nslice <= 1) return
 if (.not. allocated(run%und_slip)) return
 s_line = run%ffield(1)%slip%accuslip + sum(run%und_slip(run%i_start:run%i_end)) + &
@@ -1029,84 +1350,113 @@ if (n_rot == 0) return
 is1 = max(1, run%nslice - n_rot * run%ffield(1)%n_per + 1)
 if1 = max(1, run%nfield - n_rot + 1)
 
-any_lit = .false.
 do ihh = 1, run%n_harm
   lit = .false.
-  do is = is1, run%nslice
-    if (sum(run%fbeam%slice(is)%weight(1:run%fbeam%slice(is)%n)) > 0) lit = .true.
+  do js = is1, run%nslice
+    if (sum(run%fbeam%slice(js)%weight(1:run%fbeam%slice(js)%n)) > 0) lit = .true.
   enddo
   if (any(run%ffield(ihh)%wf%Ex(:,:,if1:run%nfield) /= 0)) lit = .true.
   if (allocated(run%ffield(ihh)%wf%Ey)) then
     if (any(run%ffield(ihh)%wf%Ey(:,:,if1:run%nfield) /= 0)) lit = .true.
   endif
   if (.not. lit) cycle
+  n_lit = n_lit + 1
 
-  if (.not. any_lit) then
-    if (run%ffield(1)%n_per == 1) then
-      write (line, '(a, i0, a)') ' Bank        ', n_rot, ' slices leave the window over the tracked line'
-    else
-      write (line, '(a, i0, a, i0, a)') ' Bank        ', n_rot, ' field planes of ', run%ffield(1)%n_per, &
-            ' slices leave the window over the tracked line'
-    endif
-    call out_io (s_blank$, r_name, trim(line))
-    any_lit = .true.
-  endif
-
-  n_grid = wavefront_shape(run%ffield(ihh)%wf)
+  ng = wavefront_shape(run%ffield(ihh)%wf)
   n_comp = 1
   if (allocated(run%ffield(ihh)%wf%Ey)) n_comp = 2
-  b_plane = 16.0_rp * n_grid(1) * n_grid(2) * n_comp
+  b_plane = 16.0_rp * ng(1) * ng(2) * n_comp
   b_rows = 8.0_rp * n_rot * (1 + 25 * n_comp)
-  b_esc = n_rot * b_plane + b_rows
-  b_pulse = (run%nfield + n_rot) * b_plane + b_rows
-  if (run%global%write_escaped) then
-    write (line, '(a, i0, a, es10.4, a)') '             h', run%ffield(ihh)%harm, &
-          ': the pulse and escaped files about ', b_pulse + b_esc, ' bytes kept, which is the peak'
-  else
-    write (line, '(a, i0, a, es10.4, a)') '             h', run%ffield(ihh)%harm, &
-          ': the pulse file about ', b_pulse, ' bytes kept, which is the peak'
-  endif
-  call out_io (s_blank$, r_name, trim(line))
+  bytes = bytes + (run%nfield + n_rot) * b_plane + b_rows
+  if (run%global%write_escaped) bytes = bytes + n_rot * b_plane + b_rows
+  call fel_record_real ('setup', 'bank_bytes_h' // int_str(run%ffield(ihh)%harm), 'B', &
+        'The size of this harmonic''s pulse file, and of its escaped file with it under ' // &
+        'run.write_escaped, as stated before tracking.', (run%nfield + n_rot) * b_plane + b_rows + &
+        merge(n_rot * b_plane + b_rows, 0.0_rp, run%global%write_escaped))
 enddo
 
-end subroutine write_bank_bytes
+end subroutine bank_bytes
 
 !------------------------------------------------------------------------------
 !+
-! Subroutine write_device_bytes ()
+! Subroutine device_bytes (bytes)
 !
-! Routine to state the device's resident bytes beside the bank's, with the record's
-! planes along tau, when the device is on. Under the spectral propagator the record
-! carries the pad's planes beside the window's, and a window that would not fit was
-! refused at setup, before any upload (fel_device_setup).
+! Routine to return the device's resident bytes (fel_device_resident_bytes).
 !-
 
-subroutine write_device_bytes ()
+subroutine device_bytes (bytes)
 
 use fel_device_mod, only: fel_device_resident_bytes
 
-real(rp) b_dev
-integer n_grid(3)
-character(200) line
+real(rp) bytes
 
 !
 
-if (.not. run%dev%on) return
-b_dev = fel_device_resident_bytes(run%dev)
-n_grid = wavefront_shape(run%ffield(1)%wf)
-if (run%dev%spectral) then
-  write (line, '(a, es10.4, a, i0, a, i0, a, i0, a, i0, a)') ' Device      ', b_dev, &
-        ' bytes resident on ' // trim(run%dev%name) // ': ', run%dev%nplane, ' window planes and ', &
-        run%dev%nfree + run%dev%nsponge, ' pad planes of ', n_grid(1), ' x ', n_grid(2), &
-        ' under the spectral propagator'
-else
-  write (line, '(a, es10.4, a, i0, a, i0, a, i0, a)') ' Device      ', b_dev, &
-        ' bytes resident on ' // trim(run%dev%name) // ': ', run%dev%nplane, ' planes of ', &
-        n_grid(1), ' x ', n_grid(2)
-endif
-call out_io (s_blank$, r_name, trim(line))
+bytes = fel_device_resident_bytes(run%dev)
 
-end subroutine write_device_bytes
+end subroutine device_bytes
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine write_warnings ()
+!
+! Routine to write, under the header, a line for each quantity of the derived part that
+! is out of proportion, each beginning with an exclamation mark so that a log can be
+! searched for them. Each bound is half of what the setup derives for itself where the
+! input file states nothing, or a count the loader already acts on.
+!-
+
+subroutine write_warnings ()
+
+!
+
+any_warning = .false.
+if (run%nslice > 1 .and. window > 0) then
+  if (slip / window > 0.5_rp) call warn ('slippage / window = ' // number_text(slip / window) // &
+        ', above 0.5')
+  if (l_coop > 0) then
+    if (l_coop / run%fbeam%slice_spacing < 2) call warn ('cooperation length / slice = ' // &
+          number_text(l_coop / run%fbeam%slice_spacing) // ', under 2')
+  endif
+endif
+if (run%sigma_beam > 0) then
+  if (run%sigma_beam / dx < 3.5_rp) call warn ('beam size / grid cell = ' // &
+        number_text(run%sigma_beam / dx) // ', under 3.5')
+  if (half / run%sigma_beam < 4.5_rp) call warn ('grid half width / beam size = ' // &
+        number_text(half / run%sigma_beam) // ', under 4.5')
+endif
+if (l_1d > 0 .and. ds_first > 0) then
+  if (l_1d / ds_first < 5) call warn ('gain length / step = ' // number_text(l_1d / ds_first) // ', under 5')
+endif
+if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0) then
+  if (nbeamlet < 128) call warn ('beamlets / slice = ' // int_str(nbeamlet) // ', under 128')
+  if (run%bparam%shot_noise .and. e_slice / nbeamlet < 1) call warn ('electrons / beamlet = ' // &
+        number_text(e_slice / nbeamlet) // ', under 1')
+endif
+if (run%n_harm > 1 .and. .not. run%bparam%shot_noise .and. run%bparam%quiet_start) then
+  call warn ('a harmonic is carried with shot_noise = false')
+endif
+
+end subroutine write_warnings
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine warn (text)
+!
+! Routine to write one warning line, with a blank line before the first.
+!-
+
+subroutine warn (text)
+
+character(*) text
+
+!
+
+if (.not. any_warning) call out_io (s_blank$, r_name, '')
+any_warning = .true.
+call out_io (s_blank$, r_name, ' ! ' // text)
+
+end subroutine warn
 
 end subroutine fel_write_header
 
@@ -1135,174 +1485,138 @@ subroutine fel_write_footer (run)
 
 type (fel_run_struct), target :: run
 type (fel_stats_struct), pointer :: stats
+type (fel_convergence_struct) cvg
+type (fel_column_struct) c_left, c_right
 character(400) line
 character(*), parameter :: r_name = 'lucifer'
-type (fel_convergence_struct) cvg
-integer ir, ih, n_listed, is, n_thin, n_shown, nbl, ie, nrec
-real(rp) pow, ene, bun, pul, worst, secs, ratio_s, e_thin
-logical few
+integer ir, ih, n_listed, is, n_thin, n_shown, nbl, ie, nrec, n_left, ip
+real(rp) pow, ene, bun, pul, worst, secs, ratio_s, e_thin, walk, t_phase(8), t_other
+logical few, any_warning, rec_err
 character(8) hsuf
 character(16) backend
 character(420) root, dname
+character(20), parameter :: phase_name(8) = [character(20) :: 'particle push', 'field solve', &
+      'unaveraged step', 'device step', 'slippage', 'interludes', 'stats and diag', 'dumps']
 integer, parameter :: n_thin_max$ = 8
 
 !
 
 stats => run%stats
-call out_io (s_blank$, r_name, &
-      '--------------------------------------------------------------------------------')
+call out_io (s_blank$, r_name, '')
 
-write (line, '(a, f0.3, a, i0, a)') ' Done        ', run%z_now, ' m, ', run%stats%iend, ' element ends'
-call out_io (s_blank$, r_name, trim(line))
-
-! The exit light, from whichever row holds the run's last state.
+! The light at the exit, as fel_stats_exit_light takes it, and the split of the power
+! at the mode's angle where the mode peaked and at the last record
+! (fel_stats_convergence).
 
 call fel_stats_exit_light (stats, pow, ene, bun, pul)
-write (line, '(7a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
-      ', window energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', pulse energy ', &
-      trim(adjustl(fel_si_str(pul, 'J'))), ', <|b|> ', bun
-call out_io (s_blank$, r_name, trim(line))
-
-! The mode against the wide-angle emission of the point beamlets, from the records the
-! run already took (docs/startup-noise.md). The share is reported and not estimated. A
-! formula fitted on one machine is 40 times low on another (docs/fel-physics.md), while
-! the split itself holds on all three.
-
 call fel_stats_convergence (stats, cvg)
+
+call fel_column_add (c_left, 'exit power', si_text(pow, 'W'))
+call fel_column_add (c_right, 'exit pulse energy', si_text(pul, 'J'))
+write (line, '(f6.4)') bun
+call fel_column_add (c_left, 'exit bunching', trim(adjustl(line)))
+call fel_column_add (c_right, 'window energy', si_text(ene, 'J'))
+write (line, '(f0.3, a)') run%z_now, ' m'
+call fel_column_add (c_left, 'tracked to', trim(line))
+call fel_column_add (c_right, 'element ends', int_str(run%stats%iend))
 if (cvg%ok) then
-  write (line, '(4a)') ' Split       ', trim(adjustl(fel_si_str(cvg%angle, 'rad'))), &
-        ', ', trim(run%split_origin) // '. Inside it the mode, outside it the beamlets.'
-  call out_io (s_blank$, r_name, trim(line))
-  do ir = 1, 2
-    if (ir == 2 .and. cvg%z(2) == cvg%z(1)) cycle
-    write (line, '(2a, f0.3, 5a, es9.2, a, f6.4)') '             ', &
-          merge('mode peak, z =   ', 'last record, z = ', ir == 1), cvg%z(ir), ' m: inside ', &
-          trim(adjustl(fel_si_str(cvg%p_in(ir), 'W'))), ', outside ', &
-          trim(adjustl(fel_si_str(cvg%p_out(ir), 'W'))), ', ratio ', cvg%ratio(ir), &
-          ', <|b|> ', cvg%bunching(ir)
-    call out_io (s_blank$, r_name, trim(line))
+  call fel_column_add (c_left, 'split angle', si_text(cvg%angle, 'rad'))
+  write (line, '(f0.3, a)') cvg%z(1), ' m'
+  call fel_column_add (c_right, 'mode peak at', trim(line))
+  call fel_column_add (c_left, 'outside / inside', number_text(cvg%ratio(1)) // ' (peak)')
+  call fel_column_add (c_right, 'outside / inside', number_text(cvg%ratio(2)) // ' (exit)')
+endif
+if (run%ffield(1)%slip%timerun) then
+  do ih = 1, run%n_harm
+    write (line, '(a, i0)') 'escaped energy h', run%ffield(ih)%harm
+    call fel_column_add (c_left, trim(line), si_text(run%ffield(ih)%slip%u_escaped, 'J'))
+    call fel_column_add (c_right, 'slices that left', int_str(run%n_banked(ih)))
   enddo
-
-  ! The verdict reads the worse of the two records. The criterion is stated at the mode's
-  ! saturation. A run that passes there can still exit with most of its power outside
-  ! the mode, since the artifact keeps growing after the mode turns over.
-
-  worst = maxval(cvg%ratio)
-  if (worst > 0.1_rp) then
-    call out_io (s_warn$, r_name, &
-          'The power outside the split angle reaches \f0.2\ times the power inside it.', &
-          'That part of the total is the wide-angle emission of the point beamlets, which', &
-          'no physical beam radiates, so a total power quoted from this run is mostly', &
-          'representation. Possible solution: more macroparticles per slice at the same', &
-          'beamlet_size. The criterion and the measured levels are in docs/startup-noise.md.', &
-          r_array = [worst])
-    if (.not. run%global%source_filter) then
-      call out_io (s_warn$, r_name, 'This run has run.source_filter = false. The filter is on by ' // &
-            'default and removes that emission at a converged load.')
-    endif
-  else if (worst < 0.01_rp) then
-    call out_io (s_info$, r_name, 'The power outside the split angle stays under \f0.4\ ' // &
-          'times the power inside it.', &
-          'The total power is converged by the criterion of docs/startup-noise.md.', &
-          r_array = [worst])
-  endif
-
-  ! The thin slices, named rather than averaged away. A window ratio is a mean over the
-  ! window. A tail under the floor of 128 beamlets, or whose light is mostly wide angle,
-  ! disappears into it. This is for an imported beam with irregular counts per slice.
-  ! load_mode = "sample" levels it.
-  !
-  ! A slice with fewer electrons than 128 beamlets may stand for is not thin by its count.
-  ! The sample mode loads such a slice with fewer beamlets on purpose (fel_beamlet_count),
-  ! and no load of it has more samples than electrons. e_thin is that electron count.
-
-  e_thin = 128
-  if (run%bparam%load_mode == 'sample' .and. run%bparam%shot_noise .and. run%bparam%quiet_start) &
-        e_thin = 128 * max(1.0_rp, run%bparam%beamlet_min_electrons)
-
-  n_thin = 0;  n_shown = 0
-  do is = 1, min(stats%nslice, size(run%fbeam%slice))
-
-    ! A slice the bunch never reached is outside the beam and not a thin load. A window
-    ! that holds the slippage has a quarter of its slices empty by construction
-    ! (docs/fel-physics.md sec-window). Listing those would bury the ones that matter.
-
-    if (stats%charge_live(is, cvg%ir(1)) <= 0) cycle
-    nbl = run%fbeam%slice(is)%n / max(1, run%bparam%beamlet_size)
-    ratio_s = 0
-    if (stats%f_angles_valid(is, cvg%ir(1)) == 1 .and. stats%f_p_in(is, cvg%ir(1)) > 0) &
-          ratio_s = max(0.0_rp, stats%f_power(is, cvg%ir(1)) - stats%f_p_in(is, cvg%ir(1))) / &
-                    stats%f_p_in(is, cvg%ir(1))
-    few = (nbl < 128 .and. stats%charge_live(is, cvg%ir(1)) >= e_thin * e_charge)
-    if (.not. few .and. ratio_s <= 0.1_rp) cycle
-    n_thin = n_thin + 1
-    if (n_shown >= n_thin_max$) cycle
-    if (n_shown == 0) call out_io (s_blank$, r_name, '             Thin slices at the mode ' // &
-          'peak, under 128 beamlets or over a tenth outside the mode:')
-    n_shown = n_shown + 1
-    write (line, '(a, i0, a, 2a, i0, a, es9.2)') '               slice ', is, ', z = ', &
-          trim(adjustl(fel_si_str((is - 1) * run%fbeam%slice_spacing, 'm'))), ', ', nbl, &
-          ' beamlets, ratio ', ratio_s
-    call out_io (s_blank$, r_name, trim(line))
-  enddo
-  if (n_thin > n_shown) then
-    write (line, '(a, i0, a, i0, a, i0)') '               and ', n_thin - n_shown, ' more, ', &
-          n_thin, ' thin of ', stats%nslice
-    call out_io (s_blank$, r_name, trim(line))
-  endif
-  if (n_thin > 0) call out_io (s_blank$, r_name, '             Possible solution: ' // &
-        'load_mode = "sample", which loads a slice from beam.n_particle and not from the bunch''s counts.')
+endif
+if (run%global%migrate .and. run%nslice > 1) then
+  call fel_column_add (c_left, 'particles migrated', int_str(run%n_moved_tot))
+  call fel_column_add (c_right, 'charge dropped', si_text(run%charge_dropped_tot, 'C'))
+endif
+if (run%fp32%on) then
+  call fel_column_add (c_left, 'FP32 worst pz', number_text(run%fp32%worst(5)))
+  call fel_column_add (c_right, 'FP32 worst theta', number_text(run%fp32%worst(6)))
+  call fel_column_add (c_left, 'FP32 worst phasor', number_text(run%fp32%worst(7)))
+  call fel_column_add (c_right, 'FP32 guard ulp', number_text(run%fp32%ulp_min))
 endif
 
-! Where the time went, one row per phase the run entered. The phases partition the
-! walk. So the unaccounted row is the walk's own overhead, and nothing is counted twice.
-! docs/performance.md reads a table like this one.
+call fel_box_rule (fel_rule_top$, 'result', '', .false., .true.)
+call fel_box_columns (c_left, c_right)
 
-call fel_timer_write (r_name)
+call fel_record_real ('run', 'exit_power', 'W', 'The peak power in the window at the last record.', pow)
+call fel_record_real ('run', 'exit_window_energy', 'J', 'The energy in the window at the last record.', ene)
+call fel_record_real ('run', 'exit_pulse_energy', 'J', 'The energy of the pulse, the window with the light ' // &
+      'that left it.', pul)
+call fel_record_real ('run', 'exit_bunching', '1', 'The bunching at the last record.', bun)
+call fel_record_real ('run', 's_end', 'm', 'Where tracking ended.', run%z_now)
+if (run%ffield(1)%slip%timerun) then
+  do ih = 1, run%n_harm
+    call fel_record_real ('run', 'escaped_energy_h' // int_str(run%ffield(ih)%harm), 'J', &
+          'The energy of this harmonic that slippage carried out of the window over the run.', &
+          run%ffield(ih)%slip%u_escaped)
+  enddo
+endif
 
-! The estimate beside the clock, on every run, so the two can be compared on any
-! machine (fel_cost_mod).
+! The time, by the phases that took any, with the walk against its estimate. --verbose
+! prints the table of every phase as well.
+
+walk = fel_timer_seconds(fel_t_walk$)
+t_phase(1) = fel_timer_seconds(fel_t_particles$)
+t_phase(2) = fel_timer_seconds(fel_t_solve$) + fel_timer_seconds(fel_t_source$)
+t_phase(3) = fel_timer_seconds(fel_t_unavg$)
+t_phase(4) = fel_timer_seconds(fel_t_device$)
+t_phase(5) = fel_timer_seconds(fel_t_slippage$)
+t_phase(6) = fel_timer_seconds(fel_t_seam$) + fel_timer_seconds(fel_t_drift$) + fel_timer_seconds(fel_t_gen_int$)
+t_phase(7) = fel_timer_seconds(fel_t_stats$) + fel_timer_seconds(fel_t_ele_end$)
+t_phase(8) = fel_timer_seconds(fel_t_dumps$)
+t_other = walk - sum(t_phase)
+
+c_left%n = 0;  c_right%n = 0
+n_left = 0
+do ip = 1, size(t_phase)
+  if (walk <= 0 .or. t_phase(ip) < 0.005_rp * walk) then
+    t_other = t_other + t_phase(ip)
+    cycle
+  endif
+  call add_time (phase_name(ip), t_phase(ip))
+enddo
+! Every phase of the timer with the times it was entered, for the stats file. The boxes
+! above merge some of them.
+
+do ip = 1, fel_t_n$
+  call fel_record_real ('timing', trim(record_name(fel_phase_name(ip))), 's', &
+        'Wall-clock time of the walk in this phase.', fel_timer_seconds(ip))
+  call fel_record_int ('timing', trim(record_name(fel_phase_name(ip))) // '_regions', &
+        'The times this phase was entered.', fel_timer_regions(ip))
+enddo
+call fel_record_real ('timing', 'walk', 's', 'Wall-clock time of the walk.', walk)
+call fel_record_real ('timing', 'run', 's', 'Wall-clock time of the run up to the closing printout.', &
+      fel_timer_run_seconds())
+if (walk > 0 .and. t_other >= 0.005_rp * walk) call add_time ('other', t_other)
 
 call fel_cost_estimate (run, secs, backend)
-write (line, '(7a)') ' Cost        walk ', &
-      trim(fel_cost_secs_str(fel_timer_seconds(fel_t_walk$))), ' measured, ', &
-      trim(fel_cost_secs_str(secs)), ' estimated on the ' // trim(backend) // ' path for ', &
-      fel_cost_machine$, '.'
-call out_io (s_blank$, r_name, trim(line))
-
-! The FP32 lockstep instrument's worst case, when it ran. The full per-step record
-! and the summary block are in the .fp32.txt file listed below.
-
-if (run%fp32%on) then
-  write (line, '(a, 3(a, es9.2), a, es9.2)') ' FP32        worst', &
-        ' pz ', run%fp32%worst(5), ', theta ', run%fp32%worst(6), &
-        ', phasor ', run%fp32%worst(7), ', guard ulp ', run%fp32%ulp_min
-  call out_io (s_blank$, r_name, trim(line))
+if (mod(n_left, 2) == 1) call fel_column_add (c_right, '', '')
+call fel_column_add (c_left, 'walk', secs_right(walk))
+if (secs > 0) then
+  call fel_column_add (c_right, 'walk / estimate', number_text(walk / secs))
+else
+  call fel_column_add (c_right, '', '')
 endif
+call fel_column_add (c_left, 'run', secs_right(fel_timer_run_seconds()))
 
-! What slippage carried out of the window, per member of the field set. The energy the
-! record lost this way is the other half of a conservation statement the window's own
-! power cannot make. Otherwise the unaveraged ledger is its only reader.
+call fel_box_rule (fel_rule_mid$, 'timing', '', .true., .true.)
+call fel_box_columns (c_left, c_right)
+if (fel_print_com%verbose) call fel_timer_write (r_name)
 
-if (run%ffield(1)%slip%timerun) then
-  line = ' Escaped    '
-  do ih = 1, run%n_harm
-    ! Full precision, since a restart comparison differences this against the same total
-    ! at a checkpoint (docs/validation.md). Six digits cannot reach its floor.
-    write (line, '(2a, i0, a, es24.16, a)') trim(line), ' h', run%ffield(ih)%harm, ' ', &
-          run%ffield(ih)%slip%u_escaped, ' J'
-    if (ih < run%n_harm) line = trim(line) // ','
-  enddo
-  call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
-endif
+! Every file the run wrote. A dump is gated by the switch that writes it and then by its
+! existence, so a file from an earlier run with the same out_root is not listed. A frame
+! series is one row in shell brace syntax.
 
-! The dumps, each listed when the switch that writes it was on in this run and the file is
-! there. A rerun in one directory leaves the earlier run's dumps in place under the same
-! out_root, and a list by existence alone would name them as this run's. The text files
-! are listed by existence. The names here are the writers' own: fel_dump_beam and
-! fel_dump_field_set at the program's start and end and at element ends (end_of_element),
-! fel_dump_frame at each comb record, and fel_bank_file_name.
-
+call fel_box_rule (fel_rule_mid$, 'output', '', .true., .false.)
 n_listed = 0
 root = run%global%out_root
 if (run%global%write_initial) call note_dumps (trim(root) // '-initial', .true., .true.)
@@ -1327,17 +1641,131 @@ if (run%global%dump_at_comb .and. nrec > 0) then
   enddo
 endif
 call note_file (trim(run%global%out_root) // '.stats.h5')
+call note_file (trim(run%global%out_root) // '.resolved.toml')
 call note_file (trim(run%global%out_root) // '.diag.txt')
 call note_file (trim(run%global%out_root) // '.ledger.txt')
 call note_file (trim(run%global%out_root) // '.import.txt')
 call note_file (trim(run%global%out_root) // '.fp32.txt')
 call note_file (trim(run%global%out_root) // '.migration.txt')
+call fel_box_rule (fel_rule_bottom$, '', '', .false., .false.)
 
-call out_io (s_blank$, r_name, &
-      '================================================================================')
+! What the result says of its own convergence, a line each. The power outside the
+! split angle is the wide-angle emission of the point beamlets, and a slice is thin
+! where it has under 128 beamlets or over a tenth of its power outside the mode.
+
+any_warning = .false.
+n_thin = 0
+if (cvg%ok) then
+  worst = maxval(cvg%ratio)
+  if (worst > 0.1_rp) call warn_result ('outside / inside = ' // number_text(worst) // ', above 0.1')
+
+  e_thin = 128
+  if (run%bparam%load_mode == 'sample' .and. run%bparam%shot_noise .and. run%bparam%quiet_start) &
+        e_thin = 128 * max(1.0_rp, run%bparam%beamlet_min_electrons)
+
+  n_thin = 0;  n_shown = 0
+  do is = 1, min(stats%nslice, size(run%fbeam%slice))
+
+    ! A slice with no charge at the mode peak is not thin, and a slice with fewer
+    ! electrons than e_thin has the beamlets its charge allows.
+
+    if (stats%charge_live(is, cvg%ir(1)) <= 0) cycle
+    nbl = run%fbeam%slice(is)%n / max(1, run%bparam%beamlet_size)
+    ratio_s = 0
+    if (stats%f_angles_valid(is, cvg%ir(1)) == 1 .and. stats%f_p_in(is, cvg%ir(1)) > 0) &
+          ratio_s = max(0.0_rp, stats%f_power(is, cvg%ir(1)) - stats%f_p_in(is, cvg%ir(1))) / &
+                    stats%f_p_in(is, cvg%ir(1))
+    few = (nbl < 128 .and. stats%charge_live(is, cvg%ir(1)) >= e_thin * e_charge)
+    if (.not. few .and. ratio_s <= 0.1_rp) cycle
+    n_thin = n_thin + 1
+    if (n_shown >= n_thin_max$) cycle
+    n_shown = n_shown + 1
+    write (line, '(a, i0, 3a, i0, 2a)') 'slice ', is, ' at ', &
+          si_text((is - 1) * run%fbeam%slice_spacing, 'm'), ': ', nbl, ' beamlets, outside / inside ', &
+          number_text(ratio_s)
+    call warn_result (trim(line))
+  enddo
+  if (n_thin > n_shown) then
+    write (line, '(a, i0, a, i0, a, i0, a)') 'and ', n_thin - n_shown, ' more: ', n_thin, ' thin slices of ', &
+          stats%nslice, ' at the mode peak'
+    call warn_result (trim(line))
+  endif
+endif
+
+! The values of this printout and the list of files, into the stats file (fel_record_mod).
+
+call fel_record_int ('run', 'n_thin_slice', 'The slices that are thin at the mode peak: fewer than 128 ' // &
+      'beamlets, or more than 0.1 of the power outside the split angle.', n_thin)
+call fel_record_write (trim(run%global%out_root) // '.stats.h5', .true., rec_err)
+
+contains
 
 !------------------------------------------------------------------------------
-contains
+!+
+! Function secs_right (seconds) result (txt)
+!
+! Routine to write seconds as fel_cost_secs_str does, set to the right of nine columns
+! so that a column of times lines up.
+!-
+
+function secs_right (seconds) result (txt)
+
+real(rp) seconds
+character(9) txt
+character(32) str
+
+!
+
+str = fel_cost_secs_str(seconds)
+txt = adjustr(str(1:9))
+
+end function secs_right
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine add_time (name, seconds)
+!
+! Routine to add one phase to the timing part, in the left column and the right in turn:
+! its seconds and its share of the walk.
+!-
+
+subroutine add_time (name, seconds)
+
+character(*) name
+real(rp) seconds
+character(40) val
+
+!
+
+write (val, '(a9, i5, a)') secs_right(seconds), nint(100 * seconds / walk), ' %'
+n_left = n_left + 1
+if (mod(n_left, 2) == 1) then
+  call fel_column_add (c_left, name, trim(val))
+else
+  call fel_column_add (c_right, name, trim(val))
+endif
+
+end subroutine add_time
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine warn_result (text)
+!
+! Routine to write one warning line, with a blank line before the first.
+!-
+
+subroutine warn_result (text)
+
+character(*) text
+
+!
+
+if (.not. any_warning) call out_io (s_blank$, r_name, '')
+any_warning = .true.
+call fel_print_line (' ! ' // text)
+
+end subroutine warn_result
+
 
 !+
 ! Subroutine note_file (name)
@@ -1433,19 +1861,44 @@ subroutine note_row (name, fsize)
 
 character(*) name
 character(500) row
+character(12) size_text
 real(rp) fsize
 
 !
 
 n_listed = n_listed + 1
-if (n_listed == 1) then
-  write (row, '(2a, t62, a)') ' Wrote       ', trim(name), trim(adjustl(fel_si_str(fsize, 'B')))
+call fel_record_file (name, fsize)
+size_text = byte_text(fsize)
+if (len_trim(name) <= 62) then
+  row = name
+  row(64:75) = adjustr(size_text)
 else
-  write (row, '(2a, t62, a)') '             ', trim(name), trim(adjustl(fel_si_str(fsize, 'B')))
+  row = trim(name) // '   ' // trim(size_text)
 endif
-call out_io (s_blank$, r_name, trim(row))
+call fel_box_full (trim(row))
 
 end subroutine note_row
+
+!+
+! Function record_name (text) result (name)
+!
+! Routine to make a dataset's name from a phase's printed name, the spaces as underscores.
+!-
+
+function record_name (text) result (name)
+
+character(*) text
+character(len(text)) name
+integer i
+
+!
+
+name = text
+do i = 1, len_trim(name)
+  if (name(i:i) == ' ') name(i:i) = '_'
+enddo
+
+end function record_name
 
 end subroutine fel_write_footer
 
@@ -1603,7 +2056,7 @@ if (g_id < 0) then
   call out_io (s_error$, r_name, 'CONTINUATION FROM A FIELD FILE WITH NO CHECKPOINT GROUP: ' // trim(fname), &
        'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
        'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
-       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (docs/reading-output.md).')
+       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT.')
   return
 endif
 fmt_str = ''          ! The reads fill the characters they have and leave the rest.
@@ -2105,6 +2558,50 @@ end function fel_bank_file_name
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_write_stats_file (run, err_flag)
+!
+! Routine to write the stats file <out_root>.stats.h5: the records taken, the input as
+! resolved in params/, the lattice table, meta/ and the values of the printout's header
+! in setup/ (fel_record_mod). A load_only run calls it with no record taken, and its
+! file then holds what setup worked out and no tracking.
+!
+! Input:
+!   run      -- fel_run_struct: Run state.
+!
+! Output:
+!   err_flag -- logical: Set true if the file could not be written.
+!-
+
+subroutine fel_write_stats_file (run, err_flag)
+
+type (fel_run_struct), target :: run
+type (fel_stats_params_struct) sprm
+character(:), allocatable :: file_name
+logical err_flag
+
+! The parameters the file states as data. They are assembled here because the whole run
+! is visible here. fel_stats_mod knows the accumulator and nothing else.
+
+file_name = trim(run%global%out_root) // '.stats.h5'
+sprm%slice_spacing = run%fbeam%slice_spacing
+sprm%species = 'electron'
+sprm%beta0 = fel_p0_mc(run%fbeam) / sqrt(fel_p0_mc(run%fbeam)**2 + 1)
+sprm%grid_dx = run%ffield(1)%wf%dx
+sprm%grid_dy = run%ffield(1)%wf%dy
+
+call fel_stats_write (run%stats, sprm, file_name, err_flag)
+call fel_write_params (run, file_name)
+if (err_flag) return
+call fel_write_lattice (run, file_name)
+call fel_write_meta (run, file_name)
+call fel_record_write (file_name, .false., err_flag)
+
+end subroutine fel_write_stats_file
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_finalize_diagnostics (run, err_flag)
 !
 ! Routine to finalize the run's file diagnostics: the stats file always. With
@@ -2142,7 +2639,6 @@ subroutine fel_finalize_diagnostics (run, err_flag)
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
-type (fel_stats_params_struct) sprm
 integer h5e, ihh, n_harm, iu_del, ios_del
 logical ferr, err_flag, keep_escaped_field
 character(400) out_root
@@ -2157,20 +2653,8 @@ n_harm = run%n_harm
 keep_escaped_field = run%global%keep_escaped_field
 out_root = run%global%out_root
 
-! The parameters the file states as data. They are assembled here because the whole run
-! is visible here. fel_stats_mod knows the accumulator and nothing else.
-
-sprm%slice_spacing = fbeam%slice_spacing
-sprm%species = 'electron'
-sprm%beta0 = fel_p0_mc(fbeam) / sqrt(fel_p0_mc(fbeam)**2 + 1)
-sprm%grid_dx = run%ffield(1)%wf%dx
-sprm%grid_dy = run%ffield(1)%wf%dy
-
-call fel_stats_write (run%stats, sprm, trim(out_root) // '.stats.h5', ferr)
-call fel_write_params (run, trim(out_root) // '.stats.h5')
+call fel_write_stats_file (run, ferr)
 if (ferr) return
-call fel_write_lattice (run, trim(out_root) // '.stats.h5')
-call fel_write_meta (run, trim(out_root) // '.stats.h5')
 
 if (.not. keep_escaped_field) then
   err_flag = .false.
@@ -2205,12 +2689,12 @@ do ihh = 1, n_harm
     if (ferr) return
     call H5Fclose_f (run%esc_id(ihh), h5e)
     run%esc_id(ihh) = 0
-    call out_io (s_blank$, r_name, '  ' // trim(fel_bank_file_name(run, ihh, 'escaped')))
+    call out_io (s_info$, r_name, 'Wrote ' // trim(fel_bank_file_name(run, ihh, 'escaped')))
   endif
 
   call fel_finish_pulse (run, ihh, ferr)
   if (ferr) return
-  call out_io (s_blank$, r_name, '  ' // trim(fel_bank_file_name(run, ihh, 'pulse')))
+  call out_io (s_info$, r_name, 'Wrote ' // trim(fel_bank_file_name(run, ihh, 'pulse')))
 enddo
 
 err_flag = .false.
@@ -2590,8 +3074,9 @@ type (fel_key_struct), allocatable :: keys(:)
 character(*) stats_file
 integer(hid_t) f_id, p_id, g_id, b_id
 integer h5e, i, it
-logical merr
+logical merr, there
 character(16) table
+character(12), parameter :: origin_name(0:3) = [character(12):: 'default', 'input file', 'command line', 'derived']
 character(*), parameter :: r_name = 'fel_write_params'
 
 !
@@ -2640,6 +3125,10 @@ do it = 1, size(fel_schema_tables$)
   do i = 1, size(keys)
     if (keys(i)%table /= table .or. .not. keys(i)%recorded) cycle
     call write_key (keys(i))
+    ! Where the value came from, on every key that is a dataset.
+    call H5Lexists_f (g_id, trim(keys(i)%name), there, h5e)
+    if (there .and. allocated(run%key_origin)) call H5LTset_attribute_string_f (g_id, trim(keys(i)%name), &
+          'origin', trim(origin_name(run%key_origin(i))), h5e)
   enddo
   call H5Gclose_f (g_id, h5e)
   if (table == 'beam.resample') call H5Gclose_f (b_id, h5e)

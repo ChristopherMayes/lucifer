@@ -53,13 +53,13 @@ mode every particle must be present at the charge the kick load gives it.
 
 With beam.beamlet_size unset the loader derives it from the harmonics carried, twice the
 highest plus 2 or the smallest divisor of the slice's macroparticles at or above that. The
-header must state the size, every slice must be loaded in beamlets of it, and the weight
+stats file must record the size, every slice must be loaded in beamlets of it, and the weight
 load's statistic is held to 1 at every carried harmonic within five standard deviations. A
 size set at twice the highest harmonic must be refused with the size that is accepted,
 and that size must load.
 
 With beam.n_particle unset the loader derives it, 512 beamlets of the derived size: 2048
-macroparticles for the fundamental alone and 4096 with the third harmonic. The header
+macroparticles for the fundamental alone and 4096 with the third harmonic. The stats file
 must state the count and every slice must hold it. A set count must be loaded as set.
 
 A slice of several wavelengths is loaded over all its periods. A Gaussian bunch with
@@ -108,6 +108,7 @@ import bunchfile
 import shot_noise_ratio
 from checkrec import record
 from lucifer.flat import to_toml
+from lucifer.stats import scalars
 to_groups = to_toml
 
 E_CHARGE = 1.602176634e-19
@@ -130,8 +131,7 @@ SCAN = (ELECTRONS, 50.0, 18.0, 4.0, 0.25)
 
 # The loader's own statement of its level at the fundamental, from fel_shot_ratio, and
 # the worst difference from shot_noise_ratio.py over the scans of the first-order kick.
-# The line prints four decimals.
-STATED = re.compile(r"noise power loaded over the shot-noise power, fundamental:\s+([0-9.]+)")
+# The level is setup/shot_noise_ratio of the stats file.
 stated_worst = {"first_order": 0.0}
 
 # The electrons a beamlet holds in each scan of the weight load, and the harmonics its
@@ -266,12 +266,11 @@ def run_mode(exe, lat, workdir, seeds, test_weights, electrons):
         clamped = clamped or "noise group of less than one real electron" in r.stdout
         dump = workdir / f"{root}-initial.beam.h5"
         vals, want = b2_samples(dump, (1, 2, 3))
-        said = STATED.search(r.stdout)
-        if not said:
-            print(f"FAIL: loader run {root} did not state its noise level:\n{r.stdout[-2000:]}")
+        said = scalars(workdir / f"{root}.stats.h5", "setup").get("shot_noise_ratio")
+        if said is None:
+            print(f"FAIL: loader run {root} did not record its noise level:\n{r.stdout[-2000:]}")
             sys.exit(1)
-        stated_worst["first_order"] = max(stated_worst["first_order"],
-                                          abs(float(said.group(1)) - float(np.mean(want[0::3]))))
+        stated_worst["first_order"] = max(stated_worst["first_order"], abs(said - float(np.mean(want[0::3]))))
         # The scan runs 150 seeds at 25 MB of particles and 4 MB of field each.
         dump.unlink()
         (workdir / f"{root}-initial.wf.h5").unlink(missing_ok=True)
@@ -322,8 +321,8 @@ def weight_scan(exe, lat, workdir, seeds):
                 grid_half_width=GRID_HALF_WIDTH, beamlet_size=BEAMLET_SIZE, kick="weight", testw="F"))
             v, c, dq, whole = weight_statistics(dump, charge)
             dump.unlink()
-            said = STATED.search(out)
-            stated = max(stated, abs(float(said.group(1)) - want) if said else 1.0)
+            said = out.get("shot_noise_ratio")
+            stated = max(stated, abs(said - want) if said is not None else 1.0)
             worst_charge = max(worst_charge, dq)
             whole_ok = whole_ok and whole
             counts.append(c)
@@ -590,7 +589,6 @@ def slice_fill(exe, lat, workdir, seeds):
 # highest harmonic plus 2, or the smallest divisor of the macroparticle count at or above
 # that, which 16 is of 1024 where 12 is not.
 DERIVED = (((1,), 1024, 4), ((1, 3), 1024, 8), ((1, 3, 5), 1536, 12), ((1, 3, 5), 1024, 16))
-DERIVED_LINE = re.compile(r"The beamlet size (\d+) is derived from the highest harmonic carried, (\d+)\.")
 DERIVED_ELECTRONS = 18.0
 
 
@@ -616,8 +614,7 @@ def derived_size(exe, lat, workdir, seeds):
             root = f"sn_ds{len(harmonics)}_{n_particle}_{seed}"
             out, dump = run_load(exe, workdir, root, size_text(lat, root, 3000 + 7 * seed, harmonics, n_particle,
                                                                  0, electrons))
-            said = DERIVED_LINE.search(out)
-            sizes.add((int(said.group(1)), int(said.group(2))) if said else None)
+            sizes.add((out["beamlet_size"], max(harmonics)) if out["origin"]["beamlet_size"] == "derived" else None)
             for sl in beamio.read_slices(dump, LAMBDA0, SPACING):
                 w = sl["weight"][: sl["n"]]
                 if sl["n"] == 0 or w.sum() == 0:
@@ -629,9 +626,9 @@ def derived_size(exe, lat, workdir, seeds):
             dump.unlink()
         good = sizes == {(want_size, max(harmonics))}
         ok = ok and good
-        print(f"--- beamlet size, {label}: the header states a derived size of {want_size} and every slice is "
+        print(f"--- beamlet size, {label}: the stats file records a derived size of {want_size} and every slice is "
               f"loaded in beamlets of it  {'ok' if good else 'FAIL ' + str(sizes)}")
-        record(f"beamlet size, {label}: derived as {want_size}, stated in the header and loaded", None, None,
+        record(f"beamlet size, {label}: derived as {want_size}, recorded in the stats file and loaded", None, None,
                "bool", good)
         for h in harmonics:
             v = np.asarray(vals[h])
@@ -647,18 +644,21 @@ def derived_size(exe, lat, workdir, seeds):
     # and the message carries the smallest size accepted.
     for harmonics, n_particle in (((1, 3), 1008), ((1, 3, 5), 990)):
         h_max = max(harmonics)
-        said = {}
+        said, set_origin = {}, ""
         for size in (2 * h_max, 2 * h_max + 1):
             root = f"sn_dr{h_max}_{size}"
             (workdir / f"{root}.toml").write_text(to_groups(size_text(
                 lat, root, 3000, harmonics, n_particle, size, DERIVED_ELECTRONS * n_particle / size)))
             r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
             said[size] = (r.returncode, r.stdout + r.stderr)
+            if r.returncode == 0:
+                with h5py.File(workdir / f"{root}.stats.h5", "r") as f:
+                    set_origin = f["params/beam/beamlet_size"].attrs["origin"].decode()
             for f in workdir.glob(f"{root}-initial.*"):
                 f.unlink()
         under, at = said[2 * h_max], said[2 * h_max + 1]
         good = (under[0] != 0 and f"SET BEAM.BEAMLET_SIZE TO {2 * h_max + 1} OR MORE" in under[1] and at[0] == 0
-                and f"The beamlet size {2 * h_max + 1} is set in the input file" in at[1])
+                and set_origin == "input file")
         ok = ok and good
         print(f"--- beamlet size, harmonic {h_max} carried: a size of {2 * h_max} is refused with the size "
               f"that is accepted, and {2 * h_max + 1} is loaded  {'ok' if good else 'FAIL'}")
@@ -670,7 +670,6 @@ def derived_size(exe, lat, workdir, seeds):
 # The macroparticles the loader derives where beam.n_particle is 0, its default: 512
 # beamlets of the derived size, for the harmonics carried.
 COUNT_BEAMLETS = 512
-COUNT_LINE = re.compile(r"The (\d+) macroparticles are derived: (\d+) beamlets of (\d+) \(beam\.n_particle\)\.")
 
 
 def derived_count(exe, lat, workdir):
@@ -681,16 +680,16 @@ def derived_count(exe, lat, workdir):
         root = f"sn_dc{len(harmonics)}"
         out, dump = run_load(exe, workdir, root, size_text(lat, root, 3100, harmonics, 0, 0,
                                                              DERIVED_ELECTRONS * COUNT_BEAMLETS))
-        said = COUNT_LINE.search(out)
+        said = [out["n_particle"], out["beamlets_per_slice"], out["beamlet_size"]]
         counts = {sl["n"] for sl in beamio.read_slices(dump, LAMBDA0, SPACING)}
         dump.unlink()
-        good = (said is not None and [int(g) for g in said.groups()] == [want, COUNT_BEAMLETS, size]
+        good = (out["origin"]["n_particle"] == "derived" and said == [want, COUNT_BEAMLETS, size]
                 and counts == {want})
         ok = ok and good
         label = f"harmonics {', '.join(str(h) for h in harmonics)}, beam.n_particle unset"
-        print(f"--- macroparticle count, {label}: derived as {want}, {COUNT_BEAMLETS} beamlets of {size}, stated in "
-              f"the header and loaded in every slice  {'ok' if good else 'FAIL ' + str(counts)}")
-        record(f"macroparticle count, {label}: derived as {want}, stated in the header and loaded", None, None,
+        print(f"--- macroparticle count, {label}: derived as {want}, {COUNT_BEAMLETS} beamlets of {size}, recorded in "
+              f"the stats file and loaded in every slice  {'ok' if good else 'FAIL ' + str(counts)}")
+        record(f"macroparticle count, {label}: derived as {want}, recorded in the stats file and loaded", None, None,
                "bool", good)
 
     # A set count is loaded as set, with no line that it was derived.
@@ -700,7 +699,7 @@ def derived_count(exe, lat, workdir):
                                                              DERIVED_ELECTRONS * n_particle / size))
         counts = {sl["n"] for sl in beamio.read_slices(dump, LAMBDA0, SPACING)}
         dump.unlink()
-        good = COUNT_LINE.search(out) is None and counts == {n_particle}
+        good = out["origin"]["n_particle"] != "derived" and counts == {n_particle}
         ok = ok and good
         print(f"--- macroparticle count, beam.n_particle = {n_particle} in beamlets of {size}: loaded as set  "
               f"{'ok' if good else 'FAIL'}")
@@ -710,14 +709,22 @@ def derived_count(exe, lat, workdir):
 
 
 def run_load(exe, workdir, root, text):
-    """One load_only run from flat keys. Returns its output and its particle dump's path."""
+    """One load_only run from flat keys. Returns what its stats file records of the setup,
+    with the resolved beam.n_particle and under "origin" where n_particle and beamlet_size
+    came from, and its particle dump's path."""
     (workdir / f"{root}.toml").write_text(to_groups(text))
     r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
     if r.returncode != 0:
         print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
     (workdir / f"{root}-initial.wf.h5").unlink(missing_ok=True)
-    return r.stdout, workdir / f"{root}-initial.beam.h5"
+    stats = workdir / f"{root}.stats.h5"
+    out = scalars(stats, "setup")
+    with h5py.File(stats, "r") as f:
+        out["n_particle"] = int(f["params/beam/n_particle"][()])
+        out["origin"] = {k: f[f"params/beam/{k}"].attrs["origin"].decode() for k in ("n_particle", "beamlet_size")}
+    stats.unlink()
+    return out, workdir / f"{root}-initial.beam.h5"
 
 
 def gauss_text(lat, root, seed, limit, kick):
@@ -768,7 +775,7 @@ def fewer_beamlets(exe, lat, workdir, seeds, limit, label):
                 want[key].append(shot_noise_ratio.slice_ratio(np.full(beamlets, per), h, BEAMLET_SIZE,
                                                               (BEAMLET_SIZE - 1) // 2))
         n_fewer += fewer_seed
-        said_ok = said_ok and f": {fewer_seed} slices have fewer beamlets for it" in out
+        said_ok = said_ok and out.get("n_slice_fewer_beamlets") == fewer_seed
         ref.unlink()
         dump.unlink()
 
@@ -902,7 +909,7 @@ def run_keep(exe, lat, workdir, seeds, label, source, quiet, want, cells=False):
             print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
             sys.exit(1)
         said = f"shot noise, {label} load: the noise reported on {want}"
-        if want not in r.stdout:
+        if scalars(workdir / f"{root}.stats.h5", "setup").get("noise_groups") != want:
             record(said, None, None, "bool", False)
             print(f"FAIL: {root} did not report the noise on {want!r}:\n{r.stdout[-2000:]}")
             sys.exit(1)
@@ -911,7 +918,7 @@ def run_keep(exe, lat, workdir, seeds, label, source, quiet, want, cells=False):
             samples[h][0].extend(vals[k::3])
             samples[h][1].extend(expect[k::3])
 
-    # Every seed's message named the grouping, or the run exited above.
+    # Every seed's stats file named the grouping, or the run exited above.
     record(said, None, None, "bool", True)
     return samples
 

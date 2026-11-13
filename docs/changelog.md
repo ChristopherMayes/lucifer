@@ -9,6 +9,32 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-13 Changed: the run prints its settings in boxes, and no program reads what it prints.
+  The header has one part for each table of the input file, with a row for each key under the key's
+  own name, its value with a unit, and a mark where the value was derived (`*`) or set on the command
+  line (`~`). A `derived` part holds the quantities that follow from the settings, among them the
+  Pierce parameter, the gain and cooperation lengths, and the ratios slippage over window, cooperation
+  length over slice, beam size over grid cell and gain length over step. A `storage` and a `work` part
+  state the files the run will write and the steps it will take. A line that begins with `!` warns
+  where a ratio is outside the range the defaults are derived for. The closing block has a `result`,
+  a `timing` and an `output` part. The boxes are drawn in Unicode where the locale is UTF-8 and in
+  ASCII otherwise, and `--ascii` and `--unicode` choose one. On a terminal the progress is one line
+  rewritten in place, and `--progress` with `bar`, `table` or `none` chooses. The messages of setup and of Bmad's lattice parser are printed with `--verbose`
+  alone. The run writes `<out_root>.resolved.toml`, the input file with every key filled, which
+  reproduces the run. Every number the printout shows is in the stats file as a value: three new
+  groups, `setup/` for what the program worked out before tracking, `timing/` for the wall clock by
+  phase with the estimate, and more scalars in `run/`, whose attributes `files` and `file_bytes` list
+  the files written, and an `origin` attribute on each key of `params/`. A `load_only` run writes a
+  stats file with `params/`, `setup/` and no record. The package takes a run's dumps from that list
+  and its `out_root` from its own arguments, and `lucifer.stats.scalars` returns a group as a dict.
+  The checks, the examples runner and the performance scripts read those values where they matched
+  printed lines, and `python -m lucifer.stats <file> <group/name>` prints one for a shell script. A
+  key the program derived is marked derived whether the input file left it out or stated the value
+  that asks for the derivation. No program message names a Markdown file. `lucifer --help` prints the arguments, the
+  options and the files a run writes, `lucifer --version` also prints the device backend, which the
+  no-argument output carried, a run with no argument prints one usage line and exits with 2, and an
+  option the program does not know is refused. Three scripts that nothing
+  ran are removed: `check_comments_only.py`, `check_prose_only.py` and `report_numbers.py`.
 - 2026-11-12 Changed: `beam.n_particle` is derived where the input file does not set it in the
   sample mode: 512 beamlets of the beamlet size, 2048 macroparticles for a run that carries the
   fundamental alone and 4096 with the third harmonic. The header states the count and its origin. A

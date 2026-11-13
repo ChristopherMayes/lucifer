@@ -39,7 +39,7 @@ import pathlib
 import h5py
 import numpy as np
 
-__all__ = ["read_stats", "Stats", "same_data"]
+__all__ = ["read_stats", "Stats", "same_data", "scalars"]
 
 # The format versions this reader understands. No older ones: see the module docstring.
 # 1.0 is bmad-stats with the FEL extension, which replaced lucifer-stats 2.x.
@@ -291,6 +291,15 @@ class Stats:
                  self.description[name]) for name in self.units]
 
 
+def scalars(stats_file, group):
+    """One group of a stats file as a dict, name to value, scalars as plain Python values
+    and strings decoded: ``scalars("s7.stats.h5", "setup")["peak_current"]``. ``setup``
+    holds what the program worked out before tracking, ``run`` what the run produced and
+    ``timing`` the wall clock, which are the numbers the program's printout shows."""
+    with h5py.File(stats_file, "r") as f:
+        return _scalars(f[group])
+
+
 def _text(val):
     """An HDF5 string as str, whether it arrived as bytes or as str."""
     if isinstance(val, bytes):
@@ -347,6 +356,17 @@ def same_data(a, b):
 
 if __name__ == "__main__":
     import sys
+
+    # python -m lucifer.stats <file> <group/name> [...] prints those values on one line,
+    # for a shell script, and with the file alone a summary of it.
+    if len(sys.argv) > 2:
+        with h5py.File(sys.argv[1], "r") as _f:
+            _vals = []
+            for _name in sys.argv[2:]:
+                _v = _f[_name][()] if _name in _f else ""
+                _vals.append(_text(_v) if isinstance(_v, bytes) else str(_v.item() if hasattr(_v, "item") else _v))
+        print(" ".join(_vals))
+        sys.exit(0)
 
     st = read_stats(sys.argv[1])
     print(f"{st.path.name}: {st.file_format} {st.version}")

@@ -515,7 +515,7 @@ def main():
     # The header states each member's bank before the run tracks. The seed fills the
     # window, so light leaves it, and the run keeps one pulse file a member and no
     # escaped file.
-    n_rot, members = bank_bytes.stated(r_t8.stdout)
+    n_rot, members = bank_bytes.stated(wd / "h3t8.stats.h5")
     for h in (1, 3):
         pulse_b, esc_b = bank_bytes.kept(wd, "h3t8", h)
         if h in members and pulse_b > 0 and esc_b == 0:

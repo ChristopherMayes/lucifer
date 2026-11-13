@@ -36,6 +36,7 @@ Usage:
 """
 
 from lucifer.flat import to_toml
+from lucifer.stats import scalars
 import argparse
 import pathlib
 import re
@@ -287,10 +288,10 @@ def refusals(exe, wd):
     rc, out = run(exe, wd, "ldcopies", '  beam.position_file = "load_copies.h5"\n'
                   '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n  shot_noise_method = "first_order"\n  beamlet_size = 8\n',
                   pextra="  run.load_only = T\n")
-    good = rc == 0 and "particles sharing their transverse coordinates" in out
-    fl = re.search(r"worst quiet floor before imposing, \|b\|\^2 \* N_lambda:\s*([0-9.E+-]+)", out)
+    s = scalars(wd / "ldcopies.stats.h5", "setup") if rc == 0 else {}
+    good = rc == 0 and s.get("noise_groups") == "particles sharing their transverse coordinates"
     print(f"  copies made outside the loader take the noise on the copies: {'ok' if good else 'FAIL'}"
-          + (f", floor {float(fl.group(1)):.2e}" if fl else ""))
+          + (f", floor {s['quiet_floor']:.2e}" if "quiet_floor" in s else ""))
     record("copies made outside the loader take the noise on the copies", None, None, "bool",
            good)
     ok = ok and good

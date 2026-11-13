@@ -40,7 +40,7 @@ The archive of a run is its [stats file](glossary.md#gl-statistics-file), which 
 (python-dumps)=
 ### The dumps
 
-A run's particle and field dumps stay on disk until they are asked for, since a run's dumps are often gigabytes. `output.particle_files` and `output.field_files` map a key to the file, from the list of files the run's footer prints: `final` and `initial`, `at<n>-<element>` for a dump at the end of element n, a frame by its record number, and `pulse` for the fields, with `escaped` beside it when `run.write_escaped` kept it, and `-h<h>` for a harmonic. Both polarizations are components of one file. `output.particles` and `output.fields` map the same keys to openPMD-beamphysics objects, each read on first access and kept, a `ParticleGroup` for a beam dump and a `Wavefront` for a field dump:
+A run's particle and field dumps stay on disk until they are asked for, since a run's dumps are often gigabytes. `output.particle_files` and `output.field_files` map a key to the file, from the list of files the run records in its stats file: `final` and `initial`, `at<n>-<element>` for a dump at the end of element n, a frame by its record number, and `pulse` for the fields, with `escaped` beside it when `run.write_escaped` kept it, and `-h<h>` for a harmonic. Both polarizations are components of one file. `output.particles` and `output.fields` map the same keys to openPMD-beamphysics objects, each read on first access and kept, a `ParticleGroup` for a beam dump and a `Wavefront` for a field dump:
 
 % example: dumps
 ```python
@@ -98,7 +98,7 @@ for key, value in inp.items():            # the keys set away from their default
 (python-run)=
 ## Running the program
 
-`lucifer.run` runs the program on an `Input`, written into the run's directory as `name`, or on the path of an input file. The executable is the `exe` argument, else `LUCIFER_EXE`, else `lucifer` on `PATH`, and `threads` sets `OMP_NUM_THREADS`. It returns a `Result` with the exit code, the output the program printed, `out_root` as the program's header states it, the stats file's path, and the files the footer says the run wrote, and `result.stats` opens the stats file through the reader.
+`lucifer.run` runs the program on an `Input`, written into the run's directory as `name`, or on the path of an input file. The executable is the `exe` argument, else `LUCIFER_EXE`, else `lucifer` on `PATH`, and `threads` sets `OMP_NUM_THREADS`. It returns a `Result` with the exit code, the output the program printed, `out_root`, the stats file's path, and the files the stats file lists, and `result.stats` opens the stats file through the reader.
 
 % example: run
 ```python

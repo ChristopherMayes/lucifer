@@ -208,10 +208,10 @@ def run_nml(exe, wd, root, nml_text):
 def h5_identical(fa, fb):
     # meta/ is excluded. Provenance is held in datasets, since HDF5 caps an attribute at
     # 64 kB (fel-physics.md, sec-meta), and meta/timestamp differs between any two runs.
-    # Nothing in meta/ is physics.
+    # Nothing in meta/ is physics, and timing/ is the wall clock.
     with h5py.File(fa) as a, h5py.File(fb) as b:
         na, nb = [], []
-        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith("meta/")
+        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith(("meta/", "timing/"))
         a.visititems(lambda n, o: na.append(n) if keep(n, o) else None)
         b.visititems(lambda n, o: nb.append(n) if keep(n, o) else None)
         if sorted(na) != sorted(nb):
@@ -433,13 +433,13 @@ def page_examples(exe, wd):
     check("the page's compare example: four lettered blocks with their differences, the runs named by their stems",
           ok, note=f"[{letters}, legend {legend}, {len(fig_compare.axes)} axes]")
 
-    # Every dump the run wrote is in the footer and every file the footer names is on
+    # Every dump the run wrote is in the stats file's list and every file the list names is on
     # disk, frames expanded from their brace range.
     on_disk = {f.name for f in page.glob("every*.h5")}
     listed = {f.name for f in every.files if f.suffix == ".h5"}
     with read_stats(page / "every.stats.h5") as st:
         nrec = len(st.record)
-    check("dumps: the footer names every file the run wrote, and only those", on_disk == listed,
+    check("dumps: the stats file lists every file the run wrote, and only those", on_disk == listed,
           note=f"[{len(listed)} files, {len(on_disk ^ listed)} apart]")
     want_p = ["initial", "at1-UND", "final", *range(1, nrec + 1)]
     want_f = ["initial", "at1-UND", "final", "escaped", "pulse", *range(1, nrec + 1)]
@@ -615,16 +615,14 @@ def main():
     m = re.search(r"lucifer_version\$ = '([^']*)'", gen.read_text()) if gen.is_file() else None
     built = m.group(1) if m else None
     r = run([str(exe), "--version"], wd)
-    m = re.fullmatch(r"Lucifer version (\S+)\nBmad version \S+\n", r.stdout)
+    m = re.fullmatch(r"Lucifer version (\S+)\nBmad version \S+\nDevice backend: [^\n]+\n", r.stdout)
     printed = m.group(1) if m else None
-    m = re.search(r"^ Lucifer version (\S+)$", r_snml.stdout, re.M)
-    header = m.group(1) if m else None
     with h5py.File(wd / "snml.stats.h5") as h5:
         stored = h5["meta/lucifer_version"][()].decode() if "meta/lucifer_version" in h5 else None
-    ok = r.returncode == 0 and built is not None and printed == header == stored == built
-    check("--version, the header and meta/lucifer_version carry the version CMake wrote", ok,
+    ok = r.returncode == 0 and built is not None and printed == stored == built
+    check("--version and meta/lucifer_version carry the version CMake wrote", ok,
           note=f"[{built} from {gen.parent.parent.name}/generated, --version {printed}, "
-               f"header {header}, meta {stored}, exit {r.returncode}]")
+               f"meta {stored}, exit {r.returncode}]")
 
     # ------------------------------------------------------------------
     print("== the overrides on the command line ==")
@@ -635,13 +633,14 @@ def main():
     (wd / "ovr.toml").write_text(to_toml(NML_TWIN.format(root="ovr", extra="", bextra="")))
     r = run([str(exe), "ovr.toml", "run.out_root=ovr2", "beam.n_particle=512", "run.ran_seed=778"], wd)
     ok = (r.returncode == 0 and (wd / "ovr2.stats.h5").exists()
-          and not (wd / "ovr.stats.h5").exists()
-          and "Override: run.out_root = \"ovr2\"" in r.stdout
-          and "Override: beam.n_particle = 512" in r.stdout)
+          and not (wd / "ovr.stats.h5").exists())
     if ok:
         with h5py.File(wd / "ovr2.stats.h5") as h5:
             echo = h5["meta/input_echo"][()].decode()
             ok = (int(h5["params/beam/n_particle"][()]) == 512
+                  and h5["params/beam/n_particle"].attrs["origin"].decode() == "command line"
+                  and h5["params/run/ran_seed"].attrs["origin"].decode() == "command line"
+                  and h5["params/beam/bunch_charge"].attrs["origin"].decode() == "input file"
                   and int(h5["params/run/ran_seed"][()]) == 778
                   and 'out_root = "ovr2"' in echo and "n_particle = 512" in echo
                   and "ran_seed = 778" in echo)
@@ -925,8 +924,8 @@ def main():
         return worst, len(common), ids_ok, pops_ok, first
 
     def escaped_of(root):
-        m = re.findall(r"Escaped\s+h1\s+([0-9.Ee+-]+)", (wd / f"{root}.out").read_text())
-        return float(m[0])
+        with h5py.File(wd / f"{root}.stats.h5", "r") as h5:
+            return float(h5["run/escaped_energy_h1"][()])
 
     def rs_run(root, nml_text, expect_fail=False, fragment=""):
         (wd / f"{root}.toml").write_text(to_toml(nml_text))
@@ -1003,7 +1002,7 @@ def main():
         check(f"escaped energy: the continuous run's increment past the pipe == the restart's total, "
               f"{kind}", abs((e_full - e_toD) - e_rest) <= 1e-5 * e_full,
               note=f"[continuous {e_full:.6e} J less {e_toD:.6e} J at the pipe = "
-                   f"{e_full - e_toD:.3e} J; restart {e_rest:.3e} J; within the footer's 1e-5]")
+                   f"{e_full - e_toD:.3e} J; restart {e_rest:.3e} J; within 1e-5]")
 
     # A present but impossible residual is refused, never read as absent: the magnitude
     # can never reach n_wavelength, since the threshold is 0.8 of it.

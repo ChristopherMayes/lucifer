@@ -186,13 +186,18 @@ run_dir () {   # <dir> <index>
     input="$(basename "$input_path")"
     log="${input%.toml}.log"
     t0=$SECONDS
-    ( cd "$dir" && "$EXE" "$input" > "$log" 2>&1 < /dev/null )
+    started="$(date +%s)"
+    ( cd "$dir" && "$EXE" --unicode "$input" > "$log" 2>&1 < /dev/null )
     rc=$?
     dt=$((SECONDS - t0))
-    line="$(grep -m1 '^ Exit' "$dir/$log" 2>/dev/null | sed 's/^ *Exit *//')"
-    # A completed run always prints its exit line, so its absence is a failure even when
-    # the status says otherwise. A stale binary that rejects a lattice it does not
-    # understand would otherwise look like success.
+    # The out_root and the light at the exit, from the stats file the run wrote. A
+    # completed run always writes one after it started, so a stats file that is absent or
+    # older is a failure even when the status says otherwise. A stale binary that rejects
+    # a lattice it does not understand would otherwise look like success.
+    info="$("$PYTHON" "$RECORD" --exit "$dir/$input" --since "$started" 2>/dev/null)"
+    root="${info%%$'\n'*}"
+    line=""
+    [[ "$info" == *$'\n'* ]] && line="${info#*$'\n'}"
     verdict=ok
     if [[ $rc -ne 0 || -z "$line" ]]; then
       line="$(grep -m1 -E 'ERROR|FATAL' "$dir/$log" 2>/dev/null | head -c 90)"
@@ -200,7 +205,7 @@ run_dir () {   # <dir> <index>
       status=1
     fi
     printf '%s\n%s\n%s\n%s\n' "$verdict" "$rc" "$dt" "$line" > "$STATE/out.$idx.$k"
-    # The record holds what the run measured, from its stats file and its log, one row
+    # The record holds what the run measured, from its stats file, one row
     # per quantity. The rows of every input file become examples/measured.tsv below, and the
     # pages carry them.
     if [[ "$verdict" == "ok" ]]; then
@@ -208,10 +213,10 @@ run_dir () {   # <dir> <index>
         echo "Error: $dir/$input: the record could not be written; see $STATE/recerr.$idx" > "$STATE/note.$idx"
         status=1
       fi
-      # The bytes the header states for the escaped-field bank, against the files the
-      # run kept, and no pulse or escaped file where the header states no bank.
-      if ! bank="$("$PYTHON" "$BANK" "$dir/$log" "$dir" 2>&1)"; then
-        printf 'Error: %s/%s: the bank the header states is not the files on disk:\n%s\n' \
+      # The bytes the stats file states for the escaped-field bank, against the files the
+      # run kept, and no pulse or escaped file where it states no bank.
+      if ! bank="$("$PYTHON" "$BANK" "$dir/$root.stats.h5" "$dir" 2>&1)"; then
+        printf 'Error: %s/%s: the bank the stats file states is not the files on disk:\n%s\n' \
                "$dir" "$input" "$bank" > "$STATE/note.$idx"
         status=1
       fi
@@ -318,7 +323,13 @@ if [[ $FAILED -eq 0 ]]; then
     printf 'directory\tinput\tquantity\tvalue\tunit\n'
     cat "$STATE"/rec.* 2>/dev/null | LC_ALL=C sort
   } > measured.tsv
-  if ! "$PYTHON" "$RECORD" --sample steady_state/lucifer.log --out "$LUCIFER_DIR/docs/generated/sample-output.md"; then
+  # The sample output the user guide shows: the steady-state example's log, and the
+  # header the same input file prints under --ascii, from a run that loads and stops.
+  ( cd steady_state && "$EXE" --ascii lucifer.toml run.load_only=true run.out_root=steady_state_ascii \
+        > "$STATE/ascii.log" 2>&1 < /dev/null )
+  rm -f steady_state/steady_state_ascii*
+  if ! "$PYTHON" "$RECORD" --sample steady_state/lucifer.log --sample-ascii "$STATE/ascii.log" \
+        --out "$LUCIFER_DIR/docs/generated/sample-output.md"; then
     echo "Error: the sample output could not be written from steady_state/lucifer.log" >&2
     FAILED=1
   fi

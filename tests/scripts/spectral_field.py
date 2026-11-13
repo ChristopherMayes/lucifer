@@ -102,9 +102,13 @@ def run(exe, toml, overrides, out_root, cwd, threads, log=None):
     A failed run returns the text too, and the caller reads the refusal from it."""
     log_path = pathlib.Path(cwd) / (log or f"{out_root}.log")
     if REUSE and log_path.exists() and (pathlib.Path(cwd) / f"{out_root}-final.wf.h5").exists():
-        text = log_path.read_text()
-        if re.search(r"\n Exit\s+power", text):
-            return 0, text
+        # A run that finished wrote its file list into the stats file as it closed.
+        import h5py
+        stats = pathlib.Path(cwd) / f"{out_root}.stats.h5"
+        if stats.exists():
+            with h5py.File(stats, "r") as f:
+                if "files" in f["run"].attrs:
+                    return 0, log_path.read_text()
     env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     cmd = [str(exe), str(toml), f"run.out_root={out_root}"] + list(overrides)
     p = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True)
@@ -113,38 +117,17 @@ def run(exe, toml, overrides, out_root, cwd, threads, log=None):
     return p.returncode, text
 
 
-def footer(text):
-    """The footer's exit and escaped energies [J], the field-solve row (regions, seconds)
-    and the walk's seconds, from a run's log."""
-    out = {}
-    m = re.search(r"Exit\s+power\s+(\S+)\s+([A-Za-z]+),\s+window energy\s+(\S+)\s+([A-Za-z]+),\s+pulse energy\s+(\S+)\s+([A-Za-z]+)", text)
-    if m:
-        out["exit_power"] = si(m.group(1), m.group(2))
-        out["window_energy"] = si(m.group(3), m.group(4))
-        out["pulse_energy"] = si(m.group(5), m.group(6))
-    m = re.search(r"Escaped\s+h1\s+(\S+)\s+J", text)
-    if m:
-        out["escaped_energy"] = float(m.group(1))
-    m = re.search(r"field solve\s+(\d+)\s+([\d.]+)\s+([\d.]+)%", text)
-    if m:
-        out["solve_regions"], out["solve_seconds"] = int(m.group(1)), float(m.group(2))
-    m = re.search(r"\n\s+walk\s+(\d+)\s+([\d.]+)\s+", text)
-    if m:
-        out["walk_seconds"] = float(m.group(2))
-    m = re.search(r"Work\s+(\d+) FEL steps", text)
-    if m:
-        out["n_step"] = int(m.group(1))
+def footer(stats_file):
+    """The exit and escaped energies [J], the field solve's regions and seconds, the walk's
+    seconds and the FEL steps of a run, from its stats file: run/, timing/ and setup/."""
+    from lucifer.stats import scalars
+    run_, tm, setup = (scalars(stats_file, g) for g in ("run", "timing", "setup"))
+    out = dict(exit_power=run_["exit_power"], window_energy=run_["exit_window_energy"],
+               pulse_energy=run_["exit_pulse_energy"], solve_regions=tm["field_solve_regions"],
+               solve_seconds=tm["field_solve"], walk_seconds=tm["walk"], n_step=setup["n_fel_step"])
+    if "escaped_energy_h1" in run_:
+        out["escaped_energy"] = run_["escaped_energy_h1"]
     return out
-
-
-SI = {"": 1, "m": 1e-3, "u": 1e-6, "n": 1e-9, "p": 1e-12, "f": 1e-15, "a": 1e-18,
-      "k": 1e3, "M": 1e6, "G": 1e9, "T": 1e12}
-
-
-def si(value, unit):
-    """A value printed with an SI prefix on its unit, as the footer prints it."""
-    prefix = unit[:-1] if len(unit) > 1 else ""
-    return float(value) * SI[prefix]
 
 
 def link_inputs(vdir, wdir):
@@ -483,7 +466,7 @@ def bank(args, wdir):
         if rc != 0:
             print(text[-2000:])
             raise SystemExit(f"bank: {root} failed")
-        row = dict(label=label, **footer(text))
+        row = dict(label=label, **footer(wdir / f"{root}.stats.h5"))
         st = read_stats(wdir / f"{root}.stats.h5")
         row.update(closure(st))
         pulse = wdir / f"{root}-pulse.wf.h5"
@@ -535,8 +518,8 @@ def cost(args, wdir):
             if rc != 0:
                 print(text[-2000:])
                 raise SystemExit(f"cost: {root} failed")
-            f = footer(text)
-            f.update(header_counts(text))
+            f = footer(wdir / f"{root}.stats.h5")
+            f.update(header_counts(wdir / f"{root}.stats.h5"))
             f.update(threads=threads, propagator=key)
             rows.append(f)
             print(f"  {threads:2d} threads {key:9s} field solve {f['solve_seconds']:.3f} s over {f['n_step']} steps = "
@@ -548,22 +531,13 @@ def cost(args, wdir):
     return dict(rows=rows, fit=fit)
 
 
-def header_counts(text):
-    """The counts of a run the cost model takes, from its header: the slices, the grid,
-    the field's planes, the pad's slots and the FEL steps."""
-    out = {}
-    m = re.search(r"^ Beam\s+(\d+) slices? x (\d+) particles", text, re.M) or \
-        re.search(r"^ Beam\s+(\d+) slices?, (\d+) particles", text, re.M)
-    if m:
-        out["n_slice"], out["n_particle_slice"] = int(m.group(1)), int(m.group(2))
-    m = re.search(r"grid (\d+) points", text)
-    if m:
-        out["ngrid"] = int(m.group(1))
-    m = re.search(r"^ Field\s+(\d+) planes of", text, re.M)
-    out["n_field"] = int(m.group(1)) if m else out.get("n_slice")
-    m = re.search(r"a pad of (\d+) free and (\d+) sponge", text)
-    out["n_pad"] = int(m.group(1)) + int(m.group(2)) if m else 0
-    return out
+def header_counts(stats_file):
+    """The counts of a run the cost model takes, from its stats file: the slices, the
+    macroparticles in a slice, the grid, the field's planes and the pad's slots."""
+    from lucifer.stats import scalars
+    setup, n_slice = scalars(stats_file, "setup"), scalars(stats_file, "run")["n_slice"]
+    return dict(n_slice=n_slice, n_particle_slice=setup["n_macroparticle"] // n_slice, ngrid=setup["grid_n_pts"],
+                n_field=setup["n_field_plane"], n_pad=setup["n_pad_free"] + setup["n_pad_sponge"])
 
 
 def cost_solve_rate():
@@ -900,10 +874,10 @@ def chirped(args, wdir):
             idx = np.arange(lam_i.size)[ok]
             slope = np.polyfit(idx, lam_i[ok] / np.nanmean(lam_i), 1)[0] * (lam_i.size - 1)
             fits.append(slope)
-        f = footer((wdir / f"{roots['spectral']}.log").read_text())
+        f = footer(wdir / f"{roots['spectral']}.stats.h5")
         rows.append(dict(chirp=float(chirp), slope_slices=float(fits[0]), slope_spectral=float(fits[1]),
                          expected_slope=-2 * chirp, pulse_energy_spectral=f.get("pulse_energy", float("nan")),
-                         pulse_energy_slices=footer((wdir / f"{roots['slices']}.log").read_text()).get("pulse_energy", float("nan")),
+                         pulse_energy_slices=footer(wdir / f"{roots['slices']}.stats.h5").get("pulse_energy", float("nan")),
                          **row_numbers(r)))
         cs, cp = field_curves(wdir / f"{roots['slices']}-final.wf.h5"), field_curves(wdir / f"{roots['spectral']}-final.wf.h5")
         curves[tag] = dict(chirp=float(chirp), power_slices=cs["power"], power_spectral=cp["power"],
@@ -985,7 +959,7 @@ def unavg(args, wdir):
         if rc != 0:
             print(text[-2000:])
             raise SystemExit(f"unavg: {root} failed")
-        f = footer(text)
+        f = footer(wdir / f"{root}.stats.h5")
         closure = unavg_closure(wdir / f"{root}.ledger.txt") if root.startswith("unavg") else None
         rows.append(dict(run=root, mode="unaveraged" if root.startswith("unavg") else "averaged",
                          propagator="slices" if root.endswith("slices") else "spectral",
@@ -1017,8 +991,7 @@ def sweep_measure(wdir, root, ref=None):
     carrier from the final field file, taken on the field's own planes, and the walk."""
     from lucifer.stats import read_stats
     from lucifer.field import read_field
-    text = (wdir / f"{root}.log").read_text()
-    f = footer(text)
+    f = footer(wdir / f"{root}.stats.h5")
     with read_stats(wdir / f"{root}.stats.h5") as st:
         power = np.asarray(st["field/total/power"])[-1]
     fld = read_field(wdir / f"{root}-final.wf.h5")
@@ -1070,12 +1043,14 @@ def sweep_derived(args, d, toml, extra):
     if rc != 0:
         print(text[-2000:])
         raise SystemExit("sweep: the load-only run failed")
-    m = re.search(r"Field sampling (\d+) wavelengths, (\d+) slices a plane, derived:.*?cooperation length\s+"
-                  r"([0-9.Ee+-]+)\s+m at rho =\s+([0-9.Ee+-]+)", text, re.S)
-    if not m:
-        raise SystemExit("sweep: the header states no derived field sampling")
-    return dict(derived_n_wavelength=int(m.group(1)), derived_slices_a_plane=int(m.group(2)),
-                l_coop=float(m.group(3)), rho=float(m.group(4)))
+    from lucifer.stats import scalars
+    setup = scalars(d / "sweep_derive.stats.h5", "setup")
+    import h5py
+    with h5py.File(d / "sweep_derive.stats.h5", "r") as f:
+        if f["params/field/n_wavelength"].attrs["origin"].decode() != "derived":
+            raise SystemExit("sweep: the run derived no field sampling")
+    return dict(derived_n_wavelength=setup["field_n_wavelength"], derived_slices_a_plane=setup["slices_per_plane"],
+                l_coop=setup["cooperation_length"], rho=setup["rho_1d"])
 
 def to_toml_text(flat):
     from lucifer.flat import to_toml

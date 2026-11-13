@@ -1,4 +1,4 @@
-"""The dumps of a run without the executable: the keys a footer names, a frame series
+"""The dumps of a run without the executable: the keys the stats file's list names, a frame series
 expanded, the dumps read on first access and kept, one slice read from its patch, and an
 archive carrying its dumps. Every file is written here.
 
@@ -14,23 +14,10 @@ from lucifer import Lucifer
 from lucifer.dumps import Dumps, dump_files, expand
 from lucifer.runner import Result
 
-FOOTER = """ Done        3.990 m, 1 element ends
- Wrote       s7-initial.beam.h5                              349.378 kB
-             s7-initial.wf.h5                                529.368 kB
-             s7-at1-UND.beam.h5                              349.378 kB
-             s7-at1-UND.wf.h5                                529.362 kB
-             s7-final.beam.h5                                349.378 kB
-             s7-final.wf.h5                                  529.362 kB
-             s7-final-h3.wf.h5                               529.362 kB
-             s7-escaped.wf.h5                                17.579 MB
-             s7-pulse.wf.h5                                  18.027 MB
-             s7-{000001..000003}.beam.h5                     9.463 MB
-             s7-{000001..000003}.wf.h5                       16.510 MB
-             s7-{000001..000003}-h3.wf.h5                    16.510 MB
-             s7.stats.h5                                     321.701 kB
-             s7.diag.txt                                     1.000 MB
-================================================================================
-"""
+FILES = ["s7-initial.beam.h5", "s7-initial.wf.h5", "s7-at1-UND.beam.h5", "s7-at1-UND.wf.h5",
+         "s7-final.beam.h5", "s7-final.wf.h5", "s7-final-h3.wf.h5", "s7-escaped.wf.h5", "s7-pulse.wf.h5",
+         "s7-{000001..000003}.beam.h5", "s7-{000001..000003}.wf.h5", "s7-{000001..000003}-h3.wf.h5",
+         "s7.stats.h5", "s7.diag.txt"]
 COUNTS = [3, 5, 2]
 
 
@@ -64,8 +51,17 @@ def test_a_frame_series_expands_to_its_files():
     assert expand("s7-final.beam.h5") == ["s7-final.beam.h5"]
 
 
-def test_the_footer_names_the_keys(tmp_path):
-    R = Result(0, FOOTER, tmp_path / "s7.toml", tmp_path, "s7")
+def test_the_stats_file_names_the_keys(tmp_path):
+    # The list is the attribute files of run/, as the program writes it, and every file
+    # it names is there.
+    from lucifer.dumps import expand
+    with h5py.File(tmp_path / "s7.stats.h5", "w") as f:
+        f.create_group("run").attrs["files"] = np.array(FILES, dtype="S")
+    for row in FILES:
+        for name in expand(row):
+            if name != "s7.stats.h5":
+                (tmp_path / name).write_bytes(b"0")
+    R = Result(0, "", tmp_path / "s7.toml", tmp_path, "s7")
     assert list(R.particle_files) == ["initial", "at1-UND", "final", 1, 2, 3]
     assert list(R.field_files) == ["initial", "at1-UND", "final", "final-h3", "escaped", "pulse",
                                    1, 2, 3, "1-h3", "2-h3", "3-h3"]
@@ -98,8 +94,7 @@ def test_the_loaders_read_the_files(tmp_path):
     pytest.importorskip("beamphysics")
     beam_file(tmp_path / "s7-final.beam.h5")
     field_file(tmp_path / "s7-final.wf.h5")
-    R = Result(0, " Wrote       s7-final.beam.h5    1 B\n             s7-final.wf.h5    1 B\n",
-               tmp_path / "s7.toml", tmp_path, "s7")
+    R = Result(0, "", tmp_path / "s7.toml", tmp_path, "s7")
     assert len(R.particles["final"]) == sum(COUNTS)
     assert R.fields["final"].Ex.shape == (4, 4, 2)
     assert R.load_particles() == ["final"] and R.load_fields() == ["final"]
@@ -108,7 +103,7 @@ def test_the_loaders_read_the_files(tmp_path):
 def test_one_slice_is_read_from_its_patch(tmp_path):
     pytest.importorskip("beamphysics")
     beam_file(tmp_path / "s7-final.beam.h5")
-    R = Result(0, " Wrote       s7-final.beam.h5    1 B\n", tmp_path / "s7.toml", tmp_path, "s7")
+    R = Result(0, "", tmp_path / "s7.toml", tmp_path, "s7")
     whole = R.particles["final"]
     one = R.load_particles_by_key("final", slice=1)
     assert len(one) == COUNTS[1]

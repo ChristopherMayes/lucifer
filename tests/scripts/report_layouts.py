@@ -285,9 +285,9 @@ def run_fixtures(exe, work, log):
         log.append(f"==== fixture {root}: exit {r.returncode}\n{r.stdout}\n{r.stderr}\n")
         if r.returncode != 0:
             raise RuntimeError(f"fixture {root} exited {r.returncode}")
-        m = re.search(r"^.*Bmad version.*$", r.stdout, re.M)
-        if m and not version:
-            version = m.group(0).strip()
+        if not version:
+            v = subprocess.run([str(exe), "--version"], capture_output=True, text=True, errors="replace")
+            version = " ".join(v.stdout.split("\n")).strip()
         for name, _, _ in fx["files"]:
             if not (work / name).is_file():
                 raise RuntimeError(f"fixture {root} did not write {name}")

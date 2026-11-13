@@ -13,12 +13,13 @@ The model is the module's:
   - A serial fraction, carrying the rates to any thread count through Amdahl's law.
   - The share of the walk the push and the solve own.
 
-Every run's configuration is read from its own header and its phase seconds from its own
-Timing block, so the input is the logs the runs already wrote. Rates come out per thread.
+Every run's configuration and its phase seconds are read from its own stats file, the
+counts in setup/ and the clock in timing/, so the input is the files the runs already
+wrote. Rates come out per thread.
 
 Usage:
 
-  fit_cost_rates.py <log> [<log> ...]
+  fit_cost_rates.py <stats file> [<stats file> ...]
 
 The set needs at least two particle counts at one slice count for the solve to separate,
 and a thread sweep at one configuration for the serial fraction. Runs whose input file turned
@@ -28,47 +29,26 @@ default.
 
 import argparse
 import math
-import re
 import sys
+
+import h5py
 
 
 def read_run(path):
-    """One run's configuration and phase seconds, from the log it wrote."""
-    txt = open(path, errors="ignore").read()
-    r = {"log": path}
-
-    m = re.search(r"^ Beam\s+(\d+) slices? x (\d+) particles", txt, re.M)
-    if not m:
-        m = re.search(r"^ Beam\s+(\d+) slices?, (\d+) particles", txt, re.M)
-    if not m:
+    """One run's configuration and phase seconds, from the stats file it wrote: the counts
+    in setup/, the clock in timing/ and the filter's switch in params/run."""
+    try:
+        with h5py.File(path, "r") as f:
+            setup = {k: v[()] for k, v in f["setup"].items()}
+            timing = {k: v[()] for k, v in f["timing"].items()}
+            nslice = int(f["run/n_slice"][()])
+            filtered = bool(f["params/run/source_filter"][()])
+    except (OSError, KeyError):
         return None
-    r["nslice"], r["npart"] = int(m.group(1)), int(m.group(2))
-
-    m = re.search(r"grid (\d+) points", txt)
-    if not m:
-        return None
-    r["ngrid"] = int(m.group(1))
-
-    m = re.search(r"^ Work\s+(\d+) FEL steps", txt, re.M)
-    if not m:
-        return None
-    r["nstep"] = int(m.group(1))
-
-    m = re.search(r"threads (\d+)", txt)
-    r["threads"] = int(m.group(1)) if m else 1
-
-    # An input file that turned the filter off is a different configuration: the solve then
-    # runs one transform fewer per field per step. The run says so in its own warning.
-    r["filtered"] = "run.source_filter = F" not in txt
-
-    for key, pat in (("push", r"^\s+particle push\s+\d+\s+([\d.]+)"),
-                     ("solve", r"^\s+field solve\s+\d+\s+([\d.]+)"),
-                     ("walk", r"^\s+walk\s+\d+\s+([\d.]+)")):
-        m = re.search(pat, txt, re.M)
-        if not m:
-            return None
-        r[key] = float(m.group(1))
-
+    r = {"log": path, "nslice": nslice, "ngrid": int(setup["grid_n_pts"]), "nstep": int(setup["n_fel_step"]),
+         "threads": int(timing["n_thread"]), "filtered": filtered}
+    r["npart"] = int(setup["n_macroparticle"]) // nslice
+    r["push"], r["solve"], r["walk"] = float(timing["particle_push"]), float(timing["field_solve"]), float(timing["walk"])
     r["pstep"] = r["nslice"] * r["npart"] * r["nstep"]
     r["gwork"] = r["nslice"] * r["ngrid"] ** 2 * math.log2(r["ngrid"]) * r["nstep"]
     return r
@@ -80,14 +60,14 @@ def speedup(f, n):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("logs", nargs="+")
+    ap.add_argument("logs", nargs="+", help="The stats files of the runs")
     a = ap.parse_args()
 
     runs = []
     for p in a.logs:
         r = read_run(p)
         if r is None:
-            print(f"  skipped, no header or no Timing block: {p}")
+            print(f"  skipped, no stats file with setup/ and timing/: {p}")
             continue
         runs.append(r)
     if not runs:

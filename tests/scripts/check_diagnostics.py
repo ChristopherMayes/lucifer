@@ -215,7 +215,8 @@ def particle_frames(wd, root):
 
 
 def h5_identical(fa, fb):
-    """Whether two HDF5 files hold the same data, with meta/ and params/ excluded.
+    """Whether two HDF5 files hold the same data, with meta/, params/, setup/ and
+    timing/ excluded. setup/ follows from params/ and timing/ is the wall clock.
 
     meta/ holds provenance as datasets (fel-physics.md, sec-meta), since HDF5 caps an
     attribute at 64 kB. input_echo carries out_root and timestamp carries the clock, so
@@ -228,7 +229,7 @@ def h5_identical(fa, fb):
     """
     with h5py.File(fa) as a, h5py.File(fb) as b:
         names_a, names_b = [], []
-        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith(("meta/", "params/"))
+        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith(("meta/", "params/", "setup/", "timing/"))
         a.visititems(lambda n, o: names_a.append(n) if keep(n, o) else None)
         b.visititems(lambda n, o: names_b.append(n) if keep(n, o) else None)
         if sorted(names_a) != sorted(names_b):
@@ -245,26 +246,26 @@ def check(name, value, tol, note=""):
         FAILED = True
 
 
-def headroom_checks(tag, out, n_wavelength, chicane):
-    """The header's two printed sums, the schedule's slippage over the line and the
-    headroom a derived window holds, come from one routine and must agree exactly, and
+def setup_values(stats_file, group="setup"):
+    """The scalars of a stats file's setup/ group, or of another, name to value."""
+    with h5py.File(stats_file, "r") as f:
+        return {k: (v[()].decode().strip() if v.dtype.kind == "S" else v[()].item()) for k, v in f[group].items()}
+
+
+def headroom_checks(tag, stats_file, n_wavelength, chicane):
+    """The two sums setup records, the schedule's slippage over the line and the slippage
+    a derived window holds headroom for, come from one routine and must agree exactly, and
     the headroom's slices are nint of the wavelengths over n_wavelength. ``chicane`` is
     the rotations the line's chicanes must contribute."""
-    m_s = re.search(r"^ Slippage\s+(\S+) wavelengths over the line: (\S+) in undulator steps, "
-                    r"(\d+) in interludes and at the end, (\d+) in chicanes", out, re.M)
-    m_w = re.search(r"^ Window\s+derived: (\d+) slices for the bunch and (\d+) of headroom for "
-                    r"(\S+) wavelengths of slippage", out, re.M)
-    terms = (f"[{m_s.group(1)} wavelengths: {m_s.group(2)} in undulator steps, {m_s.group(3)} in "
-             f"interludes and at the end, {m_s.group(4)} in chicanes]") if m_s else "[no Slippage line]"
-    same = m_s is not None and m_w is not None and m_s.group(1) == m_w.group(3)
-    check(f"window: {tag}'s headroom is the schedule's slippage, the two printed sums equal (0 = yes)",
-          0.0 if same else 1.0, 0.5, note=terms)
-    if m_w:
-        check(f"window: {tag}'s headroom slices are nint(slippage / n_wavelength) (count)",
-              abs(int(m_w.group(2)) - round(float(m_w.group(3)) / n_wavelength)), 0.5,
-              note=f"[{m_w.group(2)} slices ahead of {m_w.group(1)}]")
-    if m_s:
-        check(f"window: {tag}'s chicanes contribute {chicane} rotations (count)", abs(int(m_s.group(4)) - chicane), 0.5)
+    s = setup_values(stats_file)
+    terms = (f"[{s['slippage_wavelengths']:.6f} wavelengths: {s['slippage_undulator']:.6f} in undulator steps, "
+             f"{s['slippage_interlude']} in interludes and at the end, {s['slippage_chicane']} in chicanes]")
+    check(f"window: {tag}'s headroom is the schedule's slippage, the two recorded sums equal (0 = yes)",
+          0.0 if s["slippage_wavelengths"] == s["headroom_wavelengths"] else 1.0, 0.5, note=terms)
+    check(f"window: {tag}'s headroom slices are nint(slippage / n_wavelength) (count)",
+          abs(s["n_slice_headroom"] - round(s["headroom_wavelengths"] / n_wavelength)), 0.5,
+          note=f"[{s['n_slice_headroom']} slices of headroom]")
+    check(f"window: {tag}'s chicanes contribute {chicane} rotations (count)", abs(s["slippage_chicane"] - chicane), 0.5)
 
 
 def run(exe, wd, name, text, threads="8"):
@@ -407,18 +408,18 @@ def interludes(exe, wd):
     check("interlude: frames strictly inside the pipe (9 expected)", abs(nin - 9), 0.5,
           note=f"[{nin}]")
 
-    # The pre-run header states the pieces before it tracks, and says nothing when the
-    # element is tracked whole.
-    r = run(exe, wd, "int_hdr", INT_NML.format(lat="intlat.bmad", root="int_hdr",
+    # Setup records the pieces before the run tracks, and none when the element is
+    # tracked whole.
+    run(exe, wd, "int_hdr", INT_NML.format(lat="intlat.bmad", root="int_hdr",
         extra="  run.interlude_ds_step = 0.04\n  run.load_only = T\n"))
-    m = re.search(r"Interlude   steps of .*: (\d+) pieces, (\d+) element", r.stdout)
-    check("interlude: the header states the pieces before it tracks",
-          0.0 if (m and int(m.group(1)) == 15 and int(m.group(2)) == 2) else 1.0, 0.5,
-          note=f"[{m.group(0) if m else 'absent'}]")
-    r = run(exe, wd, "int_hdr0", INT_NML.format(lat="intlat.bmad", root="int_hdr0",
+    s = setup_values(wd / "int_hdr.stats.h5")
+    check("interlude: setup records the pieces before the run tracks",
+          0.0 if (s["n_interlude_piece"] == 15 and s["n_interlude_element"] == 2) else 1.0, 0.5,
+          note=f"[{s['n_interlude_piece']} pieces, {s['n_interlude_element']} elements]")
+    run(exe, wd, "int_hdr0", INT_NML.format(lat="intlat.bmad", root="int_hdr0",
         extra="  run.load_only = T\n"))
-    check("interlude: and says nothing where nothing is cut",
-          0.0 if "Interlude" not in r.stdout else 1.0, 0.5)
+    check("interlude: and none where nothing is cut",
+          float(setup_values(wd / "int_hdr0.stats.h5")["n_interlude_piece"]), 0.5)
 
     # The refusals. Bmad applies an element's short-range wake once per passage, as one
     # kick for the element's length, so a cut element would take one kick per piece. The
@@ -1074,22 +1075,14 @@ def main():
     if falls == 0:
         check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
 
-    # The footer's Exit line states the window's energy and the pulse's, each as the last
-    # record holds it. The line prints an SI mantissa to three decimals, so the
-    # level is the print's.
-    m = re.search(r"^ Exit\s+power .*, window energy\s+(\S+)\s*(\S?)J, pulse energy\s+(\S+)\s*(\S?)J,",
-                  r_dg.stdout, re.M)
-    if m:
-        si = {"": 1.0, "y": 1e-24, "z": 1e-21, "a": 1e-18, "f": 1e-15, "p": 1e-12, "n": 1e-9,
-              "u": 1e-6, "m": 1e-3, "k": 1e3, "M": 1e6, "G": 1e9, "T": 1e12, "P": 1e15}
-        w_line = float(m.group(1)) * si[m.group(2)]
-        p_line = float(m.group(3)) * si[m.group(4)]
-        check("pulse: the Exit line's window energy vs the last record's, rel",
-              abs(w_line / e_win[-1] - 1), 1e-3, note=f"[{w_line:.4e} J]")
-        check("pulse: the Exit line's pulse energy vs the last record's pulse_energy, rel",
-              abs(p_line / e_pul[-1] - 1), 1e-3, note=f"[{p_line:.4e} J]")
-    else:
-        check("pulse: the Exit line states the window's energy and the pulse's (0 = yes)", 1.0, 0.5)
+    # run/ holds the window's energy and the pulse's at the exit, each as the last record
+    # holds it.
+    with h5py.File(wd / "dg.stats.h5", "r") as f:
+        w_run, p_run = float(f["run/exit_window_energy"][()]), float(f["run/exit_pulse_energy"][()])
+    check("pulse: run/exit_window_energy vs the last record's, rel", abs(w_run / e_win[-1] - 1), 1e-12,
+          note=f"[{w_run:.4e} J]")
+    check("pulse: run/exit_pulse_energy vs the last record's pulse_energy, rel", abs(p_run / e_pul[-1] - 1), 1e-12,
+          note=f"[{p_run:.4e} J]")
 
     # 2c. The pulse alone. Without run.write_escaped the banked planes stream into the
     # pulse alone, so the directory holds the one file and the footer lists it alone. The
@@ -1103,9 +1096,10 @@ def main():
     left = sorted(f.name for f in wd.glob("dgp-*.wf.h5") if "-escaped" in f.name or "-pulse" in f.name)
     check("pulse alone: a default run keeps the pulse file and no escaped file (0 = yes)",
           0.0 if left == ["dgp-pulse.wf.h5"] else 1.0, 0.5, note=f"[{left}]")
-    footer = r_dgp.stdout[r_dgp.stdout.rfind(" Wrote"):]
-    check("pulse alone: the footer lists the pulse and no escaped file (0 = yes)",
-          0.0 if "dgp-pulse.wf.h5" in footer and "escaped" not in footer else 1.0, 0.5)
+    with h5py.File(wd / "dgp.stats.h5", "r") as f:
+        listed = [x.decode() for x in f["run"].attrs["files"]]
+    check("pulse alone: the stats file lists the pulse and no escaped file (0 = yes)",
+          0.0 if "dgp-pulse.wf.h5" in listed and not any("escaped" in x for x in listed) else 1.0, 0.5)
     # An empty plane has no moments, and its row is NaN in every file. NaN equals NaN here.
     worst_rows = 0.0
     with h5py.File(wd / "dgp-pulse.wf.h5") as hp, h5py.File(wd / "dg-pulse.wf.h5") as hq, \
@@ -1130,8 +1124,8 @@ def main():
     # them and into nothing else. dg keeps both, so its statement is the two files. dgp
     # keeps the pulse, and its peak is the pulse alone. The estimate counts planes and
     # rows, and HDF5's headers are the rest.
-    n_dg, st_dg = bank_bytes.stated(r_dg.stdout)
-    n_dgp, st_dgp = bank_bytes.stated(r_dgp.stdout)
+    n_dg, st_dg = bank_bytes.stated(wd / "dg.stats.h5")
+    n_dgp, st_dgp = bank_bytes.stated(wd / "dgp.stats.h5")
     on_dg = sum(bank_bytes.kept(wd, "dg", 1))
     on_dgp = bank_bytes.kept(wd, "dgp", 1)[0]
     if 1 in st_dg and 1 in st_dgp:
@@ -1167,8 +1161,8 @@ def main():
         check(f"window: {tag}'s derived window loses no light, escaped_energy max [J]", esc_w, 0.0,
               note=f"[{n_slice_w} slices; field files {files_w or 'none'}]")
         check(f"window: {tag} writes no escaped or pulse file (count)", float(len(files_w)), 0.0)
-        check(f"window: {tag}'s header states no bank (slices)", float(bank_bytes.stated(r.stdout)[0]), 0.0)
-        headroom_checks(tag, r.stdout, 1, chicane=3 if tag == "dgc" else 0)
+        check(f"window: {tag}'s header states no bank (slices)", float(bank_bytes.stated(wd / f"{tag}.stats.h5")[0]), 0.0)
+        headroom_checks(tag, wd / f"{tag}.stats.h5", 1, chicane=3 if tag == "dgc" else 0)
 
     # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane. The
     # pulse file is read with h5py alone, independent of the package's reader.
@@ -1309,51 +1303,35 @@ def main():
     # arithmetic and is checked as arithmetic. The estimate is one machine's, and is
     # checked only for being present and positive and for naming the machine.
 
-    r = run(exe, wd, "pre", PRE_NML.format(root="pre", extra=""), threads="4")
-    out = r.stdout
-    work = next((l for l in out.splitlines() if l.startswith(" Work ")), "")
-    m = re.search(r"(\d+) FEL steps, (\d+) macroparticles, ([\d.E+]+) particle-steps, "
-                  r"([\d.E+]+) grid points per step", work)
-    check("pre-run: the header states the work", 0.0 if m else 1.0, 0.5,
-          note=f"[{work.strip()}]")
-    if m:
-        nstep, npart, pstep = int(m.group(1)), int(m.group(2)), float(m.group(3))
-        # The line carries three significant figures, so the identity is checked to
-        # what it prints and not to what it computed.
-        check("pre-run: particle-steps is the product of the two counts",
-              abs(pstep - nstep * npart) / max(pstep, 1.0), 1e-2)
+    run(exe, wd, "pre", PRE_NML.format(root="pre", extra=""), threads="4")
+    s = setup_values(wd / "pre.stats.h5")
+    nstep, npart, pstep = s["n_fel_step"], s["n_macroparticle"], s["particle_steps"]
+    check("pre-run: particle-steps is the product of the two counts",
+          abs(pstep - nstep * npart) / max(pstep, 1.0), 1e-12, note=f"[{nstep} steps, {npart} macroparticles]")
+    tm = setup_values(wd / "pre.stats.h5", "timing")
+    check("pre-run: the walk is estimated before tracking and the machine named",
+          0.0 if (tm["estimate_walk"] > 0 and "M3 Max" in tm["estimate_machine"]) else 1.0, 0.5,
+          note=f"[{tm['estimate_walk']:.3g} s, {tm['estimate_machine']}]")
+    check("pre-run: 64 beamlets in a slice, under the 128 the printout warns below",
+          abs(s["beamlets_per_slice"] - 64), 0.5)
+    with h5py.File(wd / "pre.stats.h5", "r") as f:
+        thin, walk = int(f["run/n_thin_slice"][()]), float(f["timing/walk"][()])
+    check("pre-run: the run counts its thin slices", 0.0 if thin > 0 else 1.0, 0.5, note=f"[{thin}]")
+    check("pre-run: the run records the walk's clock beside the estimate", 0.0 if walk > 0 else 1.0, 0.5,
+          note=f"[{walk:.3g} s]")
 
-    est = next((l for l in out.splitlines() if l.startswith(" Estimate ")), "")
-    m = re.search(r"Estimate\s+([\d.]+) s of walk", est)
-    check("pre-run: the header estimates the walk and names the machine",
-          0.0 if (m and float(m.group(1)) > 0 and "M3 Max" in est) else 1.0, 0.5,
-          note=f"[{est.strip()}]")
+    # load_only records the same setup and stops: the pre-run is the setup without the
+    # tracking, so the two setup/ groups have to agree value for value, and the estimate
+    # with them.
 
-    check("pre-run: the load standing reads under the measured floor",
-          0.0 if "Under the measured load" in out else 1.0, 0.5)
-    check("pre-run: the beamlet size is stated by the harmonics it carries",
-          0.0 if "Shot noise on harmonics 1 to 3" in out else 1.0, 0.5)
-
-    thin = [l for l in out.splitlines() if l.strip().startswith("slice ")]
-    check("pre-run: the footer lists the thin slices", 0.0 if thin else 1.0, 0.5,
-          note=f"[{len(thin)} listed]")
-    check("pre-run: and names the remedy",
-          0.0 if 'load_mode = "sample"' in out else 1.0, 0.5)
-    cost = next((l for l in out.splitlines() if l.startswith(" Cost ")), "")
-    check("pre-run: the footer prints the clock beside the estimate",
-          0.0 if ("measured" in cost and "estimated" in cost) else 1.0, 0.5,
-          note=f"[{cost.strip()}]")
-
-    # load_only prints the same header and stops: the pre-run is the header without the
-    # tracking, so the two headers have to agree line for line.
-
-    r2 = run(exe, wd, "pre2", PRE_NML.format(root="pre2", extra="  load_only = T\n"),
-             threads="4")
-    head = lambda s, root: [l.replace(root, "R") for l in s.splitlines()
-                            if l.startswith((" Work ", " Estimate ", " Load "))]
-    check("pre-run: load_only gives the same header as the run does",
-          0.0 if head(out, "pre") == head(r2.stdout, "pre2") else 1.0, 0.5)
-    check("pre-run: load_only tracks nothing", 0.0 if " Cost " not in r2.stdout else 1.0, 0.5)
+    run(exe, wd, "pre2", PRE_NML.format(root="pre2", extra="  load_only = T\n"), threads="4")
+    s2 = setup_values(wd / "pre2.stats.h5")
+    tm2 = setup_values(wd / "pre2.stats.h5", "timing")
+    same = s == s2 and all(tm2[k] == tm[k] for k in tm2)
+    check("pre-run: load_only records the same setup and estimate as the run does", 0.0 if same else 1.0, 0.5,
+          note=f"[{len(s2)} values of setup/, {len(tm2)} of timing/]")
+    with h5py.File(wd / "pre2.stats.h5", "r") as f:
+        check("pre-run: load_only tracks nothing (records)", float(f["run/n_record"][()]), 0.5)
 
     # The refusal: a harmonic above (beamlet_size - 1)/2 has no shot noise at its own
     # frequency, so a dark-start run there would report a number with no startup behind
@@ -1384,11 +1362,10 @@ def main():
           note=f"[{len(frames)} frames, {nrec} records]")
     check("frames: one field frame per stats record", abs(len(wframes) - nrec), 0.5)
 
-    # The cost line counts them before the run, from the schedule alone.
-    m = re.search(r"^ Frames\s+(\d+) at the comb", r.stdout, re.M)
-    check("frames: the header's count matches the files written",
-          abs(int(m.group(1)) - len(frames)) if m else 1.0, 0.5,
-          note=f"[header {m.group(1) if m else 'absent'}]")
+    # Setup counts them before the run, from the schedule alone.
+    n_stated = setup_values(wd / "fr.stats.h5").get("n_frame", -1)
+    check("frames: setup's count matches the files written", abs(n_stated - len(frames)), 0.5,
+          note=f"[setup {n_stated}]")
 
     # A frame at an element end and that element's own dump are one writer at one state.
     end_dump = wd / "fr-at1-UND.beam.h5"

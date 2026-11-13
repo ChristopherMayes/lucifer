@@ -112,7 +112,7 @@ where the two builds agree to every printed digit.
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 2 | 4.8221e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet, harmonic 3 | 4.8408e-02 | same | 4.4888e-02 to 5.2768e-02 |
 | shot noise, nonuniform weights (0.25x/1.75x), 0.25 electrons a beamlet: the loader warns of beamlets under one electron |  | same | holds |
-| shot noise, the level the loader states for the first-order kick against the closed form | 4.2903e-05 | same | <= 1.0000e-04 |
+| shot noise, the level the loader states for the first-order kick against the closed form | 9.2149e-15 | 8.9928e-15 | <= 1.0000e-04 |
 | shot noise, weight load, uniform weights, 146.4 electrons a beamlet | 1.0015e+00 | same | 9.6950e-01 to 1.0305e+00 |
 | shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 1 | 1.0205e+00 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, uniform weights, 146.4 electrons a beamlet, harmonic 2 | 9.8898e-01 | same | 9.1931e-01 to 1.0807e+00 |
@@ -159,7 +159,7 @@ where the two builds agree to every printed digit.
 | shot noise, weight load, uniform weights, 0.25 electrons a beamlet, harmonic 7 | 1.0017e+00 | same | 9.1931e-01 to 1.0807e+00 |
 | shot noise, weight load, 0.25 electrons a beamlet: the variance of the slices' counts over the binomial variance | 1.0374e+00 | same | 8.8589e-01 to 1.1141e+00 |
 | shot noise, weight load, the loaded charge against the input file's, worst over the scans | 2.2809e-13 | same | <= 1.0000e-12 |
-| shot noise, weight load, the level the loader states against the closed form | 4.1691e-08 | same | <= 1.0000e-04 |
+| shot noise, weight load, the level the loader states against the closed form | 2.2737e-13 | same | <= 1.0000e-04 |
 | shot noise, weight load, every weight is a whole number of counted electrons, in whole beamlets |  | same | holds |
 | shot noise, weight load, Gaussian bunch, the slices with particles | 9.9492e-01 | same | 9.6862e-01 to 1.0314e+00 |
 | shot noise, weight load, Gaussian bunch: a slice that drew no electron has no particles |  | same | holds |
@@ -189,23 +189,23 @@ where the two builds agree to every printed digit.
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, one beamlet, under the limit | 6.1763e-01 | same | 5.6027e-01 to 7.1029e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, fewer beamlets | 9.0567e-01 | same | 8.4096e-01 to 9.5976e-01 |
 | shot noise, Gaussian bunch, beamlets of 18 electrons or more, the input file's beamlets | 9.2958e-01 | same | 8.7360e-01 to 1.0174e+00 |
-| beamlet size, harmonics 1, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 4, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 4, recorded in the stats file and loaded |  | same | holds |
 | beamlet size, harmonics 1, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 9.9288e-01 | same | 8.1958e-01 to 1.1804e+00 |
-| beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 8, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 8, recorded in the stats file and loaded |  | same | holds |
 | beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 9.7400e-01 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonics 1, 3, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 3 over the shot noise | 1.0025e+00 | same | 8.1958e-01 to 1.1804e+00 |
-| beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: derived as 12, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: derived as 12, recorded in the stats file and loaded |  | same | holds |
 | beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 1.0021e+00 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 3 over the shot noise | 9.8938e-01 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonics 1, 3, 5, 1536 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 5 over the shot noise | 1.0448e+00 | same | 8.1958e-01 to 1.1804e+00 |
-| beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 16, stated in the header and loaded |  | same | holds |
+| beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: derived as 16, recorded in the stats file and loaded |  | same | holds |
 | beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 1 over the shot noise | 9.5694e-01 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 3 over the shot noise | 1.0204e+00 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 5 over the shot noise | 9.6103e-01 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonic 3 carried: 6 refused with the size accepted, 7 loaded |  | same | holds |
 | beamlet size, harmonic 5 carried: 10 refused with the size accepted, 11 loaded |  | same | holds |
-| macroparticle count, harmonics 1, beam.n_particle unset: derived as 2048, stated in the header and loaded |  | same | holds |
-| macroparticle count, harmonics 1, 3, beam.n_particle unset: derived as 4096, stated in the header and loaded |  | same | holds |
+| macroparticle count, harmonics 1, beam.n_particle unset: derived as 2048, recorded in the stats file and loaded |  | same | holds |
+| macroparticle count, harmonics 1, 3, beam.n_particle unset: derived as 4096, recorded in the stats file and loaded |  | same | holds |
 | macroparticle count, beam.n_particle = 2048 in beamlets of 4: loaded as set |  | same | holds |
 | macroparticle count, beam.n_particle = 512 in beamlets of 4: loaded as set |  | same | holds |
 | shot noise, no slice with fewer beamlets: the same bits as with beam.beamlet_min_electrons = 0 |  | same | holds |
@@ -352,15 +352,15 @@ where the two builds agree to every printed digit.
 | refused, a negative angle |  | same | holds |
 | tolerance left unset | 0.0000e+00 | same | <= 5.5862e-10 |
 | tolerance stated as 0.75 | 0.0000e+00 | same | <= 5.5862e-10 |
-| tolerance stated as 0.2 | 5.9023e-13 | same | <= 6.2544e-10 |
-| tolerance stated as 0.01 | 1.6259e-12 | same | <= 7.5955e-10 |
+| tolerance stated as 0.2 | 0.0000e+00 | same | <= 6.2544e-10 |
+| tolerance stated as 0.01 | 0.0000e+00 | same | <= 7.5955e-10 |
 | the reported split across that scan | 0.0000e+00 | same | <= 2.7931e-15 |
 | refused, a tolerance of zero |  | same | holds |
 | refused, a tolerance of one |  | same | holds |
 | refused, a tolerance above one |  | same | holds |
 | refused, a negative tolerance |  | same | holds |
 | refused, a width too large for the tolerance |  | same | holds |
-| a tolerance of 1e-17 at a width of 0.01 | 1.7493e-12 | same | <= 9.2852e-10 |
+| a tolerance of 1e-17 at a width of 0.01 | 8.4703e-22 | same | <= 9.2852e-10 |
 | the tolerance is bypassed by a stated angle |  | same | holds |
 | the tolerance is bypassed by stated cuts |  | same | holds |
 | seed containment at the default edge | 1.0000e+00 | same | >= 9.9000e-01 |
@@ -380,7 +380,7 @@ where the two builds agree to every printed digit.
 | the derived coarse field against the slice run, SASE tier | 8.1041e-02 | same | >= 1.5000e-02 |
 | the field at two slices a plane against one a slice, SASE tier | 4.2271e-02 | same | <= 1.5000e-01 |
 | two slices a plane over four, the ratio of the levels, SASE tier | 5.0544e-01 | same | <= 1 |
-| a stated sampling equal to a slice above the cliff runs, the slice over the cooperation length | 3.1000e-01 | same | >= 2.5000e-01 |
+| a stated sampling equal to a slice above the cliff runs, the slice over the cooperation length | 3.0940e-01 | same | >= 2.5000e-01 |
 | the key unset derives the same slice above the cliff | 192 | same | = 192 |
 | a stated sampling coarser than a slice above the cliff is refused |  | same | holds |
 | one slice by the ramp against one by the rotation | 1.0729e-09 | same | <= 1.0000e-08 |
@@ -475,7 +475,7 @@ where the two builds agree to every printed digit.
 | refused: does not cover the escaped-field bank |  | same | holds |
 | refused: write_escaped, which asks for the bank |  | same | holds |
 | refused: unsupported grid, nearest size named |  | same | holds |
-| bank at its default: the device runs without it, says so, writes no field file |  | same | holds |
+| bank at its default: the device runs without it, records the key as false, writes no field file |  | same | holds |
 | harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
 | harmonic lockstep worst_px | 4.1970e-08 | same | <= 1.0000e-06 |
 | harmonic lockstep worst_y | 1.8743e-07 | same | <= 1.0000e-06 |
@@ -509,8 +509,8 @@ where the two builds agree to every printed digit.
 | harmonic lockstep TD worst_source_h3 | 2.6483e-06 | same | <= 8.0000e-06 |
 | harmonic lockstep TD worst_field_h3 | 2.6483e-06 | same | <= 8.0000e-06 |
 | harmonic TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| harmonic TD footer states the escaped energy (CPU) |  | same | holds |
-| harmonic TD footer states the escaped energy (device) |  | same | holds |
+| harmonic TD run records the escaped energy (CPU) |  | same | holds |
+| harmonic TD run records the escaped energy (device) |  | same | holds |
 | harmonic production TD escaped energy h1 vs CPU | 6.4135e-07 | same | <= 1.6000e-03 |
 | harmonic production TD escaped energy h3 vs CPU | 1.1700e-05 | same | <= 1.8000e-03 |
 | harmonic production TD window P1 vs CPU | 3.1338e-06 | same | <= 1.6000e-03 |
@@ -566,8 +566,8 @@ where the two builds agree to every printed digit.
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
 | migration no-op on the device: migrate T vs F final beam z |  | same | holds |
-| two runs bit for bit, the filter on: 130 arrays compared | 0 | same | <= 0 |
-| two runs bit for bit, the filter off: 130 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter on: 181 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter off: 177 arrays compared | 0 | same | <= 0 |
 | deposit accuracy, cancelling phases | 1.4673e-05 | same | <= 1.5372e-05 |
 | deposit quantum below the FP32 spacing of its bound, cancelling phases | 37 | same | >= 24 |
 | deposit accuracy, unequal weights | 1.4681e-05 | same | <= 1.5383e-05 |
@@ -621,11 +621,11 @@ where the two builds agree to every printed digit.
 | unaveraged production TD window power vs CPU | 8.3461e-06 | 8.3059e-06 | <= 5.0000e-03 |
 | two unaveraged device runs, diag and ledger identical |  | same | holds |
 | FP32 transform pair energy loss, unaveraged input file | 1.2829e-07 | 1.2854e-07 | 5.0000e-08 to 4.0000e-07 |
-| header counts the transform pairs, unaveraged input file | [5340, 5340] | same | = [5340, 5340] |
-| header projection over measured loss, unaveraged input file | 9.5098e-01 | 9.4915e-01 | 5.0000e-01 to 2.0000e+00 |
+| setup counts the transform pairs, unaveraged input file | [5340, 5340] | same | = [5340, 5340] |
+| setup's projection over measured loss, unaveraged input file | 9.4781e-01 | 9.4599e-01 | 5.0000e-01 to 2.0000e+00 |
 | FP32 transform pair energy loss, averaged input file | 1.2733e-07 | same | 5.0000e-08 to 4.0000e-07 |
-| header counts the transform pairs, averaged input file | [89, 0] | same | = [89, 0] |
-| header projection over measured loss, averaged input file | 9.5814e-01 | same | 5.0000e-01 to 2.0000e+00 |
+| setup counts the transform pairs, averaged input file | [89, 0] | same | = [89, 0] |
+| setup's projection over measured loss, averaged input file | 9.5495e-01 | same | 5.0000e-01 to 2.0000e+00 |
 | two-plane unaveraged lockstep worst_x | 1.9377e-06 | same | <= 3.5000e-06 |
 | two-plane unaveraged lockstep worst_px | 2.9026e-06 | same | <= 2.5000e-05 |
 | two-plane unaveraged lockstep worst_y | 2.2475e-06 | same | <= 3.0000e-06 |
@@ -817,7 +817,6 @@ where the two builds agree to every printed digit.
 | kick: uv \|d_y / (L vkick / 2) - 1\| | 2.9198e-05 | same | <= 2.0000e-04 |
 | all: avg max \|d_all - (d_offset + d_kx + d_kick)\| / max \|d_all\| | 2.2338e-02 | same | <= 5.0000e-02 |
 | all: uv max \|d_all - (d_offset + d_kx + d_kick)\| / max \|d_all\| | 2.1065e-02 | same | <= 5.0000e-02 |
-| header: the element's line names x_offset, kx and hkick |  | same | holds |
 | refusal: kx on a helical element |  | same | holds |
 | refusal: a pitched element |  | same | holds |
 
@@ -842,7 +841,7 @@ where the two builds agree to every printed digit.
 | crossed: the pulse file carries both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | crossed: the escaped file's params come per polarization, one row per plane (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | crossed: the pulse's lucifer/pulse rows equal the escaped file's, both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| crossed: the stated pulse and escaped files vs on disk, both polarizations, rel | 2.5237e-03 | same | <= 1.0000e-02 |
+| crossed: the stated pulse and escaped files vs on disk, both polarizations, rel | 2.5231e-03 | same | <= 1.0000e-02 |
 | crossed: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | helical re-anchor: vector vs scalar path, shot-noise power | 1.5798e-14 | 1.5959e-14 | <= 1.0000e-12 |
 | handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
@@ -961,8 +960,8 @@ where the two builds agree to every printed digit.
 | Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 2.1649e-14 | 1.5432e-14 | <= 1.0000e-12 |
 | 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| bank bytes: h1's stated pulse file vs on disk, rel | 1.6273e-03 | same | <= 1.0000e-02 |
-| bank bytes: h3's stated pulse file vs on disk, rel | 1.6273e-03 | same | <= 1.0000e-02 |
+| bank bytes: h1's stated pulse file vs on disk, rel | 1.6024e-03 | same | <= 1.0000e-02 |
+| bank bytes: h3's stated pulse file vs on disk, rel | 1.6024e-03 | same | <= 1.0000e-02 |
 | refusal harmonics without the fundamental |  | same | holds |
 | refusal harmonics + unaveraged element |  | same | holds |
 | refusal harmonics + two polarizations |  | same | holds |
@@ -1038,7 +1037,7 @@ where the two builds agree to every printed digit.
 | a name outside the set is refused with the set, space_charge.model = "mine" |  | same | holds |
 | a name outside the set is refused with the set, wake.material = "FE" |  | same | holds |
 | a name outside the set is refused with the set, wake.model = "mine" |  | same | holds |
-| --version, the header and meta/lucifer_version carry the version CMake wrote |  | same | holds |
+| --version and meta/lucifer_version carry the version CMake wrote |  | same | holds |
 | run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow |  | same | holds |
 | a key no table has on the command line is refused (run.wake_on=true) |  | same | holds |
 | a key in the wrong table on the command line is refused (beam.lambda0=1e-10) |  | same | holds |
@@ -1056,7 +1055,7 @@ where the two builds agree to every printed digit.
 | the page's field example: the pulse holds the window and the banked planes, alone |  | same | holds |
 | the page's dumps example: the final dumps read on first access, one slice from its patch |  | same | holds |
 | the page's compare example: four lettered blocks with their differences, the runs named by their stems |  | same | holds |
-| dumps: the footer names every file the run wrote, and only those |  | same | holds |
+| dumps: the stats file lists every file the run wrote, and only those |  | same | holds |
 | dumps: the keys are the writers' names, each frame by its record |  | same | holds |
 | dumps: the mapping lists every key with its size and reads no file until asked |  | same | holds |
 | dumps: one slice read from its patch is those rows of the whole dump |  | same | holds |
@@ -1166,25 +1165,25 @@ where the two builds agree to every printed digit.
 | pulse: escaped_energy at the exit vs the banked slices' energies, rel | 7.2164e-15 | 8.1046e-15 | <= 1.0000e-12 |
 | pulse: escaped_energy at the exit vs the ledger's U_escaped, rel | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse: the largest fall of pulse_energy between records, rel (the window falls) | 0.0000e+00 | same | <= 1.0000e-12 |
-| pulse: the Exit line's window energy vs the last record's, rel | 1.1632e-05 | 1.1629e-05 | <= 1.0000e-03 |
-| pulse: the Exit line's pulse energy vs the last record's pulse_energy, rel | 1.0011e-04 | 1.0012e-04 | <= 1.0000e-03 |
+| pulse: run/exit_window_energy vs the last record's, rel | 0.0000e+00 | same | <= 1.0000e-12 |
+| pulse: run/exit_pulse_energy vs the last record's pulse_energy, rel | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse alone: a default run keeps the pulse file and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| pulse alone: the footer lists the pulse and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| pulse alone: the stats file lists the pulse and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pulse alone: lucifer/pulse rows of dgp and dg vs dg's lucifer/escaped, max abs | 0.0000e+00 | same | <= 0.0000e+00 |
 | pulse alone: dgp's pulse identical to dg's (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| bank bytes: dg's stated pulse and escaped files vs on disk, rel | 1.5148e-03 | same | <= 1.0000e-02 |
-| bank bytes: dgp's stated pulse file vs on disk, rel | 1.5873e-03 | same | <= 1.0000e-02 |
-| bank bytes: dgp's stated peak vs its pulse alone, rel | 1.5873e-03 | same | <= 1.0000e-02 |
+| bank bytes: dg's stated pulse and escaped files vs on disk, rel | 1.5264e-03 | same | <= 1.0000e-02 |
+| bank bytes: dgp's stated pulse file vs on disk, rel | 1.5908e-03 | same | <= 1.0000e-02 |
+| bank bytes: dgp's stated peak vs its pulse alone, rel | 1.5908e-03 | same | <= 1.0000e-02 |
 | window: dgw's derived window loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgw writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgw's header states no bank (slices) | 0.0000e+00 | same | <= 0.0000e+00 |
-| window: dgw's headroom is the schedule's slippage, the two printed sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| window: dgw's headroom is the schedule's slippage, the two recorded sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | window: dgw's headroom slices are nint(slippage / n_wavelength) (count) | 0 | same | <= 5.0000e-01 |
 | window: dgw's chicanes contribute 0 rotations (count) | 0 | same | <= 5.0000e-01 |
 | window: dgc's derived window loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgc writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgc's header states no bank (slices) | 0.0000e+00 | same | <= 0.0000e+00 |
-| window: dgc's headroom is the schedule's slippage, the two printed sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| window: dgc's headroom is the schedule's slippage, the two recorded sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | window: dgc's headroom slices are nint(slippage / n_wavelength) (count) | 0 | same | <= 5.0000e-01 |
 | window: dgc's chicanes contribute 3 rotations (count) | 0 | same | <= 5.0000e-01 |
 | bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
@@ -1197,20 +1196,17 @@ where the two builds agree to every printed digit.
 | provenance: run.record_environment restores user and cwd | 0 | same | <= 5.0000e-01 |
 | refusal: unknown dump_beam_at element refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal: write_escaped with keep_escaped_field = F refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: the header states the work | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: particle-steps is the product of the two counts | 1.2493e-03 | same | <= 1.0000e-02 |
-| pre-run: the header estimates the walk and names the machine | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: the load standing reads under the measured floor | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: the beamlet size is stated by the harmonics it carries | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: the footer lists the thin slices | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: and names the remedy | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: the footer prints the clock beside the estimate | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: load_only gives the same header as the run does | 0.0000e+00 | same | <= 5.0000e-01 |
-| pre-run: load_only tracks nothing | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: particle-steps is the product of the two counts | 0.0000e+00 | same | <= 1.0000e-12 |
+| pre-run: the walk is estimated before tracking and the machine named | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: 64 beamlets in a slice, under the 128 the printout warns below | 0 | same | <= 5.0000e-01 |
+| pre-run: the run counts its thin slices | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: the run records the walk's clock beside the estimate | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: load_only records the same setup and estimate as the run does | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: load_only tracks nothing (records) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it | 0.0000e+00 | same | <= 5.0000e-01 |
 | frames: one beam frame per stats record | 0 | same | <= 5.0000e-01 |
 | frames: one field frame per stats record | 0 | same | <= 5.0000e-01 |
-| frames: the header's count matches the files written | 0 | same | <= 5.0000e-01 |
+| frames: setup's count matches the files written | 0 | same | <= 5.0000e-01 |
 | frames: a frame at an element end equals that element's own dump (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | frames: every label appears once in every frame | 0 | same | <= 5.0000e-01 |
 | frames: no label appears that the first frame did not carry | 0 | same | <= 5.0000e-01 |
@@ -1244,8 +1240,8 @@ where the two builds agree to every printed digit.
 | interlude: one frame per stats row with the pieces on | 0 | same | <= 5.0000e-01 |
 | interlude: the frames carry the rows' own s | 0.0000e+00 | same | <= 1.0000e-09 |
 | interlude: frames strictly inside the pipe (9 expected) | 0 | same | <= 5.0000e-01 |
-| interlude: the header states the pieces before it tracks | 0.0000e+00 | same | <= 5.0000e-01 |
-| interlude: and says nothing where nothing is cut | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: setup records the pieces before the run tracks | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: and none where nothing is cut | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: a wake-carrying element is not cut | 0 | same | <= 5.0000e-01 |
 | interlude: and the elements without a wake still are | 0 | same | <= 5.0000e-01 |
 | interlude: the zero wake left the physics alone, so only the rows differ | 7.4631e-15 | 1.2742e-15 | <= 1.0000e-09 |

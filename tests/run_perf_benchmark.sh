@@ -244,8 +244,8 @@ grid_half_width = 2e-4
 INPUT
   }
 
-  # phase_run <label> <nslice> <threads> [<suffix>] does one run and parses out its
-  # footer table. The suffix keeps a scan's repeated runs apart.
+  # phase_run <label> <nslice> <threads> [<suffix>] does one run and checks that its
+  # stats file holds the timing. The suffix keeps a scan's repeated runs apart.
   phase_run () {
     local label="$1" ns="$2" nt="$3" root log
     root="phase_${ns}_${nt}${4:-}"
@@ -257,16 +257,16 @@ INPUT
       tail -20 "$log" >&2
       exit 1
     fi
-    if ! grep -q '^ Timing' "$log"; then
-      echo "FAILED: the run printed no Timing block. An old binary, or a phase left open." >&2
+    if [[ -z "$("$PYTHON" -m lucifer.stats "$root.stats.h5" timing/walk 2>/dev/null)" ]]; then
+      echo "FAILED: the run's stats file holds no timing/walk. An old binary, or a phase left open." >&2
       exit 1
     fi
 
     # The profile compares two slice counts, so a run that built a different one is
-    # measuring a different configuration. The header says what it built.
+    # measuring a different configuration. The stats file says what it built.
 
     local built
-    built="$(awk '/^ Beam / {for (i = 1; i <= NF; i++) if ($i == "slices" || $i == "slice") print $(i-1)}' "$log")"
+    built="$("$PYTHON" -m lucifer.stats "$root.stats.h5" run/n_slice)"
     if [[ "$built" != "$ns" ]]; then
       echo "FAILED: asked for $ns slices and the run built ${built:-none}." >&2
       echo "The input file states window.n_wavelength; a derived spacing would change the count." >&2
@@ -286,18 +286,20 @@ INPUT
       done
     done
     "$PYTHON" - "$WORK_DIR" "$((8 * WORKERS))" "$WORKERS" "$NPART" $GRID_SCAN <<'SCAN'
-import re, sys, os
+import sys, os
 from collections import Counter
+import h5py
 
 work, small, workers, npart = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
 grids = [int(g) for g in sys.argv[5:]]
 
 def walk_of(path):
-    for line in open(path):
-        m = re.match(r'^\s{2,}walk\s+\d+\s+(\d+\.\d+)', line.rstrip())
-        if m:
-            return float(m.group(1))
-    return None
+    # The walk's seconds, timing/walk of the stats file the run of this log wrote.
+    try:
+        with h5py.File(path[:-len('.log')] + '.stats.h5', 'r') as f:
+            return float(f['timing/walk'][()])
+    except (OSError, KeyError):
+        return None
 
 def factors(n):
     out, d = [], 2
@@ -348,34 +350,46 @@ SCAN
 
   "$PYTHON" - "$WORK_DIR" "$((8 * WORKERS))" "$BIG_SLICES" "$WORKERS" "$NPART" <<'EOF'
 import re, sys, glob, os
+import h5py
 
 work, small, big, workers, npart = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 
-# The footer's own table, read back rather than re-derived: name, regions, seconds,
-# share of the walk. The name field can hold spaces, so the numbers anchor the parse.
-ROW = re.compile(r'^\s{2,}(?P<name>\S.*?)\s+(?P<reg>\d+)?\s+(?P<sec>\d+\.\d+)(?:\s+(?P<frac>[-\d.]+)%)?\s*$')
+# The timer's phases as the stats file holds them in timing/, in the timer's own order:
+# name, regions, seconds, share of the walk. The step's phases are followed by their
+# subtotal, and what no phase holds is the row unaccounted.
+STEP = ['undulator prep', 'space charge', 'particle push', 'coherent source', 'field solve', 'unaveraged step']
+REST = ['slippage', 'radiation', 'migration', 'wake', 'seam interlude', 'field drift', 'genesis interlude',
+        'stats and diag', 'element end', 'dumps', 'device step']
 
 def read_phases(path):
-    rows, inblock = [], False
-    for line in open(path):
-        if line.startswith(' Timing'):
-            inblock = True
-            continue
-        if not inblock:
-            continue
-        if line.startswith(' Wrote') or line.startswith('====') or not line.strip():
-            break
-        m = ROW.match(line.rstrip())
-        if m:
-            rows.append((m.group('name'), int(m.group('reg')) if m.group('reg') else None,
-                         float(m.group('sec')), float(m.group('frac')) if m.group('frac') else None))
+    try:
+        with h5py.File(path[:-len('.log')] + '.stats.h5', 'r') as f:
+            tm = {k: v[()].item() for k, v in f['timing'].items() if v.dtype.kind in 'fi'}
+    except (OSError, KeyError):
+        return []
+    walk = tm['walk']
+    share = lambda sec: 100 * sec / walk if walk > 0 else 0.0
+    key = lambda name: name.replace(' ', '_')
+    rows = []
+    for names in (STEP, REST):
+        for name in names:
+            if tm.get(key(name) + '_regions', 0) > 0:
+                rows.append((name, tm[key(name) + '_regions'], tm[key(name)], share(tm[key(name)])))
+        if names is STEP:
+            step = sum(tm[key(n)] for n in STEP)
+            if step > 0:
+                rows.append(('= FEL step', None, step, share(step)))
+    leaf = sum(tm[key(n)] for n in STEP + REST)
+    rows.append(('unaccounted', None, walk - leaf, share(walk - leaf)))
+    rows.append(('walk', None, walk, 100.0))
+    rows.append(('run', None, tm['run'], None))
     return rows
 
 def table(ns, nt, title):
     path = os.path.join(work, f'phase_{ns}_{nt}.log')
     rows = read_phases(path)
     if not rows:
-        print(f'  {title}: no Timing block in {path}')
+        print(f'  {title}: no timing/ in the stats file of {path}')
         return
     print(f'  {title}')
     print(f"    {'phase':22s} {'regions':>10s} {'seconds':>10s} {'of walk':>9s}")

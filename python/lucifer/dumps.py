@@ -1,8 +1,8 @@
 """
 A run's particle and field dumps, reached as files and loaded on first use.
 
-The program names every dump it writes after the run's ``out_root``, and its footer
-lists them. ``dump_files`` keys each one by what follows ``<out_root>-``, the form
+The program names every dump it writes after the run's ``out_root``, and the stats
+file lists them in the attribute ``files`` of ``run/``. ``dump_files`` keys each one by what follows ``<out_root>-``, the form
 LUME-Genesis keys its files by:
 
     final, initial          the state after the last element and before the first
@@ -39,7 +39,7 @@ SERIES = re.compile(r"^(.*)\{(\d+)\.\.(\d+)\}(.*)$")
 
 
 def expand(name):
-    """The file names a footer row stands for: the row itself, or for a frame series
+    """The file names one entry of the stats file's list stands for: the entry itself, or for a frame series
     written as a shell brace range, ``<root>-{000001..000012}.beam.h5``, every name in
     the range with the range's zero padding."""
     m = SERIES.match(name)

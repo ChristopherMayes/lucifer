@@ -704,7 +704,7 @@ if (trim(beam_init%distribution_type(2)) /= '' .and. trim(beam_init%distribution
 
 if (bad /= '') then
   call out_io (s_error$, r_name, 'BEAM.' // trim(bad) // ' IS SET BUT NOT HONORED BY THE', &
-                                 'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN docs/input-reference.md).', &
+                                 'QUIET-START GENERATOR, WHICH TAKES THE BEAM KEYS OF THE INPUT REFERENCE AND NO OTHER.', &
                                  'REFUSING RATHER THAN SILENTLY IGNORING IT.')
   err_flag = .true.;  return
 endif
@@ -1504,6 +1504,7 @@ if (run%winit%n_wavelength == 0) then
     n_fld = n_wl * max(1, nint(want / n_wl))
     run%winit%n_wavelength = n_fld
     run%field_sampling_derived = .true.
+    call fel_schema_mark (run, 'field.n_wavelength', fel_origin_derived$)
     call out_io (s_info$, r_name, 'Field sampling \i0\ wavelengths, \i0\ slices a plane, derived: ' // &
                  '\f0.2\ of the cooperation length \es10.3\ m at rho = \es10.3\ , in whole slices.', &
                  i_array = [n_fld, n_fld / n_wl], r_array = [fel_field_coop_fraction$, l_coop, rho])
@@ -1537,8 +1538,8 @@ if (rho > 0) then
                    r_array = [n_wl * fbeam%wavelength / l_coop, l_coop, rho, fel_field_coop_cliff$])
     else
       call out_io (s_error$, r_name, 'FIELD.N_WAVELENGTH = \i0\ WAVELENGTHS IS ABOVE \f0.2\ OF THE COOPERATION', &
-                   'LENGTH \es10.3\ m AT rho = \es10.3\ , WHERE THE SWEEP ON docs/spectral-field.md FOUND THE', &
-                   'OUTPUT MOVE. POSSIBLE SOLUTION: A SMALLER FIELD.N_WAVELENGTH, OR LEAVE IT UNSET.', &
+                   'LENGTH \es10.3\ m AT rho = \es10.3\ , ABOVE WHICH THE OUTPUT DEPENDS ON THE SAMPLING.', &
+                   'POSSIBLE SOLUTION: A SMALLER FIELD.N_WAVELENGTH, OR LEAVE IT UNSET.', &
                    i_array = [run%winit%n_wavelength], r_array = [fel_field_coop_cliff$, l_coop, rho])
       err_flag = .true.
       return

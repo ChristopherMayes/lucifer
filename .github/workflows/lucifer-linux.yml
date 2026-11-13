@@ -265,15 +265,19 @@ jobs:
           env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/prefix/bin/lucifer" --version
           env -i HOME="$HOME" PATH=/usr/bin:/bin OMP_NUM_THREADS=4 \
               "$RUNNER_TEMP/prefix/bin/lucifer" lucifer.toml > run.log
-          grep -e '^ Lucifer version' -e '^ Exit ' run.log
+          # The run is judged by the files it wrote and never by what it printed. The
+          # printout goes into the log for a reader.
+          cat run.log
           test -s steady_state.stats.h5
+          test -s steady_state.resolved.toml
+          test -s steady_state-final.beam.h5
 
-      # Which backend this build carries, from lucifer's own banner. This is the line the
+      # Which backend this build carries, from lucifer --version. This is the line the
       # validation suite reads to decide whether the device section can run, so having it in the
       # log makes the skip below checkable rather than asserted.
       - name: Print the ${{ matrix.build }} build's device backend
         shell: bash
-        run: ./${{ matrix.dir }}/bin/lucifer || true
+        run: ./${{ matrix.dir }}/bin/lucifer --version
 
       # One environment for the reference and the Python side, from the repository's own
       # file, which pins genesis4 4.6.16. The pin is the whole reason this job is possible:

@@ -274,6 +274,10 @@ real(rp), parameter :: fel_cells_per_sigma$ = 7
 ! 5% at 512 beamlets, under 2% on the three real ones, and the error falls as one over
 ! the count.
 integer, parameter :: fel_beamlets_default$ = 512
+
+! Where a key's value came from (fel_run_struct%key_origin).
+integer, parameter :: fel_origin_default$ = 0, fel_origin_file$ = 1
+integer, parameter :: fel_origin_command$ = 2, fel_origin_derived$ = 3
 real(rp), parameter :: fel_widths_per_sigma$ = 9
 
 !+
@@ -385,6 +389,16 @@ type fel_run_struct
   character(400) :: lat_file = ''
   character(400) :: field_file(9) = ''
   logical :: bank_set = .false.            ! keep_escaped_field set by the input or the command line.
+  ! Where each key's value came from, by the key's place in the schema's table
+  ! (fel_schema_table): fel_origin_default$, _file$, _command$ or _derived$. The header
+  ! marks a derived value and one set on the command line, and the resolved input file
+  ! states every key's.
+  integer, allocatable :: key_origin(:)
+  character(400) :: input_file = ''        ! The input file as it was named.
+  ! What the setup estimated from the described beam, 0 where a dump is loaded and
+  ! nothing describes it: the one-dimensional Pierce parameter and the rms beam size.
+  real(rp) :: rho_1d = 0, sigma_beam = 0
+  real(rp) :: filter_edge = 0              ! The source filter's edge as an angle [rad], 0 with no filter.
   ! The assembled state.
   type (lat_struct) :: lat
   type (fel_beam_struct) :: fbeam
