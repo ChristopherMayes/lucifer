@@ -117,7 +117,7 @@ def run(exe, wd, root, m, coherent, seed=777, bextra="", wextra="", pextra="", t
         sase=False, expect_fail=None, sig_z=None, lat="coh.bmad"):
     extra = (COHERENT if coherent else "") + (SASE_W if sase else "") + pextra
     text = NML.format(root=root, m=m, seed=seed, extra=extra, lat=lat,
-                      bextra=(SASE_B if sase else "") + bextra,
+                      bextra=(SASE_B if sase or "  beamlet_size" in bextra else "  beamlet_size = 8\n") + bextra,
                       wextra=wextra)
     if sig_z is not None:
         text = text.replace("  beam.sig_z = 0\n", f"  beam.sig_z = {sig_z}\n")

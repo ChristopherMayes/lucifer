@@ -90,6 +90,8 @@ source_model = "coherent"
 
 [beam]
 n_particle = 512
+# The three runs of this comparison count their particles in beamlets of 8.
+beamlet_size = 8
 bunch_charge = 1.000692285594e-15
 sig_z = 0
 sig_pz = 8.804506566858e-5
@@ -114,6 +116,8 @@ out_root = "low_m"
 
 [beam]
 n_particle = 512
+# The three runs of this comparison count their particles in beamlets of 8.
+beamlet_size = 8
 bunch_charge = 1.000692285594e-15
 sig_z = 0
 sig_pz = 8.804506566858e-5
@@ -138,6 +142,8 @@ out_root = "reference"
 
 [beam]
 n_particle = 8192
+# The three runs of this comparison count their particles in beamlets of 8.
+beamlet_size = 8
 bunch_charge = 1.000692285594e-15
 sig_z = 0
 sig_pz = 8.804506566858e-5

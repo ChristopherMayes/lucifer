@@ -114,7 +114,17 @@ import check_two_polarization as tp
 import convert_genesis
 import fieldio
 from checkrec import record
-from lucifer.flat import to_toml as to_groups
+from lucifer.flat import to_toml
+
+
+def to_groups(text):
+    """The input file from flat keys, with beamlets of 8 where the text states no size.
+
+    Every level here was recorded on beamlets of 8, the size of every load before the
+    loader took it from the harmonics carried."""
+    if "beamlet_size" not in text:
+        text = text.replace("&end", "  beamlet_size = 8\n&end")
+    return to_toml(text)
 from lucifer.stats import read_stats
 
 FAILED = False
@@ -1428,14 +1438,14 @@ REPRO_SKIP = ("params", "meta/input_echo", "meta/timestamp")
 PRECISION_CASES = (
     ("cancelling phases", "  beamlet_size = 8\n", 1.464e-05),
     ("unequal weights", "  beamlet_size = 8\n  split_weights = T\n", 1.465e-05),
-    ("charge in few cells", "  beam.a_norm_emit = 4e-9\n"
+    ("charge in few cells", "  beamlet_size = 8\n  beam.a_norm_emit = 4e-9\n"
                             "  beam.b_norm_emit = 4e-9\n", 6.889e-06),
-    ("the largest load", "  beam.n_particle = 32768\n", 2.507e-06),
+    ("the largest load", "  beamlet_size = 8\n  beam.n_particle = 32768\n", 2.507e-06),
     # The load at which performance.md gives the deposit's cost. It carries no
     # float-deposit number, since the float deposit was not run at this load and no
     # longer exists to run, so it is held to the recorded ceiling and to the headroom
     # instead. It makes the accuracy cases reach the load the cost table uses.
-    ("the performance load", "  beam.n_particle = 131072\n", None),
+    ("the performance load", "  beamlet_size = 8\n  beam.n_particle = 131072\n", None),
 )
 
 # The float deposit is not reproducible, so its numbers above carry their own scatter and

@@ -51,6 +51,13 @@ hundredth of an electron is loaded the same way: the charge is held, the slices 
 no electron have no particles, and the statistic of the others is held to 1. In the keep
 mode every particle must be present at the charge the kick load gives it.
 
+With beam.beamlet_size unset the loader derives it from the harmonics carried, twice the
+highest plus 2 or the smallest divisor of the slice's macroparticles at or above that. The
+header must state the size, every slice must be loaded in beamlets of it, and the weight
+load's statistic is held to 1 at every carried harmonic within five standard deviations. A
+size set at twice the highest harmonic must be refused with the size that is accepted,
+and that size must load.
+
 A slice of several wavelengths is loaded over all its periods. A Gaussian bunch with
 slices of 3 and of 12 wavelengths is loaded under the weight load, the first-order kick
 and no noise, and every slice's sum of w exp(-i (m/n) theta) is taken at the m that are
@@ -574,6 +581,88 @@ def slice_fill(exe, lat, workdir, seeds):
     return ok
 
 
+# The beamlet size the loader derives where beam.beamlet_size is 0, its default: the
+# harmonics carried, the macroparticles in a slice and the size wanted. It is twice the
+# highest harmonic plus 2, or the smallest divisor of the macroparticle count at or above
+# that, which 16 is of 1024 where 12 is not.
+DERIVED = (((1,), 1024, 4), ((1, 3), 1024, 8), ((1, 3, 5), 1536, 12), ((1, 3, 5), 1024, 16))
+DERIVED_LINE = re.compile(r"The beamlet size (\d+) is derived from the highest harmonic carried, (\d+)\.")
+DERIVED_ELECTRONS = 18.0
+
+
+def size_text(lat, root, seed, harmonics, n_particle, size, electrons_in_slice):
+    """The uniform bunch under the weight load with the harmonics carried and the beamlet size given."""
+    text = NML.format(lat=lat, root=root, seed=seed, n_particle=n_particle, window=N_SLICE * SPACING,
+                      z_min=-N_SLICE * SPACING / 2, z_max=N_SLICE * SPACING / 2,
+                      charge=electrons_in_slice * E_CHARGE * N_SLICE, grid_n_pts=GRID_N_PTS,
+                      grid_half_width=GRID_HALF_WIDTH, beamlet_size=size, kick="weight", testw="F")
+    return text.replace("  load_only = T\n", f"  harmonics = {', '.join(str(h) for h in harmonics)}\n  load_only = T\n")
+
+
+def derived_size(exe, lat, workdir, seeds):
+    """The beamlet size derived from the harmonics, the noise it carries at them, and the refusal."""
+    ok = True
+    for harmonics, n_particle, want_size in DERIVED:
+        label = (f"harmonics {', '.join(str(h) for h in harmonics)}, {n_particle} macroparticles in a slice, "
+                 f"beam.beamlet_size unset")
+        electrons = DERIVED_ELECTRONS * n_particle / want_size
+        vals = {h: [] for h in harmonics}
+        sizes = set()
+        for seed in range(1, seeds + 1):
+            root = f"sn_ds{len(harmonics)}_{n_particle}_{seed}"
+            out, dump = run_load(exe, workdir, root, size_text(lat, root, 3000 + 7 * seed, harmonics, n_particle,
+                                                                 0, electrons))
+            said = DERIVED_LINE.search(out)
+            sizes.add((int(said.group(1)), int(said.group(2))) if said else None)
+            for sl in beamio.read_slices(dump, LAMBDA0, SPACING):
+                w = sl["weight"][: sl["n"]]
+                if sl["n"] == 0 or w.sum() == 0:
+                    continue
+                sizes.add((want_size, max(harmonics)) if sl["n"] % want_size == 0 else ("slice", sl["n"]))
+                for h in harmonics:
+                    b = np.sum(w * np.exp(-1j * h * sl["theta"][: sl["n"]])) / w.sum()
+                    vals[h].append(abs(b) ** 2 * w.sum() / E_CHARGE)
+            dump.unlink()
+        good = sizes == {(want_size, max(harmonics))}
+        ok = ok and good
+        print(f"--- beamlet size, {label}: the header states a derived size of {want_size} and every slice is "
+              f"loaded in beamlets of it  {'ok' if good else 'FAIL ' + str(sizes)}")
+        record(f"beamlet size, {label}: derived as {want_size}, stated in the header and loaded", None, None,
+               "bool", good)
+        for h in harmonics:
+            v = np.asarray(vals[h])
+            bound = 5 / np.sqrt(len(v))
+            goodh = abs(v.mean() - 1) < bound
+            ok = ok and goodh
+            print(f"      harmonic {h}: <|b(h)|^2 * N_lambda> = {v.mean():.4f} (1 +- {bound:.3f}, {len(v)} slices)  "
+                  f"{'ok' if goodh else 'FAIL'}")
+            record(f"beamlet size, {label}: noise power at harmonic {h} over the shot noise", v.mean(),
+                   [1 - bound, 1 + bound], "range", goodh)
+
+    # A size the input file sets is honored above twice the highest harmonic and refused at it,
+    # and the message carries the smallest size accepted.
+    for harmonics, n_particle in (((1, 3), 1008), ((1, 3, 5), 990)):
+        h_max = max(harmonics)
+        said = {}
+        for size in (2 * h_max, 2 * h_max + 1):
+            root = f"sn_dr{h_max}_{size}"
+            (workdir / f"{root}.toml").write_text(to_groups(size_text(
+                lat, root, 3000, harmonics, n_particle, size, DERIVED_ELECTRONS * n_particle / size)))
+            r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
+            said[size] = (r.returncode, r.stdout + r.stderr)
+            for f in workdir.glob(f"{root}-initial.*"):
+                f.unlink()
+        under, at = said[2 * h_max], said[2 * h_max + 1]
+        good = (under[0] != 0 and f"SET BEAM.BEAMLET_SIZE TO {2 * h_max + 1} OR MORE" in under[1] and at[0] == 0
+                and f"The beamlet size {2 * h_max + 1} is set in the input file" in at[1])
+        ok = ok and good
+        print(f"--- beamlet size, harmonic {h_max} carried: a size of {2 * h_max} is refused with the size "
+              f"that is accepted, and {2 * h_max + 1} is loaded  {'ok' if good else 'FAIL'}")
+        record(f"beamlet size, harmonic {h_max} carried: {2 * h_max} refused with the size accepted, "
+               f"{2 * h_max + 1} loaded", None, None, "bool", good)
+    return ok
+
+
 def run_load(exe, workdir, root, text):
     """One load_only run from flat keys. Returns its output and its particle dump's path."""
     (workdir / f"{root}.toml").write_text(to_groups(text))
@@ -839,6 +928,7 @@ SPLIT_NML = """  lattice = "{lat}"
   ran_seed = 4321
   lambda0 = 1e-10
   beam.n_particle = 1024
+  beamlet_size = 8
   beam.bunch_charge = 1.000692285594e-15
   beam.sig_z = 0
   beam.sig_pz = 8.804506566858e-5
@@ -951,6 +1041,7 @@ def main():
                         "Gaussian bunch, beam.beamlet_min_electrons at its default") and ok
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, 18.0,
                         "Gaussian bunch, beamlets of 18 electrons or more") and ok
+    ok = derived_size(exe, PARSED.lat, workdir, max(3, PARSED.seeds // 5)) and ok
     ok = same_bits(exe, PARSED.lat, workdir) and ok
     ok = empty_slices(exe, PARSED.lat, workdir) and ok
 

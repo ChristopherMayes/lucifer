@@ -51,7 +51,7 @@ where the second equality holds for uniform weights. It is shown in [](#shot-rea
 
 Both regimes appear in [](#fig-shot-bunch), where the slices have 256 macroparticles. In the peak slice, which contains 1600 electrons, the noise power of the load with `quiet_start = false` is about 6 times the shot-noise power. It is equal to the shot-noise power two rms bunch lengths from the peak, where a slice contains about 256 electrons, and it is $2\times10^{-3}$ of the shot-noise power at four rms bunch lengths. The spectrum of this load is nearly constant above $k_r/3$, between 4.3 and 4.4. This value is the charge-weighted mean of the number of electrons per macroparticle, for which [](#eq-shot-loud) gives 4.42. Below $k_r/3$ the spectrum decreases toward zero, because the charge of each slice of three wavelengths is fixed. Shot noise cannot be added to such a load: with `quiet_start = false` and `shot_noise = true` the loader measures the bunching of the load and refuses a load that already has noise ([](fel-physics.md#sec-noise)).
 
-The quiet start removes this noise. With `quiet_start = true` the macroparticles are generated in beamlets. A beamlet consists of $M$ macroparticles (`beamlet_size`, 8 by default) that have the same transverse coordinates and the same energy. Their phases are evenly spaced over one radiation period,
+The quiet start removes this noise. With `quiet_start = true` the macroparticles are generated in beamlets. A beamlet consists of $M$ macroparticles (`beam.beamlet_size`, the choice of which is the subject of [](#shot-size)) that have the same transverse coordinates and the same energy. Their phases are evenly spaced over one radiation period,
 
 $$
   \theta_j = \theta_0 + \frac{2\pi j}{M}, \qquad j = 0 \ldots M-1 ,
@@ -80,6 +80,53 @@ $$ (eq-shot-n)
 where $w$ is the weight of one of its macroparticles in the quiet load. For uniform weights, $N = N_\lambda M / n_p$. The quantity $N$ is a number of electrons. It is not the number of macroparticles in the beamlet, which is $M$. At a given current, $N$ increases with the length of the slice (`window.n_wavelength`) and decreases with `beam.n_particle`.
 
 As an example, a slice one wavelength long, at a wavelength of 1 Å and a current of 3 kA, contains $N_\lambda = 6246$ electrons. With 1024 macroparticles in beamlets of 8, the slice has 128 beamlets, each of which represents $N = 48.8$ electrons. A slice in the tail of the same bunch, at $10^{-3}$ of that current, contains 6 electrons, or 0.049 of an electron for each of its 128 beamlets. These two slices are referred to below as the core slice and the tail slice. Without the quiet start the noise power of the core slice would be 6.1 times its shot-noise power, and that of the tail slice 0.006 of its shot-noise power.
+
+(shot-size)=
+### The number of macroparticles in a beamlet
+
+The number $M$ determines the harmonics at which the beamlet is a valid representation of the beam. On $M$ evenly spaced phases, $e^{-i(M-h)\theta_j} = e^{-iM\theta_0}\,e^{ih\theta_j}$, so that harmonic $M - h$ is not distinguished from harmonic $h$. When the phases of a quiet beamlet are displaced by $\delta\theta_j = -a \sin(\theta_j + \phi)$, as they are by the interaction with the fundamental field, the bunching to first order in $a$ is
+
+$$
+  |b_1| = \frac{a}{2}, \qquad |b_{M-1}| = (M-1)\,\frac{a}{2} ,
+$$ (eq-shot-alias)
+
+and it vanishes at the harmonics between. The bunching of the fundamental therefore appears at harmonic $M-1$ of each beamlet, multiplied by $M-1$. Summed over the beamlets of a slice this term cancels on the axis, because the beamlets are offset from one another in phase ([](#fig-shot-slice-fill)). It does not cancel in the radiation, because the beamlets are at different transverse positions. A field that is carried at harmonic $M-1$ is then driven by bunching that belongs to the fundamental. In the same way the bunching at harmonic $h$ appears at harmonic $M-h$, and for $M = 2h$ the harmonic coincides with its own image, so that a beamlet represents only one quadrature of it.
+
+Hwang and Qiang divide a beamlet into $M = 2h_{\max}$ macroparticles, where $h_{\max}$ is the highest harmonic of the simulation ([](references.md#ref-hwang-qiang-weight)). The measurements of [](#tab-shot-size) show that a beamlet smaller than this gives the highest harmonic too much power, by a factor between 2 and 300, and that a beamlet of exactly $2h_{\max}$ gives between 1.1 and 1.6 times the power. A larger beamlet agrees with one of twice its size. In a FLASH1 beam tracked through three undulator segments with the fundamental alone, the rms bunching of a slice at the third harmonic is 0.23 of that at the fundamental for $M = 4$ and 0.027 for $M = 8$.
+
+When `beam.beamlet_size` is not set, the loader takes
+
+$$
+  M = 2h_{\max} + 2 ,
+$$ (eq-shot-size)
+
+where $h_{\max}$ is the highest harmonic of `field.harmonics`. This is 4 for the fundamental alone, 8 with the third harmonic and 12 with the fifth. Two conditions modify it. A slice in the sample mode contains `beam.n_particle` macroparticles in whole beamlets, and $M$ is then the smallest divisor of that number that is not less than [](#eq-shot-size). With 4096 macroparticles and the fifth harmonic it is 16. With an unaveraged element $M$ is at least 8. That mode resolves all wavelengths, and the only comparison made in it is over one undulator segment without gain, where the exit pulse energy for $M = 4$ is 0.996 ± 0.008 of that for $M = 8$. The header of a run states the value and the highest harmonic at which a field may be carried. A value set in the input file is used as given, except that a generated load with $M \le 2h_{\max}$ and $h_{\max} > 1$ is refused.
+
+:::{table} The power at the highest carried harmonic for beamlets of $M$ macroparticles, as a ratio to its value for the largest beamlet of each row group, at an equal number of beamlets per slice. The FLASH1 and LCLS runs are SASE with the weight load, 8 seeds for the third harmonic and 6 for the fifth, and the row for $M = 7$ is the first-order kick against $M = 8$. The seeded amplifier is the example `harmonics`, 4 seeds. Measured on 2026-11-12.
+:name: tab-shot-size
+
+| case | $h_{\max}$ | $M$ | exponential regime | exit |
+|---|---|---|---|---|
+| FLASH1 | 3 | 4 | 21 ± 2 | 1.03 ± 0.10 |
+| | | 5 | 2.2 ± 0.3 | 1.21 ± 0.11 |
+| | | 6 | 1.10 ± 0.07 | 0.97 ± 0.10 |
+| | | 7 | 1.02 ± 0.04 | 1.01 ± 0.10 |
+| | | 8 | 1 | 1 |
+| FLASH1 | 5 | 8 | 1.93 ± 0.31 | 1.43 ± 0.10 |
+| | | 10 | 1.02 ± 0.02 | 1.14 ± 0.09 |
+| | | 12 | 0.99 ± 0.02 | 1.10 ± 0.08 |
+| | | 16 | 1 | 1 |
+| LCLS | 3 | 4 | 4.3 ± 0.1 | 1.12 ± 0.05 |
+| | | 6 | 1.15 ± 0.03 | 1.02 ± 0.04 |
+| | | 8 | 1 | 1 |
+| seeded amplifier | 3 | 4 | | 309 ± 33 |
+| | | 5 | | 18 ± 2 |
+| | | 6 | | 1.62 ± 0.25 |
+| | | 8 | | 0.99 ± 0.23 |
+| | | 16 | | 1 |
+:::
+
+At the fundamental the result depends on the number of beamlets in a slice and not on $M$. In a seeded steady-state run with 1024 beamlets the gain length is 0.989, 0.989 and 1.004 of its converged value for $M = 8$, 4 and 2, and with 256 beamlets it is 0.921, 0.919 and 0.945. In SASE runs of LCLS and FLASH1 the exit pulse energy for $M = 2$, 4 and 8 agrees at an equal number of beamlets, to 1% on LCLS. With fewer than 256 beamlets per slice the exit pulse energy of a SASE run is too large: by 2 to 5% with 128 beamlets on LCLS, 9% with 64, 21% with 32 and 45% with 16. A smaller beamlet therefore gives the same result with fewer macroparticles. A run that carries only the fundamental, with $M = 4$ and half the macroparticles of a run with $M = 8$, has the same number of beamlets, and its run time is shorter by a factor of 1.4 for FLASH1 and LCLS at 4096 macroparticles per slice and of 1.09 for the example `sase` at 2048.
 
 (shot-real)=
 ## The shot noise of N electrons
@@ -118,7 +165,7 @@ $$
   \qquad \langle |b_h|^2 \rangle = \frac{\langle |S_h|^2 \rangle}{N^2} = \frac{1}{N} .
 $$ (eq-shot-weight)
 
-This is the result [](#eq-shot-real) for the real beam, and its derivation involves no approximation. The bunching is linear in the numbers $c_j$, so that no expansion in a small parameter is required. The result holds for any $N$, integral or not, and at every harmonic below $M$, which for the default beamlet are the harmonics 1 to 7. When a beamlet represents about one electron, most of its macroparticles are assigned no electron and a few are assigned one. In that limit the load consists of the individual electrons, each at one of $M$ phases.
+This is the result [](#eq-shot-real) for the real beam, and its derivation involves no approximation. The bunching is linear in the numbers $c_j$, so that no expansion in a small parameter is required. The result holds for any $N$, integral or not, and at every harmonic below $M$, which for a beamlet of 8 are the harmonics 1 to 7. When a beamlet represents about one electron, most of its macroparticles are assigned no electron and a few are assigned one. In that limit the load consists of the individual electrons, each at one of $M$ phases.
 
 :::{figure} generated/shot-noise/phasors-weight.svg
 :name: fig-shot-phasors-weight
@@ -283,7 +330,7 @@ $$
   \qquad R_h(N) = N\, \langle |b_h|^2 \rangle .
 $$ (eq-shot-rh)
 
-This expression is exact for the kick of [](#eq-shot-kick). It is a sum of $M$ terms, and it is evaluated by `fel_shot_ratio` and by `tests/scripts/shot_noise_ratio.py`. For a single harmonic and in the limit of large $M$ it reduces to [](#eq-shot-r1). A harmonic above $H$ receives no kick, and its mean square bunching is of order $1/N^2$. To second order in the kick, the default beamlet has
+This expression is exact for the kick of [](#eq-shot-kick). It is a sum of $M$ terms, and it is evaluated by `fel_shot_ratio` and by `tests/scripts/shot_noise_ratio.py`. For a single harmonic and in the limit of large $M$ it reduces to [](#eq-shot-r1). A harmonic above $H$ receives no kick, and its mean square bunching is of order $1/N^2$. To second order in the kick, a beamlet of 8 has
 
 $$
   R_1 \approx 1 - \frac{22}{9N}, \qquad R_2 \approx 1 - \frac{1.01}{N}, \qquad R_3 \approx 1 - \frac{2.00}{N} .
@@ -299,7 +346,7 @@ The deficit at the fundamental exceeds the $2/N$ of [](#eq-shot-r1), because the
 :::{figure} generated/shot-noise/ratio.svg
 :name: fig-shot-ratio
 :alt: The ratio of imposed to physical noise power as a function of the number of electrons per beamlet, from 0.1 to 1000 on a logarithmic axis. The curves rise from near zero below one electron through about 0.5 at four electrons to 1 above one hundred. Measured points with error bars lie on the curves.
-The ratio $R_h(N)$ of [](#eq-shot-rh) for the default beamlet, at the fundamental and at the second and third harmonics. The dashed curve is the result for a kick at a single harmonic, [](#eq-shot-r1), and the dotted curve is $1 - 2/N$. The points are the values measured on loaded beams by `check_shot_noise.py`, shown with one standard deviation. In the shaded band a beamlet represents less than one electron ([](#shot-clamp)).
+The ratio $R_h(N)$ of [](#eq-shot-rh) for a beamlet of 8, at the fundamental and at the second and third harmonics. The dashed curve is the result for a kick at a single harmonic, [](#eq-shot-r1), and the dotted curve is $1 - 2/N$. The points are the values measured on loaded beams by `check_shot_noise.py`, shown with one standard deviation. In the shaded band a beamlet represents less than one electron ([](#shot-clamp)).
 :::
 
 The ratio approaches 1 gradually and has no threshold. Above 20 electrons per beamlet, the deficit at the fundamental is close to $2.4/N$. The core slice of [](#shot-counts), with 48.8 electrons per beamlet, starts with 0.951 of the shot-noise power.
@@ -326,7 +373,7 @@ $$
   R_h(N) = N\, R_h(1), \qquad N < 1 .
 $$ (eq-shot-clamp)
 
-For the default beamlet, $R_1(1) = 0.161$. The tail slice of [](#shot-counts), with 6 electrons in 128 beamlets, would start with 0.008 of its shot-noise power, that is, with $\langle|b|^2\rangle = 0.0013$ where the real slice has $1/6$.
+For a beamlet of 8, $R_1(1) = 0.161$. The tail slice of [](#shot-counts), with 6 electrons in 128 beamlets, would start with 0.008 of its shot-noise power, that is, with $\langle|b|^2\rangle = 0.0013$ where the real slice has $1/6$.
 
 A beamlet of less than one electron occurs in three cases: in a slice that contains less than one electron in total, which has a single beamlet according to [](#eq-shot-fewer), in the keep mode, and in the sample mode with `beam.beamlet_min_electrons = 0`. The report of the load gives the number of slices of the first kind. For the slices that contain one electron or more and have a group of less than one electron, it issues the following warning, with the level computed from [](#eq-shot-slice):
 

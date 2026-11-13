@@ -236,7 +236,9 @@ call add ('beam', 'load_mode', key_string$, '', 'load mode', &
 call add ('beam', 'quiet_start', key_logical$, '', 'quiet start', &
       'Load beamlets of beamlet_size phase copies, quiet below that harmonic.')
 call add ('beam', 'beamlet_size', key_int$, '', 'beamlet size', &
-      'Copies per beamlet, and the harmonics the noise resolves.', lo = 1.0_rp)
+      'Copies per beamlet. 0 derives it: twice the highest harmonic of field.harmonics ' // &
+      'plus 2, 8 at least with an unaveraged element, and in the sample mode the smallest ' // &
+      'divisor of n_particle at or above that. A size not above twice the highest harmonic is refused.', lo = 0.0_rp)
 call add ('beam', 'shot_noise', key_logical$, '', 'shot noise', &
       'Impose the physical noise on the load''s groups. Time-dependent windows only.')
 call add ('beam', 'beamlet_min_electrons', key_real$, 'electrons', 'beamlet electrons', &

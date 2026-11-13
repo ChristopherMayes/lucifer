@@ -42,7 +42,18 @@ import subprocess
 import sys
 
 from checkrec import record
-from lucifer.flat import to_toml as to_groups
+from lucifer.flat import to_toml
+
+
+def to_groups(text):
+    """The input file from flat keys, with beamlets of 8 where the text states no size.
+
+    Every level here was recorded on beamlets of 8, the size of every load before the
+    loader took it from the harmonics carried."""
+    if "beamlet_size" not in text:
+        text = text.replace("&end", "  beamlet_size = 8\n&end")
+    return to_toml(text)
+
 
 FAILED = False
 

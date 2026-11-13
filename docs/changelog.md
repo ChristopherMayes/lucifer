@@ -9,6 +9,38 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-12 Changed: `beam.beamlet_size` is derived from the harmonics the run carries where the
+  input file does not set it. It is twice the highest harmonic of `field.harmonics` plus 2, which is
+  4 for the fundamental alone, 8 with the third harmonic and 12 with the fifth, where it was 8 in
+  every run. In the sample mode it is the smallest divisor of `beam.n_particle` at or above that, 16
+  for the fifth harmonic at 4096 macroparticles, and with an unaveraged element it is 8 at least. The
+  header states the size, whether it was derived or set, and the highest harmonic a field may be
+  carried at. On evenly spaced phases harmonic M - h of a beamlet of M is not distinguished from
+  harmonic h, so the bunching of the fundamental appears at harmonic M - 1 of each beamlet,
+  multiplied by M - 1 ([](shot-noise.md#shot-size)). Fixed: a beamlet too small for a carried
+  harmonic was accepted. `harmonics = [1, 3, 5]` at the former default of 8 gave the fifth harmonic
+  1.93 +- 0.31 times its power in the exponential regime of FLASH1 and 1.43 +- 0.10 times its pulse
+  energy at the exit, against a beamlet of 16. A beamlet of 4 gave the third harmonic 21 times its
+  power on FLASH1 and 4.3 times on LCLS, and 309 times in the seeded example `harmonics`. A beamlet
+  of exactly twice the harmonic gave 1.10 to 1.62 times. A generated load whose beamlet size is not
+  above twice the highest carried harmonic is now refused with the size that is accepted. At the
+  fundamental the result follows the number of beamlets in a slice and not their size: beamlets of
+  2, 4 and 8 give the same gain length and the same exit pulse energy at equal beamlets, so a run
+  that carries the fundamental alone has twice the beamlets at the same `beam.n_particle`, or the
+  same beamlets at half of it, which is 1.4 times shorter in run time on FLASH1 and LCLS at 4096
+  macroparticles a slice and 1.09 on the example `sase`. The checks that hold recorded levels set
+  `beamlet_size = 8`, and their levels are unchanged. The examples that carry the fundamental alone
+  now load beamlets of 4, and each is a different shot at its seed: the FLASH1 example's exit pulse
+  energy is 39.2 uJ where it was 53.0, and over 32 seeds it is 48.9 +- 0.9 uJ with beamlets of 4 and
+  50.2 +- 0.8 uJ with beamlets of 8, a per-shot spread of 10%. The LCLS example's is 264 uJ as
+  before. The averaged twins of `unaveraged` and `mixed_line` and the three inputs of
+  `coherent_source` set `beamlet_size = 8`, since each is compared with a run on beamlets of 8, and
+  the fitted rates in the README of `spontaneous` are refitted, 100.4% of the analytic rate with
+  damping alone and 99.7% with both switches. `check_shot_noise.py` holds the derived size,
+  the noise power at each carried harmonic and the refusal. Added: `docs/shot-noise.md` has
+  diagrams of the quiet beamlet beside macroparticles at independent phases, of the beamlets of a
+  slice of one wavelength and of three, and of the weight load on a beamlet of 40 electrons and of
+  2, and a section on the number of macroparticles in a beamlet with the measurements.
 - 2026-11-12 Fixed: `.github/workflows/lucifer-docs.yml` installs Node 22, where it installed Node 20.
   The workflow installs the current mystmd from npm, and mystmd 1.13.0, released 2026-11-12, requires
   Node 22 or later and stops before the build under Node 20, so the site was neither built nor

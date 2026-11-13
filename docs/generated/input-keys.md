@@ -88,7 +88,7 @@
 | `z_max` | real | `0` | m |  | The flat profile's upper z bound, read under grid only. |
 | `load_mode` | string | `"sample"` |  | `"sample"`, `"keep"` | How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, or keep, every particle kept with the counts following the charge. |
 | `quiet_start` | true/false | true |  |  | Load beamlets of beamlet_size phase copies, quiet below that harmonic. |
-| `beamlet_size` | integer | `8` |  | from 1 | Copies per beamlet, and the harmonics the noise resolves. |
+| `beamlet_size` | integer | `0` |  | from 0 | Copies per beamlet. 0 derives it: twice the highest harmonic of field.harmonics plus 2, 8 at least with an unaveraged element, and in the sample mode the smallest divisor of n_particle at or above that. A size not above twice the highest ha |
 | `shot_noise` | true/false | false |  |  | Impose the physical noise on the load's groups. Time-dependent windows only. |
 | `beamlet_min_electrons` | real | `1` | electrons | from 0 | Fewest real electrons a beamlet stands for under shot_noise in the sample mode. A slice with too little charge is loaded with fewer beamlets, and a slice with none with no particles. 0 gives every slice n_particle. |
 | `shot_noise_method` | string | `"weight"` |  | `"weight"`, `"first_order"` | How the shot noise is imposed: weight, a whole number of electrons counted into each macroparticle with the bunch charge held, or first_order, a phase kick of twice the bunching asked for, as Fawley's algorithm and Genesis4. |

@@ -139,6 +139,7 @@ REFUSE = """[run]
 {extra}/
 [beam]
   beam.n_particle = 512
+  beam.beamlet_size = 8
   beam.bunch_charge = 1.000692285594e-15
   beam.sig_z = 0
   beam.sig_pz = 8.804506566858e-5
@@ -366,6 +367,7 @@ SCOPE = """[run]
 {extra}/
 [beam]
   beam.n_particle = 512
+  beam.beamlet_size = 8
   beam.bunch_charge = 1.000692285594e-15
   beam.sig_z = 0
   beam.sig_pz = 8.804506566858e-5

@@ -67,6 +67,7 @@ do ipass = 1, 2
   run%winit%grid_half_width = 2e-4_rp
 
   run%beam_init%n_particle = 2048
+  run%bparam%beamlet_size = 8
   run%beam_init%bunch_charge = 1.000692285594e-15_rp
   run%beam_init%sig_z = 0
   run%beam_init%sig_pz = 8.804506566858e-5_rp

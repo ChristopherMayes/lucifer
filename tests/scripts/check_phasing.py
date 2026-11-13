@@ -132,6 +132,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   interlude_model = '{imodel}'
   transport_model = '{transport}'
   beam.n_particle = 8192
+  beamlet_size = 8
   beam.bunch_charge = 1.000692285594e-15
   beam.sig_z = 0
   beam.sig_pz = 8.804506566858e-5
