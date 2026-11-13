@@ -204,6 +204,10 @@ where the two builds agree to every printed digit.
 | beamlet size, harmonics 1, 3, 5, 1024 macroparticles in a slice, beam.beamlet_size unset: noise power at harmonic 5 over the shot noise | 9.6103e-01 | same | 8.1958e-01 to 1.1804e+00 |
 | beamlet size, harmonic 3 carried: 6 refused with the size accepted, 7 loaded |  | same | holds |
 | beamlet size, harmonic 5 carried: 10 refused with the size accepted, 11 loaded |  | same | holds |
+| macroparticle count, harmonics 1, beam.n_particle unset: derived as 2048, stated in the header and loaded |  | same | holds |
+| macroparticle count, harmonics 1, 3, beam.n_particle unset: derived as 4096, stated in the header and loaded |  | same | holds |
+| macroparticle count, beam.n_particle = 2048 in beamlets of 4: loaded as set, with no note |  | same | holds |
+| macroparticle count, beam.n_particle = 512 in beamlets of 4: loaded as set, with the header's note of what was measured there |  | same | holds |
 | shot noise, no slice with fewer beamlets: the same bits as with beam.beamlet_min_electrons = 0 |  | same | holds |
 | shot noise, a slice with no charge is loaded with no particles |  | same | holds |
 | shot noise, the slices with charge beside slices with none keep their particles and charge |  | same | holds |

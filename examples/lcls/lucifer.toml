@@ -8,7 +8,6 @@ n_wavelength = 68
 n_slice = 300
 
 [beam]
-n_particle = 4096
 bunch_charge = 3.082369e-11
 sig_pz = 1.3e-4
 a_norm_emit = 4e-7

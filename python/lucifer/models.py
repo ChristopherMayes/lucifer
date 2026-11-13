@@ -135,7 +135,7 @@ class Beam:
     position_file: str = ''
     """An openPMD-beamphysics bunch to load, read whole and then sliced by load_mode."""
     n_particle: int = 0
-    """Macroparticles per slice after the phase copies, a positive multiple of beamlet_size. In the keep mode, the particles of the generated bunch. Bounds: from 1."""
+    """Macroparticles per slice after the phase copies, a multiple of beamlet_size. 0 in the sample mode derives it, 512 beamlets of beamlet_size. In the keep mode, the particles of the generated bunch. Bounds: from 0."""
     bunch_charge: float = 0.0
     """Total bunch charge. The current is derived from it and never input. [C] Bounds: from 0.0."""
     sig_z: float = 0.0

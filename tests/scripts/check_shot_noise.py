@@ -58,6 +58,11 @@ load's statistic is held to 1 at every carried harmonic within five standard dev
 size set at twice the highest harmonic must be refused with the size that is accepted,
 and that size must load.
 
+With beam.n_particle unset the loader derives it, 512 beamlets of the derived size: 2048
+macroparticles for the fundamental alone and 4096 with the third harmonic. The header
+must state the count and every slice must hold it. A set count must be loaded as set, and
+under 256 beamlets the header must state the count and what was measured there.
+
 A slice of several wavelengths is loaded over all its periods. A Gaussian bunch with
 slices of 3 and of 12 wavelengths is loaded under the weight load, the first-order kick
 and no noise, and every slice's sum of w exp(-i (m/n) theta) is taken at the m that are
@@ -663,6 +668,54 @@ def derived_size(exe, lat, workdir, seeds):
     return ok
 
 
+# The macroparticles the loader derives where beam.n_particle is 0, its default: 512
+# beamlets of the derived size, for the harmonics carried.
+COUNT_BEAMLETS = 512
+COUNT_LINE = re.compile(r"The (\d+) macroparticles are derived: (\d+) beamlets of (\d+) \(beam\.n_particle\)\.")
+COUNT_WARN = re.compile(r"(\d+) beamlets in a slice, under 256\.")
+
+
+def derived_count(exe, lat, workdir):
+    """The macroparticle count derived from the beamlet size, a set count honored, and the header's note under 256 beamlets."""
+    ok = True
+    for harmonics, size in (((1,), 4), ((1, 3), 8)):
+        want = COUNT_BEAMLETS * size
+        root = f"sn_dc{len(harmonics)}"
+        out, dump = run_load(exe, workdir, root, size_text(lat, root, 3100, harmonics, 0, 0,
+                                                             DERIVED_ELECTRONS * COUNT_BEAMLETS))
+        said = COUNT_LINE.search(out)
+        counts = {sl["n"] for sl in beamio.read_slices(dump, LAMBDA0, SPACING)}
+        dump.unlink()
+        good = (said is not None and [int(g) for g in said.groups()] == [want, COUNT_BEAMLETS, size]
+                and counts == {want} and COUNT_WARN.search(out) is None)
+        ok = ok and good
+        label = f"harmonics {', '.join(str(h) for h in harmonics)}, beam.n_particle unset"
+        print(f"--- macroparticle count, {label}: derived as {want}, {COUNT_BEAMLETS} beamlets of {size}, stated in "
+              f"the header and loaded in every slice  {'ok' if good else 'FAIL ' + str(counts)}")
+        record(f"macroparticle count, {label}: derived as {want}, stated in the header and loaded", None, None,
+               "bool", good)
+
+    # A set count is loaded as set, with no line that it was derived, and under 256 beamlets the
+    # header states the count and what was measured there.
+    for n_particle, size, warned in ((2048, 4, False), (512, 4, True)):
+        root = f"sn_dc_set{n_particle}"
+        out, dump = run_load(exe, workdir, root, size_text(lat, root, 3100, (1,), n_particle, size,
+                                                             DERIVED_ELECTRONS * n_particle / size))
+        counts = {sl["n"] for sl in beamio.read_slices(dump, LAMBDA0, SPACING)}
+        dump.unlink()
+        note = COUNT_WARN.search(out)
+        good = (COUNT_LINE.search(out) is None and counts == {n_particle}
+                and (note is not None and int(note.group(1)) == n_particle // size) == warned
+                and (note is None) == (not warned))
+        ok = ok and good
+        what = "with the header's note of what was measured there" if warned else "with no note"
+        print(f"--- macroparticle count, beam.n_particle = {n_particle} in beamlets of {size}: loaded as set, "
+              f"{what}  {'ok' if good else 'FAIL'}")
+        record(f"macroparticle count, beam.n_particle = {n_particle} in beamlets of {size}: loaded as set, {what}",
+               None, None, "bool", good)
+    return ok
+
+
 def run_load(exe, workdir, root, text):
     """One load_only run from flat keys. Returns its output and its particle dump's path."""
     (workdir / f"{root}.toml").write_text(to_groups(text))
@@ -1042,6 +1095,7 @@ def main():
     ok = fewer_beamlets(exe, PARSED.lat, workdir, PARSED.seeds, 18.0,
                         "Gaussian bunch, beamlets of 18 electrons or more") and ok
     ok = derived_size(exe, PARSED.lat, workdir, max(3, PARSED.seeds // 5)) and ok
+    ok = derived_count(exe, PARSED.lat, workdir) and ok
     ok = same_bits(exe, PARSED.lat, workdir) and ok
     ok = empty_slices(exe, PARSED.lat, workdir) and ok
 

@@ -64,8 +64,8 @@ Every value is measured on this machine. The grid, the slice count, the macropar
 - `window.n_wavelength` is 68, two slices per cooperation length. Half the spacing over twice the slices, the same window at twice the sampling, moves the gain length and the saturation point by about a percent, at twice the wall clock.
 - `window.n_slice` holds 5.4 times the whole line's slippage.
 - `ds_step` in the lattice is 0.09 m, three periods and 38 steps per segment. One period gives the same gain length and an exit power inside the seed spread, at over twice the wall clock.
-- `beam.n_particle` is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
-- `beamlet_size` is 8, the default.
+- `beam.n_particle`: the input file states none. Setup takes 512 beamlets of the beamlet size, 2048 macroparticles, and prints it. 512 beamlets is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
+- `beamlet_size`: the input file states none. Setup takes 4, twice the highest harmonic carried plus 2.
 - `run.source_filter` is T, the default. At its derived edge it removes about a hundred times the wide-angle power and moves the mode power a few percent, since the macroparticle count has already converged.
 
 The run's own convergence report puts the power outside the split angle at a small fraction of the power inside it, so the total field power is the mode. With the filter off the same input file reports about a hundred times that fraction outside the mode.
