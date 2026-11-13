@@ -84,6 +84,7 @@ from convert_genesis import write_openpmd_beam  # noqa: E402
 from lucifer.compare import differences, read_curves  # noqa: E402
 from lucifer.field import read_field  # noqa: E402
 from lucifer.flat import to_toml  # noqa: E402
+from lucifer.stats import scalars  # noqa: E402
 
 STEADY_TOL = 1e-11      # The steady state: one transform pair apart, 1e-12 measured.
 COARSE_TOL = 1.5e-1     # The derived coarse field against one plane a slice on the SASE tier, 8.3e-2
@@ -180,10 +181,9 @@ def worst_of(d, keys=None):
     return out
 
 
-def escaped_energy(text):
-    """The escaped energy the footer states at full precision [J]."""
-    m = re.search(r"Escaped\s+h1\s+(\S+)\s+J", text)
-    return float(m.group(1)) if m else 0.0
+def escaped_energy(stats_file):
+    """The fundamental's escaped energy, run/escaped_energy_h1 of a stats file [J]."""
+    return scalars(stats_file, "run").get("escaped_energy_h1", 0.0)
 
 
 def field_energy(f):
@@ -274,8 +274,8 @@ def coarse(exe, wd, threads, sase_tol):
     text = run(exe, wd, "tdsase.toml", root, base, threads)
     if text is None:
         return False
-    m = re.search(r"Field\s+(\d+) planes of (\d+) wavelengths over the window, (\d+) slices a plane", text)
-    planes, n_wl, n_per = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 1)
+    s = scalars(wd / f"{root}.stats.h5", "setup")
+    planes, n_wl, n_per = s["n_field_plane"], s["field_n_wavelength"], s["slices_per_plane"]
     worst = exit_power_level(wd, root, "spec_tdsase_spectral")
     good = worst <= COARSE_TOL and n_per > 1
     print(f"  coarse field, {planes} planes of {n_wl} wavelengths, {n_per} slices a plane, against one a slice: "
@@ -335,17 +335,20 @@ def cliff(exe, wd, threads):
         (wd / f"{root}.log").write_text(out[key][1])
 
     rc, text = out["stated"]
-    m = re.search(r"Field sampling the window's slice, (\d+) wavelengths, stated: the slice is\s+([0-9.]+) of", text)
-    frac = float(m.group(2)) if m else 0.0
-    good_s = rc == 0 and m is not None and int(m.group(1)) == CLIFF_N_WAVELENGTH and frac > COOP_CLIFF
+    s = scalars(wd / "spec_cliff_stated.stats.h5", "setup") if rc == 0 else {}
+    frac = scalars(wd / "spec_cliff_stated.stats.h5", "run")["slice_spacing"] / s["cooperation_length"] if s else 0.0
+    good_s = rc == 0 and s["field_n_wavelength"] == CLIFF_N_WAVELENGTH and frac > COOP_CLIFF
     print(f"  cliff, the slice stated: exit {rc}, the slice {frac:.2f} of the cooperation length "
           f"(above {COOP_CLIFF})")
     record("a stated sampling equal to a slice above the cliff runs, the slice over the cooperation length",
            frac, COOP_CLIFF, "min", good_s)
 
     rc, text = out["unset"]
-    m = re.search(r"Field sampling (\d+) wavelengths, (\d+) slices a plane, derived", text)
-    n_derived = int(m.group(1)) if m else 0
+    n_derived = 0
+    if rc == 0:
+        with h5py.File(wd / "spec_cliff_unset.stats.h5", "r") as f:
+            if f["params/field/n_wavelength"].attrs["origin"].decode() == "derived":
+                n_derived = int(f["setup/field_n_wavelength"][()])
     good_u = rc == 0 and n_derived == CLIFF_N_WAVELENGTH
     print(f"  cliff, the key unset: exit {rc}, derived {n_derived} wavelengths")
     record("the key unset derives the same slice above the cliff", n_derived, CLIFF_N_WAVELENGTH, "equal", good_u)
@@ -391,7 +394,7 @@ def bank(exe, wd, threads):
         text = run(exe, wd, "spec_bank.toml", root, more, threads)
         if text is None:
             return False
-        escaped = escaped_energy(text)
+        escaped = escaped_energy(wd / f"{root}.stats.h5")
         f0 = read_field(wd / "spec_bank-initial.wf.h5")
         f1 = read_field(wd / f"{root}-final.wf.h5")
         e0, window = field_energy(f0), field_energy(f1)

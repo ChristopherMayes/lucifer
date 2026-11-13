@@ -43,6 +43,7 @@ Usage:
 """
 
 from lucifer.flat import to_toml
+from lucifer.stats import scalars
 import argparse
 import pathlib
 import re
@@ -218,8 +219,13 @@ def containment(exe, wd):
     return good
 
 
-EDGE_LINE = re.compile(r"Protected angle\s+([0-9.eE+-]+)\s+rad.*?"
-                       r"puts the edge at\s+([0-9.eE+-]+)\s+rad")
+def derived_edge(wd, root="sftol"):
+    """The protected angle and the edge the tolerance placed, from the stats file's
+    setup/ group, or None where a stated angle or stated cuts placed the edge."""
+    s = scalars(wd / f"{root}.stats.h5", "setup")
+    if s.get("filter_edge_from") != "tolerance":
+        return None
+    return s["filter_protected_angle"], s["filter_edge"]
 
 
 def edge_margin(tol, width):
@@ -246,7 +252,7 @@ def tolerance(exe, wd):
 
     Every check here has to fail against a run that reads source_filter_tolerance and
     then puts the edge at the protected angle anyway. Each one therefore compares the edge
-    the run printed against the edge the tolerance asks for. The tiers cannot catch that,
+    the run recorded against the edge the tolerance asks for. The tiers cannot catch that,
     since the default of 0.75 puts the edge at the protected angle to the bit.
     """
     ok = True
@@ -263,12 +269,12 @@ def tolerance(exe, wd):
         ("  run.source_filter_tolerance = 0.01\n", 0.01, "stated as 0.01"),
     ):
         r = tolerance_run(exe, wd, extra)
-        m = EDGE_LINE.search(r.stdout.replace("\n", " ")) if r.returncode == 0 else None
+        m = derived_edge(wd) if r.returncode == 0 else None
         if m is None:
             print(f"FAIL: the tolerance {what} did not derive an edge "
                   f"(exit {r.returncode}):\n{r.stdout[-1500:]}", file=sys.stderr)
             return False
-        th_p, edge = float(m.group(1)), float(m.group(2))
+        th_p, edge = m
         if protected is None:
             protected = th_p
         want = th_p / edge_margin(tol, width)
@@ -324,13 +330,13 @@ def tolerance(exe, wd):
 
     r = tolerance_run(exe, wd, "  run.source_filter_tolerance = 1e-17\n"
                                "  run.source_filter_width = 0.01\n")
-    m = EDGE_LINE.search(r.stdout.replace("\n", " ")) if r.returncode == 0 else None
+    m = derived_edge(wd) if r.returncode == 0 else None
     if m is None:
         print(f"FAIL: a tolerance of 1e-17 at a width of 0.01 is feasible and did not "
               f"derive an edge (exit {r.returncode}):\n{r.stdout[-1500:]}", file=sys.stderr)
         ok = False
     else:
-        th_p, edge = float(m.group(1)), float(m.group(2))
+        th_p, edge = m
         want = th_p / edge_margin(1e-17, 0.01)
         good = abs(edge - want) <= 2e-4 * want
         print(f"  a tolerance of 1e-17 at a width of 0.01: edge {edge:.5e} rad against "
@@ -351,8 +357,8 @@ def tolerance(exe, wd):
          "stated cuts"),
     ):
         r = tolerance_run(exe, wd, extra)
-        good = (r.returncode == 0 and "is bypassed" in r.stdout
-                and EDGE_LINE.search(r.stdout.replace("\n", " ")) is None)
+        good = (r.returncode == 0
+                and scalars(wd / "sftol.stats.h5", "setup").get("filter_edge_from") in ("angle", "cuts"))
         print(f"  the tolerance is bypassed by {what}: {'ok' if good else 'FAIL'}")
         record(f"the tolerance is bypassed by {what}", None, None, "bool", good)
         ok = ok and good

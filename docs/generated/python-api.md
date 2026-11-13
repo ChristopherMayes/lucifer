@@ -642,10 +642,10 @@ directory, as for a run restored from an archive.
 The run's particle and field dumps are ``particle_files`` and ``field_files``, key to
 path, and ``particles`` and ``fields``, key to a ParticleGroup or a Wavefront read on
 first access and kept (lucifer.dumps names the keys). The files are the ones the
-footer of the run's output lists. A Result with no output, one made by
-Lucifer.load_output or restored from an archive, takes the dumps it finds by the
-writers' names in ``dump_dir``, else in the run's directory, and a restored archive
-with no ``dump_dir`` has none. ``keep`` holds
+stats file lists in the attribute ``files`` of ``run/``. With ``dump_dir``, as for a
+run restored from an archive with its dumps, they are the dumps found there by the
+writers' names, and a restored archive with no ``dump_dir`` has none. Nothing here
+reads the program's printed output, which ``output`` holds as text for a person. ``keep`` holds
 whatever must outlive the Result for its files to stay, a temporary directory.
 ```
 
@@ -694,7 +694,9 @@ its arguments. Needs the extra lucifer[plot].
 *Property*
 
 ```
-Every file the footer says the run wrote, a frame series expanded to its files.
+Every file the run wrote, as its stats file lists them in the attribute
+``files`` of ``run/``, a frame series expanded to its files. Empty where there is
+no stats file or it carries no list.
 ```
 
 (pyapi-lucifer-runner-result-particle-files)=
@@ -800,8 +802,8 @@ The program: ``exe``, ``$LUCIFER_EXE`` or ``lucifer`` on PATH.
 ```
 A run's particle and field dumps, reached as files and loaded on first use.
 
-The program names every dump it writes after the run's ``out_root``, and its footer
-lists them. ``dump_files`` keys each one by what follows ``<out_root>-``, the form
+The program names every dump it writes after the run's ``out_root``, and the stats
+file lists them in the attribute ``files`` of ``run/``. ``dump_files`` keys each one by what follows ``<out_root>-``, the form
 LUME-Genesis keys its files by:
 
     final, initial          the state after the last element and before the first
@@ -842,7 +844,7 @@ over, the stats file and the text files among them.
 *Function* `expand(name)`
 
 ```
-The file names a footer row stands for: the row itself, or for a frame series
+The file names one entry of the stats file's list stands for: the entry itself, or for a frame series
 written as a shell brace range, ``<root>-{000001..000012}.beam.h5``, every name in
 the range with the range's zero padding.
 ```
@@ -1202,6 +1204,18 @@ The stats file carries NaN wherever a quantity was not computed: the theta momen
 away from element ends, an empty slice's moments, the twiss of a degenerate slice.
 Two files with a NaN in the same place are identical, and plain equality would call
 every such pair different, so every identity check in the validation suite comes here.
+```
+
+(pyapi-lucifer-stats-scalars)=
+### `scalars`
+
+*Function* `scalars(stats_file, group)`
+
+```
+One group of a stats file as a dict, name to value, scalars as plain Python values
+and strings decoded: ``scalars("s7.stats.h5", "setup")["peak_current"]``. ``setup``
+holds what the program worked out before tracking, ``run`` what the run produced and
+``timing`` the wall clock, which are the numbers the program's printout shows.
 ```
 
 (pyapi-lucifer-beam)=

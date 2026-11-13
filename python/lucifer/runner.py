@@ -55,10 +55,10 @@ class Result:
     The run's particle and field dumps are ``particle_files`` and ``field_files``, key to
     path, and ``particles`` and ``fields``, key to a ParticleGroup or a Wavefront read on
     first access and kept (lucifer.dumps names the keys). The files are the ones the
-    footer of the run's output lists. A Result with no output, one made by
-    Lucifer.load_output or restored from an archive, takes the dumps it finds by the
-    writers' names in ``dump_dir``, else in the run's directory, and a restored archive
-    with no ``dump_dir`` has none. ``keep`` holds
+    stats file lists in the attribute ``files`` of ``run/``. With ``dump_dir``, as for a
+    run restored from an archive with its dumps, they are the dumps found there by the
+    writers' names, and a restored archive with no ``dump_dir`` has none. Nothing here
+    reads the program's printed output, which ``output`` holds as text for a person. ``keep`` holds
     whatever must outlive the Result for its files to stay, a temporary directory."""
     returncode: int
     output: str
@@ -89,7 +89,7 @@ class Result:
         rows = [("exit", self.returncode), ("out_root", self.out_root), ("directory", self.cwd),
                 ("stats file", self.stats_path.name)]
         rows += [("overrides", " ".join(self.overrides))] if self.overrides else []
-        rows += [("files", ", ".join(f.name for f in self.files))] if self.output else []
+        rows += [("files", ", ".join(f.name for f in self.files))] if self.files else []
         rows += [("particle dumps", ", ".join(map(str, self.particle_files)) or "none"),
                  ("field dumps", ", ".join(map(str, self.field_files)) or "none")]
         return table("Result", rows)
@@ -118,21 +118,31 @@ class Result:
 
     @property
     def files(self) -> list[pathlib.Path]:
-        """Every file the footer says the run wrote, a frame series expanded to its files."""
+        """Every file the run wrote, as its stats file lists them in the attribute
+        ``files`` of ``run/``, a frame series expanded to its files. Empty where there is
+        no stats file or it carries no list."""
+        import h5py
         from lucifer.dumps import expand
-        return [self.cwd / f for row in WROTE.findall(self.output) for f in expand(row)]
+        try:
+            with h5py.File(self.stats_path, "r") as f:
+                rows = f["run"].attrs.get("files", []) if "run" in f else []
+                rows = [r.decode() if isinstance(r, bytes) else str(r) for r in rows]
+        except OSError:
+            return []
+        return [self.cwd / f for row in rows for f in expand(row)]
 
     def _dump_paths(self):
-        """The footer's files, else the dumps in dump_dir, else none for a run restored
-        from an archive, else the dumps in the run's directory."""
+        """The dumps in dump_dir, else none for a run restored from an archive, else the
+        files the stats file lists, else the dumps in the run's directory."""
         import glob
-        if self.output:
-            return self.files
         if self.dump_dir is not None:
             where = pathlib.Path(self.dump_dir)
         elif self.stats_file is not None:
             return []
         else:
+            listed = [f for f in self.files if f.is_file()]
+            if listed:
+                return listed
             where = self.cwd
         return sorted(where.glob(f"{glob.escape(self.out_root)}-*.h5")) if where.is_dir() else []
 
@@ -189,8 +199,6 @@ class Result:
         return self.fields.load_all()
 
 
-OUT_ROOT = re.compile(r'^ Output\s+out_root "([^"]*)"', re.M)
-WROTE = re.compile(r"^(?: Wrote\s+|\s{13})(\S+\.(?:h5|txt))", re.M)
 ERROR_BLOCK = re.compile(r"^\[ERROR[^\n]*\n((?:    [^\n]*\n?)+)", re.M)
 
 
@@ -220,9 +228,10 @@ def run(input_file, cwd=".", exe=None, threads=None, overrides=(), name="lucifer
         out = (err.stdout or b"").decode(errors="replace") if isinstance(err.stdout, bytes) else (err.stdout or "")
         raise LuciferError(f"the run passed its timeout of {timeout} s", out, -1) from None
     output = r.stdout + r.stderr
-    m = OUT_ROOT.search(output)
-    if m:
-        out_root = m.group(1)
+    for item in overrides:
+        key, _, value = str(item).partition("=")
+        if key.strip() == "run.out_root":
+            out_root = value.strip().strip("'\"")
     if r.returncode != 0:
         blocks = ERROR_BLOCK.findall(output)
         message = "\n".join(b.strip() for b in blocks) or output.strip()[-2000:]

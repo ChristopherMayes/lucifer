@@ -152,7 +152,7 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 **ramp, second meaning.** The periods at each end of an unaveraged segment over which the undulator field rises from zero and falls back, `run.unaveraged_ramp_periods`, 2 by default. A segment with none is a hard edge ([](fel-physics.md#sec-unaveraged)).
 
 (gl-walk)=
-**walk.** One pass down the line, from `run.track_start` to `run.track_end`, element by element and step by step. The footer's timing table partitions the walk into its phases, and the header's estimate is an estimate of the walk ([](#gl-estimate), [](performance.md)).
+**walk.** One pass down the line, from `run.track_start` to `run.track_end`, element by element and step by step. The `timing` part of the closing block partitions the walk into its phases, and the header's estimate is an estimate of the walk ([](#gl-estimate), [](performance.md)).
 
 (gl-comb)=
 **comb.** The positions along the line where the run takes a statistics row, every `run.comb_ds_save` metres, with an element end always one of them. The frame series rides the comb ([](user-guide.md)).
@@ -181,7 +181,7 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 **ledger.** The unaveraged mode's energy accounting, one row per record, `<out_root>.ledger.txt`: the beam's energy change, the field's, the escaped and spontaneous terms, and the closure ([](fel-physics.md#sec-unaveraged)).
 
 (gl-header)=
-**header, footer.** What a run prints before and after the walk. The header states the derived numbers with their origins, the work and the estimate. The footer states the timing by phase, the exit energies and every file the run wrote ([](user-guide.md)).
+**header, footer.** What a run prints before and after the walk. The header states the settings under their key names with their origins, the derived quantities, the storage, the work and the estimate. The footer is the closing block, which states the result at the exit, the timing by phase and every file the run wrote ([](user-guide.md)).
 
 ## The device and single precision
 

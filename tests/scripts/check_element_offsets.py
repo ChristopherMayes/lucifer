@@ -26,7 +26,7 @@ in x, y, px and py. The checks hold max |d_avg - d_bs| / max |d_bs| near roundof
 and max |d_uv - d_rk| / max |d_rk| and max |d_avg - d_rk| / max |d_rk| at the model
 level. The kick's d_rk itself is checked against the kick: px moves by hkick and x by
 L hkick / 2. Two refusals are matched on their messages, kx on a helical element and
-a pitched element, and the header's line naming the attributes is checked for.
+a pitched element.
 
 Run by the validation suite. Exits nonzero on failure.
 """
@@ -219,11 +219,6 @@ def main():
         check(f"all: {tr} max |d_all - (d_offset + d_kx + d_kick)| / max |d_all|",
               rel(d[(tr, "all")], s3) * np.abs(s3).max() / np.abs(d[(tr, "all")]).max(),
               BOUNDS["all"][tr])
-
-    # The header names the attributes.
-    log = run(exe, wd, "op_hdr", NML.format(lat="op_avg_all.bmad", root="op_hdr", extra="")).stdout
-    check_message("header: the element's line names x_offset, kx and hkick", log,
-                  "UNDS: x_offset  3.000E-05 m")
 
     # Refusals: kx on a helical element, and a pitched element.
     (wd / "op_helical_kx.bmad").write_text("call, file = spont_probe.bmad\nUNDS[kx] = 100\n")

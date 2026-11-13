@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Record what an example's run measured, from its stats file and its log.
+Record what an example's run measured, from its stats file.
 
   example_record.py <input.toml> <log>              # rows of the record, to stdout
-  example_record.py --sample <log> --out <md>    # the sample output the user guide shows
+  example_record.py --sample <log> [--sample-ascii <log>] --out <md>   # the sample output the user guide shows
+  example_record.py --exit <input.toml> [--since <s>]   # the out_root, and the light at the exit
 
 The first form reads the input file for its out_root, opens the stats file the run wrote
 beside it and the log the runner kept, and prints one row per quantity:
@@ -86,18 +87,40 @@ import sys
 import h5py
 import numpy as np
 
-# The header lines the user guide's sample shows. The Lucifer version line is not among
-# them: it changes with every commit, and the generated page would change with it.
-SAMPLE_PREFIXES = (" Lucifer --", " Beam ", " Radiation ", " Work ", " Load ", " Exit ",
-                   " Split ", "             mode peak", "             last record")
+# What opens a rule of a box of the printout, in Unicode and in ASCII, and the tag line
+# beside the logo, at whose column the logo's other lines carry the version, the date
+# and the host.
+RULE_STARTS, TAG_LINE = (" \u256d", " \u251c", " \u2570", " +"), "FEL tracking in Bmad"
 
 
 def out_root(input_file: pathlib.Path) -> str:
-    for line in input_file.read_text().splitlines():
-        m = re.match(r"\s*(?:run.)?out_root\s*=\s*['\"]([^'\"]+)['\"]", line)
-        if m:
-            return m.group(1)
-    raise SystemExit(f"{input_file}: no out_root")
+    import tomllib
+    root = tomllib.loads(input_file.read_text()).get("run", {}).get("out_root")
+    if not root:
+        raise SystemExit(f"{input_file}: no out_root")
+    return root
+
+
+def si(value: float, unit: str) -> str:
+    """A number with an SI prefix, three decimals, as a table row reads best."""
+    if value == 0:
+        return f"0 {unit}"
+    exp = max(-24, min(15, 3 * math.floor(math.log10(abs(value)) / 3)))
+    return f"{value / 10.0 ** exp:.3f} {'yzafpnµm kMGTP'[exp // 3 + 8].strip()}{unit}"
+
+
+def exit_line(input_file: pathlib.Path, since: float) -> str:
+    """The out_root, and on a second line the light at the exit as the stats file's run/
+    group holds it. Fails where the stats file is absent or older than ``since``."""
+    root = out_root(input_file)
+    stats = input_file.parent / f"{root}.stats.h5"
+    if not stats.exists() or stats.stat().st_mtime < since:
+        raise SystemExit(f"{root}\n")
+    with h5py.File(stats, "r") as h5:
+        run = h5["run"]
+        return (f"{root}\npower {si(float(run['exit_power'][()]), 'W')}, window energy "
+                f"{si(float(run['exit_window_energy'][()]), 'J')}, pulse energy "
+                f"{si(float(run['exit_pulse_energy'][()]), 'J')}")
 
 
 def fmt(v) -> str:
@@ -111,36 +134,27 @@ def fmt(v) -> str:
     return f"{f:.4e}"
 
 
-def from_log(log: pathlib.Path):
-    """The setup quantities a log states, as (name, value, unit)."""
+def from_setup(h5):
+    """The setup quantities, as (name, value, unit), from the stats file's setup/ group
+    and the origin each key of params/ carries."""
     out = []
-    text = log.read_text() if log.exists() else ""
-    m = re.search(r"grid (\d+) points of ([0-9.]+) (um|nm|mm)", text)
-    if m:
-        scale = {"um": 1e-6, "nm": 1e-9, "mm": 1e-3}[m.group(3)]
-        out.append(("grid_cell", float(m.group(2)) * scale, "m"))
-    m = re.search(r"Grid (\d+) points, derived:.*?rounded up from (\d+)", text)
-    if m:
-        out += [("grid_derived", True, ""), ("grid_derived_from", int(m.group(2)), "")]
-    elif re.search(r"Grid \d+ points, derived", text):
-        out.append(("grid_derived", True, ""))
-    else:
-        out.append(("grid_derived", False, ""))
-    m = re.search(r"The beamlet size (\d+) is (derived|set)", text)
-    if m:
-        out += [("beamlet_size", int(m.group(1)), ""), ("beamlet_size_derived", m.group(2) == "derived", "")]
-    if re.search(r" Load ", text):
-        out.append(("n_particle_derived", re.search(r"The \d+ macroparticles are derived", text) is not None, ""))
-    m = re.search(r"Work\s+(\d+) FEL steps", text)
-    if m:
-        out.append(("fel_steps", int(m.group(1)), ""))
-    m = re.search(r"Source filter: mode angle\s+([0-9.E+-]+) rad, rho angle\s+([0-9.E+-]+) rad, ratio\s+([0-9.E+-]+)", text)
-    if m:
-        out += [("filter_mode_angle", float(m.group(1)), "rad"), ("filter_rho_angle", float(m.group(2)), "rad"),
-                ("filter_ratio", float(m.group(3)), "")]
-    m = re.search(r"(?:puts the edge at|Edge at)\s+([0-9.E+-]+)\s*rad", text)
-    if m:
-        out.append(("filter_edge", float(m.group(1)), "rad"))
+    setup = h5["setup"]
+
+    def origin(key):
+        return h5[f"params/{key}"].attrs["origin"].decode() if f"params/{key}" in h5 else ""
+
+    out.append(("grid_cell", float(setup["grid_cell"][()]), "m"))
+    out.append(("grid_derived", origin("field/grid_n_pts") == "derived", ""))
+    if "grid_n_pts_unrounded" in setup and int(setup["grid_n_pts_unrounded"][()]) != int(setup["grid_n_pts"][()]):
+        out.append(("grid_derived_from", int(setup["grid_n_pts_unrounded"][()]), ""))
+    out += [("beamlet_size", int(setup["beamlet_size"][()]), ""),
+            ("beamlet_size_derived", origin("beam/beamlet_size") == "derived", "")]
+    out.append(("n_particle_derived", origin("beam/n_particle") == "derived", ""))
+    out.append(("fel_steps", int(setup["n_fel_step"][()]), ""))
+    if "filter_mode_angle" in setup:
+        mode, rho = float(setup["filter_mode_angle"][()]), float(setup["filter_rho_angle"][()])
+        out += [("filter_mode_angle", mode, "rad"), ("filter_rho_angle", rho, "rad"),
+                ("filter_ratio", mode / rho if rho > 0 else 0.0, ""), ("filter_edge", float(setup["filter_edge"][()]), "rad")]
     return out
 
 
@@ -242,17 +256,50 @@ def rows_for(input_file: pathlib.Path, log: pathlib.Path):
         rows.append(("n_particle", int(npart[0].max()), ""))
         if "params/field/grid_n_pts" in h5:
             rows.append(("grid_n_pts", int(h5["params/field/grid_n_pts"][()]), ""))
-    rows += from_log(log)
+        rows += from_setup(h5)
     return rows
 
 
-def sample(log: pathlib.Path, out: pathlib.Path) -> None:
-    lines = [l.rstrip() for l in log.read_text().splitlines() if l.startswith(SAMPLE_PREFIXES)]
-    if not lines:
-        raise SystemExit(f"{log}: no lines to sample")
+def sample_lines(log: pathlib.Path) -> list[str]:
+    """The printout of a log as the user guide shows it: the logo, the boxes of the header
+    with their legend and warnings, and the result. Left out are what changes from run to
+    run or names the machine: the version, date and host beside the logo, the estimate,
+    the progress rows, the timing and the sizes of the files."""
+    lines = [l.rstrip() for l in log.read_text().splitlines()]
+    rules = [i for i, l in enumerate(lines) if l.startswith(RULE_STARTS) and len(l) > 40]
+    if not rules or TAG_LINE not in lines[rules[0] - 4]:
+        raise SystemExit(f"{log}: no printout to sample")
+    first = rules[0]
+    column = lines[first - 4].index(TAG_LINE)
+    out = [lines[first - 4]] + [l[:column].rstrip() for l in lines[first - 3:first - 1] if l[:column].strip()] + [""]
+    i = first
+    while i < len(lines) and lines[i].strip():
+        if " estimate " not in lines[i][:14]:
+            out.append(lines[i])
+        i += 1
+    while i < len(lines) and (not lines[i].strip() or lines[i].startswith(" ! ")):
+        if lines[i].strip():
+            out.append(lines[i])
+        i += 1
+    result = [i for i in rules if " result " in lines[i]]
+    if result:
+        out.append("")
+        i = result[0]
+        while " timing " not in lines[i]:
+            out.append(lines[i])
+            i += 1
+        out.append(lines[rules[-1]])
+    return out
+
+
+def sample(log: pathlib.Path, out: pathlib.Path, ascii_log: pathlib.Path | None = None) -> None:
+    text = ("<!-- Generated by examples/run_examples.sh from the steady-state example's log. Do not edit. -->\n\n"
+            "```\n" + "\n".join(sample_lines(log)) + "\n```\n")
+    if ascii_log is not None:
+        text += ("\nWith `--ascii`, and `run.load_only=true` on the command line, the same input file "
+                 "prints its header and stops:\n\n```\n" + "\n".join(sample_lines(ascii_log)) + "\n```\n")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("<!-- Generated by examples/run_examples.sh from the steady-state example's log. Do not edit. -->\n\n"
-                   "```\n" + "\n".join(lines) + "\n```\n")
+    out.write_text(text)
 
 
 def main() -> int:
@@ -260,12 +307,23 @@ def main() -> int:
     ap.add_argument("input_file", nargs="?", help="The input file the run read")
     ap.add_argument("log", nargs="?", help="The log the runner kept")
     ap.add_argument("--sample", metavar="LOG", help="Write the sample output of this log instead")
+    ap.add_argument("--sample-ascii", metavar="LOG", help="With --sample, the log of the same input under --ascii")
     ap.add_argument("--out", help="Where --sample writes")
+    ap.add_argument("--exit", metavar="INPUT", help="Print this input file's out_root and its run's light at the exit")
+    ap.add_argument("--since", type=float, default=0.0, help="With --exit, the time the run started (s)")
     a = ap.parse_args()
+    if a.exit:
+        try:
+            print(exit_line(pathlib.Path(a.exit), a.since))
+        except SystemExit as err:
+            print(str(err.code).strip())
+            return 1
+        return 0
     if a.sample:
         if not a.out:
             ap.error("--sample needs --out")
-        sample(pathlib.Path(a.sample), pathlib.Path(a.out))
+        sample(pathlib.Path(a.sample), pathlib.Path(a.out),
+               pathlib.Path(a.sample_ascii) if a.sample_ascii else None)
         return 0
     if not (a.input_file and a.log):
         ap.error("give <input> <log>, or --sample <log> --out <md>")

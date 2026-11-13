@@ -234,6 +234,7 @@ if (run%bparam%beamlet_size == 0) then
   endif
   run%bparam%beamlet_size = m_size
   run%bparam%beamlet_size_derived = .true.
+  call fel_schema_mark (run, 'beam.beamlet_size', fel_origin_derived$)
 endif
 
 ! The macroparticles in a slice, where the input file states none and the sample mode
@@ -246,6 +247,7 @@ if (run%beam_init%n_particle == 0 .and. run%bparam%load_mode == 'sample' .and. &
     run%bparam%beam_file == '' .and. .not. run%resample%use_beam_init) then
   run%beam_init%n_particle = fel_beamlets_default$ * run%bparam%beamlet_size
   run%bparam%n_particle_derived = .true.
+  call fel_schema_mark (run, 'beam.n_particle', fel_origin_derived$)
 endif
 
 ! The load has to carry the harmonic it is asked to start. The quiet start leaves no
@@ -628,8 +630,9 @@ half = run%winit%grid_half_width
 if (half <= 0) then
   half = fel_widths_per_sigma$ * sig
   run%winit%grid_half_width = half
+  call fel_schema_mark (run, 'field.grid_half_width', fel_origin_derived$)
   call out_io (s_info$, r_name, 'Grid half width \es10.3\ m, derived: \f0.1\ rms beam sizes ' // &
-               'of \es10.3\ m (docs/startup-noise.md).', &
+               'of \es10.3\ m.', &
                r_array = [half, fel_widths_per_sigma$, sig])
 endif
 
@@ -641,6 +644,9 @@ if (run%winit%grid_n_pts <= 0) then
     n_pts = 2 * n_pts
   enddo
   run%winit%grid_n_pts = n_pts
+  call fel_schema_mark (run, 'field.grid_n_pts', fel_origin_derived$)
+  call fel_record_int ('setup', 'grid_n_pts_unrounded', 'The grid points the derivation asked for, ' // &
+        'before the count was rounded up to a power of two.', n_raw)
   call out_io (s_info$, r_name, 'Grid \i0\ points, derived: cells of \es10.3\ m, a beam size ' // &
                'over \f0.1\ , rounded up from \i0\ to a power of two.', &
                i_array = [n_pts, n_raw], r_array = [2 * half / (n_pts - 1), fel_cells_per_sigma$])
@@ -802,6 +808,8 @@ logical td
 !
 
 rho = described_pierce ()
+run%rho_1d = rho
+run%sigma_beam = described_beam_size ()
 td = (run%beam_init%sig_z > 0 .or. &
       run%beam_init%grid(3)%x_max > run%beam_init%grid(3)%x_min .or. &
       run%slicing%window_length > 0 .or. run%slicing%n_slice > 0)
@@ -813,6 +821,7 @@ td = (run%beam_init%sig_z > 0 .or. &
 ! unset.
 
 if (run%slicing%n_wavelength == 0) then
+  call fel_schema_mark (run, 'window.n_wavelength', fel_origin_derived$)
   if (td .and. rho > 0) then
     l_coop = run%winit%lambda0 / (4 * pi * rho)
     n_wl = max(1, int(0.25_rp * l_coop / run%winit%lambda0))
@@ -1458,6 +1467,8 @@ if (any(is_fel)) then
         run%und_of%filter%ycut = max(run%global%source_filter_ycut, 1.0e-12_rp)
         run%und_of%filter%angle = 0
       end where
+      call fel_record_str ('setup', 'filter_edge_from', 'What placed the source filter''s edge: the ' // &
+            'tolerance, a stated angle or stated cuts.', 'cuts')
       call out_io (s_info$, r_name, 'Source filter: edge from xcut and ycut, ' // &
                    'validation-internal, at \es10.3\ rad on this grid.', &
                    'The cuts place the edge directly, so source_filter_tolerance is bypassed.', &
@@ -1502,16 +1513,25 @@ if (any(is_fel)) then
       ! of 1.14 to 1.86 on four machines (docs/startup-noise.md). A ratio outside 0.3 to 3
       ! is far from that range and draws a warning.
 
+      run%filter_edge = th
       ratio = 0
       if (th_rho > 0) ratio = th_mode / th_rho
+      call fel_record_real ('setup', 'filter_mode_angle', 'rad', 'The source filter''s mode angle.', th_mode)
+      call fel_record_real ('setup', 'filter_rho_angle', 'rad', 'The source filter''s rho angle.', th_rho)
       call out_io (s_info$, r_name, 'Source filter: mode angle \es10.3\ rad, ' // &
                    'rho angle \es10.3\ rad, ratio \f8.2\ .', &
                    r_array = [th_mode, th_rho, ratio])
       if (run%global%source_filter_angle > 0) then
+        call fel_record_str ('setup', 'filter_edge_from', 'What placed the source filter''s edge: the ' // &
+              'tolerance, a stated angle or stated cuts.', 'angle')
         call out_io (s_info$, r_name, 'Edge at \es12.5\ rad, set by the input file, so ' // &
                      'source_filter_tolerance is bypassed. Sigmoid on axis \f7.4\ .', &
                      r_array = [th, 1 / (1 + exp(-1 / run%global%source_filter_width))])
       else
+        call fel_record_str ('setup', 'filter_edge_from', 'What placed the source filter''s edge: the ' // &
+              'tolerance, a stated angle or stated cuts.', 'tolerance')
+        call fel_record_real ('setup', 'filter_protected_angle', 'rad', 'The angle inside which the source ' // &
+              'filter holds its loss to run.source_filter_tolerance.', th_p)
         call out_io (s_info$, r_name, 'Protected angle \es12.5\ rad, ' // trim(origin) // &
                      '. Tolerance \f7.4\ puts the edge at \es12.5\ rad. Sigmoid on axis \f7.4\ .', &
                      r_array = [th_p, run%global%source_filter_tolerance, th, &
@@ -1556,7 +1576,6 @@ run%any_unavg = any(fel_mode == unaveraged$ .and. is_fel)
 
 if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
   call out_io (s_error$, r_name, 'WAKES/SPACE CHARGE ARE NOT WIRED INTO THE UNAVERAGED MODE', &
-                                 '(SEE fel-physics.md sec-unaveraged).', &
                                  'POSSIBLE SOLUTION: TURN THEM OFF.')
   err_flag = .true.;  return
 endif
@@ -1839,6 +1858,7 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
                    '" DOES NOT COVER THE ESCAPED-FIELD BANK UNDER FIELD.PROPAGATOR = "slices", SO THIS RUN KEEPS NONE.', &
                    'THE STATS FILE STILL RECORDS ESCAPED_ENERGY AND PULSE_ENERGY.')
       run%global%keep_escaped_field = .false.
+      call fel_schema_mark (run, 'run.keep_escaped_field', fel_origin_derived$)
     endif
   endif
   if (run%global%transport_model /= 'bmad') then

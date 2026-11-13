@@ -10,7 +10,7 @@
 # its derived sampling, six slices a plane, which is the second table of that page.
 #
 # Usage:
-#   ./device_table.sh [--exe <path>] [--workers N] [--work-dir <path>]
+#   ./device_table.sh [--exe <path>] [--workers N] [--work-dir <path>] [--python <path>]
 #
 # The production lucifer is preferred, found as in run_fel_validation.sh. The work
 # directory is kept. The input files are the *.toml files beside this script, and the lattice
@@ -21,12 +21,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../util/locations.sh
 source "$SCRIPT_DIR/../../util/locations.sh"
 
-EXE=""; WORKERS=""; WORK_DIR=""
+EXE=""; WORKERS=""; WORK_DIR=""; PYTHON=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --exe)       EXE="$2";      shift 2 ;;
     --workers)   WORKERS="$2";  shift 2 ;;
     --work-dir)  WORK_DIR="$2"; shift 2 ;;
+    --python)    PYTHON="$2";   shift 2 ;;
     -h|--help)   sed -n '2,17p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -40,6 +41,16 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Error: no lucifer binary found (use --exe)." >&2; exit 1
 fi
 [[ "$EXE" == /* ]] || EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
+if [[ -z "$PYTHON" ]]; then
+  for candidate in "${LUCIFER_PYTHON:-}" \
+                   "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/python3" \
+                   "$(command -v python3 2>/dev/null)"; do
+    if [[ -x "$candidate" ]]; then PYTHON="$candidate"; break; fi
+  done
+fi
+if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
+  echo "Error: no python3 with the lucifer package found (use --python)." >&2; exit 1
+fi
 if [[ -z "$WORKERS" ]]; then
   WORKERS="$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || nproc 2>/dev/null)"
 fi
@@ -73,14 +84,15 @@ variant_of () {
   esac
 }
 
-# walk_of <log> prints the walk row's seconds from the footer's Timing block.
-walk_of () {
-  awk '/^ Timing/ {t = 1; next} t && $1 == "walk" {print $3; exit}' "$1"
+# value_of <log> <group/name> ... prints values of the stats file the run of that log
+# wrote, <root>.stats.h5 beside <root>.log.
+value_of () {
+  local stats="${1%.log}.stats.h5"; shift
+  "$PYTHON" -m lucifer.stats "$stats" "$@"
 }
-# busy_of <log> prints the device-busy seconds the backend reports.
-busy_of () {
-  sed -n 's/.*device busy *\([0-9.]*\) s.*/\1/p' "$1" | head -n 1
-}
+# walk_of <log> prints the walk's seconds, and busy_of <log> the device-busy seconds.
+walk_of () { value_of "$1" timing/walk; }
+busy_of () { value_of "$1" timing/device_busy; }
 
 echo "=============================================================================="
 echo "The device against the CPU: best of three walks on each side"

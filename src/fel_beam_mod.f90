@@ -53,6 +53,7 @@ module fel_beam_mod
 use bmad
 use hdf5_interface
 use fel_h5_mod
+use fel_record_mod
 
 implicit none
 
@@ -959,7 +960,7 @@ call out_io (s_error$, r_name, 'CONTINUATION FROM A BEAM FILE WITH NO CHECKPOINT
      trim(file_name), &
      'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
      'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
-     'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (docs/reading-output.md).')
+     'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT.')
 
 end subroutine fel_say_no_checkpoint
 
@@ -2304,6 +2305,18 @@ nl = 2
 write (lines(1), '(a, i0, a)') 'Shot noise imposed on ', tally%n_slice, &
       ' slices, one phasor per group, the groups being ' // trim(what) // '.'
 write (lines(2), '(a, es10.2)') '  worst quiet floor before imposing, |b|^2 * N_lambda: ', floor_n_lambda
+
+! The same as values, for the stats file (fel_record_mod).
+
+call fel_record_str ('setup', 'noise_groups', 'What the shot noise takes as a group, one phasor each.', trim(what))
+call fel_record_real ('setup', 'quiet_floor', '1', 'The worst quiet floor of a slice before the shot noise ' // &
+      'is imposed, |b|^2 times the electrons in a wavelength.', floor_n_lambda)
+if (tally%n_slice > 0 .and. tally%n_electron > 0) then
+  call fel_record_real ('setup', 'shot_noise_ratio', '1', 'The noise power loaded over the shot-noise ' // &
+        'power at the fundamental, as the load''s closed form gives it.', tally%power / tally%n_electron)
+  call fel_record_int ('setup', 'n_slice_fewer_beamlets', 'The slices loaded with fewer beamlets than ' // &
+        'the full count.', tally%n_slice_thin)
+endif
 
 if (tally%n_slice > 0 .and. tally%n_electron > 0) then
   nl = nl + 1

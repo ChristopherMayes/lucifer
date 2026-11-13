@@ -58,12 +58,12 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | slice spacing | 1.0000e-10 | m |
 | macroparticles per slice | 2048 |  |
 | grid points | 128 |  |
-| grid cell | 3.1500e-06 | m |
+| grid cell | 3.1496e-06 | m |
 | grid derived by setup | no |  |
 | FEL steps | 80 |  |
-| source filter, mode angle | 3.2640e-06 | rad |
-| source filter, rho angle | 2.5880e-06 | rad |
-| source filter, ratio of the angles | 1.2600e+00 |  |
+| source filter, mode angle | 3.2637e-06 | rad |
+| source filter, rho angle | 2.5883e-06 | rad |
+| source filter, ratio of the angles | 1.2609e+00 |  |
 | source filter, edge | 3.2637e-06 | rad |
 | beamlet size | 8 |  |
 | beamlet size derived by setup | no |  |

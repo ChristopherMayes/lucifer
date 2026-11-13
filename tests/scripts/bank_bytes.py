@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """
-The bytes the header states for the escaped-field bank, against the files the run kept.
+The bytes a run states for the escaped-field bank before it tracks, against the files it kept.
 
-A run whose light leaves the window states before it tracks how many slices leave and,
-for each member of the field set, the bytes of the files it keeps (write_bank_bytes in
-src/fel_io_mod.f90): the pulse, and with run.write_escaped the escaped file too. The
-banked planes stream into those files and into nothing else, so the bytes kept are also
-the peak on disk. stated() reads those lines and kept() sums the files of one member on
-disk.
+A run whose light leaves the window records in its stats file, before it tracks, how many
+slices leave (setup/n_slice_leaving) and, for each member of the field set, the bytes of
+the files it keeps (setup/bank_bytes_h<h>): the pulse, and with run.write_escaped the
+escaped file too. The banked planes stream into those files and into nothing else, so the
+bytes kept are also the peak on disk. stated() reads those values and kept() sums the
+files of one member on disk.
 
-    python3 bank_bytes.py <log> <dir>
+    python3 bank_bytes.py <stats file> <dir>
 
-holds every member a log states to its files within TOLERANCE, and a log that states no
-bank to a directory with no pulse or escaped file of its out_root. It prints one line per
-member and exits nonzero on a failure. The examples job runs it on every example.
+holds every member a stats file states to its files within TOLERANCE, and a stats file
+that states no bank to a directory with no pulse or escaped file of its out_root. It
+prints one line per member and exits nonzero on a failure. The examples job runs it on
+every example.
 """
 
 from __future__ import annotations
@@ -22,37 +23,31 @@ import pathlib
 import re
 import sys
 
+import h5py
+
 # The estimate counts the planes, 16 bytes a grid point a component, and the rows of the
 # private group. HDF5's own headers and chunk index are the rest, tens of kilobytes. That
 # is 2.5e-3 of the two-polarization check's 24 MB, the largest share any check measures,
 # and 6.6e-5 of the sase example's 1.34 GB pulse.
 TOLERANCE = 1e-2
 
-OUT_ROOT = re.compile(r'^ Output\s+out_root "([^"]*)"', re.M)
-SLICES = re.compile(r"^ Bank\s+(\d+) slices leave the window", re.M)
-MEMBER = re.compile(r"^\s+h(\d+): the (pulse file|pulse and escaped files) about (\S+) bytes kept, "
-                    r"which is the peak", re.M)
+MEMBER = re.compile(r"^bank_bytes_h(\d+)$")
 
 
-def stated(text):
-    """The header's bank lines: (slices, {harmonic: (kept, peak, both)}), both True when
-    the run keeps the escaped file too. (0, {}) when the header states no bank."""
-    m = SLICES.search(text)
-    if not m:
-        return 0, {}
+def stated(stats_file):
+    """What a stats file states of the bank: (slices, {harmonic: (kept, peak, both)}),
+    both True when the run keeps the escaped file too. (0, {}) when it states no bank."""
     members = {}
-    for h, what, kept_s in MEMBER.findall(text):
-        kept_b = float(kept_s)
-        members[int(h)] = (kept_b, kept_b, what != "pulse file")
-    return int(m.group(1)), members
-
-
-def out_root(text):
-    """The out_root the header names."""
-    m = OUT_ROOT.search(text)
-    if not m:
-        raise ValueError("the log has no Output line naming its out_root")
-    return m.group(1)
+    with h5py.File(stats_file, "r") as f:
+        setup = f["setup"]
+        both = bool(f["params/run/write_escaped"][()])
+        for name in setup:
+            m = MEMBER.match(name)
+            if m:
+                kept_b = float(setup[name][()])
+                members[int(m.group(1))] = (kept_b, kept_b, both)
+        n = int(setup["n_slice_leaving"][()]) if members else 0
+    return n, members
 
 
 def bank_file(wd, root, harm, what):
@@ -73,9 +68,8 @@ def main(argv):
         print(__doc__)
         return 2
     log, wd = pathlib.Path(argv[1]), pathlib.Path(argv[2])
-    text = log.read_text(errors="replace")
-    root = out_root(text)
-    n, members = stated(text)
+    root = log.name.removesuffix(".stats.h5")
+    n, members = stated(log)
     failed = False
     if not members:
         left = sorted(p.name for w in ("pulse", "escaped") for p in wd.glob(f"{root}-{w}*.wf.h5"))

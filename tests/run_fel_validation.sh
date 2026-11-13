@@ -904,7 +904,7 @@ sec_fp32_lockstep () {
 sec_device () {
   local backend
   echo "--- Device backend checks -------------------------------------------------------"
-  backend="$("$EXE" 2>&1 | sed -n 's/^Device backend: //p' | head -1)"
+  backend="$("$EXE" --version 2>&1 | sed -n 's/^Device backend: //p' | head -1)"
   case "$backend" in
     none*)
       echo "SKIP: ${backend#none. }"

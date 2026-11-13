@@ -172,6 +172,58 @@ end function fel_timer_seconds
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function fel_timer_regions (iphase) result (n)
+!
+! Routine to return the number of times a phase was entered.
+!
+! Input:
+!   iphase -- integer: The phase, one of the fel_t_ parameters.
+!
+! Output:
+!   n      -- integer: The regions of the phase closed so far.
+!-
+
+function fel_timer_regions (iphase) result (n)
+
+integer iphase, n
+
+!
+
+n = int(min(n_region(iphase), int(huge(1), 8)))
+
+end function fel_timer_regions
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_timer_run_seconds () result (secs)
+!
+! Routine to give the seconds since fel_timer_reset, which the program calls before it
+! reads anything, so the whole process.
+!
+! Output:
+!   secs -- real(rp): The seconds, 0 before the clock was started.
+!-
+
+function fel_timer_run_seconds () result (secs)
+
+real(rp) secs
+integer(8) now
+
+!
+
+secs = 0
+if (t_rate == 0) return
+call system_clock (now)
+secs = real(now - t_run0, rp) / t_rate
+
+end function fel_timer_run_seconds
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_timer_write (r_name)
 !
 ! Routine to print the phase table.

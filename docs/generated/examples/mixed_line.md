@@ -76,7 +76,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | slice spacing | 1.0000e-10 | 1.0000e-10 | m |
 | macroparticles per slice | 2048 | 2048 |  |
 | grid points | 128 | 128 |  |
-| grid cell | 3.1500e-06 | 3.1500e-06 | m |
+| grid cell | 3.1496e-06 | 3.1496e-06 | m |
 | grid derived by setup | no | no |  |
 | FEL steps | 6319 | 1068 |  |
 | beamlet size | 4 | 4 |  |

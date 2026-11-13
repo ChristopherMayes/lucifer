@@ -4070,6 +4070,62 @@ Output:
   err_flag  -- logical: Set True if a file could not be written. False otherwise.
 ```
 
+(api-si-text)=
+### `si_text`
+
+*Function* `(value, unit) result (txt)`
+
+```
+Routine to write a value with its unit scaled to a prefix, for a box of the printout:
+30.824 pC, 150.992 pm. The mantissa keeps at most three decimals and loses its trailing
+zeros down to one, the micro prefix is fel_micro$, which fel_print_line writes as the
+micro sign or as u, and zero is written as 0 and the unit.
+```
+
+```
+Input:
+  value -- real(rp): The value in the unit.
+  unit  -- character(*): The unit, m or C.
+
+Output:
+  txt   -- character(:), allocatable: The text.
+```
+
+(api-number-text)=
+### `number_text`
+
+*Function* `(x) result (txt)`
+
+```
+Routine to write a pure number compactly for a box of the printout: 0.19, 7.0, 22.3,
+1253, 5.90e-4, 6.41e5.
+```
+
+```
+Input:
+  x   -- real(rp): The number.
+
+Output:
+  txt -- character(:), allocatable: The text.
+```
+
+(api-byte-text)=
+### `byte_text`
+
+*Function* `(bytes) result (txt)`
+
+```
+Routine to write a count of bytes in kB, MB or GB, a thousand to the step.
+```
+
+```
+Input:
+  bytes -- real(rp): The bytes.
+
+Output:
+  txt   -- character(:), allocatable: The text.
+```
+
 (api-fel-write-header)=
 ### `fel_write_header`
 
@@ -4087,43 +4143,128 @@ Input:
   run -- fel_run_struct: The fully set-up run state.
 ```
 
-(api-write-bank-bytes)=
-### `write_bank_bytes`
+(api-key-index)=
+### `key_index`
+
+*Function* `(table, name) result (ik)`
+
+```
+Routine to return a key's place in the schema's table, 0 where there is no such key.
+```
+
+(api-origin-mark)=
+### `origin_mark`
+
+*Function* `(ik, computed) result (mark)`
+
+```
+Routine to return the provenance mark of key ik: * where the program derived its value,
+~ where the command line set it, and blank for the input file or a default. A key the
+input left unset whose value the run computed, the slices of a derived window among
+them, is marked derived when computed is true.
+```
+
+(api-add-keys)=
+### `add_keys`
+
+*Subroutine* `(col, table, prefix, skip, only)`
+
+```
+Routine to add the keys of one table to a column: every key the input file or the
+command line set or the program derived, and the defaults of shown_defaults, which
+decide how a run behaves. The value is written by key_text, from the key's own kind
+and unit.
+```
+
+```
+Input:
+  col    -- fel_column_struct: The column.
+  table  -- character(*): The table.
+  prefix -- character(*): Written before each key's name, resample. for the keys of
+              [beam.resample].
+  skip   -- character(32)(:), optional: Keys to leave out.
+  only   -- character(32)(:), optional: The only keys to take.
+```
+
+(api-key-text)=
+### `key_text`
+
+*Function* `(key) result (txt)`
+
+```
+Routine to write a key's value for the header from its kind and its unit: a real with
+a unit that takes a prefix scaled to it, a string without its quotes, a list with
+commas, and anything else as the input file writes it.
+```
+
+(api-storage-rule)=
+### `storage_rule`
 
 *Subroutine* `()`
 
 ```
-Routine to state, before the run tracks, what the escaped-field bank will write: the
-slices that leave the window and, per member of the field set, the bytes of the files
-the run keeps. The banked planes stream into those files as they leave
-(fel_drain_bank), and nothing else is written, so the bytes kept are also the peak on
-disk. So a pulse of gigabytes is stated before the run rather than discovered on a full
-disk.
+Routine to write the rule above the first row of what the run stores, once.
+```
+
+(api-frame-bytes)=
+### `frame_bytes`
+
+*Function* `() result (bytes)`
+
+```
+Routine to return the bytes of one frame of the series: 68 a macroparticle and 16 a
+grid point, over the slice range the frames keep.
+```
+
+(api-bank-bytes)=
+### `bank_bytes`
+
+*Subroutine* `(n_rot, bytes, n_lit)`
+
+```
+Routine to return what the escaped-field bank will write: the slices that leave the
+window over the tracked line, the bytes of the files the run keeps over the members of
+the field set that carry light, and how many members those are. The banked planes
+stream into those files as they leave (fel_drain_bank), so the bytes kept are also the
+peak on disk.
 
 The slices are the rotations the walk makes over the tracked elements, from the
 schedule's own slippage (fel_setup_slippage) and the residual a continuation starts
 with: the record rotates once |accuslip| passes 0.8 of a slice, so S wavelengths give
-the least integer at or above S/n_wavelength - 0.8.
-The k-th slice to leave is the window's slice nslice - k + 1 at the start, carried to
-the head with what the beam there radiated into it. So light leaves only if one of the
-last n_rot slices holds charge or field at the start. A derived window puts its headroom
-there, and a run whose light stays in the window states nothing, as it writes nothing.
-
-A file holds 16 bytes a grid point a component, a plane per slice, and a row of 25
-params a component and the transmission position per banked slice. The pulse holds the
-window's slices too.
+the least integer at or above S/n_wavelength - 0.8. Light leaves only if one of the
+last n_rot slices holds charge or field at the start. A file holds 16 bytes a grid
+point a component, a plane per slice, and a row of 25 params a component and the
+transmission position per banked slice. The pulse holds the window's slices too.
 ```
 
-(api-write-device-bytes)=
-### `write_device_bytes`
+(api-device-bytes)=
+### `device_bytes`
+
+*Subroutine* `(bytes)`
+
+```
+Routine to return the device's resident bytes (fel_device_resident_bytes).
+```
+
+(api-write-warnings)=
+### `write_warnings`
 
 *Subroutine* `()`
 
 ```
-Routine to state the device's resident bytes beside the bank's, with the record's
-planes along tau, when the device is on. Under the spectral propagator the record
-carries the pad's planes beside the window's, and a window that would not fit was
-refused at setup, before any upload (fel_device_setup).
+Routine to write, under the header, a line for each quantity of the derived part that
+is out of proportion, each beginning with an exclamation mark so that a log can be
+searched for them. Each bound is half of what the setup derives for itself where the
+input file states nothing, or a count the loader already acts on.
+```
+
+(api-warn)=
+### `warn`
+
+*Subroutine* `(text)`
+
+```
+Routine to write one warning line, with a blank line before the first.
 ```
 
 (api-fel-write-footer)=
@@ -4147,6 +4288,35 @@ line per kind of file, its record numbers written as a shell brace range,
 ```
 Input:
   run -- fel_run_struct: The finished run state.
+```
+
+(api-secs-right)=
+### `secs_right`
+
+*Function* `(seconds) result (txt)`
+
+```
+Routine to write seconds as fel_cost_secs_str does, set to the right of nine columns
+so that a column of times lines up.
+```
+
+(api-add-time)=
+### `add_time`
+
+*Subroutine* `(name, seconds)`
+
+```
+Routine to add one phase to the timing part, in the left column and the right in turn:
+its seconds and its share of the walk.
+```
+
+(api-warn-result)=
+### `warn_result`
+
+*Subroutine* `(text)`
+
+```
+Routine to write one warning line, with a blank line before the first.
 ```
 
 (api-note-file)=
@@ -4189,6 +4359,15 @@ not listed.
 
 ```
 Routine to write one row of the file list, the first after "Wrote".
+```
+
+(api-record-name)=
+### `record_name`
+
+*Function* `(text) result (name)`
+
+```
+Routine to make a dataset's name from a phase's printed name, the spaces as underscores.
 ```
 
 (api-fel-read-openpmd-into-field)=
@@ -4378,6 +4557,26 @@ Input:
 
 Output:
   fname  -- character(420): The file name.
+```
+
+(api-fel-write-stats-file)=
+### `fel_write_stats_file`
+
+*Subroutine* `(run, err_flag)`
+
+```
+Routine to write the stats file <out_root>.stats.h5: the records taken, the input as
+resolved in params/, the lattice table, meta/ and the values of the printout's header
+in setup/ (fel_record_mod). A load_only run calls it with no record taken, and its
+file then holds what setup worked out and no tracking.
+```
+
+```
+Input:
+  run      -- fel_run_struct: Run state.
+
+Output:
+  err_flag -- logical: Set true if the file could not be written.
 ```
 
 (api-fel-finalize-diagnostics)=
@@ -4667,6 +4866,504 @@ Output:
   txt  -- character(:), allocatable: The unit's text.
 ```
 
+## `fel_print_mod.f90`
+
+(api-fel-print-mod)=
+### `fel_print_mod`
+
+*Module*
+
+```
+The layout of what a run prints: the logo, and boxes of rows in one or two columns
+with titled rules between them. A row is composed in single-byte characters at fixed
+widths, with stand-ins for the borders and for the two characters a unit or the logo
+may need, the micro sign and the middle dot. fel_print_line then writes the row with
+the box-drawing characters of Unicode or with ASCII. A box-drawing character is three
+bytes and one column, so no width is ever counted on the text that is written.
+
+Unicode is used where the locale names UTF-8 (LC_ALL, LC_CTYPE, LANG, in that order),
+and the program's --ascii and --unicode set it outright. The two forms have the same
+columns.
+```
+
+(api-fel-print-struct)=
+### `fel_print_struct`
+
+*Struct*
+
+```
+How the run prints. unicode selects the box-drawing characters, verbose prints the
+setup's information lines on the screen as well as in the log, tty is true where
+standard output is a terminal, and progress is how the tracking reports: bar, one line
+rewritten in place, which a terminal takes unless told otherwise, table, a row at each
+element end and every two seconds inside a long element, or none.
+```
+
+(api-fel-column-struct)=
+### `fel_column_struct`
+
+*Struct*
+
+```
+One column of a two-column box, or the rows of a one-column box, gathered before any
+is written so that the keys can be padded to the longest. An entry is a key, a value
+and a provenance mark, or a rule across the column when its key starts with
+fel_subrule$ and its value is the rule's title.
+```
+
+(api-fel-print-setup)=
+### `fel_print_setup`
+
+*Subroutine* `(force_ascii, force_unicode, verbose, progress)`
+
+```
+Routine to choose how the run prints. Unicode is taken where the locale names UTF-8,
+and either argument sets it outright, ASCII winning where both are given.
+```
+
+```
+Input:
+  force_ascii   -- logical: The command line asked for ASCII.
+  force_unicode -- logical: The command line asked for Unicode.
+  verbose       -- logical: Print the setup's information lines on the screen.
+  progress      -- character(*): bar, table or none, or blank for the bar on a terminal
+                     and the table elsewhere.
+```
+
+(api-locale-is-utf8)=
+### `locale_is_utf8`
+
+*Function* `() result (is_utf8)`
+
+```
+Routine to say whether the locale names UTF-8: the first of LC_ALL, LC_CTYPE and LANG
+that is set decides, as the C library reads them.
+```
+
+```
+Output:
+  is_utf8 -- logical: True where that variable holds UTF-8 or utf8 in any case.
+```
+
+(api-fel-print-host)=
+### `fel_print_host`
+
+*Function* `() result (host)`
+
+```
+Routine to return the name of the machine the run is on, which the logo states. A batch
+system's logs from many nodes are told apart by it.
+```
+
+```
+Output:
+  host -- character(64): The host name, blank where the system gives none.
+```
+
+(api-utf8)=
+### `utf8`
+
+*Function* `(name) result (c)`
+
+```
+Routine to return a box-drawing character by name as its UTF-8 bytes, or its ASCII
+stand-in where the run prints ASCII.
+```
+
+```
+Input:
+  name -- character(*): h and v the lines, tl tr bl br the rounded corners, lt and rt
+            the left and right joints, tt and bt the joints that open down and up, x
+            the cross, tick_down and tick_up the half lines of the logo.
+
+Output:
+  c    -- character(:), allocatable: The character's bytes.
+```
+
+(api-fel-print-line)=
+### `fel_print_line`
+
+*Subroutine* `(line)`
+
+```
+Routine to write one composed line: the stand-ins become the characters of the form
+the run prints in, and the line goes out through out_io, to the screen and the log.
+```
+
+```
+Input:
+  line -- character(*): The line in single-byte characters, with fel_bar$ for a
+            border, fel_micro$ for the micro sign and fel_dot$ for the middle dot.
+```
+
+(api-rule-cells)=
+### `rule_cells`
+
+*Function* `(title, i_first, i_last, left) result (out)`
+
+```
+Routine to compose the part of a rule between two columns of the box: the character at
+its left end, the title after two lines and a blank, and lines to its right end.
+```
+
+```
+Input:
+  title   -- character(*): The title, blank for none.
+  i_first -- integer: Column of the left end, counted from the box's left border as 0.
+  i_last  -- integer: Column of the last line of this part.
+  left    -- character(*): The name of the character at the left end.
+
+Output:
+  out     -- character(:), allocatable: The bytes of the part.
+```
+
+(api-fel-box-rule)=
+### `fel_box_rule`
+
+*Subroutine* `(kind, title, title2, above, below)`
+
+```
+Routine to write a rule of a box: its top, a rule between two parts of it, or its
+bottom. The middle border joins the rule where a two-column part is above it, below it
+or both.
+```
+
+```
+Input:
+  kind   -- integer: fel_rule_top$, fel_rule_mid$ or fel_rule_bottom$.
+  title  -- character(*): Title of the part below, at the left. Blank for none.
+  title2 -- character(*): Title at the middle border, of the right column below. Blank
+              for none.
+  above  -- logical: The part above has two columns.
+  below  -- logical: The part below has two columns.
+```
+
+(api-fel-box-full)=
+### `fel_box_full`
+
+*Subroutine* `(text)`
+
+```
+Routine to write one row across the whole box. A text longer than the box is written
+whole and passes the right border, which a long file name may do.
+```
+
+```
+Input:
+  text -- character(*): The row's text.
+```
+
+(api-fel-column-add)=
+### `fel_column_add`
+
+*Subroutine* `(col, key, val, mark)`
+
+```
+Routine to add a row to a column: a key, its value and its provenance mark.
+```
+
+```
+Input:
+  col  -- fel_column_struct: The column.
+  key  -- character(*): The key, or the name of a quantity.
+  val  -- character(*): The value with its unit.
+  mark -- character(*), optional: The provenance mark, one character. Blank by default.
+
+Output:
+  col  -- fel_column_struct: With the row added.
+```
+
+(api-fel-column-rule)=
+### `fel_column_rule`
+
+*Subroutine* `(col, title)`
+
+```
+Routine to add a titled rule across a column, which starts a box of its own within the
+right column of a two-column part.
+```
+
+```
+Input:
+  col   -- fel_column_struct: The column.
+  title -- character(*): The title.
+
+Output:
+  col   -- fel_column_struct: With the rule added.
+```
+
+(api-fel-column-text)=
+### `fel_column_text`
+
+*Function* `(col, i, width, key_width) result (text)`
+
+```
+Routine to compose row i of a column at a width: the key padded to key_width, the
+value, and the mark in the last column but one. A value too long for its place is
+written whole and takes the mark's place, and the text is cut at the width.
+```
+
+```
+Input:
+  col       -- fel_column_struct: The column.
+  i         -- integer: The row. Past the column's last, the text is blank.
+  width     -- integer: Columns of the text.
+  key_width -- integer: Columns the key is padded to.
+
+Output:
+  text      -- character(width): The row.
+```
+
+(api-fel-column-key-width)=
+### `fel_column_key_width`
+
+*Function* `(col) result (width)`
+
+```
+Routine to return the columns the keys of a column are padded to: the longest key of
+the column, the rules aside.
+```
+
+```
+Input:
+  col   -- fel_column_struct: The column.
+
+Output:
+  width -- integer: The longest key's length, at least 1.
+```
+
+(api-fel-box-columns)=
+### `fel_box_columns`
+
+*Subroutine* `(left, right, key_width)`
+
+```
+Routine to write a two-column part of a box from its two columns, row beside row, the
+shorter column ending in blank rows. A rule in the right column is written from the
+middle border to the right one.
+```
+
+```
+Input:
+  left      -- fel_column_struct: The left column.
+  right     -- fel_column_struct: The right column.
+  key_width -- integer, optional: Columns the keys of both are padded to. By default
+                 each column pads to its own longest key.
+```
+
+(api-fel-si-micro)=
+### `fel_si_micro`
+
+*Function* `(str) result (out)`
+
+```
+Routine to put the stand-in fel_micro$ where a number with its unit, as fel_si_str
+writes it, carries the prefix u, so that fel_print_line writes the micro sign in
+Unicode and u in ASCII.
+```
+
+```
+Input:
+  str -- character(*): The number and its unit, such as "48.824 uJ".
+
+Output:
+  out -- character(len(str)): The same text with the stand-in for the prefix.
+```
+
+(api-stand-ins)=
+### `stand_ins`
+
+*Function* `(text) result (out)`
+
+```
+Routine to replace the micro sign's stand-in in a text by the character of the form
+the run prints in, keeping the text's trailing blanks.
+```
+
+```
+Input:
+  text -- character(*): The text, at its full width.
+
+Output:
+  out  -- character(:), allocatable: The text as written.
+```
+
+(api-fel-print-logo)=
+### `fel_print_logo`
+
+*Subroutine* `(line1, line2, line3)`
+
+```
+Routine to write the logo with three lines of text to its right: the name in
+line-drawn letters with rounded corners in Unicode, and in capitals in ASCII.
+```
+
+```
+Input:
+  line1, line2, line3 -- character(*): The text beside the three rows. fel_dot$
+                           stands for the middle dot.
+```
+
+## `fel_record_mod.f90`
+
+(api-fel-record-mod)=
+### `fel_record_mod`
+
+*Module*
+
+```
+The numbers the printout shows, kept as values for the stats file.
+
+The header and the footer print a number and hand the same number here, under a group
+and a name, with its unit and a description. fel_record_write puts every one of them in
+the stats file as a scalar dataset, setup/ for what setup worked out before tracking,
+run/ for what the run produced and timing/ for the wall clock, which is the one group
+that differs between two runs of one input, and the files the run wrote as the attributes
+files and file_bytes of run/. A program that wants a number the printout shows reads it there, so the
+printout's layout is free to change.
+
+The entries are held in fel_record_com between the call that hands one in and the
+write. fel_record_write may be called more than once on one file, and each call writes
+the entries handed in since the last.
+```
+
+(api-new-entry)=
+### `new_entry`
+
+*Function* `(group, name, unit, descrip, kind) result (ix)`
+
+```
+Routine to make room for one entry and fill what every kind shares. An entry of the
+same group and name is replaced, so a number printed twice is held once.
+```
+
+```
+Input:
+  group   -- character(*): setup, run or timing.
+  name    -- character(*): The dataset's name.
+  unit    -- character(*): Its unit.
+  descrip -- character(*): Its description.
+  kind    -- integer: The kind of value.
+
+Output:
+  ix      -- integer: The entry's index in fel_record_com%entry.
+```
+
+(api-fel-record-real)=
+### `fel_record_real`
+
+*Subroutine* `(group, name, unit, descrip, value)`
+
+```
+Routine to hold one real number for the stats file.
+```
+
+```
+Input:
+  group   -- character(*): setup, run or timing.
+  name    -- character(*): The dataset's name.
+  unit    -- character(*): Its unit, 1 for a pure number.
+  descrip -- character(*): Its description.
+  value   -- real(rp): The number, in the unit named.
+```
+
+(api-fel-record-int)=
+### `fel_record_int`
+
+*Subroutine* `(group, name, descrip, value)`
+
+```
+Routine to hold one count for the stats file.
+```
+
+```
+Input:
+  group   -- character(*): setup, run or timing.
+  name    -- character(*): The dataset's name.
+  descrip -- character(*): Its description.
+  value   -- integer: The count.
+```
+
+(api-fel-record-flag)=
+### `fel_record_flag`
+
+*Subroutine* `(group, name, descrip, value)`
+
+```
+Routine to hold one logical for the stats file.
+```
+
+```
+Input:
+  group   -- character(*): setup, run or timing.
+  name    -- character(*): The dataset's name.
+  descrip -- character(*): Its description.
+  value   -- logical: The value.
+```
+
+(api-fel-record-str)=
+### `fel_record_str`
+
+*Subroutine* `(group, name, descrip, value)`
+
+```
+Routine to hold one string for the stats file.
+```
+
+```
+Input:
+  group   -- character(*): setup, run or timing.
+  name    -- character(*): The dataset's name.
+  descrip -- character(*): Its description.
+  value   -- character(*): The string.
+```
+
+(api-fel-record-file)=
+### `fel_record_file`
+
+*Subroutine* `(name, bytes)`
+
+```
+Routine to hold the name of one file the run wrote, for the attribute files of run/. A series of frames
+is one name in shell brace syntax, as the printout lists it.
+```
+
+```
+Input:
+  name  -- character(*): The file's name, relative to the run's directory.
+  bytes -- real(rp): Its size (bytes), the sum over a series.
+```
+
+(api-fel-record-write)=
+### `fel_record_write`
+
+*Subroutine* `(file_name, with_files, err_flag)`
+
+```
+Routine to write the entries held, and with with_files the list of files, into a stats
+file that is already there. The groups setup/, run/ and timing/ are made where the
+file has none. An entry is written once: a second call writes what was handed in since.
+```
+
+```
+Input:
+  file_name  -- character(*): The stats file.
+  with_files -- logical: Write the attributes files and file_bytes of run/ too. The
+                  stats file's own size is its size before this call.
+
+Output:
+  err_flag   -- logical: Set true if the file could not be opened or written.
+```
+
+(api-label-of)=
+### `label_of`
+
+*Function* `(name) result (label)`
+
+```
+Routine to make a dataset's label from its name, the underscores as spaces.
+```
+
 ## `fel_schema_mod.f90`
 
 (api-fel-schema-mod)=
@@ -4803,6 +5500,27 @@ Input:
 
 Output:
   key     -- fel_key_struct: The key. A name no key has gives a key with a blank name.
+```
+
+(api-fel-schema-mark)=
+### `fel_schema_mark`
+
+*Subroutine* `(run, dotted, origin)`
+
+```
+Routine to record where a key's value came from, which the setup calls for a value it
+derived. A derived value is marked as derived whatever set the key before, since an
+input file may state the value that asks for the derivation, beam.beamlet_size = 0.
+```
+
+```
+Input:
+  run    -- fel_run_struct: The run state.
+  dotted -- character(*): The key as table.key, beam.n_particle.
+  origin -- integer: fel_origin_derived$.
+
+Output:
+  run    -- fel_run_struct: With key_origin set for the key.
 ```
 
 (api-fel-schema-value)=
@@ -6744,6 +7462,38 @@ Input:
 
 Output:
   secs   -- real(rp): Seconds accumulated in that phase.
+```
+
+(api-fel-timer-regions)=
+### `fel_timer_regions`
+
+*Function* `(iphase) result (n)`
+
+```
+Routine to return the number of times a phase was entered.
+```
+
+```
+Input:
+  iphase -- integer: The phase, one of the fel_t_ parameters.
+
+Output:
+  n      -- integer: The regions of the phase closed so far.
+```
+
+(api-fel-timer-run-seconds)=
+### `fel_timer_run_seconds`
+
+*Function* `() result (secs)`
+
+```
+Routine to give the seconds since fel_timer_reset, which the program calls before it
+reads anything, so the whole process.
+```
+
+```
+Output:
+  secs -- real(rp): The seconds, 0 before the clock was started.
 ```
 
 (api-fel-timer-write)=
@@ -8712,8 +9462,10 @@ key in the wrong table with the table it belongs in. The arguments after the inp
 keys of the input file, each table.key=value, read through the same schema after it.
 
 Usage:
-  lucifer <input.toml> [<table>.<key>=<value> ...]
-  lucifer --schema <schema.json>
+  lucifer [--ascii | --unicode] [--verbose] [--progress <mode>] <input.toml> [<table>.<key>=<value> ...]
+  lucifer --schema <file>
+  lucifer --version
+  lucifer --help
 ```
 
 ## `lucifer_advance_bench.f90`

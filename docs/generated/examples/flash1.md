@@ -134,9 +134,9 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 1.5748e-05 | m |
 | grid derived by setup | no |  |
 | FEL steps | 330 |  |
-| source filter, mode angle | 8.1520e-05 | rad |
-| source filter, rho angle | 4.4420e-05 | rad |
-| source filter, ratio of the angles | 1.8400e+00 |  |
+| source filter, mode angle | 8.1519e-05 | rad |
+| source filter, rho angle | 4.4423e-05 | rad |
+| source filter, ratio of the angles | 1.8351e+00 |  |
 | source filter, edge | 8.1519e-05 | rad |
 | beamlet size | 4 |  |
 | beamlet size derived by setup | yes |  |

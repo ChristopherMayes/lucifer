@@ -20,11 +20,11 @@ bmad_wake	lucifer.toml	exit_sigma_energy	5.4786e+05	eV
 bmad_wake	lucifer.toml	exit_window_energy	7.7959e-11	J
 bmad_wake	lucifer.toml	fel_steps	1068	
 bmad_wake	lucifer.toml	filter_edge	2.9826e-06	rad
-bmad_wake	lucifer.toml	filter_mode_angle	2.9830e-06	rad
-bmad_wake	lucifer.toml	filter_ratio	1.1400e+00	
-bmad_wake	lucifer.toml	filter_rho_angle	2.6260e-06	rad
+bmad_wake	lucifer.toml	filter_mode_angle	2.9826e-06	rad
+bmad_wake	lucifer.toml	filter_ratio	1.1358e+00	
+bmad_wake	lucifer.toml	filter_rho_angle	2.6261e-06	rad
 bmad_wake	lucifer.toml	gain_length	3.8515e+00	m
-bmad_wake	lucifer.toml	grid_cell	1.5690e-06	m
+bmad_wake	lucifer.toml	grid_cell	1.5686e-06	m
 bmad_wake	lucifer.toml	grid_derived	no	
 bmad_wake	lucifer.toml	grid_n_pts	256	
 bmad_wake	lucifer.toml	initial_bunching	6.6356e-03	
@@ -66,11 +66,11 @@ bmad_wake	lucifer_transcribed.toml	exit_sigma_energy	5.4582e+05	eV
 bmad_wake	lucifer_transcribed.toml	exit_window_energy	7.9191e-11	J
 bmad_wake	lucifer_transcribed.toml	fel_steps	1068	
 bmad_wake	lucifer_transcribed.toml	filter_edge	2.9826e-06	rad
-bmad_wake	lucifer_transcribed.toml	filter_mode_angle	2.9830e-06	rad
-bmad_wake	lucifer_transcribed.toml	filter_ratio	1.1400e+00	
-bmad_wake	lucifer_transcribed.toml	filter_rho_angle	2.6260e-06	rad
+bmad_wake	lucifer_transcribed.toml	filter_mode_angle	2.9826e-06	rad
+bmad_wake	lucifer_transcribed.toml	filter_ratio	1.1358e+00	
+bmad_wake	lucifer_transcribed.toml	filter_rho_angle	2.6261e-06	rad
 bmad_wake	lucifer_transcribed.toml	gain_length	3.8355e+00	m
-bmad_wake	lucifer_transcribed.toml	grid_cell	1.5690e-06	m
+bmad_wake	lucifer_transcribed.toml	grid_cell	1.5686e-06	m
 bmad_wake	lucifer_transcribed.toml	grid_derived	no	
 bmad_wake	lucifer_transcribed.toml	grid_n_pts	256	
 bmad_wake	lucifer_transcribed.toml	initial_bunching	6.6356e-03	
@@ -111,10 +111,10 @@ chicane	lucifer.toml	exit_sigma_energy	6.0142e+05	eV
 chicane	lucifer.toml	exit_window_energy	8.5513e-11	J
 chicane	lucifer.toml	fel_steps	132	
 chicane	lucifer.toml	filter_edge	2.7748e-06	rad
-chicane	lucifer.toml	filter_mode_angle	2.7750e-06	rad
-chicane	lucifer.toml	filter_ratio	1.0900e+00	
-chicane	lucifer.toml	filter_rho_angle	2.5540e-06	rad
-chicane	lucifer.toml	grid_cell	3.1500e-06	m
+chicane	lucifer.toml	filter_mode_angle	2.7748e-06	rad
+chicane	lucifer.toml	filter_ratio	1.0865e+00	
+chicane	lucifer.toml	filter_rho_angle	2.5539e-06	rad
+chicane	lucifer.toml	grid_cell	3.1496e-06	m
 chicane	lucifer.toml	grid_derived	no	
 chicane	lucifer.toml	grid_n_pts	128	
 chicane	lucifer.toml	initial_bunching	3.9308e-17	
@@ -155,10 +155,10 @@ chicane	lucifer_detuned.toml	exit_sigma_energy	5.5584e+05	eV
 chicane	lucifer_detuned.toml	exit_window_energy	6.3146e-11	J
 chicane	lucifer_detuned.toml	fel_steps	132	
 chicane	lucifer_detuned.toml	filter_edge	2.7748e-06	rad
-chicane	lucifer_detuned.toml	filter_mode_angle	2.7750e-06	rad
-chicane	lucifer_detuned.toml	filter_ratio	1.0900e+00	
-chicane	lucifer_detuned.toml	filter_rho_angle	2.5540e-06	rad
-chicane	lucifer_detuned.toml	grid_cell	3.1500e-06	m
+chicane	lucifer_detuned.toml	filter_mode_angle	2.7748e-06	rad
+chicane	lucifer_detuned.toml	filter_ratio	1.0865e+00	
+chicane	lucifer_detuned.toml	filter_rho_angle	2.5539e-06	rad
+chicane	lucifer_detuned.toml	grid_cell	3.1496e-06	m
 chicane	lucifer_detuned.toml	grid_derived	no	
 chicane	lucifer_detuned.toml	grid_n_pts	128	
 chicane	lucifer_detuned.toml	initial_bunching	3.9308e-17	
@@ -199,7 +199,7 @@ coherent_source	lucifer.toml	exit_sigma_energy	2.4428e+06	eV
 coherent_source	lucifer.toml	exit_window_energy	2.4971e-10	J
 coherent_source	lucifer.toml	fel_steps	1068	
 coherent_source	lucifer.toml	gain_length	2.0369e+00	m
-coherent_source	lucifer.toml	grid_cell	1.5690e-06	m
+coherent_source	lucifer.toml	grid_cell	1.5686e-06	m
 coherent_source	lucifer.toml	grid_derived	no	
 coherent_source	lucifer.toml	grid_n_pts	256	
 coherent_source	lucifer.toml	initial_bunching	3.8856e-17	
@@ -240,11 +240,11 @@ coherent_source	lucifer_low_m.toml	exit_sigma_energy	2.7134e+06	eV
 coherent_source	lucifer_low_m.toml	exit_window_energy	3.9412e-10	J
 coherent_source	lucifer_low_m.toml	fel_steps	1068	
 coherent_source	lucifer_low_m.toml	filter_edge	2.7931e-06	rad
-coherent_source	lucifer_low_m.toml	filter_mode_angle	2.7930e-06	rad
-coherent_source	lucifer_low_m.toml	filter_ratio	1.0900e+00	
-coherent_source	lucifer_low_m.toml	filter_rho_angle	2.5600e-06	rad
+coherent_source	lucifer_low_m.toml	filter_mode_angle	2.7931e-06	rad
+coherent_source	lucifer_low_m.toml	filter_ratio	1.0913e+00	
+coherent_source	lucifer_low_m.toml	filter_rho_angle	2.5595e-06	rad
 coherent_source	lucifer_low_m.toml	gain_length	1.9904e+00	m
-coherent_source	lucifer_low_m.toml	grid_cell	1.5690e-06	m
+coherent_source	lucifer_low_m.toml	grid_cell	1.5686e-06	m
 coherent_source	lucifer_low_m.toml	grid_derived	no	
 coherent_source	lucifer_low_m.toml	grid_n_pts	256	
 coherent_source	lucifer_low_m.toml	initial_bunching	3.8856e-17	
@@ -285,11 +285,11 @@ coherent_source	lucifer_reference.toml	exit_sigma_energy	2.5464e+06	eV
 coherent_source	lucifer_reference.toml	exit_window_energy	2.6752e-10	J
 coherent_source	lucifer_reference.toml	fel_steps	1068	
 coherent_source	lucifer_reference.toml	filter_edge	2.9661e-06	rad
-coherent_source	lucifer_reference.toml	filter_mode_angle	2.9660e-06	rad
-coherent_source	lucifer_reference.toml	filter_ratio	1.1400e+00	
-coherent_source	lucifer_reference.toml	filter_rho_angle	2.6110e-06	rad
+coherent_source	lucifer_reference.toml	filter_mode_angle	2.9661e-06	rad
+coherent_source	lucifer_reference.toml	filter_ratio	1.1359e+00	
+coherent_source	lucifer_reference.toml	filter_rho_angle	2.6113e-06	rad
 coherent_source	lucifer_reference.toml	gain_length	2.1043e+00	m
-coherent_source	lucifer_reference.toml	grid_cell	1.5690e-06	m
+coherent_source	lucifer_reference.toml	grid_cell	1.5686e-06	m
 coherent_source	lucifer_reference.toml	grid_derived	no	
 coherent_source	lucifer_reference.toml	grid_n_pts	256	
 coherent_source	lucifer_reference.toml	initial_bunching	3.9886e-17	
@@ -331,10 +331,10 @@ crossed_undulator	lucifer.toml	exit_sigma_energy	5.2944e+05	eV
 crossed_undulator	lucifer.toml	exit_window_energy	3.3357e-13	J
 crossed_undulator	lucifer.toml	fel_steps	80	
 crossed_undulator	lucifer.toml	filter_edge	3.2637e-06	rad
-crossed_undulator	lucifer.toml	filter_mode_angle	3.2640e-06	rad
-crossed_undulator	lucifer.toml	filter_ratio	1.2600e+00	
-crossed_undulator	lucifer.toml	filter_rho_angle	2.5880e-06	rad
-crossed_undulator	lucifer.toml	grid_cell	3.1500e-06	m
+crossed_undulator	lucifer.toml	filter_mode_angle	3.2637e-06	rad
+crossed_undulator	lucifer.toml	filter_ratio	1.2609e+00	
+crossed_undulator	lucifer.toml	filter_rho_angle	2.5883e-06	rad
+crossed_undulator	lucifer.toml	grid_cell	3.1496e-06	m
 crossed_undulator	lucifer.toml	grid_derived	no	
 crossed_undulator	lucifer.toml	grid_n_pts	128	
 crossed_undulator	lucifer.toml	initial_bunching	4.2511e-17	
@@ -376,9 +376,9 @@ flash1	lucifer.toml	exit_sigma_energy	4.6372e+05	eV
 flash1	lucifer.toml	exit_window_energy	3.9239e-05	J
 flash1	lucifer.toml	fel_steps	330	
 flash1	lucifer.toml	filter_edge	8.1519e-05	rad
-flash1	lucifer.toml	filter_mode_angle	8.1520e-05	rad
-flash1	lucifer.toml	filter_ratio	1.8400e+00	
-flash1	lucifer.toml	filter_rho_angle	4.4420e-05	rad
+flash1	lucifer.toml	filter_mode_angle	8.1519e-05	rad
+flash1	lucifer.toml	filter_ratio	1.8351e+00	
+flash1	lucifer.toml	filter_rho_angle	4.4423e-05	rad
 flash1	lucifer.toml	gain_length	1.1179e+00	m
 flash1	lucifer.toml	grid_cell	1.5748e-05	m
 flash1	lucifer.toml	grid_derived	no	
@@ -422,10 +422,10 @@ frames	lucifer.toml	exit_sigma_energy	5.0337e+05	eV
 frames	lucifer.toml	exit_window_energy	7.3435e-14	J
 frames	lucifer.toml	fel_steps	178	
 frames	lucifer.toml	filter_edge	3.0029e-06	rad
-frames	lucifer.toml	filter_mode_angle	3.0030e-06	rad
-frames	lucifer.toml	filter_ratio	1.1400e+00	
-frames	lucifer.toml	filter_rho_angle	2.6260e-06	rad
-frames	lucifer.toml	grid_cell	3.1500e-06	m
+frames	lucifer.toml	filter_mode_angle	3.0029e-06	rad
+frames	lucifer.toml	filter_ratio	1.1436e+00	
+frames	lucifer.toml	filter_rho_angle	2.6259e-06	rad
+frames	lucifer.toml	grid_cell	3.1496e-06	m
 frames	lucifer.toml	grid_derived	no	
 frames	lucifer.toml	grid_n_pts	128	
 frames	lucifer.toml	initial_bunching	7.1924e-03	
@@ -466,7 +466,7 @@ harmonics	lucifer.toml	exit_pulse_energy	6.1589e-11	J
 harmonics	lucifer.toml	exit_sigma_energy	8.6474e+05	eV
 harmonics	lucifer.toml	exit_window_energy	6.1589e-11	J
 harmonics	lucifer.toml	fel_steps	88	
-harmonics	lucifer.toml	grid_cell	3.1500e-06	m
+harmonics	lucifer.toml	grid_cell	3.1496e-06	m
 harmonics	lucifer.toml	grid_derived	no	
 harmonics	lucifer.toml	grid_n_pts	128	
 harmonics	lucifer.toml	initial_bunching	3.9886e-17	
@@ -507,12 +507,12 @@ import	lucifer.toml	exit_pulse_energy	1.4762e-11	J
 import	lucifer.toml	exit_sigma_energy	4.5666e+05	eV
 import	lucifer.toml	exit_window_energy	7.4024e-14	J
 import	lucifer.toml	fel_steps	1068	
-import	lucifer.toml	filter_edge	2.9794e-06	rad
-import	lucifer.toml	filter_mode_angle	2.9790e-06	rad
-import	lucifer.toml	filter_ratio	1.1400e+00	
-import	lucifer.toml	filter_rho_angle	2.6200e-06	rad
+import	lucifer.toml	filter_edge	2.9795e-06	rad
+import	lucifer.toml	filter_mode_angle	2.9795e-06	rad
+import	lucifer.toml	filter_ratio	1.1373e+00	
+import	lucifer.toml	filter_rho_angle	2.6198e-06	rad
 import	lucifer.toml	gain_length	4.6391e+00	m
-import	lucifer.toml	grid_cell	1.5690e-06	m
+import	lucifer.toml	grid_cell	1.5686e-06	m
 import	lucifer.toml	grid_derived	no	
 import	lucifer.toml	grid_n_pts	256	
 import	lucifer.toml	initial_bunching	7.5523e-02	
@@ -554,11 +554,11 @@ import	lucifer_from_file.toml	exit_sigma_energy	4.2637e+05	eV
 import	lucifer_from_file.toml	exit_window_energy	7.1458e-14	J
 import	lucifer_from_file.toml	fel_steps	1068	
 import	lucifer_from_file.toml	filter_edge	3.0014e-06	rad
-import	lucifer_from_file.toml	filter_mode_angle	3.0010e-06	rad
-import	lucifer_from_file.toml	filter_ratio	1.1400e+00	
-import	lucifer_from_file.toml	filter_rho_angle	2.6380e-06	rad
+import	lucifer_from_file.toml	filter_mode_angle	3.0014e-06	rad
+import	lucifer_from_file.toml	filter_ratio	1.1379e+00	
+import	lucifer_from_file.toml	filter_rho_angle	2.6376e-06	rad
 import	lucifer_from_file.toml	gain_length	4.4703e+00	m
-import	lucifer_from_file.toml	grid_cell	1.5690e-06	m
+import	lucifer_from_file.toml	grid_cell	1.5686e-06	m
 import	lucifer_from_file.toml	grid_derived	no	
 import	lucifer_from_file.toml	grid_n_pts	256	
 import	lucifer_from_file.toml	initial_bunching	5.3091e-02	
@@ -600,11 +600,11 @@ lcls	lucifer.toml	exit_sigma_energy	1.1200e+07	eV
 lcls	lucifer.toml	exit_window_energy	2.6809e-04	J
 lcls	lucifer.toml	fel_steps	1254	
 lcls	lucifer.toml	filter_edge	4.5178e-06	rad
-lcls	lucifer.toml	filter_mode_angle	4.5180e-06	rad
-lcls	lucifer.toml	filter_ratio	1.8600e+00	
-lcls	lucifer.toml	filter_rho_angle	2.4270e-06	rad
+lcls	lucifer.toml	filter_mode_angle	4.5178e-06	rad
+lcls	lucifer.toml	filter_ratio	1.8617e+00	
+lcls	lucifer.toml	filter_rho_angle	2.4267e-06	rad
 lcls	lucifer.toml	gain_length	3.5490e+00	m
-lcls	lucifer.toml	grid_cell	3.0140e-06	m
+lcls	lucifer.toml	grid_cell	3.0138e-06	m
 lcls	lucifer.toml	grid_derived	yes	
 lcls	lucifer.toml	grid_derived_from	127	
 lcls	lucifer.toml	grid_n_pts	128	
@@ -647,11 +647,11 @@ migration	lucifer.toml	exit_sigma_energy	5.3413e+05	eV
 migration	lucifer.toml	exit_window_energy	4.3254e-11	J
 migration	lucifer.toml	fel_steps	1068	
 migration	lucifer.toml	filter_edge	2.9733e-06	rad
-migration	lucifer.toml	filter_mode_angle	2.9730e-06	rad
-migration	lucifer.toml	filter_ratio	1.1300e+00	
-migration	lucifer.toml	filter_rho_angle	2.6230e-06	rad
+migration	lucifer.toml	filter_mode_angle	2.9733e-06	rad
+migration	lucifer.toml	filter_ratio	1.1334e+00	
+migration	lucifer.toml	filter_rho_angle	2.6233e-06	rad
 migration	lucifer.toml	gain_length	5.6418e+00	m
-migration	lucifer.toml	grid_cell	3.1500e-06	m
+migration	lucifer.toml	grid_cell	3.1496e-06	m
 migration	lucifer.toml	grid_derived	no	
 migration	lucifer.toml	grid_n_pts	128	
 migration	lucifer.toml	initial_bunching	6.0905e-03	
@@ -693,11 +693,11 @@ migration	lucifer_no_migrate.toml	exit_sigma_energy	5.2433e+05	eV
 migration	lucifer_no_migrate.toml	exit_window_energy	2.1468e-11	J
 migration	lucifer_no_migrate.toml	fel_steps	1068	
 migration	lucifer_no_migrate.toml	filter_edge	2.9733e-06	rad
-migration	lucifer_no_migrate.toml	filter_mode_angle	2.9730e-06	rad
-migration	lucifer_no_migrate.toml	filter_ratio	1.1300e+00	
-migration	lucifer_no_migrate.toml	filter_rho_angle	2.6230e-06	rad
+migration	lucifer_no_migrate.toml	filter_mode_angle	2.9733e-06	rad
+migration	lucifer_no_migrate.toml	filter_ratio	1.1334e+00	
+migration	lucifer_no_migrate.toml	filter_rho_angle	2.6233e-06	rad
 migration	lucifer_no_migrate.toml	gain_length	5.1245e+00	m
-migration	lucifer_no_migrate.toml	grid_cell	3.1500e-06	m
+migration	lucifer_no_migrate.toml	grid_cell	3.1496e-06	m
 migration	lucifer_no_migrate.toml	grid_derived	no	
 migration	lucifer_no_migrate.toml	grid_n_pts	128	
 migration	lucifer_no_migrate.toml	initial_bunching	6.0905e-03	
@@ -738,7 +738,7 @@ mixed_line	lucifer.toml	exit_sigma_energy	2.5499e+06	eV
 mixed_line	lucifer.toml	exit_window_energy	3.9046e-10	J
 mixed_line	lucifer.toml	fel_steps	6319	
 mixed_line	lucifer.toml	gain_length	2.0435e+00	m
-mixed_line	lucifer.toml	grid_cell	3.1500e-06	m
+mixed_line	lucifer.toml	grid_cell	3.1496e-06	m
 mixed_line	lucifer.toml	grid_derived	no	
 mixed_line	lucifer.toml	grid_n_pts	128	
 mixed_line	lucifer.toml	initial_bunching	4.4450e-17	
@@ -779,7 +779,7 @@ mixed_line	lucifer_averaged.toml	exit_sigma_energy	2.5534e+06	eV
 mixed_line	lucifer_averaged.toml	exit_window_energy	3.9195e-10	J
 mixed_line	lucifer_averaged.toml	fel_steps	1068	
 mixed_line	lucifer_averaged.toml	gain_length	2.0435e+00	m
-mixed_line	lucifer_averaged.toml	grid_cell	3.1500e-06	m
+mixed_line	lucifer_averaged.toml	grid_cell	3.1496e-06	m
 mixed_line	lucifer_averaged.toml	grid_derived	no	
 mixed_line	lucifer_averaged.toml	grid_n_pts	128	
 mixed_line	lucifer_averaged.toml	initial_bunching	4.4450e-17	
@@ -821,11 +821,11 @@ sase	lucifer.toml	exit_sigma_energy	5.3373e+05	eV
 sase	lucifer.toml	exit_window_energy	5.7501e-11	J
 sase	lucifer.toml	fel_steps	1068	
 sase	lucifer.toml	filter_edge	2.9826e-06	rad
-sase	lucifer.toml	filter_mode_angle	2.9830e-06	rad
-sase	lucifer.toml	filter_ratio	1.1400e+00	
-sase	lucifer.toml	filter_rho_angle	2.6260e-06	rad
+sase	lucifer.toml	filter_mode_angle	2.9826e-06	rad
+sase	lucifer.toml	filter_ratio	1.1358e+00	
+sase	lucifer.toml	filter_rho_angle	2.6261e-06	rad
 sase	lucifer.toml	gain_length	4.3629e+00	m
-sase	lucifer.toml	grid_cell	1.5690e-06	m
+sase	lucifer.toml	grid_cell	1.5686e-06	m
 sase	lucifer.toml	grid_derived	no	
 sase	lucifer.toml	grid_n_pts	256	
 sase	lucifer.toml	initial_bunching	6.6356e-03	
@@ -867,11 +867,11 @@ sase_wake	lucifer.toml	exit_sigma_energy	5.2593e+05	eV
 sase_wake	lucifer.toml	exit_window_energy	1.9135e-11	J
 sase_wake	lucifer.toml	fel_steps	1068	
 sase_wake	lucifer.toml	filter_edge	2.9826e-06	rad
-sase_wake	lucifer.toml	filter_mode_angle	2.9830e-06	rad
-sase_wake	lucifer.toml	filter_ratio	1.1400e+00	
-sase_wake	lucifer.toml	filter_rho_angle	2.6260e-06	rad
+sase_wake	lucifer.toml	filter_mode_angle	2.9826e-06	rad
+sase_wake	lucifer.toml	filter_ratio	1.1358e+00	
+sase_wake	lucifer.toml	filter_rho_angle	2.6261e-06	rad
 sase_wake	lucifer.toml	gain_length	3.5879e+00	m
-sase_wake	lucifer.toml	grid_cell	1.5690e-06	m
+sase_wake	lucifer.toml	grid_cell	1.5686e-06	m
 sase_wake	lucifer.toml	grid_derived	no	
 sase_wake	lucifer.toml	grid_n_pts	256	
 sase_wake	lucifer.toml	initial_bunching	6.6356e-03	
@@ -913,11 +913,11 @@ space_charge	lucifer.toml	exit_sigma_energy	1.2445e-06	eV
 space_charge	lucifer.toml	exit_window_energy	1.8097e-33	J
 space_charge	lucifer.toml	fel_steps	1068	
 space_charge	lucifer.toml	filter_edge	3.0203e-06	rad
-space_charge	lucifer.toml	filter_mode_angle	3.0200e-06	rad
-space_charge	lucifer.toml	filter_ratio	1.1500e+00	
-space_charge	lucifer.toml	filter_rho_angle	2.6270e-06	rad
+space_charge	lucifer.toml	filter_mode_angle	3.0203e-06	rad
+space_charge	lucifer.toml	filter_ratio	1.1498e+00	
+space_charge	lucifer.toml	filter_rho_angle	2.6268e-06	rad
 space_charge	lucifer.toml	gain_length	1.9066e+00	m
-space_charge	lucifer.toml	grid_cell	3.1500e-06	m
+space_charge	lucifer.toml	grid_cell	3.1496e-06	m
 space_charge	lucifer.toml	grid_derived	no	
 space_charge	lucifer.toml	grid_n_pts	128	
 space_charge	lucifer.toml	initial_bunching	5.1226e-17	
@@ -959,11 +959,11 @@ space_charge	lucifer_gate_off.toml	exit_sigma_energy	0.0000e+00	eV
 space_charge	lucifer_gate_off.toml	exit_window_energy	9.4107e-34	J
 space_charge	lucifer_gate_off.toml	fel_steps	1068	
 space_charge	lucifer_gate_off.toml	filter_edge	3.0203e-06	rad
-space_charge	lucifer_gate_off.toml	filter_mode_angle	3.0200e-06	rad
-space_charge	lucifer_gate_off.toml	filter_ratio	1.1500e+00	
-space_charge	lucifer_gate_off.toml	filter_rho_angle	2.6270e-06	rad
+space_charge	lucifer_gate_off.toml	filter_mode_angle	3.0203e-06	rad
+space_charge	lucifer_gate_off.toml	filter_ratio	1.1498e+00	
+space_charge	lucifer_gate_off.toml	filter_rho_angle	2.6268e-06	rad
 space_charge	lucifer_gate_off.toml	gain_length	2.5062e+00	m
-space_charge	lucifer_gate_off.toml	grid_cell	3.1500e-06	m
+space_charge	lucifer_gate_off.toml	grid_cell	3.1496e-06	m
 space_charge	lucifer_gate_off.toml	grid_derived	no	
 space_charge	lucifer_gate_off.toml	grid_n_pts	128	
 space_charge	lucifer_gate_off.toml	initial_bunching	5.1226e-17	
@@ -1005,11 +1005,11 @@ space_charge	lucifer_off.toml	exit_sigma_energy	0.0000e+00	eV
 space_charge	lucifer_off.toml	exit_window_energy	9.4107e-34	J
 space_charge	lucifer_off.toml	fel_steps	1068	
 space_charge	lucifer_off.toml	filter_edge	3.0203e-06	rad
-space_charge	lucifer_off.toml	filter_mode_angle	3.0200e-06	rad
-space_charge	lucifer_off.toml	filter_ratio	1.1500e+00	
-space_charge	lucifer_off.toml	filter_rho_angle	2.6270e-06	rad
+space_charge	lucifer_off.toml	filter_mode_angle	3.0203e-06	rad
+space_charge	lucifer_off.toml	filter_ratio	1.1498e+00	
+space_charge	lucifer_off.toml	filter_rho_angle	2.6268e-06	rad
 space_charge	lucifer_off.toml	gain_length	2.5062e+00	m
-space_charge	lucifer_off.toml	grid_cell	3.1500e-06	m
+space_charge	lucifer_off.toml	grid_cell	3.1496e-06	m
 space_charge	lucifer_off.toml	grid_derived	no	
 space_charge	lucifer_off.toml	grid_n_pts	128	
 space_charge	lucifer_off.toml	initial_bunching	5.1226e-17	
@@ -1050,11 +1050,11 @@ space_charge	lucifer_short_range.toml	exit_sigma_energy	2.5444e+06	eV
 space_charge	lucifer_short_range.toml	exit_window_energy	2.8397e-10	J
 space_charge	lucifer_short_range.toml	fel_steps	1068	
 space_charge	lucifer_short_range.toml	filter_edge	2.9849e-06	rad
-space_charge	lucifer_short_range.toml	filter_mode_angle	2.9850e-06	rad
-space_charge	lucifer_short_range.toml	filter_ratio	1.1400e+00	
-space_charge	lucifer_short_range.toml	filter_rho_angle	2.6170e-06	rad
+space_charge	lucifer_short_range.toml	filter_mode_angle	2.9849e-06	rad
+space_charge	lucifer_short_range.toml	filter_ratio	1.1407e+00	
+space_charge	lucifer_short_range.toml	filter_rho_angle	2.6168e-06	rad
 space_charge	lucifer_short_range.toml	gain_length	2.1296e+00	m
-space_charge	lucifer_short_range.toml	grid_cell	1.5690e-06	m
+space_charge	lucifer_short_range.toml	grid_cell	1.5686e-06	m
 space_charge	lucifer_short_range.toml	grid_derived	no	
 space_charge	lucifer_short_range.toml	grid_n_pts	256	
 space_charge	lucifer_short_range.toml	initial_bunching	3.9308e-17	
@@ -1095,11 +1095,11 @@ spontaneous	lucifer.toml	exit_sigma_energy	2.3262e+06	eV
 spontaneous	lucifer.toml	exit_window_energy	1.8055e-10	J
 spontaneous	lucifer.toml	fel_steps	1068	
 spontaneous	lucifer.toml	filter_edge	2.9849e-06	rad
-spontaneous	lucifer.toml	filter_mode_angle	2.9850e-06	rad
-spontaneous	lucifer.toml	filter_ratio	1.1400e+00	
-spontaneous	lucifer.toml	filter_rho_angle	2.6170e-06	rad
+spontaneous	lucifer.toml	filter_mode_angle	2.9849e-06	rad
+spontaneous	lucifer.toml	filter_ratio	1.1407e+00	
+spontaneous	lucifer.toml	filter_rho_angle	2.6168e-06	rad
 spontaneous	lucifer.toml	gain_length	2.1578e+00	m
-spontaneous	lucifer.toml	grid_cell	1.5690e-06	m
+spontaneous	lucifer.toml	grid_cell	1.5686e-06	m
 spontaneous	lucifer.toml	grid_derived	no	
 spontaneous	lucifer.toml	grid_n_pts	256	
 spontaneous	lucifer.toml	initial_bunching	3.9308e-17	
@@ -1140,11 +1140,11 @@ spontaneous	lucifer_damping_only.toml	exit_sigma_energy	2.2936e+06	eV
 spontaneous	lucifer_damping_only.toml	exit_window_energy	1.6638e-10	J
 spontaneous	lucifer_damping_only.toml	fel_steps	1068	
 spontaneous	lucifer_damping_only.toml	filter_edge	2.9849e-06	rad
-spontaneous	lucifer_damping_only.toml	filter_mode_angle	2.9850e-06	rad
-spontaneous	lucifer_damping_only.toml	filter_ratio	1.1400e+00	
-spontaneous	lucifer_damping_only.toml	filter_rho_angle	2.6170e-06	rad
+spontaneous	lucifer_damping_only.toml	filter_mode_angle	2.9849e-06	rad
+spontaneous	lucifer_damping_only.toml	filter_ratio	1.1407e+00	
+spontaneous	lucifer_damping_only.toml	filter_rho_angle	2.6168e-06	rad
 spontaneous	lucifer_damping_only.toml	gain_length	2.1557e+00	m
-spontaneous	lucifer_damping_only.toml	grid_cell	1.5690e-06	m
+spontaneous	lucifer_damping_only.toml	grid_cell	1.5686e-06	m
 spontaneous	lucifer_damping_only.toml	grid_derived	no	
 spontaneous	lucifer_damping_only.toml	grid_n_pts	256	
 spontaneous	lucifer_damping_only.toml	initial_bunching	3.9308e-17	
@@ -1185,11 +1185,11 @@ steady_state	lucifer.toml	exit_sigma_energy	2.5639e+06	eV
 steady_state	lucifer.toml	exit_window_energy	2.9215e-10	J
 steady_state	lucifer.toml	fel_steps	1068	
 steady_state	lucifer.toml	filter_edge	2.9849e-06	rad
-steady_state	lucifer.toml	filter_mode_angle	2.9850e-06	rad
-steady_state	lucifer.toml	filter_ratio	1.1400e+00	
-steady_state	lucifer.toml	filter_rho_angle	2.6170e-06	rad
+steady_state	lucifer.toml	filter_mode_angle	2.9849e-06	rad
+steady_state	lucifer.toml	filter_ratio	1.1407e+00	
+steady_state	lucifer.toml	filter_rho_angle	2.6168e-06	rad
 steady_state	lucifer.toml	gain_length	2.1227e+00	m
-steady_state	lucifer.toml	grid_cell	1.5690e-06	m
+steady_state	lucifer.toml	grid_cell	1.5686e-06	m
 steady_state	lucifer.toml	grid_derived	no	
 steady_state	lucifer.toml	grid_n_pts	256	
 steady_state	lucifer.toml	initial_bunching	3.9308e-17	
@@ -1230,11 +1230,11 @@ taper	lucifer.toml	exit_sigma_energy	5.2786e+06	eV
 taper	lucifer.toml	exit_window_energy	2.9352e-09	J
 taper	lucifer.toml	fel_steps	1068	
 taper	lucifer.toml	filter_edge	2.9849e-06	rad
-taper	lucifer.toml	filter_mode_angle	2.9850e-06	rad
-taper	lucifer.toml	filter_ratio	1.1400e+00	
-taper	lucifer.toml	filter_rho_angle	2.6170e-06	rad
+taper	lucifer.toml	filter_mode_angle	2.9849e-06	rad
+taper	lucifer.toml	filter_ratio	1.1407e+00	
+taper	lucifer.toml	filter_rho_angle	2.6168e-06	rad
 taper	lucifer.toml	gain_length	2.1227e+00	m
-taper	lucifer.toml	grid_cell	1.5690e-06	m
+taper	lucifer.toml	grid_cell	1.5686e-06	m
 taper	lucifer.toml	grid_derived	no	
 taper	lucifer.toml	grid_n_pts	256	
 taper	lucifer.toml	initial_bunching	3.9308e-17	
@@ -1275,10 +1275,10 @@ unaveraged	lucifer.toml	exit_sigma_energy	5.0151e+05	eV
 unaveraged	lucifer.toml	exit_window_energy	1.4757e-15	J
 unaveraged	lucifer.toml	fel_steps	5340	
 unaveraged	lucifer.toml	filter_edge	3.0007e-06	rad
-unaveraged	lucifer.toml	filter_mode_angle	3.0010e-06	rad
-unaveraged	lucifer.toml	filter_ratio	1.1400e+00	
-unaveraged	lucifer.toml	filter_rho_angle	2.6210e-06	rad
-unaveraged	lucifer.toml	grid_cell	3.1500e-06	m
+unaveraged	lucifer.toml	filter_mode_angle	3.0007e-06	rad
+unaveraged	lucifer.toml	filter_ratio	1.1447e+00	
+unaveraged	lucifer.toml	filter_rho_angle	2.6214e-06	rad
+unaveraged	lucifer.toml	grid_cell	3.1496e-06	m
 unaveraged	lucifer.toml	grid_derived	no	
 unaveraged	lucifer.toml	grid_n_pts	128	
 unaveraged	lucifer.toml	initial_bunching	4.4450e-17	
@@ -1318,7 +1318,7 @@ unaveraged	lucifer_averaged.toml	exit_pulse_energy	1.4759e-15	J
 unaveraged	lucifer_averaged.toml	exit_sigma_energy	5.0151e+05	eV
 unaveraged	lucifer_averaged.toml	exit_window_energy	1.4759e-15	J
 unaveraged	lucifer_averaged.toml	fel_steps	89	
-unaveraged	lucifer_averaged.toml	grid_cell	3.1500e-06	m
+unaveraged	lucifer_averaged.toml	grid_cell	3.1496e-06	m
 unaveraged	lucifer_averaged.toml	grid_derived	no	
 unaveraged	lucifer_averaged.toml	grid_n_pts	128	
 unaveraged	lucifer_averaged.toml	initial_bunching	4.4450e-17	

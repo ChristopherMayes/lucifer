@@ -125,7 +125,7 @@ def to_groups(text):
     if "beamlet_size" not in text:
         text = text.replace("&end", "  beamlet_size = 8\n&end")
     return to_toml(text)
-from lucifer.stats import read_stats
+from lucifer.stats import read_stats, scalars
 
 FAILED = False
 
@@ -270,12 +270,9 @@ U_FRAME_CEIL = 1.0e-5
 # narrow enough that a pair which stopped being nearly unitary would show.
 
 PAIR_LOSS = (5e-8, 4e-7)
-# The footer's line on what slippage transmitted out of the window, per member.
-ESCAPED_RE = re.compile(r"Escaped\s+h1\s+([-+.0-9Ee]+) J,\s+h3\s+([-+.0-9Ee]+) J")
-# The header's projection of that loss against what the same run measures. The rate it
-# projects from is one machine's fit to four grids, so a factor of two either way.
-PAIR_RE = re.compile(r"FP32 transform pair (\d+) times a field record \((\d+) unaveraged "
-                     r"substeps\), projected field-energy loss ([-+.0-9Ee]+) a pair")
+# Setup's projection of that loss (setup/device_pair_loss) against what the same run
+# measures. The rate it projects from is one machine's fit to four grids, so a factor of
+# two either way.
 PROJ_BAND = (0.5, 2.0)
 
 # The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
@@ -467,10 +464,12 @@ def main():
     r = run(args.exe, wd, "dev_bank.in", BASE.format(root="dev_bank", extra=DEV))
     with h5py.File(wd / "dev_bank.stats.h5") as h5:
         recorded = "field/total/escaped_energy" in h5 and "field/total/pulse_energy" in h5
-    dropped = ("SO THIS RUN KEEPS NONE" in r.stdout and not list(wd.glob("dev_bank-escaped*.wf.h5"))
+        recorded = (recorded and not bool(h5["params/run/keep_escaped_field"][()])
+                    and h5["params/run/keep_escaped_field"].attrs["origin"].decode() == "derived")
+    dropped = (not list(wd.glob("dev_bank-escaped*.wf.h5"))
                and not list(wd.glob("dev_bank-pulse*.wf.h5"))
                and recorded)
-    ok("bank at its default: the device runs without it, says so, writes no field file",
+    ok("bank at its default: the device runs without it, records the key as false, writes no field file",
        dropped, "True", dropped)
 
     field_set(args, wd, exe)
@@ -534,9 +533,8 @@ def sp_field_energy(path):
 
 
 def sp_escaped(wd, root):
-    """The escaped energy the footer states at full precision [J]."""
-    m = re.search(r"Escaped\s+h1\s+(\S+)\s+J", (wd / f"{root}.log").read_text())
-    return float(m.group(1)) if m else float("nan")
+    """The fundamental's escaped energy, run/escaped_energy_h1 of the stats file [J]."""
+    return scalars(wd / f"{root}.stats.h5", "run").get("escaped_energy_h1", float("nan"))
 
 
 def spectral(args, wd, exe):
@@ -544,11 +542,7 @@ def spectral(args, wd, exe):
     print("== 14. the spectral propagator on the device ==")
 
     def runlog(name, text, threads="4", expect_fail=False):
-        # The run's output, kept under its root for the footer's escaped energy.
-        r = run(args.exe, wd, name, text, threads=threads, expect_fail=expect_fail)
-        root = re.search(r'out_root = "(\w+)"', text).group(1)
-        (wd / f"{root}.log").write_text(r.stdout)
-        return r
+        return run(args.exe, wd, name, text, threads=threads, expect_fail=expect_fail)
 
     # 1. Steady lockstep: the device's spectral step in the twin's role against the
     # CPU's spectral run, the rows read before the slip.
@@ -632,9 +626,8 @@ def spectral(args, wd, exe):
     n_per = {}
     for key, extra in (("cpu", SP_COARSE_EXTRA + SPECTRAL), ("dev", SP_COARSE_EXTRA + SPECTRAL + DEV)):
         root = f"devspco{key}"
-        r = runlog(f"devsp_co{key}.in", BASE.format(root=root, extra=extra), threads="8")
-        mm = re.search(r"Field\s+(\d+) planes of (\d+) wavelengths over the window, (\d+) slices a plane", r.stdout)
-        n_per[key] = int(mm.group(3)) if mm else 0
+        runlog(f"devsp_co{key}.in", BASE.format(root=root, extra=extra), threads="8")
+        n_per[key] = scalars(wd / f"{root}.stats.h5", "setup")["slices_per_plane"]
     ok("spectral coarse field: slices a plane, device against CPU", f"{n_per['dev']} against {n_per['cpu']}",
        "equal and above 1", n_per["dev"] == n_per["cpu"] and n_per["dev"] > 1,
        num=n_per["dev"], bound=n_per["cpu"], kind="equal")
@@ -884,8 +877,8 @@ def unaveraged(args, wd, exe):
 
     # 7. The transform pair's own energy loss, with no charge to feed the field. The
     # CPU's FP64 pair holds the energy to 1.6e-12 over the same 5340 applications. The
-    # run header counts the pairs and projects the loss from the recorded rate, and the
-    # count must be the input file's and the projection must sit near what the run measured.
+    # setup counts the pairs and projects the loss from the recorded rate, and the count
+    # must be the input file's and the projection must sit near what the run measured.
     for root, extra, npair, nsub in (("dvu_darku", DEV, 89 * 60, 89 * 60),
                                      ("dvu_darka", DEV, 89, 0)):
         text = base.format(root=root, extra=extra)
@@ -902,13 +895,13 @@ def unaveraged(args, wd, exe):
         ok(f"FP32 transform pair energy loss, {mode} input file", f"{loss:.3e} a pair",
            f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good,
            num=loss, bound=list(PAIR_LOSS), kind="range")
-        m = PAIR_RE.search(r.stdout)
-        counts = (int(m.group(1)), int(m.group(2))) if m else None
-        ok(f"header counts the transform pairs, {mode} input file", counts, f"== {(npair, nsub)}",
+        s = scalars(wd / f"{root}.stats.h5", "setup")
+        counts = (s["n_fel_step"], s["n_unaveraged_substep"])
+        ok(f"setup counts the transform pairs, {mode} input file", counts, f"== {(npair, nsub)}",
            counts == (npair, nsub),
            num=counts, bound=[npair, nsub], kind="equal")
-        ratio = float(m.group(3)) / loss if m else float("nan")
-        ok(f"header projection over measured loss, {mode} input file", f"{ratio:.3f}",
+        ratio = s["device_pair_loss"] / loss
+        ok(f"setup's projection over measured loss, {mode} input file", f"{ratio:.3f}",
            f"in [{PROJ_BAND[0]}, {PROJ_BAND[1]}]", PROJ_BAND[0] <= ratio <= PROJ_BAND[1],
            num=ratio, bound=list(PROJ_BAND), kind="range")
 
@@ -979,7 +972,7 @@ def unaveraged(args, wd, exe):
                 "bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
     p0 = sum(tp.dump_power(wd, "dvud2-initial.wf.h5", c) for c in ("x", "y"))
     p1 = sum(tp.dump_power(wd, "dvud2-final.wf.h5", c) for c in ("x", "y"))
-    npair = int(PAIR_RE.search(r.stdout).group(1))   # this line's own count, not the steady input file's
+    npair = scalars(wd / "dvud2.stats.h5", "setup")["n_fel_step"]   # this line's own count, not the steady input file's
     loss = (p0 - p1) / p0 / npair
     good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
     ok("FP32 transform pair energy loss, two-plane input file", f"{loss:.3e} a pair",
@@ -1298,12 +1291,13 @@ def field_set(args, wd, exe):
     # would give a third harmonic's escaped energy as a third of what left the record,
     # while the surviving field and the window power stayed right (validation.md,
     # val-device).
-    e_off, e_pr = ESCAPED_RE.search(r_off.stdout), ESCAPED_RE.search(r_pr.stdout)
+    e_off, e_pr = scalars(wd / "devhtdoff.stats.h5", "run"), scalars(wd / "devhtdpr.stats.h5", "run")
     for name, m in (("CPU", e_off), ("device", e_pr)):
-        ok(f"harmonic TD footer states the escaped energy ({name})", bool(m), "True", bool(m))
-    if e_off and e_pr:
-        for grp, label, ceil in ((1, "h1", E2E_CEIL), (2, "h3", H_E2E_CEIL)):
-            c, d = float(e_off.group(grp)), float(e_pr.group(grp))
+        has = "escaped_energy_h1" in m and "escaped_energy_h3" in m
+        ok(f"harmonic TD run records the escaped energy ({name})", has, "True", has)
+    if "escaped_energy_h3" in e_off and "escaped_energy_h3" in e_pr:
+        for label, ceil in (("h1", E2E_CEIL), ("h3", H_E2E_CEIL)):
+            c, d = e_off[f"escaped_energy_{label}"], e_pr[f"escaped_energy_{label}"]
             ok(f"harmonic production TD escaped energy {label} vs CPU",
                f"{abs(d-c)/c:.3e} [{d:.4e} vs {c:.4e} J]", f"<= {ceil:.1e}",
                c > 0 and abs(d - c) / c <= ceil,
@@ -1425,7 +1419,7 @@ def field_set(args, wd, exe):
 # is the wall clock, which differs whenever two runs land in different seconds.
 # Everything else is compared, the field and beam records among them, and the Bmad
 # versions and the lattice source are compared and do match.
-REPRO_SKIP = ("params", "meta/input_echo", "meta/timestamp")
+REPRO_SKIP = ("params", "meta/input_echo", "meta/timestamp", "timing")
 
 
 # The four configurations the recorded ceilings do not isolate, each read as the
@@ -1475,7 +1469,6 @@ PRECISION_BITS_MIN = 24
 QUANT_SHIFT = -24          # 16 million times the quantum, where the row does not move
 QUANT_UNMOVED = 1.001      # the row may not move by even a part in a thousand there
 QUANT_REFUSED = -30        # one bit past the floor, where the run must be refused
-BITS_RE = re.compile(r"(\d+) bits below the FP32 spacing")
 
 
 def precision(args, wd, exe):
@@ -1519,10 +1512,9 @@ def precision(args, wd, exe):
                f"<= {CEIL['source']:.1e} and <= the float deposit's {before:.2e}",
                v <= CEIL["source"] and v <= before * PRECISION_MARGIN,
                num=v, bound=min(CEIL["source"], before * PRECISION_MARGIN), kind="max")
-        m = BITS_RE.search(r.stdout)
-        bits = int(m.group(1)) if m else -1
+        bits = scalars(wd / f"{root}.stats.h5", "run").get("device_deposit_bits", -1)
         ok(f"deposit quantum below the FP32 spacing of its bound, {name}",
-           f"{bits} bits" if m else "the run printed no headroom",
+           f"{bits} bits" if bits >= 0 else "the run recorded no headroom",
            f">= {PRECISION_BITS_MIN} bits", bits >= PRECISION_BITS_MIN,
            num=bits, bound=PRECISION_BITS_MIN, kind="min")
 
@@ -1669,7 +1661,7 @@ def migration(args, wd, exe):
     ok("heavy-migration window power, device vs CPU", f"{abs(pd-pc)/pc:.3e}", f"<= {MIG_E2E_CEIL:.1e}",
        abs(pd - pc) / pc <= MIG_E2E_CEIL,
        num=abs(pd - pc) / pc, bound=MIG_E2E_CEIL, kind="max")
-    grown = "particle capacity grown" in r.stdout
+    grown = "device_particle_capacity" in scalars(wd / "devmd.stats.h5", "run")
     ok("a migrated slice outgrew the rectangle and the seam grew it", grown, "True", grown)
 
     # 8b. Lockstep across migration: the twin re-stages every step over the changed
@@ -1720,7 +1712,7 @@ def dumps_identical(fa, fb):
     with h5py.File(fa) as a, h5py.File(fb) as b:
         names = []
         a.visititems(lambda n, o: names.append(n)
-                     if isinstance(o, h5py.Dataset) and not n.startswith("meta/") else None)
+                     if isinstance(o, h5py.Dataset) and not n.startswith(("meta/", "timing/")) else None)
         return all(n in b and np.array_equal(a[n][()], b[n][()]) for n in names)
 
 

@@ -71,6 +71,7 @@ module fel_device_mod
 use fel_beam_mod
 use fel_field_mod
 use fel_fp32_mod
+use fel_record_mod
 use wavefront_mod
 
 use, intrinsic :: iso_c_binding
@@ -772,6 +773,8 @@ if (spectral) then
 endif
 
 dev%on = .true.
+if (spectral) call fel_record_int ('setup', 'device_tau_lines', 'The lines a threadgroup of the device ' // &
+      'transforms along tau.', int(luc_dev_tau_lines()))
 if (spectral) then
   call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
                '\i0\ field member(s) of \i0\ plane(s), \i0\ window planes and \i0\ pad planes ' // &
@@ -1599,6 +1602,8 @@ enddo
 if (np <= dev%npart) return
 
 call luc_dev_resize_particles (np)
+call fel_record_int ('run', 'device_particle_capacity', 'The particles a slice holds on the device, ' // &
+      'recorded where a slice outgrew the capacity setup gave and it was grown.', np)
 call out_io (s_info$, r_name, 'Device: particle capacity grown from \i0\ to \i0\ per slice.', &
              i_array = [dev%npart, np])
 dev%npart = np
@@ -2095,6 +2100,9 @@ endif
 
 call out_io (s_info$, r_name, 'Device: \i0\ steps encoded, device busy \f10.3\ s.', &
              i_array = [dev%nstep], r_array = [real(luc_dev_seconds(), rp)])
+call fel_record_int ('timing', 'device_steps', 'The steps the device encoded.', dev%nstep)
+call fel_record_real ('timing', 'device_busy', 's', 'The time the device was busy, as its command ' // &
+      'buffers clock it.', real(luc_dev_seconds(), rp))
 
 ! The per-pass table, when the run asked for it. The passes of one kind in a step sum
 ! into one line. The transverse map runs twice a step, and the filter and the solve are
@@ -2106,6 +2114,10 @@ if (dev%timing) then
   early = luc_dev_pass_seconds (psec, pcount, fel_dev_pass_n$)
   call out_io (s_info$, r_name, 'Device per pass, seconds and encoders:')
   do ip = 1, fel_dev_pass_n$
+    call fel_record_real ('timing', 'device_pass_' // trim(fel_dev_pass_name$(ip)), 's', 'The device''s time in this ' // &
+          'kind of pass, under run.device_timing.', real(psec(ip), rp))
+    call fel_record_int ('timing', 'device_pass_' // trim(fel_dev_pass_name$(ip)) // '_encoders', &
+          'The encoders of this kind of pass.', int(pcount(ip)))
     call out_io (s_info$, r_name, '  ' // fel_dev_pass_name$(ip) // &
                  ' \f10.4\ s over \i0\ encoders.', &
                  r_array = [real(psec(ip), rp)], i_array = [int(pcount(ip))])
@@ -2221,6 +2233,8 @@ endif
 
 if (.not. dev%dep_told) then
   dev%dep_told = .true.
+  call fel_record_int ('run', 'device_deposit_bits', 'The bits by which the quantum of the device''s ' // &
+        'fixed-point deposit sits below the FP32 spacing of the deposit''s bound.', dep_bits)
   call out_io (s_info$, r_name, 'Device: the deposit accumulates in fixed point at 2^\i0\ ticks ' // &
                'per V/m,', '  bounded by \es9.2\ V/m in one cell (' // trim(origin) // '),', &
                '  with the quantum \i0\ bits below the FP32 spacing of that bound.', &
