@@ -79,6 +79,9 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | source filter, rho angle | 2.6260e-06 | rad |
 | source filter, ratio of the angles | 1.1400e+00 |  |
 | source filter, edge | 2.9826e-06 | rad |
+| beamlet size | 4 |  |
+| beamlet size derived by setup | yes |  |
+| macroparticles per slice derived by setup | no |  |
 
 ## The input files
 

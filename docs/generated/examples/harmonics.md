@@ -67,7 +67,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | grid cell | 3.1500e-06 | m |
 | grid derived by setup | no |  |
 | FEL steps | 88 |  |
+| beamlet size | 8 |  |
+| beamlet size derived by setup | yes |  |
 | exit power, the harm3 component | 4.8069e+03 | W |
+| macroparticles per slice derived by setup | no |  |
 
 ## The input files
 

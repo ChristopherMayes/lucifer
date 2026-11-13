@@ -55,6 +55,9 @@ by column and a number a README once typed from a run comes from the run itself:
   n_slice, n_record, slice_spacing, n_particle, grid_n_pts, grid_cell, fel_steps
   grid_derived, grid_derived_from        whether setup derived the grid, and the count it
                                          rounded up from
+  beamlet_size, beamlet_size_derived, n_particle_derived
+                                         the beamlet size, and whether setup derived it and
+                                         the macroparticles in a slice
   filter_mode_angle, filter_rho_angle, filter_ratio, filter_edge
                                          the source filter's two angles, their ratio and
                                          the edge, as setup printed them
@@ -123,6 +126,11 @@ def from_log(log: pathlib.Path):
         out.append(("grid_derived", True, ""))
     else:
         out.append(("grid_derived", False, ""))
+    m = re.search(r"The beamlet size (\d+) is (derived|set)", text)
+    if m:
+        out += [("beamlet_size", int(m.group(1)), ""), ("beamlet_size_derived", m.group(2) == "derived", "")]
+    if re.search(r" Load ", text):
+        out.append(("n_particle_derived", re.search(r"The \d+ macroparticles are derived", text) is not None, ""))
     m = re.search(r"Work\s+(\d+) FEL steps", text)
     if m:
         out.append(("fel_steps", int(m.group(1)), ""))
