@@ -1,0 +1,32 @@
+# Timed run: Genesis4, FFT field solver, from the shared start (flash1-start.par.h5) with
+# a dark start on the 256-point grid. output_step = 170 keeps only the records at
+# the entrance and the exit. The end dumps match Lucifer's final dumps.
+&setup
+rootname = G4fft
+lattice = flash1_cell.lat
+beamline = CELL
+lambda0 = 1.37e-08
+gamma0 = 1308.2103184308594
+delz = 0.0273
+beam_global_stat = True
+field_global_stat = True
+&end
+
+&importbeam
+file = flash1-start.par.h5
+&end
+
+&field
+dgrid = 0.001
+ngrid = 256
+&end
+
+&track
+output_step = 170
+fft_fieldsolver = true
+&end
+
+&write
+beam = G4fft-end
+field = G4fft-end
+&end

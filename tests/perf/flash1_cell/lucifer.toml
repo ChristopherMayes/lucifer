@@ -1,0 +1,21 @@
+# Timed run: Lucifer from the shared start, Genesis4's particles (flash1-start.beam.h5) and
+# its zero field on the 256-point grid (zero-start.wf.h5). comb_ds_save = -1 keeps stats
+# rows at element ends only. flash1_cell_table.sh sets run.out_root, run.transport_model,
+# run.interlude_model and run.fft_plan on the command line.
+
+lattice = "flash1_cell.bmad"
+
+[run]
+source_filter = false
+keep_escaped_field = false
+comb_ds_save = -1
+
+[window]
+n_wavelength = 12
+
+[beam]
+file = "flash1-start.beam.h5"
+
+[field]
+lambda0 = 1.37e-08
+file = ["zero-start.wf.h5"]

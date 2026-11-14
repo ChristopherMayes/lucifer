@@ -56,6 +56,7 @@
 | `device_timing` | true/false | false |  |  | Per-pass device timing, one compute encoder a pass. Slows the run. |
 | `device_dep_mutate` | integer | `0` |  |  | Shift the device deposit's fixed-point scale, in bits. A check instrument. |
 | `device_wake_mutate` | true/false | false |  |  | Enlarge the device's chamber-wake decrement by 2^-4. A check instrument. |
+| `fft_plan` | string | `"wisdom"` |  | `"wisdom"`, `"estimate"`, `"measure"` | The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run. |
 <!-- end keys-run -->
 
 (keys-window)=

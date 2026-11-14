@@ -40,6 +40,7 @@ KEYS = {
         "write_diag", "write_initial", "load_only", "keep_escaped_field", "write_escaped",
         "migrate", "migrate_check", "reference_run", "record_environment", "fp32_check",
         "fp32_mutate", "device", "device_timing", "device_dep_mutate", "device_wake_mutate",
+        "fft_plan",
     ],
     "window": ["window_length", "n_wavelength", "n_slice", "current"],
     "beam": [

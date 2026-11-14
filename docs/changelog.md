@@ -9,6 +9,36 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-14 Changed: the transverse transform is planned from a record of a measured plan, and a
+  run on a power-of-two grid takes less time. `wavefront_fft2` planned with `FFTW_ESTIMATE`, which
+  gives the same plan in every run and, at a 256-point grid, a plan 2.2 times slower on twelve
+  threads than the one FFTW's planner finds by timing. A plan found by timing differs from one run
+  to the next in the last bit of every output, so it cannot be made at run time.
+  `util/make_fft_wisdom.py` measures the plans of the square power-of-two grids from 32 to 2048
+  points once, at `FFTW_PATIENT`, and writes FFTW's wisdom text into
+  `src/wavefront_wisdom_mod.f90`. Each thread reads the text, makes its plans from it alone and
+  forgets it, so every run and every thread makes the same plan and no other plan of the program is
+  made from it. The new key `run.fft_plan` takes `wisdom`, the default, `estimate`, the plan of
+  every earlier run, and `measure`, a plan timed in the run, which does not repeat its last bits.
+  A grid the text does not hold, or an FFTW that does not accept it, is planned as under
+  `estimate`: the run writes a warning line, and the resolved input file and `setup/fft_plan` of
+  the statistics file name the plan in use. On the Benchmark1-SASE line at 96 slices of 2048
+  particles and twelve threads the field solve takes 12.5 s where it took 25.2 s and the walk
+  21.7 s where it took 33.6 s, and on one thread the walk takes 186 s where it took 372 s. On one
+  cell of FLASH1 at 528 slices of 8192 particles, where Genesis4 takes 19.1 s, Lucifer with
+  Genesis4's models takes 25.0 s where it took 28.7 s (`tests/perf/flash1_cell_table.sh`,
+  `docs/performance.md`). Seventeen rows of
+  `docs/generated/validation-measured.md` moved, each a difference at rounding level or a level
+  of the unaveraged mode in its fourth digit or beyond, and every tolerance holds unchanged. In `examples/measured.tsv` the positions of the
+  mode's peak and of the peak power moved between neighboring records in fifteen runs, by 0.08 to
+  0.76 m, with the bunching read there, since both curves are nearly level at their maxima and
+  the last bits decide which record holds the largest value. No power or energy of an example moved in
+  five digits. The new `fft-plan` section of the validation suite, `check_fft_plan.py`, holds two
+  runs under `wisdom` and a run at one thread against one at eight to the same bytes in every
+  array of the statistics file, holds `wisdom` to `estimate` in the window energy, measured at
+  9.6e-16, and holds a 127-point grid under `wisdom` to the arrays of `estimate`. The estimate of
+  a run's time is refitted to the new measurements, and the copies of `wavefront_fft2` into
+  FFTW's buffer and back, which stay, are 9.4 percent of the samples of the 96-slice run.
 - 2026-11-13 Added: the chamber wake of `[wake]` runs on the Metal device in the averaged mode. A
   device run with `wake.on` was refused. The host now forms each slice's decrement of gamma over one
   step, `eloss*dz/m_electron`, in double precision at an FEL element's entry, and the push kernel

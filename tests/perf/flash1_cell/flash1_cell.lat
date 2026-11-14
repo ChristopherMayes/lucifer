@@ -1,0 +1,9 @@
+# One cell of Lucifer's FLASH1 example, the Genesis4 twin of flash1_cell.bmad.
+# aw = K/sqrt(2) with K = c b_max / (k_u m_e c^2) for b_max = 0.47 T, l_period = 0.0273 m.
+UND: UNDULATOR = {lambdau = 0.0273, nwig = 165, aw = 0.8471617393990083, helical = false};
+D1: DRIFT = {l = 0.25};
+D2: DRIFT = {l = 0.10};
+D3: DRIFT = {l = 0.25};
+QF: QUADRUPOLE = {l = 0.1, k1 = 1.3};
+QD: QUADRUPOLE = {l = 0.1, k1 = -0.8};
+CELL: LINE = {UND, D1, QF, D2, QD, D3};

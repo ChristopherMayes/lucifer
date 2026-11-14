@@ -99,6 +99,8 @@ class Run:
     """Shift the device deposit's fixed-point scale, in bits. A check instrument."""
     device_wake_mutate: bool = False
     """Enlarge the device's chamber-wake decrement by 2^-4. A check instrument."""
+    fft_plan: Literal['wisdom', 'estimate', 'measure'] = 'wisdom'
+    """The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run."""
 
 
 @dataclass

@@ -763,12 +763,12 @@ echo
 # passes share while it runs, and the CPU sections of either pass carry on beside
 # it (scripts/with_lock.py).
 
-SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous element-offsets two-polarization beam-format harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
+SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous element-offsets two-polarization beam-format fft-plan harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
 
 # The launch order is longest first, by the section times of one debug pass (device
 # 116 s, source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section
 # is not left to run alone at the end. The printed order is SECTION_ORDER regardless.
-LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
+LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format fft-plan load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
 
 SECTIONS="$WORK_DIR/sections"
 DEVICE_LOCK="${LUCIFER_DEVICE_LOCK:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/device.lock}"
@@ -961,6 +961,15 @@ sec_beam_format () {
   echo "--- particle dump format checks (openPMD and Genesis .par) ---------------------"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$1" \
     || { echo "FAIL: beam-format checks; outputs kept in: $1" >&2; return 1; }
+}
+
+# The plan of the transverse transform: the recorded plan gives the same arrays in two
+# runs and at two thread counts, and a size it does not hold runs the estimated plan.
+
+sec_fft_plan () {
+  echo "--- transverse transform plan checks (run.fft_plan) ----------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_fft_plan.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: fft-plan checks; outputs kept in: $1" >&2; return 1; }
 }
 
 sec_harmonics () {

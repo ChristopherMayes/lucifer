@@ -35,6 +35,7 @@ module wavefront_mod
 
 use, intrinsic :: iso_c_binding
 use sim_utils
+use wavefront_wisdom_mod
 
 use, intrinsic :: ieee_arithmetic
 
@@ -141,6 +142,26 @@ end type
 ! The transform itself is single threaded. The parallel axis for a wavefront is the slice
 ! index, not the transverse transform. So fftw_plan_with_nthreads is not called.
 ! Threading a small 2D transform under a parallel loop over slices would oversubscribe.
+
+! How the plans are made (wavefront_fft2_set_plan). wf_plan_wisdom$ makes the plan the
+! wisdom text of wavefront_wisdom_mod records, and where that text gives none, the
+! estimated one. wf_plan_estimate$ is FFTW_ESTIMATE, a pure function of the problem.
+! wf_plan_measure$ is FFTW_MEASURE, which times candidates and so can choose differently
+! in two runs. The first two give the same plan in every run and on every thread. That
+! is what keeps a run's digits the same from run to run and from one thread count to
+! another, since two plans for one transform differ in the last bit of every output.
+!
+! wf_plan_mode is shared and is set before any thread plans. wf_cache_mode and
+! wf_cache_made belong to the calling thread's cache: the mode it was filled under, and
+! the way its plans were in fact made, which is wf_plan_estimate$ under wf_plan_wisdom$
+! where the wisdom gave no plan.
+
+integer, parameter :: wf_plan_wisdom$ = 1, wf_plan_estimate$ = 2, wf_plan_measure$ = 3
+character(8), parameter :: wf_plan_name(3) = [character(8) :: 'wisdom', 'estimate', 'measure']
+
+integer, private, save :: wf_plan_mode = wf_plan_wisdom$
+integer, private, save :: wf_cache_mode = 0, wf_cache_made = 0
+!$OMP threadprivate(wf_cache_mode, wf_cache_made)
 
 type(C_PTR), private, save :: wf_plan_fwd = C_NULL_PTR
 type(C_PTR), private, save :: wf_plan_bwd = C_NULL_PTR
@@ -1156,13 +1177,14 @@ subroutine wavefront_fft2_plan (nx, ny, cache_ok)
 include 'fftw3.f03'
 
 integer nx, ny
+integer(C_INT) n_ok, flags
 logical cache_ok
 
 !
 
 !$OMP CRITICAL (wavefront_fft_plan_lock)
 
-if (nx /= wf_cache_nx .or. ny /= wf_cache_ny) then
+if (nx /= wf_cache_nx .or. ny /= wf_cache_ny .or. wf_cache_mode /= wf_plan_mode) then
   if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
   if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
   if (C_ASSOCIATED(wf_buf_cptr)) call fftw_free(wf_buf_cptr)
@@ -1186,17 +1208,41 @@ if (nx /= wf_cache_nx .or. ny /= wf_cache_ny) then
     ! dimension first, and in a Fortran (nx, ny) array that is ny. Getting this backwards
     ! is invisible on a square grid, which is why wavefront_drift_reference exists.
     !
-    ! FFTW_ESTIMATE is used and not FFTW_MEASURE. FFTW_MEASURE picks the algorithm by
-    ! timing candidate transforms, so two runs of the same binary can pick differently. Every
-    ! transform after that differs at the ulp level, enough to change a run's field
-    ! diagnostics byte for byte. ESTIMATE's choice is a pure function of the problem. So
-    ! results reproduce from run to run, from one thread count to another, and against the
-    ! banked reference files. Reproducibility matters more here than FFT speed.
-    wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  FFTW_ESTIMATE)
-    wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, FFTW_ESTIMATE)
+    ! The plan is one every run and every thread makes alike. FFTW_MEASURE picks the
+    ! algorithm by timing candidate transforms, so two runs of the same binary can pick
+    ! differently. Every transform after that differs at the ulp level, enough to change a
+    ! run's field diagnostics byte for byte. Under wf_plan_wisdom$ the plan is the one
+    ! the wisdom text records, a measured plan chosen once and written down. The text is
+    ! read, the plan is made from it alone (FFTW_WISDOM_ONLY, which returns null where
+    ! the text does not hold this problem), and the text is forgotten again, so no other
+    ! plan of the program is made from it. FFTW_PATIENT is the level the text was
+    ! measured at. Where it gives no plan, and under wf_plan_estimate$, the plan is
+    ! FFTW_ESTIMATE's, a pure function of the problem.
+    wf_cache_made = wf_plan_mode
+
+    if (wf_plan_mode == wf_plan_wisdom$) then
+      n_ok = fftw_import_wisdom_from_string(wavefront_wisdom_text())
+      flags = ior(FFTW_PATIENT, FFTW_WISDOM_ONLY)
+      wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  flags)
+      wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, flags)
+      call fftw_forget_wisdom()
+      if (.not. C_ASSOCIATED(wf_plan_fwd) .or. .not. C_ASSOCIATED(wf_plan_bwd)) then
+        if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
+        if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
+        wf_cache_made = wf_plan_estimate$
+      endif
+    endif
+
+    if (wf_cache_made /= wf_plan_wisdom$) then
+      flags = FFTW_ESTIMATE
+      if (wf_cache_made == wf_plan_measure$) flags = FFTW_MEASURE
+      wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  flags)
+      wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, flags)
+    endif
 
     if (C_ASSOCIATED(wf_plan_fwd) .and. C_ASSOCIATED(wf_plan_bwd)) then
       wf_cache_nx = nx; wf_cache_ny = ny
+      wf_cache_mode = wf_plan_mode
     endif
   endif
 endif
@@ -1250,6 +1296,100 @@ endif
 err_flag = any_bad
 
 end subroutine wavefront_fft2_plan_threads
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_set_plan (name, err_flag)
+!
+! Routine to set how the plans of wavefront_fft2 are made: 'wisdom', the plan the text
+! of wavefront_wisdom_mod records and the estimated plan where it records none,
+! 'estimate', FFTW_ESTIMATE, or 'measure', FFTW_MEASURE, whose choice can differ from
+! run to run. Call it serially, before any transform. A thread whose cache was filled
+! another way plans again at its next transform.
+!
+! Input:
+!   name      -- character(*): 'wisdom', 'estimate' or 'measure'.
+!
+! Output:
+!   err_flag  -- logical: Set True if name is none of the three, False otherwise.
+!-
+
+subroutine wavefront_fft2_set_plan (name, err_flag)
+
+character(*) name
+logical err_flag
+character(*), parameter :: r_name = 'wavefront_fft2_set_plan'
+
+!
+
+err_flag = .false.
+
+select case (name)
+case ('wisdom');    wf_plan_mode = wf_plan_wisdom$
+case ('estimate');  wf_plan_mode = wf_plan_estimate$
+case ('measure');   wf_plan_mode = wf_plan_measure$
+case default
+  call out_io (s_error$, r_name, 'UNKNOWN FFT PLAN: ' // trim(name))
+  err_flag = .true.
+end select
+
+end subroutine wavefront_fft2_set_plan
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function wavefront_fft2_plan_made () result (name)
+!
+! Routine to return how the plans in the calling thread's cache were made: 'wisdom',
+! 'estimate' or 'measure'. Under 'wisdom' this is 'estimate' where the wisdom text
+! gave no plan for the cached size. Every thread plans alike, so after
+! wavefront_fft2_plan_threads the calling thread's answer is every thread's.
+!
+! Output:
+!   name  -- character(8): How the plans were made, blank if the cache is empty.
+!-
+
+function wavefront_fft2_plan_made () result (name)
+
+character(8) name
+
+!
+
+name = ''
+if (wf_cache_nx > 0 .and. wf_cache_made > 0) name = wf_plan_name(wf_cache_made)
+
+end function wavefront_fft2_plan_made
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function wavefront_wisdom_text () result (text)
+!
+! Routine to return the wisdom text of wavefront_wisdom_mod as one C string, its lines
+! joined and a null at the end, as fftw_import_wisdom_from_string takes it.
+!
+! Output:
+!   text  -- character(:), allocatable: The wisdom text.
+!-
+
+function wavefront_wisdom_text () result (text)
+
+character(:, kind = C_CHAR), allocatable :: text
+integer i
+
+!
+
+text = ''
+do i = 1, size(wf_wisdom_line)
+  text = text // trim(wf_wisdom_line(i)) // new_line('a')
+enddo
+text = text // C_NULL_CHAR
+
+end function wavefront_wisdom_text
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

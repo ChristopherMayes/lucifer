@@ -649,7 +649,25 @@ The measurement is a 48-slice run, full line, 2048 particles per slice, identica
 | Genesis4 (MPI) | 152.7 s | 35.8 s (12 ranks) | 4.3x |
 | `lucifer` (OpenMP) | 123.6 s | 19.4 s (12 threads) | 6.4x |
 
+This table was measured on a 255-point grid, before the input files moved to power-of-two grids. On a 256-point grid Genesis4's measured plan of the transform is faster than the estimated plan Lucifer made until 2026-11-14, and the comparison there, with the recorded plan, is [](performance.md#perf-flash1-cell).
+
 Lucifer is 1.2x faster serial and 1.85x faster at 12 workers. The parallel gap is the cost of communication. Genesis4's 12-rank run spent 68 s of system time on the per-step MPI slippage ring exchange and diagnostics gather, where this code's slippage is an index rotation in shared memory and costs nothing to communicate.
+
+(val-fft-plan)=
+## The plan of the transverse transform
+
+The transform of one plane is FFTW's, and FFTW can make more than one plan for it. Two plans give outputs that differ in the last bit, so the digits of a run belong to the plan as they belong to the compiler. Under `run.fft_plan = "wisdom"`, the default, the plan is the one recorded in `src/wavefront_wisdom_mod.f90`, a plan FFTW's planner measured once and that every run then makes from the text, with no timing ([](input-reference.md#param-global-fft-plan)). Every thread reads the same text, makes its plans from it alone and forgets it again, so no other plan of the program is made from it, and a thread's plan does not depend on which thread planned first.
+
+check_fft_plan.py, in the validation suite, runs a time-dependent probe of eight slices on a 128-point grid, and the levels are in [](#val-levels-fft-plan):
+
+- Two runs under `wisdom` give the same bytes in every array of the stats file, and so do a run at one thread and a run at eight.
+- A run under `estimate` differs from the run under `wisdom` in some of its arrays, which shows that the recorded plan is the one that ran, and the window energy of the two agrees to a part in $10^{15}$.
+- A run under `measure` names its plan in the stats file, and its window energy is held to the same bound. The difference is printed and not recorded, since the plan of one such run can differ from the next.
+- On a 127-point grid, which the recorded text does not hold, the run under `wisdom` writes its warning line, the stats file and the resolved input file name `estimate`, and every array is that of the same run under `estimate`.
+
+On a platform whose FFTW does not accept the recorded text, the second check becomes the fourth: the run under `wisdom` must give the arrays of the run under `estimate`. The script prints the plan in use, and the field solve's seconds on a 256-point grid under each setting, which nothing judges.
+
+The recorded text was measured on 2026-11-14 with fftw 3.3.11 on the machine of this document. Until then every plan was FFTW's estimate, so the digits recorded before that day belong to the estimated plan, and `run.fft_plan = "estimate"` reproduces them.
 
 (val-the-particlepath-cost-measured)=
 ## The particle-path cost: measured, two levers adopted
