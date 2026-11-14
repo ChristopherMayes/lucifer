@@ -85,6 +85,11 @@ void luc_dev_set_slice_phases (const float *base, const float *base_dep)
   (void) base; (void) base_dep;
 }
 
+void luc_dev_set_wake (const float *dg)
+{
+  (void) dg;
+}
+
 int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
                   char *reason, int reason_len)
 {

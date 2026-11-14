@@ -224,6 +224,7 @@ struct PushPar {
     float gridmax, dgrid, aw, qmut;
     uint  ngrid, npart, nslice, first, nf, npol;
     uint  n_per, nplane, ntot;   // slices a plane, the window's planes, planes with the pad
+    uint  wake;                  // 1 = add the slice's chamber-wake decrement to gamma
 };
 
 // The bilinear read of one plane at the cell and weights the caller formed,
@@ -293,6 +294,7 @@ kernel void push (device float* G [[buffer(0)]], device long* U [[buffer(1)]],
                   constant PushPar& P [[buffer(8)]],
                   constant long& cret [[buffer(9)]],
                   constant SetPar& S [[buffer(10)]],
+                  const device float* WAKE [[buffer(11)]],
                   uint gid [[thread_position_in_grid]]){
     uint is = gid / P.npart;
     float x = X[gid], y = Y[gid], px = PX[gid], py = PY[gid];
@@ -370,6 +372,11 @@ kernel void push (device float* G [[buffer(0)]], device long* U [[buffer(1)]],
     // advance is subtracted exactly (whole ticks, computed FP64 on the host).
     long dt = long(rint((d - d0) * TICKS_PER_RAD));
     U[gid] += dt - cret;
+
+    // The chamber wake's decrement of the step (fel_wake_apply_slice), the slice's
+    // eloss*dz/m_e formed FP64 on the host. The CPU rescales z there to hold theta.
+    // Here the phase is a variable of its own, so the tick count is untouched.
+    if (P.wake != 0u) g += WAKE[is];
     G[gid] = g;
 }
 
@@ -1403,6 +1410,7 @@ struct PushPar {
     float gridmax, dgrid, aw, qmut;
     uint32_t ngrid, npart, nslice, first, nf, npol;
     uint32_t n_per, nplane, ntot;
+    uint32_t wake;
 };
 
 struct FieldPar { float h, rtmp, scl, pad; };
@@ -1474,7 +1482,7 @@ struct Impl {
     size_t nplanes () const { return (size_t) nfield * npol * ntot; }
 
     id<MTLBuffer> bX, bPX, bY, bPY, bG, bU, bW;
-    id<MTLBuffer> bField, bSrc, bSrcI, bExpK, bSig, bTw, bBase, bBaseDep;
+    id<MTLBuffer> bField, bSrc, bSrcI, bExpK, bSig, bTw, bBase, bBaseDep, bWake;
     id<MTLBuffer> bProbe, bPh, bFault;
     // The spectral propagator's own: the twiddle table along tau, the kernel factors
     // per member, the sponge's weights and the bank slots.
@@ -1803,6 +1811,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bTw = alloc((size_t) ngrid * 8);
         p->bBase = alloc((size_t) nfield * nslice * 8);
         p->bBaseDep = alloc((size_t) nfield * nslice * 8);
+        p->bWake = alloc((size_t) nslice * 4);
         p->bProbe = alloc(4096 * 8);
         p->bFault = alloc(4);
         if (p->bFault != nil) *((uint32_t *) [p->bFault contents]) = 0u;
@@ -2150,6 +2159,14 @@ void luc_dev_set_slice_phases (const float *base, const float *base_dep)
     memcpy([p->bBaseDep contents], base_dep, (size_t) p->nfield * p->nslice * 8);
 }
 
+void luc_dev_set_wake (const float *dg)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || p->bWake == nil) return;
+    p->sync();
+    memcpy([p->bWake contents], dg, (size_t) p->nslice * 4);
+}
+
 int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
                   char *reason, int reason_len)
 {
@@ -2224,6 +2241,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         P.n_per = (uint32_t) (par->n_per > 0 ? par->n_per : 1);
         P.nplane = (uint32_t) p->nplane;
         P.ntot = (uint32_t) p->ntot;
+        P.wake = (par->wake != 0) ? 1u : 0u;
 
         // The set: per-member coupling, scale and harmonic factor, and the
         // polarization pair as the gather reads it (conjugated) and the add
@@ -2309,6 +2327,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBytes:&P length:sizeof(P) atIndex:8];
         [e setBytes:&cret length:sizeof(cret) atIndex:9];
         [e setBytes:&S length:sizeof(S) atIndex:10];
+        [e setBuffer:p->bWake offset:0 atIndex:11];
         [e dispatchThreads:grid threadsPerThreadgroup:tgp];
 
         encTrk(0);

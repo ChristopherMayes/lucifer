@@ -484,6 +484,17 @@ The Metal backend ([](validation.md#val-device)) is run against the CPU path on 
 
 The input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` in `tests/perf/`, and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-09-04, under gfortran 13.3 and the clang of 2025-06, when the CPU walks were 0.360, 0.873, 3.92 and 0.032 s and the device walls 0.049, 0.107, 0.316 and 0.037. The device walls are longer on the current toolchain, by 20 to 48 percent, and the busy seconds with them, which is the host side and the Metal library of the newer clang rather than the shaders, which are compiled at run time by the same Metal compiler. The source filter is on in these runs and was not the default then.
 
+The chamber wake adds one addition a particle to the push and no pass, and the device's busy seconds do not resolve it. The two SASE windows with the wake of the validation suite's wake tier on, by the same script on the same day as their rows without it:
+
+*Measured 2026-11-13: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge.*
+
+| case | device busy, wake off | device busy, wake on | device wall, wake off | device wall, wake on |
+|---|---|---|---|---|
+| SASE window, 24 x 4096, slippage live | 0.066 s | 0.063 s | 0.134 s | 0.132 s |
+| SASE window, 96 x 8192 | 0.284 s | 0.280 s | 0.396 s | 0.384 s |
+
+The CPU walks of the two windows were 1.063 and 3.870 s with the wake off and 1.059 and 3.874 s with it on. The differences are inside the spread of three runs.
+
 (perf-device-spectral)=
 ### The spectral propagator on the device
 

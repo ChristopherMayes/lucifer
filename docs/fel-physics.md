@@ -558,7 +558,7 @@ $$
   \end{aligned}
 $$ (eq-eloss)
 
-The kick is uniform within a slice. Every particle loses $\Delta\gamma = \mathcal{E}_i\,\delta z/(m_e c^2)$ per step, in every element (the chamber does not end where the undulator does), with $z$ rescaled by $\beta_{\mathrm{new}}/ \beta_{\mathrm{old}}$ to hold $\theta$ fixed through the kick. The convolution is hoisted while currents cannot change and recomputed at the migration stride.
+The kick is uniform within a slice. Every particle loses $\Delta\gamma = \mathcal{E}_i\,\delta z/(m_e c^2)$ per step, in every element (the chamber does not end where the undulator does), with $z$ rescaled by $\beta_{\mathrm{new}}/ \beta_{\mathrm{old}}$ to hold $\theta$ fixed through the kick. The convolution is hoisted while currents cannot change and recomputed at the migration stride. With `run.device = "metal"` the push kernel applies the same $\Delta\gamma$ inside an undulator, as an addition to the energy offset with the fixed-point phase untouched, and the host applies it between undulators ([](validation.md#val-device-wake)).
 
 (sec-spacecharge)=
 ### Space charge

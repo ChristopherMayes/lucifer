@@ -86,7 +86,9 @@ typedef struct {
   int32_t source_filter; /* 1 = filter the source term before it reaches the field */
   int32_t nfield;        /* members in use, 1 to LUC_DEV_MAX_FIELD */
   int32_t npol;          /* planes per member, 1 or 2 */
-  int32_t pad;
+  /* 1 = the push adds the slice's chamber-wake decrement (luc_dev_set_wake) to gamma
+   * after its Runge-Kutta stages, fel_wake_apply_slice's place in the step. */
+  int32_t wake;
   /* The spectral propagator (fel_spectral_mod): 1 runs the field half of the step as
    * fel_spectral_apply's kernel pass, the transform along tau over the window and its
    * pad with the kernel at k0 + kappa, in place of the propagator exp(K2 dz), and the
@@ -237,6 +239,11 @@ void luc_dev_set_filter (int im, const float *sig);
  * as i times the rotator), the two epochs fel_fp32_mod's twin uses. Uploaded per
  * step: phi0 advances, and in lockstep z_ref moves. */
 void luc_dev_set_slice_phases (const float *base, const float *base_dep);
+
+/* The chamber wake's decrement of gamma over one step, nslice floats, one a slice:
+ * eloss*dz/m_e, formed in double precision by the caller. The push reads it only when
+ * the step's wake member is set. It holds until the next call. */
+void luc_dev_set_wake (const float *dg);
 
 /* Encode one integration step: transverse half step, longitudinal push in the
  * (goff, phase-tick) chart gathering every member, transverse half step, source
