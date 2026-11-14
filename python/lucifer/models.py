@@ -97,6 +97,8 @@ class Run:
     """Per-pass device timing, one compute encoder a pass. Slows the run."""
     device_dep_mutate: int = 0
     """Shift the device deposit's fixed-point scale, in bits. A check instrument."""
+    device_wake_mutate: bool = False
+    """Enlarge the device's chamber-wake decrement by 2^-4. A check instrument."""
 
 
 @dataclass

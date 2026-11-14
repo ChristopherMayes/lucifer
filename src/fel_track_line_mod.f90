@@ -305,6 +305,14 @@ do ie = run%i_start, run%i_end
       call fel_device_element_begin (run%dev, fbeam, ffield)
     endif
 
+    ! The chamber wake's decrement over one step of this element, for the device's push
+    ! in either role. The loss rates are refreshed only where migration re-slices the
+    ! beam (do_migrate), which is after an element's last step, so one upload an
+    ! element holds.
+
+    if (run%dev%on .and. coll%wake%on .and. fel_mode(ie) /= unaveraged$) &
+          call fel_device_set_wake (run%dev, coll%wake%eloss, und%dz, run%global%device_wake_mutate)
+
     do istep = 1, und%nstep
 
       ! The step's slippage, which the spectral propagator takes with the step, inside

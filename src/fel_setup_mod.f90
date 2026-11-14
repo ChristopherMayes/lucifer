@@ -1815,7 +1815,8 @@ endif
 ! Their combination is refused above for the CPU and the device alike. Slice migration
 ! needs no kernel. It runs on the host at an element's last step after the walk reads
 ! the beam back (do_migrate). The next element re-uploads into a rectangle grown to the
-! new largest fill.
+! new largest fill. The chamber wake is covered: the push adds each slice's decrement
+! of gamma (fel_device_set_wake), and between undulators the host applies it.
 
 if (.not. fel_device_known(run%global%device)) then
   err_flag = .true.;  return
@@ -1823,10 +1824,6 @@ endif
 if (run%global%device /= '' .and. run%global%device /= 'off') then
   if (run%global%source_model == 'coherent') then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE COHERENT SOURCE MODEL.')
-    err_flag = .true.;  return
-  endif
-  if (run%chamber_wake%on) then
-    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER WAKES.')
     err_flag = .true.;  return
   endif
   if (run%global%source_filter_mutate) then

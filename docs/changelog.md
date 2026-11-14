@@ -9,6 +9,29 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-13 Added: the chamber wake of `[wake]` runs on the Metal device in the averaged mode. A
+  device run with `wake.on` was refused. The host now forms each slice's decrement of gamma over one
+  step, `eloss*dz/m_electron`, in double precision at an FEL element's entry, and the push kernel
+  adds its slice's value to the energy offset after its Runge-Kutta stages, where
+  `fel_wake_apply_slice` acts in the CPU's step. The device carries the phase as a fixed-point
+  variable of its own, so the phase is untouched where the CPU rescales z. No pass and no readback
+  is added, and the device's busy seconds on the two SASE windows of `tests/perf` are 0.063 and
+  0.280 s with the wake on against 0.066 and 0.284 s without it. Between undulators the host applies
+  the wake as before, and after a migration event the refreshed loss rates go up with the next
+  element. With the device in the twin's role `run.fp32_check` covers the wake, and the CPU twin
+  still refuses it. `check_device.py` holds the lockstep rows with the wake on under the ceilings of
+  the window without it, the window power against the CPU's at 1.8e-6, the energy the wake removes
+  at 2.8e-5 of itself, two device runs identical on every array of the statistics file, the run
+  under the spectral propagator, and on a migrating window the wake record's 49 refreshes at the
+  CPU's positions with rates within 3.7e-4. The new key `run.device_wake_mutate` enlarges the
+  device's decrement by 2^-4 for that check, which then reads 6.25e-2. On `examples/sase_wake` the
+  device's exit power is 19.103 MW against the CPU's 19.122 MW and its exit pulse energy 1.3242 nJ
+  against 1.3268 nJ, where the wake lowers the exit power from 57.5 MW, and the run takes 9.8 s
+  against 40.5 s on twelve threads. A wake with a mean loss rate of 74 keV/m lowers gamma by 55000
+  spacings of the single-precision energy offset a step, and the energy removed over that line
+  agrees with the CPU's to 9.0e-7 of itself (`docs/validation.md`, the chamber wake on the device).
+  Bmad element `sr_wake` definitions on an FEL element, space charge and the unaveraged mode with a
+  wake stay refused with the device.
 - 2026-11-13 Changed: the run prints its settings in boxes, and no program reads what it prints.
   The header has one part for each table of the input file, with a row for each key under the key's
   own name, its value with a unit, and a mark where the value was derived (`*`) or set on the command

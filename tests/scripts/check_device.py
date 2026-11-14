@@ -23,7 +23,7 @@ physics alone, the check can fail, and everything the backend does not cover is 
    path corroborate each other.
 5. Time dependence. An 8-slice shot-noise window with slippage rotating the resident
    record holds the same ceilings, read-only proof and production band.
-6. Refused. Wakes, spontaneous radiation, harmonics together with two live
+6. Refused. Spontaneous radiation, harmonics together with two live
    polarizations, source_filter_mutate, an unsupported grid (the message names the
    nearest supported size), an unknown backend name, and keep_escaped_field or
    write_escaped set in the input file each stop the run. The bank is on by default, so a device run that does
@@ -83,6 +83,13 @@ physics alone, the check can fail, and everything the backend does not cover is 
    planes the CPU's. The coarse field at its derived default lands against the CPU's
    coarse run per slice. Harmonic members and two polarization planes ride under it at
    one plane a slice. Two device runs agree bit for bit. See spectral().
+15. The chamber wake, which the push applies as each slice's decrement of gamma. The
+   lockstep rows with the wake on hold the ceilings and the FP64 run is untouched, and
+   the CPU twin still refuses a wake. The production run lands against the CPU's in
+   window power and in the energy the wake removes, a decrement enlarged through
+   run.device_wake_mutate moves that row, two device runs agree bit for bit, and the
+   run under the spectral propagator lands against the CPU's. On a migrating window
+   the wake record holds the CPU's refreshes. See wake().
 
 The deposit accumulates in fixed point, so two device runs of one input file agree bit for
 bit, and checks 8, 9 and the unaveraged section assert that. Against the CPU the
@@ -434,9 +441,6 @@ def main():
 
     # 6. Refused, never a quiet CPU fallback.
     refusals = [
-        ("dev_rw.in", DEV + '  wake_on = T\n  wake_radius = 2.5e-3\n'
-                            '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n',
-         "DOES NOT COVER WAKES"),
         ("dev_rr.in", DEV + '  bmad.radiation_damping_on = T\n',
          "DOES NOT COVER SPONTANEOUS RADIATION"),
         # The key table refuses a name outside run.device's set as the input file is read.
@@ -476,6 +480,7 @@ def main():
     source_filter(args, wd, exe)
     unaveraged(args, wd, exe)
     spectral(args, wd, exe)
+    wake(args, wd, exe)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0
@@ -691,6 +696,150 @@ def spectral(args, wd, exe):
         ok(f"spectral crossed production P{comp} vs CPU", f"{rel:.3e}", f"<= {band:.1e}", rel <= band,
            num=rel, bound=band, kind="max")
 
+
+
+# The chamber wake on the device (validation.md, val-device-wake). The wake is the
+# validation suite's wake tier's, all three kernels, on this check's own windows, since
+# the tier's grid is not one the device carries.
+
+WAKE = """  wake.on = T
+  wake.radius = 2.5e-3
+  wake.conductivity = 5.813e7
+  wake.relaxation = 8.1e-6
+  wake.gap = 0.5e-3
+  wake.lgap = 0.015
+  wake.hrough = 100e-9
+  wake.lrough = 100e-6
+"""
+
+# The energy the wake removes, the mean of pz at the exit with the wake less the mean
+# without it, on the device against the CPU, as a fraction of itself. Three times the
+# first measurement. The hook enlarges the device's decrement by 2^-4, which must show
+# as that fraction.
+
+WAKE_LOSS_CEIL = 9e-5
+WAKE_MUTATE = 2.0**-4
+
+# The refreshed loss rates of a migrating window, the device's run against the CPU's,
+# block by block, over the largest rate of the block. The device's migration re-slices
+# a beam read back from single precision, so a particle near a slice boundary can land
+# on the other side of it and the profiles differ by that charge.
+
+WAKE_REFRESH_CEIL = 1.2e-3
+
+
+def wake_blocks(path):
+    """The blocks of a wake record: [(z, loss rates a slice)], one a refresh."""
+    blocks = []
+    for line in pathlib.Path(path).read_text().splitlines():
+        if line.startswith("# z ="):
+            blocks.append((float(line.split("=")[1]), []))
+        elif line.strip():
+            blocks[-1][1].append(float(line.split()[1]))
+    return [(z, np.array(v)) for z, v in blocks]
+
+
+def exit_pz(wd, root):
+    """The window's mean pz at the last element end."""
+    with read_stats(wd / f"{root}.stats.h5") as st:
+        return float(st["beam/bunch/centroid"][-1, 5])
+
+
+def wake(args, wd, exe):
+    """The chamber wake on the device: the push adds each slice's decrement of gamma."""
+    print("== 15. the chamber wake on the device ==")
+
+    # 15a. Lockstep on the time-dependent window with the wake on. The device twin runs
+    # the whole step, the decrement included, and holds the ceilings of the run without
+    # it. The FP64 run is untouched.
+    run(exe, wd, "devw_l.in", BASE.format(root="devwl",
+        extra=TD_EXTRA + WAKE + DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
+    s = summary(wd, "devwl")
+    for q in CEIL:
+        ok(f"wake lockstep TD worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
+    run(exe, wd, "devw_c.in", BASE.format(root="devwc", extra=TD_EXTRA + WAKE), threads="8")
+    same = (wd / "devwl.diag.txt").read_bytes() == (wd / "devwc.diag.txt").read_bytes()
+    ok("wake FP64 diag byte-identical, device twin on vs off", same, "True", same)
+
+    # The CPU twin does not cover the wake and still refuses it.
+    r = run(exe, wd, "devw_r.in", BASE.format(root="devwr",
+            extra=TD_EXTRA + WAKE + '  run.fp32_check = "lockstep"\n'), expect_fail=True)
+    refused = r.returncode != 0 and "FP32_CHECK DOES NOT COVER WAKES" in r.stdout
+    ok("refused: the FP32 check with a wake and no device", refused, "True", refused)
+
+    # 15b. The production run against the CPU's, in window power and in the energy the
+    # wake removes.
+    run(exe, wd, "devw_d.in", BASE.format(root="devwd", extra=TD_EXTRA + WAKE + DEV), threads="8")
+    pc = diag_power(wd, "devwc", 8)
+    pd = diag_power(wd, "devwd", 8)
+    rel = abs(pd - pc) / pc
+    ok("wake production TD window power vs CPU", f"{rel:.3e}", f"<= {E2E_CEIL:.1e}", rel <= E2E_CEIL,
+       num=rel, bound=E2E_CEIL, kind="max")
+    loss_c = exit_pz(wd, "devwc") - exit_pz(wd, "devtdoff")
+    loss_d = exit_pz(wd, "devwd") - exit_pz(wd, "devtdpr")
+    frac = abs(loss_d / loss_c - 1)
+    print(f"--- the wake's mean pz change: CPU {loss_c:.6e}, device {loss_d:.6e}")
+    ok("energy the wake removes, device vs CPU, fraction of itself", f"{frac:.3e}",
+       f"<= {WAKE_LOSS_CEIL:.1e}", loss_c < 0 and frac <= WAKE_LOSS_CEIL,
+       num=frac, bound=WAKE_LOSS_CEIL, kind="max")
+
+    # 15c. Falsifiable: a decrement larger by 2^-4 removes that much more.
+    run(exe, wd, "devw_m.in", BASE.format(root="devwm",
+        extra=TD_EXTRA + WAKE + DEV + "  run.device_wake_mutate = T\n"), threads="8")
+    loss_m = exit_pz(wd, "devwm") - exit_pz(wd, "devtdpr")
+    moved = loss_m / loss_c - 1
+    ok("the enlarged decrement moves the energy removed", f"{moved:.3e}",
+       f">= {WAKE_MUTATE / 2:.2e}", moved >= WAKE_MUTATE / 2,
+       num=moved, bound=WAKE_MUTATE / 2, kind="min")
+
+    # 15d. Two device runs of the wake's input file, every array of the statistics file.
+    run(exe, wd, "devw_d2.in", BASE.format(root="devwd2", extra=TD_EXTRA + WAKE + DEV), threads="8")
+    a = stats_arrays(wd / "devwd.stats.h5")
+    b = stats_arrays(wd / "devwd2.stats.h5")
+    same_keys = sorted(a) == sorted(b)
+    differ = [k for k in sorted(a) if same_keys and a[k] != b[k]]
+    ok(f"two wake runs bit for bit: {len(a)} arrays compared",
+       "identical" if same_keys and not differ else f"{len(differ)} differ: {differ[:3]}",
+       "every array identical", same_keys and not differ,
+       num=len(differ) if same_keys else None, bound=0, kind="max")
+
+    # 15e. Under the spectral propagator the push is the same kernel.
+    for root, extra in (("devwsc", ""), ("devwsd", DEV)):
+        run(exe, wd, f"{root}.in", BASE.format(root=root, extra=TD_EXTRA + WAKE + SPECTRAL + SP_PLANE + extra),
+            threads="8")
+    pc = diag_power(wd, "devwsc", 8)
+    pd = diag_power(wd, "devwsd", 8)
+    rel = abs(pd - pc) / pc
+    ok("wake spectral production TD window power vs CPU", f"{rel:.3e}", f"<= {E2E_CEIL:.1e}",
+       rel <= E2E_CEIL, num=rel, bound=E2E_CEIL, kind="max")
+
+    # 15f. A migrating window. Migration with the device re-slices on the host at an
+    # element's last step, where the loss rates are refreshed, and the next element's
+    # upload carries them. The wake record must hold the CPU run's refreshes at the
+    # CPU's positions with the CPU's rates.
+    base = cm.BASE.replace("&end\n", "{extra}&end\n").replace(
+        "seed_power = 0\n", "seed_power = 1e4\n  seed_waist_size = 30e-6\n  shot_noise = T\n"
+        "  shot_noise_method = \"first_order\"\n  beam.beamlet_min_electrons = 0\n")
+    heavy = dict(lat="aramis.bmad", sig_pz="5.282703940115e-03", emit="4e-7", npart=1024,
+                 slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9")
+    run(exe, wd, "devw_mc.in", base.format(root="devwmc", mig="T", extra=WAKE, **heavy), threads="8")
+    run(exe, wd, "devw_md.in", base.format(root="devwmd", mig="T", extra=WAKE + DEV, **heavy), threads="8")
+    bc = wake_blocks(wd / "devwmc.wake.txt")
+    bd = wake_blocks(wd / "devwmd.wake.txt")
+    same_z = len(bc) == len(bd) and all(zc == zd for (zc, _), (zd, _) in zip(bc, bd))
+    ok("migrating wake record: refreshes at the CPU's positions", f"{len(bd)} blocks, CPU {len(bc)}",
+       "the same positions, more than one", same_z and len(bc) > 1,
+       num=len(bd), bound=2, kind="min")
+    worst = max(float(np.max(np.abs(vd - vc)) / np.max(np.abs(vc))) for (_, vc), (_, vd) in zip(bc, bd)) \
+        if same_z else float("inf")
+    ok("migrating wake record: refreshed loss rates vs CPU", f"{worst:.3e}", f"<= {WAKE_REFRESH_CEIL:.1e}",
+       worst <= WAKE_REFRESH_CEIL, num=worst, bound=WAKE_REFRESH_CEIL, kind="max")
+    pc = diag_power(wd, "devwmc", 16)
+    pd = diag_power(wd, "devwmd", 16)
+    rel = abs(pd - pc) / pc
+    ok("migrating wake window power, device vs CPU", f"{rel:.3e}", f"<= {MIG_E2E_CEIL:.1e}",
+       rel <= MIG_E2E_CEIL, num=rel, bound=MIG_E2E_CEIL, kind="max")
 
 
 def unaveraged(args, wd, exe):

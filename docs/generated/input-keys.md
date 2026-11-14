@@ -55,6 +55,7 @@
 | `device` | string | `"off"` |  | `""`, `"off"`, `"metal"` | The device backend: off, or metal on a build that carries it. |
 | `device_timing` | true/false | false |  |  | Per-pass device timing, one compute encoder a pass. Slows the run. |
 | `device_dep_mutate` | integer | `0` |  |  | Shift the device deposit's fixed-point scale, in bits. A check instrument. |
+| `device_wake_mutate` | true/false | false |  |  | Enlarge the device's chamber-wake decrement by 2^-4. A check instrument. |
 <!-- end keys-run -->
 
 (keys-window)=

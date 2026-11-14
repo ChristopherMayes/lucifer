@@ -147,7 +147,8 @@ type, bind(c) :: fel_device_par_struct
   real(c_double) :: pol_re(2), pol_im(2)        ! The element's polarization pair.
   real(c_double) :: dep_scale                   ! Deposit's fixed-point scale [ticks per V/m].
   real(c_double) :: dep_gam_floor               ! The gamma the deposit's bound assumes.
-  integer(c_int) :: first, helical, mutate, source_filter, nfield, npol, pad
+  integer(c_int) :: first, helical, mutate, source_filter, nfield, npol
+  integer(c_int) :: wake                        ! The push adds the chamber wake's decrement.
   integer(c_int) :: spectral                    ! The spectral propagator's kernel pass (fel_spectral_mod).
   integer(c_int) :: n_per                       ! Beam slices a field plane spans (fel_field_sample).
   integer(c_int) :: pad2
@@ -360,6 +361,11 @@ interface
   subroutine luc_dev_set_slice_phases (base, base_dep) bind(c, name = 'luc_dev_set_slice_phases')
     import c_float_complex
     complex(c_float_complex) :: base(*), base_dep(*)
+  end subroutine
+
+  subroutine luc_dev_set_wake (dg) bind(c, name = 'luc_dev_set_wake')
+    import c_float
+    real(c_float) :: dg(*)
   end subroutine
 
   function luc_dev_step (par, cret_ticks, reason, reason_len) &
@@ -854,6 +860,49 @@ call fel_device_upload_fields (dev, ff)
 dev%resident = .true.
 
 end subroutine fel_device_element_begin
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_set_wake (dev, eloss, dz, mutate)
+!
+! Routine to upload the chamber wake's decrement of gamma over one step of an element,
+! one value a slice: eloss(is)*dz/m_electron, formed in double precision and rounded
+! once. The push adds its slice's value to the energy offset after its Runge-Kutta
+! stages, the place fel_wake_apply_slice holds in the CPU's step, when the step's wake
+! member is set (fel_device_par_struct). The CPU rescales z there to hold theta. The
+! device carries the phase as a variable of its own, so the decrement alone is the kick.
+!
+! The values hold through the element, since the step length is the element's and the
+! loss rates change only where migration re-slices the beam, which with the device is
+! on the host at an element's last step.
+!
+! Input:
+!   dev     -- fel_device_struct: The armed device.
+!   eloss   -- real(rp): (nslice) The wake's loss rate a slice [eV/m] (fel_wake_update).
+!   dz      -- real(rp): The element's step length [m].
+!   mutate  -- logical: The check's hook: a decrement larger by 2^-4.
+!-
+
+subroutine fel_device_set_wake (dev, eloss, dz, mutate)
+
+type (fel_device_struct) dev
+real(rp) eloss(:), dz
+logical mutate
+
+real(c_float), allocatable :: dg(:)
+real(rp) fac
+
+!
+
+fac = dz / m_electron
+if (mutate) fac = fac * (1 + 2.0_rp**(-4))
+allocate (dg(dev%nslice))
+dg = real(eloss(1:dev%nslice) * fac, c_float)
+call luc_dev_set_wake (dg)
+
+end subroutine fel_device_set_wake
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

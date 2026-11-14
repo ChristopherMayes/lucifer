@@ -1053,7 +1053,8 @@ if (dev_prod) then
 endif
 
 ! The CPU twin covers the fundamental of one polarization. The device twin covers the
-! whole set. So the first two refusals below apply only to the CPU twin.
+! whole set and runs the whole step, the chamber wake's decrement included. So the
+! first two refusals below and the wake's apply only to the CPU twin.
 
 if (fp_on .and. .not. fp32%checked) then
   if (size(ff) > 1 .and. .not. dev_twin) then
@@ -1068,7 +1069,7 @@ if (fp_on .and. .not. fp32%checked) then
     call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER THE COHERENT SOURCE MODEL.')
     return
   endif
-  if (coll%wake%on) then
+  if (coll%wake%on .and. .not. dev_twin) then
     call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER WAKES.')
     return
   endif
@@ -1425,7 +1426,7 @@ par%mutate = 0
 par%source_filter = merge(1, 0, und%filter%on)
 par%nfield = size(ff)
 par%npol = merge(2, 1, allocated(ff(1)%wf%Ey))
-par%pad = 0
+par%wake = merge(1, 0, coll%wake%on)
 par%spectral = merge(1, 0, und%spectral)
 par%n_per = ff(1)%n_per
 par%pad2 = 0

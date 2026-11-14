@@ -229,6 +229,7 @@ type fel_global_struct
   ! is off by default and timings are taken with it off (docs/performance.md perf-device).
   logical :: device_timing = .false.
   integer :: device_dep_mutate = 0     ! Shift the deposit's fixed-point scale, in bits.
+  logical :: device_wake_mutate = .false.  ! Enlarge the device's wake decrement by 2^-4.
 end type
 
 !+
