@@ -665,7 +665,7 @@ check_fft_plan.py, in the validation suite, runs a time-dependent probe of eight
 - A run under `measure` names its plan in the stats file, and its window energy is held to the same bound. The difference is printed and not recorded, since the plan of one such run can differ from the next.
 - On a 127-point grid, which the recorded text does not hold, the run under `wisdom` writes its warning line, the stats file and the resolved input file name `estimate`, and every array is that of the same run under `estimate`.
 
-On a platform whose FFTW does not accept the recorded text, the second check becomes the fourth: the run under `wisdom` must give the arrays of the run under `estimate`. The script prints the plan in use, and the field solve's seconds on a 256-point grid under each setting, which nothing judges.
+On a platform whose FFTW does not accept the recorded text, the second check becomes the fourth: the run under `wisdom` must give the arrays of the run under `estimate`. The script prints the plan in use, and the field solve's seconds on a 256-point grid under each setting, which nothing judges. The Linux CI job is such a platform. On 2026-11-14 the FFTW of its environment gave no plan from the text, so both of its builds ran the estimated plan, and the release job's log reads 2.69 s for that field solve under `estimate` and 1.61 s under `measure`, on a shared runner whose clock does not repeat. A run there that needs the faster plan sets `run.fft_plan = "measure"`.
 
 The recorded text was measured on 2026-11-14 with fftw 3.3.11 on the machine of this document. Until then every plan was FFTW's estimate, so the digits recorded before that day belong to the estimated plan, and `run.fft_plan = "estimate"` reproduces them.
 
