@@ -50,7 +50,8 @@
         "fp32_mutate": {"type": "boolean", "default": false, "description": "The FP32 check's self-test: coarsen the residual."},
         "device": {"type": "string", "default": "off", "enum": ["", "off", "metal"], "description": "The device backend: off, or metal on a build that carries it."},
         "device_timing": {"type": "boolean", "default": false, "description": "Per-pass device timing, one compute encoder a pass. Slows the run."},
-        "device_dep_mutate": {"type": "integer", "default": 0, "description": "Shift the device deposit's fixed-point scale, in bits. A check instrument."}
+        "device_dep_mutate": {"type": "integer", "default": 0, "description": "Shift the device deposit's fixed-point scale, in bits. A check instrument."},
+        "device_wake_mutate": {"type": "boolean", "default": false, "description": "Enlarge the device's chamber-wake decrement by 2^-4. A check instrument."}
       }
     },
     "window": {

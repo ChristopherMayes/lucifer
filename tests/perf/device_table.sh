@@ -7,7 +7,9 @@
 # table takes the best walk of each side and the device-busy seconds the backend reports
 # from its command-buffer timestamps. The same four run again under the spectral
 # propagator at one plane a slice, and the 96-slice window once more with the field at
-# its derived sampling, six slices a plane, which is the second table of that page.
+# its derived sampling, six slices a plane, which is the second table of that page. The
+# two SASE windows run once more with the chamber wake on, the wake of the validation
+# suite's wake tier, which is the page's wake table beside their rows without it.
 #
 # Usage:
 #   ./device_table.sh [--exe <path>] [--workers N] [--work-dir <path>] [--python <path>]
@@ -66,9 +68,12 @@ CASES="steady_1x8192 sase_24x4096 sase_96x8192 floor_1x1024"
 # plane the window's slice, and the 96-slice window again with the plane left to derive.
 SPECTRAL_CASES="steady_1x8192:spectral sase_24x4096:spectral sase_96x8192:spectral floor_1x1024:spectral sase_96x8192:coarse"
 
+# The wake rows: the two SASE windows with the chamber wake on.
+WAKE_CASES="sase_24x4096:wake sase_96x8192:wake"
+
 # variant_of <toml> <variant> rewrites one case's input file for a variant: spectral adds
 # the propagator and holds the field's plane at the window's slice, coarse adds the
-# propagator alone, and slices leaves the file as it is.
+# propagator alone, wake adds the [wake] table, and slices leaves the file as it is.
 variant_of () {
   case "$2" in
     spectral)
@@ -81,6 +86,9 @@ variant_of () {
       rm -f "$1.bak" ;;
     coarse)
       sed -i.bak 's/^\[field\]$/[field]\npropagator = "spectral"/' "$1"; rm -f "$1.bak" ;;
+    wake)
+      printf '\n[wake]\non = true\nradius = 2.5e-3\nconductivity = 5.813e7\nrelaxation = 8.1e-6\n' >> "$1"
+      printf 'gap = 0.5e-3\nlgap = 0.015\nhrough = 100e-9\nlrough = 100e-6\n' >> "$1" ;;
   esac
 }
 
@@ -144,6 +152,12 @@ echo "The spectral propagator, the same four at one plane a slice and the 96-sli
 echo "with the plane derived:"
 printf '  %-28s %14s %14s %14s %8s\n' "case" "CPU, ${WORKERS} thr" "device wall" "device busy" "ratio"
 for cv in $SPECTRAL_CASES; do
+  measure "${cv%%:*}" "${cv##*:}"
+done
+echo
+echo "The chamber wake on, the two SASE windows:"
+printf '  %-28s %14s %14s %14s %8s\n' "case" "CPU, ${WORKERS} thr" "device wall" "device busy" "ratio"
+for cv in $WAKE_CASES; do
   measure "${cv%%:*}" "${cv##*:}"
 done
 echo

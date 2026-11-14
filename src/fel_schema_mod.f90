@@ -191,6 +191,8 @@ call add ('run', 'device_timing', key_logical$, '', 'device timing', &
       'Per-pass device timing, one compute encoder a pass. Slows the run.')
 call add ('run', 'device_dep_mutate', key_int$, '', 'deposit mutate', &
       'Shift the device deposit''s fixed-point scale, in bits. A check instrument.')
+call add ('run', 'device_wake_mutate', key_logical$, '', 'wake mutate', &
+      'Enlarge the device''s chamber-wake decrement by 2^-4. A check instrument.')
 
 ! [window]: fel_slicing_struct.
 
@@ -573,6 +575,7 @@ case ('run.fp32_mutate');                  run%global%fp32_mutate = lv
 case ('run.device');                       call put (run%global%device)
 case ('run.device_timing');                run%global%device_timing = lv
 case ('run.device_dep_mutate');            run%global%device_dep_mutate = iv
+case ('run.device_wake_mutate');           run%global%device_wake_mutate = lv
 case ('window.window_length');             run%slicing%window_length = rv
 case ('window.n_wavelength');              run%slicing%n_wavelength = iv
 case ('window.n_slice');                   run%slicing%n_slice = iv
@@ -977,6 +980,7 @@ case ('run.fp32_mutate');                  lv = run%global%fp32_mutate
 case ('run.device');                       sv = run%global%device
 case ('run.device_timing');                lv = run%global%device_timing
 case ('run.device_dep_mutate');            iv = run%global%device_dep_mutate
+case ('run.device_wake_mutate');           lv = run%global%device_wake_mutate
 case ('window.window_length');             rv = run%slicing%window_length
 case ('window.n_wavelength');              iv = run%slicing%n_wavelength
 case ('window.n_slice');                   iv = run%slicing%n_slice

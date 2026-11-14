@@ -1953,6 +1953,32 @@ Output:
   dev   -- fel_device_struct: Resident.
 ```
 
+(api-fel-device-set-wake)=
+### `fel_device_set_wake`
+
+*Subroutine* `(dev, eloss, dz, mutate)`
+
+```
+Routine to upload the chamber wake's decrement of gamma over one step of an element,
+one value a slice: eloss(is)*dz/m_electron, formed in double precision and rounded
+once. The push adds its slice's value to the energy offset after its Runge-Kutta
+stages, the place fel_wake_apply_slice holds in the CPU's step, when the step's wake
+member is set (fel_device_par_struct). The CPU rescales z there to hold theta. The
+device carries the phase as a variable of its own, so the decrement alone is the kick.
+
+The values hold through the element, since the step length is the element's and the
+loss rates change only where migration re-slices the beam, which with the device is
+on the host at an element's last step.
+```
+
+```
+Input:
+  dev     -- fel_device_struct: The armed device.
+  eloss   -- real(rp): (nslice) The wake's loss rate a slice [eV/m] (fel_wake_update).
+  dz      -- real(rp): The element's step length [m].
+  mutate  -- logical: The check's hook: a decrement larger by 2^-4.
+```
+
 (api-fel-device-upload-fields)=
 ### `fel_device_upload_fields`
 

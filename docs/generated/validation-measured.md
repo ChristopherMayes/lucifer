@@ -469,7 +469,6 @@ where the two builds agree to every printed digit.
 | device lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | device production TD window power vs CPU | 1.3774e-05 | same | <= 1.6000e-03 |
-| refused: does not cover wakes |  | same | holds |
 | refused: does not cover spontaneous radiation |  | same | holds |
 | refused: unrecognized device |  | same | holds |
 | refused: does not cover the escaped-field bank |  | same | holds |
@@ -724,6 +723,25 @@ where the two builds agree to every printed digit.
 | spectral two-plane lockstep worst_field | 6.3377e-06 | same | <= 2.2000e-04 |
 | spectral crossed production Px vs CPU | 1.4011e-04 | same | <= 1.6000e-03 |
 | spectral crossed production Py vs CPU | 3.7773e-03 | same | <= 1.3000e-02 |
+| wake lockstep TD worst_x | 2.4640e-07 | same | <= 1.0000e-06 |
+| wake lockstep TD worst_px | 2.5713e-07 | same | <= 1.0000e-06 |
+| wake lockstep TD worst_y | 2.7342e-07 | same | <= 1.0000e-06 |
+| wake lockstep TD worst_py | 2.2760e-07 | same | <= 1.0000e-06 |
+| wake lockstep TD worst_pz | 1.8188e-07 | same | <= 1.3000e-06 |
+| wake lockstep TD worst_theta | 6.9761e-06 | same | <= 1.5000e-04 |
+| wake lockstep TD worst_phasor | 9.3336e-08 | same | <= 2.2000e-05 |
+| wake lockstep TD worst_source | 6.5401e-06 | same | <= 2.2000e-04 |
+| wake lockstep TD worst_field | 6.5401e-06 | same | <= 2.2000e-04 |
+| wake FP64 diag byte-identical, device twin on vs off |  | same | holds |
+| refused: the FP32 check with a wake and no device |  | same | holds |
+| wake production TD window power vs CPU | 1.7755e-06 | same | <= 1.6000e-03 |
+| energy the wake removes, device vs CPU, fraction of itself | 2.8039e-05 | same | <= 9.0000e-05 |
+| the enlarged decrement moves the energy removed | 6.2520e-02 | same | >= 3.1250e-02 |
+| two wake runs bit for bit: 177 arrays compared | 0 | same | <= 0 |
+| wake spectral production TD window power vs CPU | 9.0210e-08 | same | <= 1.6000e-03 |
+| migrating wake record: refreshes at the CPU's positions | 49 | same | >= 2 |
+| migrating wake record: refreshed loss rates vs CPU | 3.6770e-04 | same | <= 1.2000e-03 |
+| migrating wake window power, device vs CPU | 1.7742e-04 | same | <= 3.0000e-03 |
 
 (val-levels-unaveraged)=
 ### `unaveraged`
