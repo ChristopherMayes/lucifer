@@ -247,6 +247,11 @@ endif
 call fel_read_input (param_file, run, err, overrides)
 if (err) stop 1
 
+! How the transverse transform is planned, set before anything transforms.
+
+call wavefront_fft2_set_plan (trim(run%global%fft_plan), err)
+if (err) stop 1
+
 call fel_setup_lattice (run, err)
 if (err) stop 1
 

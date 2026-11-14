@@ -1436,6 +1436,8 @@ endif
 if (run%n_harm > 1 .and. .not. run%bparam%shot_noise .and. run%bparam%quiet_start) then
   call warn ('a harmonic is carried with shot_noise = false')
 endif
+if (run%fft_plan_fallback) call warn ('fft_plan = wisdom has no plan for a ' // int_str(n_grid(1)) // &
+      ' by ' // int_str(n_grid(2)) // ' transform, estimate is used')
 
 end subroutine write_warnings
 

@@ -51,7 +51,8 @@
         "device": {"type": "string", "default": "off", "enum": ["", "off", "metal"], "description": "The device backend: off, or metal on a build that carries it."},
         "device_timing": {"type": "boolean", "default": false, "description": "Per-pass device timing, one compute encoder a pass. Slows the run."},
         "device_dep_mutate": {"type": "integer", "default": 0, "description": "Shift the device deposit's fixed-point scale, in bits. A check instrument."},
-        "device_wake_mutate": {"type": "boolean", "default": false, "description": "Enlarge the device's chamber-wake decrement by 2^-4. A check instrument."}
+        "device_wake_mutate": {"type": "boolean", "default": false, "description": "Enlarge the device's chamber-wake decrement by 2^-4. A check instrument."},
+        "fft_plan": {"type": "string", "default": "wisdom", "enum": ["wisdom", "estimate", "measure"], "description": "The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run."}
       }
     },
     "window": {

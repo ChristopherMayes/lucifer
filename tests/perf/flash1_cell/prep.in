@@ -1,0 +1,41 @@
+# Makes the shared start: Genesis4 generates the particles (flash1-start.par.h5) and a
+# zero field on the grid (zero-start.fld.h5). flash1_cell_table.sh converts both to openPMD for Lucifer.
+# 528 slices of 12 wavelengths (divides over 12 MPI ranks), 8192 particles a slice,
+# a flat 2500 A current so every slice carries the same load, and the FLASH1 example's
+# beam: 668.494 MeV, sig_pz 6e-4, 1.5 um emittances, matched entrance Twiss.
+&setup
+rootname = prep
+lattice = flash1_cell.lat
+beamline = CELL
+lambda0 = 1.37e-08
+gamma0 = 1308.2103184308594
+delz = 0.0273
+npart = 8192
+seed = 12345
+&end
+
+&time
+slen = 8.68032e-05
+sample = 12
+&end
+
+&beam
+current = 2500
+delgam = 0.7849261910585156
+ex = 1.5e-6
+ey = 1.5e-6
+betax = 10.1189
+alphax = 0.18898
+betay = 9.8031
+alphay = -0.23996
+&end
+
+&field
+dgrid = 0.001
+ngrid = 256
+&end
+
+&write
+beam = flash1-start
+field = zero-start
+&end

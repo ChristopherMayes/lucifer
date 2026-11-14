@@ -7,8 +7,8 @@ name links to its figure, the run over Genesis4 with the difference beneath each
 | Tier | What runs | Debug | Production |
 |---|---|---|---|
 | [`tier1`](#fig-tier1) | FEL core, one undulator segment | 1.568854e-06 | same |
-| [`tier1_unavg`](#fig-tier1-unavg) | one segment, unaveraged dynamics vs Genesis4 (priced model difference) | 6.102423e-02 | 6.102604e-02 |
-| [`tier2_genesis`](#fig-tier2-genesis) | full line, transcribed interludes | 1.365597e-05 | 1.365595e-05 |
+| [`tier1_unavg`](#fig-tier1-unavg) | one segment, unaveraged dynamics vs Genesis4 (priced model difference) | 6.102392e-02 | 6.102604e-02 |
+| [`tier2_genesis`](#fig-tier2-genesis) | full line, transcribed interludes | 1.365597e-05 | same |
 | [`tier2_bmad`](#fig-tier2-bmad) | full line, Bmad seam interludes | 4.846885e-02 | same |
 | [`td1`](#fig-td1) | FEL core + slippage, one undulator segment | 8.357080e-07 | same |
 | [`td2_genesis`](#fig-td2-genesis) | full line time dependent, transcribed interludes | 2.293948e-06 | same |
@@ -24,7 +24,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 30 in all.
+Every section below ran and passed on both builds, 31 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -48,6 +48,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `element-offsets`
 - `two-polarization`
 - `beam-format`
+- `fft-plan`
 - `harmonics`
 - `phasing`
 - `coherent-source`
@@ -373,7 +374,7 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| steady state, spectral against the slice run | 3.6653e-15 | 7.8045e-15 | <= 1.0000e-11 |
+| steady state, spectral against the slice run | 3.4998e-15 | 7.9773e-15 | <= 1.0000e-11 |
 | SASE tier with the source filter on, spectral against slices | 5.8944e-03 | same | <= 1.5000e-02 |
 | the derived coarse field against one plane a slice, SASE tier | 8.3631e-02 | same | <= 1.5000e-01 |
 | the derived coarse field's slices a plane, SASE tier | 4 | same | >= 1 |
@@ -388,7 +389,7 @@ where the two builds agree to every printed digit.
 | the tail slice stays dark, slices | 0.0000e+00 | same | <= 1.0000e-09 |
 | the pulse file holds the planes slipped, slices | 41 | same | = 41 |
 | the ledger closes, spectral | 1.1486e-06 | same | <= 1.0000e-05 |
-| the tail slice stays dark, spectral | 4.9134e-35 | 5.4767e-35 | <= 1.0000e-09 |
+| the tail slice stays dark, spectral | 5.6329e-35 | 5.0437e-35 | <= 1.0000e-09 |
 | the pulse file holds the planes slipped, spectral | 41 | same | = 41 |
 
 (val-levels-fp32-lockstep)=
@@ -565,8 +566,8 @@ where the two builds agree to every printed digit.
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
 | migration no-op on the device: migrate T vs F final beam z |  | same | holds |
-| two runs bit for bit, the filter on: 181 arrays compared | 0 | same | <= 0 |
-| two runs bit for bit, the filter off: 177 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter on: 182 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter off: 178 arrays compared | 0 | same | <= 0 |
 | deposit accuracy, cancelling phases | 1.4673e-05 | same | <= 1.5372e-05 |
 | deposit quantum below the FP32 spacing of its bound, cancelling phases | 37 | same | >= 24 |
 | deposit accuracy, unequal weights | 1.4681e-05 | same | <= 1.5383e-05 |
@@ -737,7 +738,7 @@ where the two builds agree to every printed digit.
 | wake production TD window power vs CPU | 1.7755e-06 | same | <= 1.6000e-03 |
 | energy the wake removes, device vs CPU, fraction of itself | 2.8039e-05 | same | <= 9.0000e-05 |
 | the enlarged decrement moves the energy removed | 6.2520e-02 | same | >= 3.1250e-02 |
-| two wake runs bit for bit: 177 arrays compared | 0 | same | <= 0 |
+| two wake runs bit for bit: 178 arrays compared | 0 | same | <= 0 |
 | wake spectral production TD window power vs CPU | 9.0210e-08 | same | <= 1.6000e-03 |
 | migrating wake record: refreshes at the CPU's positions | 49 | same | >= 2 |
 | migrating wake record: refreshed loss rates vs CPU | 3.6770e-04 | same | <= 1.2000e-03 |
@@ -763,7 +764,7 @@ where the two builds agree to every printed digit.
 | fc measured vs closed form, helical (h=1): \|ratio-1\| | 5.9279e-04 | same | <= 5.0000e-03 |
 | fc measured vs closed form, planar_h3 (h=3): \|ratio-1\| | 7.0543e-04 | same | <= 5.0000e-03 |
 | convergence: \|fc(30)/fc(20) - 1\| | 7.5001e-06 | same | <= 5.0000e-04 |
-| gain curve: \|ln(P_unavg/P_avg)\| at segment exit | 2.7430e-03 | 2.7455e-03 | <= 2.0000e-01 |
+| gain curve: \|ln(P_unavg/P_avg)\| at segment exit | 2.7443e-03 | 2.7455e-03 | <= 2.0000e-01 |
 | sandwich: ledger rows confined to the unaveraged segment (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | sandwich: ledger max\|d(E+U)\| / sum\|dU\| on the middle segment | 1.4589e-04 | same | <= 1.0000e-03 |
 | sandwich: frames on against off, final beam and field identical to the bit (5 frames inside the unaveraged segment) (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
@@ -774,11 +775,11 @@ where the two builds agree to every printed digit.
 | TD ledger: max\|d(E_beam+U_window+U_escaped-U_spont+E_rad)\| / turnover | 4.5759e-10 | 9.8500e-10 | <= 1.0000e-03 |
 | twin: worst transverse row | 9.9829e-07 | same | <= 1.0000e-05 |
 | twin: worst transverse momentum row | 7.6421e-06 | 7.1084e-06 | <= 1.0000e-04 |
-| twin: worst energy row | 2.1138e-06 | 2.1051e-06 | <= 1.0000e-04 |
-| twin: worst phase row | 9.6871e-06 | 9.9196e-06 | <= 1.0000e-03 |
-| twin: worst phasor row | 7.8557e-08 | 8.3188e-08 | <= 1.0000e-05 |
-| twin: worst ledger row, its energy against the FP64 step's | 1.5559e-05 | 1.5561e-05 | <= 1.0000e-04 |
-| twin: worst field row, after every substep of the record step | 5.8824e-06 | 5.9548e-06 | <= 5.0000e-05 |
+| twin: worst energy row | 2.1086e-06 | 2.1051e-06 | <= 1.0000e-04 |
+| twin: worst phase row | 9.9637e-06 | 9.9196e-06 | <= 1.0000e-03 |
+| twin: worst phasor row | 7.8680e-08 | 8.3188e-08 | <= 1.0000e-05 |
+| twin: worst ledger row, its energy against the FP64 step's | 1.5553e-05 | 1.5561e-05 | <= 1.0000e-04 |
+| twin: worst field row, after every substep of the record step | 5.9722e-06 | 6.0137e-06 | <= 5.0000e-05 |
 | twin: the FP64 stream is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | twin: the ledger is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | twin: freerun refused in the unaveraged mode (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
@@ -812,7 +813,7 @@ where the two builds agree to every printed digit.
 | fluctuations: unaveraged sigma growth vs analytic, \|ratio - 1\| | 1.7894e-02 | same | 0.0000e+00 to 5.0000e-02 |
 | fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.3485e-01 | same | 0.0000e+00 to 2.5000e-01 |
 | fluctuations: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
-| ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.9122e-12 | 5.0416e-12 | 0.0000e+00 to 1.0000e-03 |
+| ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.7421e-12 | 5.2661e-12 | 0.0000e+00 to 1.0000e-03 |
 
 (val-levels-element-offsets)=
 ### `element-offsets`
@@ -917,6 +918,24 @@ where the two builds agree to every printed digit.
 | a frame at the device's end initializes, every record identical but the four that place a beam | 0.0000e+00 | same | <= 5.0000e-01 |
 | a continuation from that face composes with the run it continues | 5.1011e-19 | 6.5295e-17 | <= 1.0000e-10 |
 
+(val-levels-fft-plan)=
+### `fft-plan`
+
+| Check | Debug | Production | Bound |
+|---|---|---|---|
+| wisdom twice: stats arrays that differ | 0 | same | = 0 |
+| the plan in use is wisdom or estimate |  | same | holds |
+| estimate: the stats file names estimate |  | same | holds |
+| wisdom against estimate: stats arrays that differ | 18 | same | >= 1 |
+| wisdom against estimate: window energy | 1.1517e-15 | 9.5978e-16 | <= 1.0000e-10 |
+| measure: the stats file names measure |  | same | holds |
+| measure against estimate: window energy within 1e-10 |  | same | holds |
+| 127-point grid under wisdom: the plan in use is estimate |  | same | holds |
+| 127-point grid under wisdom: the warning line |  | same | holds |
+| 127-point grid under wisdom: the resolved input file names estimate |  | same | holds |
+| 127-point grid: stats arrays that differ from estimate | 0 | same | = 0 |
+| wisdom at 1 and 8 threads: stats arrays that differ | 0 | same | = 0 |
+
 (val-levels-harmonics)=
 ### `harmonics`
 
@@ -970,13 +989,13 @@ where the two builds agree to every printed digit.
 | h3both-final-h3.wf.h5 unitDimension |  | same | holds |
 | h3both-final-h3.wf.h5 photonEnergy wavelength | 0.0000e+00 | same | <= 3.3333e-17 |
 | h3both-final-h3.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 2.7851e-16 | 2.7905e-16 | <= 1.0000e-13 |
+| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.5569e-16 | 3.1138e-16 | <= 1.0000e-13 |
 | Fortran openPMD read-back, re-dump dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | Python Wavefront class energy (its Genesis path) | 1.1938e-12 | same | <= 1.0000e-09 |
-| Python openPMD reader (vs Genesis dump) | 2.7851e-16 | 2.7905e-16 | <= 1.0000e-13 |
+| Python openPMD reader (vs Genesis dump) | 1.5569e-16 | 3.1138e-16 | <= 1.0000e-13 |
 | Python openPMD write/read round trip exact | 0.0000e+00 | same | <= 5.0000e-01 |
 | Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 2.1649e-14 | 1.5432e-14 | <= 1.0000e-12 |
+| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 2.2538e-14 | 1.5543e-14 | <= 1.0000e-12 |
 | 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | bank bytes: h1's stated pulse file vs on disk, rel | 1.6024e-03 | same | <= 1.0000e-02 |
 | bank bytes: h3's stated pulse file vs on disk, rel | 1.6024e-03 | same | <= 1.0000e-02 |
@@ -997,10 +1016,10 @@ where the two builds agree to every printed digit.
 | cross-mode identity: absolute gap scan == knob scan | 1.1808e-03 | same | <= 5.0000e-03 |
 | our z_offset curve == Genesis PHASESHIFTER curve | 2.3593e-08 | same | <= 1.0000e-06 |
 | exit power vs phi: our knob == Genesis shifter (max rel) | 1.2634e-08 | same | <= 1.0000e-06 |
-| chicane, relative mode: geometric fraction dropped (flat, rad span) | 7.7786e-06 | 7.1474e-06 | <= 5.0000e-03 |
-| chicane, absolute mode vs independent geometry (rad) | 6.8280e-04 | 6.6948e-04 | <= 2.0000e-03 |
+| chicane, relative mode: geometric fraction dropped (flat, rad span) | 7.7680e-06 | 7.1368e-06 | <= 5.0000e-03 |
+| chicane, absolute mode vs independent geometry (rad) | 6.8281e-04 | 6.6948e-04 | <= 2.0000e-03 |
 | 2D trace vs the small-angle closed form | 6.4361e-08 | same | <= 1.0000e-06 |
-| unaveraged ledger closure across the chicane | 2.9748e-11 | 2.1418e-11 | <= 1.0000e-04 |
+| unaveraged ledger closure across the chicane | 3.6747e-11 | 1.7104e-11 | <= 1.0000e-04 |
 | extra banked slices == floor(delay/lambda), three delays | 0.0000e+00 | same | <= 5.0000e-01 |
 | TD chicane 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal non-closed-bump break |  | same | holds |
@@ -1048,6 +1067,7 @@ where the two builds agree to every printed digit.
 | a name outside the set is refused with the set, field.propagator = "spectra" |  | same | holds |
 | a name outside the set is refused with the set, field.seed_polarization = "z" |  | same | holds |
 | a name outside the set is refused with the set, run.device = "metl" |  | same | holds |
+| a name outside the set is refused with the set, run.fft_plan = "patient" |  | same | holds |
 | a name outside the set is refused with the set, run.fp32_check = "on" |  | same | holds |
 | a name outside the set is refused with the set, run.interlude_model = "bamd" |  | same | holds |
 | a name outside the set is refused with the set, run.source_model = "deposits" |  | same | holds |

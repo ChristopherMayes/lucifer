@@ -1797,6 +1797,24 @@ call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, ru
                      fel_p0_mc(fbeam) / fel_gamma0(fbeam) * fbeam%slice_spacing, trim(out_root), err_flag)
 if (err_flag) return
 
+! The plans of the transverse transform on the field's grid, made here on every thread
+! so that the header and the stats file name the plan the run uses. Under
+! fft_plan = 'wisdom' a grid the recorded text does not hold, or an FFTW that does not
+! accept the text, is planned by 'estimate'. The key then takes that value, marked as
+! derived, and the header writes a warning line.
+
+call wavefront_fft2_plan_threads (size(wf%Ex, 1), size(wf%Ex, 2), err_flag)
+if (err_flag) return
+if (wavefront_fft2_plan_made() /= run%global%fft_plan) then
+  run%fft_plan_fallback = .true.
+  run%global%fft_plan = wavefront_fft2_plan_made()
+  call fel_schema_mark (run, 'run.fft_plan', fel_origin_derived$)
+  call wavefront_fft2_set_plan (trim(run%global%fft_plan), err_flag)
+  if (err_flag) return
+endif
+call fel_record_str ('setup', 'fft_plan', 'How the plans of the transverse transform were made: wisdom, ' // &
+      'the measured plan the source records, estimate or measure.', trim(run%global%fft_plan))
+
 ! The escaped file is the bank's own, and a run without the bank has none to keep.
 
 if (run%global%write_escaped .and. .not. run%global%keep_escaped_field) then

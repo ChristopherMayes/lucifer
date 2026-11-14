@@ -589,7 +589,7 @@ def main():
             if "enum" in prop:
                 names[f"{table}.{key}"] = prop
     bad = {"run.interlude_model": "bamd", "run.transport_model": "genesys", "run.source_model": "deposits",
-           "run.fp32_check": "on", "run.device": "metl", "beam.z_distribution": "gauss",
+           "run.fp32_check": "on", "run.device": "metl", "run.fft_plan": "patient", "beam.z_distribution": "gauss",
            "beam.load_mode": "all", "field.seed_polarization": "z", "wake.model": "mine",
            "wake.material": "FE", "space_charge.model": "mine", "field.propagator": "spectra",
            "beam.shot_noise_method": "second_order"}

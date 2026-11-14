@@ -230,6 +230,13 @@ type fel_global_struct
   logical :: device_timing = .false.
   integer :: device_dep_mutate = 0     ! Shift the deposit's fixed-point scale, in bits.
   logical :: device_wake_mutate = .false.  ! Enlarge the device's wake decrement by 2^-4.
+  ! How the transverse transform is planned (wavefront_fft2_set_plan): 'wisdom', the
+  ! measured plan the source records, the same in every run, 'estimate', FFTW's
+  ! estimated plan, or 'measure', a plan measured in this run, which can differ from
+  ! one run to the next in the last bit. Under 'wisdom' a transform the recorded text
+  ! does not hold is planned by 'estimate', and fel_setup_schedule then sets this to
+  ! 'estimate', so that it names the plan in use.
+  character(16) :: fft_plan = 'wisdom'
 end type
 
 !+
@@ -449,6 +456,7 @@ type fel_run_struct
   integer :: nfield = 0                    ! Planes of a field record over the window (fel_field_planes).
   logical :: field_sampling_derived = .false.   ! field.n_wavelength was derived, so the window may cut it.
   logical :: two_pol = .false., any_unavg = .false., timerun = .false.
+  logical :: fft_plan_fallback = .false.  ! fft_plan = 'wisdom' gave no plan for the field's grid.
   ! Running counters and ledger terms.
   real(rp) :: u_spont_cum = 0, e_rad_cum = 0
   real(rp) :: charge_dropped_tot = 0, b_dev_max = 0

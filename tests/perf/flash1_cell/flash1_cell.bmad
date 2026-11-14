@@ -1,0 +1,29 @@
+! One cell of the FLASH1 example (examples/flash1/flash1.bmad): one 165-period planar
+! segment and the 0.8 m intersection with its quadrupole doublet, 5.3045 m. The cell is
+! timed against Genesis4 (flash1_cell.lat) by tests/perf/flash1_cell_table.sh, so the FEL
+! step is one period, 165 steps, where the example takes three. Everything else is the
+! example's.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 6.684941e8
+
+! The matched periodic Twiss of the cell, at the entrance of a segment.
+beginning[beta_a]  = 10.1189
+beginning[alpha_a] = 0.18898
+beginning[beta_b]  = 9.8031
+beginning[alpha_b] = -0.23996
+
+UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = planar_model, &
+     b_max = 0.47, fel_method = averaged, ds_step = 0.0273
+
+D1: drift, l = 0.25
+D2: drift, l = 0.10
+D3: drift, l = 0.25
+QF: quadrupole, l = 0.1, k1 =  1.3
+QD: quadrupole, l = 0.1, k1 = -0.8
+
+CELL: line = (UND, D1, QF, D2, QD, D3)
+
+use, CELL
