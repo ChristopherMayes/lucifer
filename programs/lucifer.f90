@@ -39,6 +39,7 @@
 ! Usage:
 !   lucifer [--ascii | --unicode] [--verbose] [--progress <mode>] <input.toml> [<table>.<key>=<value> ...]
 !   lucifer --schema <file>
+!   lucifer --fft-wisdom [<points> ...]
 !   lucifer --version
 !   lucifer --help
 !-
@@ -69,6 +70,9 @@ implicit none
 type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k, n_over, i_skip
 integer(8) t_0, t_1, t_rate
+integer, allocatable :: wis_n(:), wis_state(:)
+real(rp), allocatable :: wis_seconds(:)
+character(600) wis_file
 logical err, dev_usable, want_ascii, want_unicode, want_verbose
 character(400) param_file, arg
 character(400) :: progress = ''
@@ -111,6 +115,7 @@ if (param_file == '--help' .or. param_file == '-h') then
         'Usage:                                                                        ', &
         '  lucifer [options] <input.toml> [<table>.<key>=<value> ...]                  ', &
         '  lucifer --schema <file>                                                     ', &
+        '  lucifer --fft-wisdom [<points> ...]                                         ', &
         '  lucifer --version                                                           ', &
         '  lucifer --help                                                              ', &
         '                                                                              ', &
@@ -138,6 +143,12 @@ if (param_file == '--help' .or. param_file == '-h') then
         '                           device backend, and exit.                          ', &
         '  --schema <file>          Write the schema of the input file as JSON Schema  ', &
         '                           and exit.                                          ', &
+        '  --fft-wisdom [<points>]  Measure the plans of the transverse transform for  ', &
+        '                           the grids named, by their points on a side, and add', &
+        '                           them to the wisdom file a run plans from, then     ', &
+        '                           exit (run.fft_wisdom_file). A grid the file or the ', &
+        '                           source already holds is not measured. Default: the ', &
+        '                           powers of two from 32 to 2048.                     ', &
         '                                                                              ', &
         'Output files, named by run.out_root:                                          ', &
         '  <out_root>.stats.h5        The record of the run, with every number the     ', &
@@ -169,6 +180,56 @@ if (param_file == '--version') then
     call out_io (s_blank$, r_name, 'Device backend: metal, on ' // trim(dev_name))
   else
     call out_io (s_blank$, r_name, 'Device backend: none. ' // trim(dev_reason))
+  endif
+  flush (output_unit)
+  stop
+endif
+
+! The wisdom file (run.fft_wisdom_file): the plans of the transverse transform for the
+! grids named, measured once on this machine and written to the file a run then plans
+! from. With no grid named, the power-of-two grids from 32 to 2048.
+
+if (param_file == '--fft-wisdom') then
+  allocate (wis_n(max(7, n_arg - 1)))
+  if (n_arg == 1) then
+    wis_n = [32, 64, 128, 256, 512, 1024, 2048]
+  else
+    do i_k = 2, n_arg
+      call get_command_argument (i_k, arg)
+      read (arg, *, iostat = i_skip) wis_n(i_k-1)
+      if (i_skip /= 0 .or. wis_n(i_k-1) < 2) then
+        call out_io (s_error$, r_name, '--fft-wisdom TAKES GRID POINTS ON A SIDE, AND WAS GIVEN: ' // trim(arg))
+        stop 2
+      endif
+    enddo
+    wis_n = wis_n(1:n_arg-1)
+  endif
+  wis_file = fel_fft_wisdom_path('cache')
+  if (wis_file == '') then
+    call out_io (s_error$, r_name, 'NO PLACE FOR THE WISDOM FILE: SET HOME, XDG_CACHE_HOME OR LUCIFER_FFT_WISDOM_FILE.')
+    stop 1
+  endif
+  i_k = index(wis_file, '/', back = .true.)
+  if (i_k > 1) call execute_command_line ('mkdir -p "' // wis_file(1:i_k-1) // '"')
+  allocate (wis_state(size(wis_n)), wis_seconds(size(wis_n)))
+  call wavefront_fft2_make_wisdom (trim(wis_file), wis_n, wis_state, wis_seconds, err)
+  if (err) stop 1
+  do i_k = 1, size(wis_n)
+    write (arg, '(i0, a, i0)') wis_n(i_k), ' by ', wis_n(i_k)
+    select case (wis_state(i_k))
+    case (wf_wisdom_in_source$)
+      call out_io (s_blank$, r_name, ' ' // trim(arg) // ': planned from the record in the source, not measured')
+    case (wf_wisdom_in_file$)
+      call out_io (s_blank$, r_name, ' ' // trim(arg) // ': in the file already, not measured')
+    case default
+      write (progress, '(f10.2)') wis_seconds(i_k)
+      call out_io (s_blank$, r_name, ' ' // trim(arg) // ': measured in ' // trim(adjustl(progress)) // ' s')
+    end select
+  enddo
+  if (any(wis_state == wf_wisdom_measured$)) then
+    call out_io (s_blank$, r_name, ' Wrote ' // trim(wis_file))
+  else
+    call out_io (s_blank$, r_name, ' Nothing to measure. The file is ' // trim(wis_file))
   endif
   flush (output_unit)
   stop
@@ -252,6 +313,7 @@ if (err) stop 1
 
 call wavefront_fft2_set_plan (trim(run%global%fft_plan), err)
 if (err) stop 1
+call wavefront_fft2_set_wisdom_file (trim(fel_fft_wisdom_path(trim(run%global%fft_wisdom_file))), err)
 
 call fel_setup_lattice (run, err)
 if (err) stop 1

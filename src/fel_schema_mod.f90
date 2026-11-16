@@ -195,8 +195,12 @@ call add ('run', 'device_wake_mutate', key_logical$, '', 'wake mutate', &
       'Enlarge the device''s chamber-wake decrement by 2^-4. A check instrument.')
 call add ('run', 'fft_plan', key_string$, '', 'fft plan', &
       'The plan of the transverse transform: wisdom, the measured plan the source records; ' // &
-      'estimate, FFTW''s estimated plan; or measure, a plan measured in this run.', &
-      allowed = [character(16) :: 'wisdom', 'estimate', 'measure'])
+      'estimate, FFTW''s estimated plan; or measure, a plan measured in this run. wisdom_file is ' // &
+      'wisdom, and is what a run records where a wisdom file made the plan.', &
+      allowed = [character(16) :: 'wisdom', 'wisdom_file', 'estimate', 'measure'])
+call add ('run', 'fft_wisdom_file', key_string$, '', 'fft wisdom file', &
+      'The wisdom file fft_plan = wisdom plans from where the source records no plan: cache, the ' // &
+      'file of the cache directory, a path, or blank for none.')
 
 ! [window]: fel_slicing_struct.
 
@@ -581,6 +585,7 @@ case ('run.device_timing');                run%global%device_timing = lv
 case ('run.device_dep_mutate');            run%global%device_dep_mutate = iv
 case ('run.device_wake_mutate');           run%global%device_wake_mutate = lv
 case ('run.fft_plan');                     call put (run%global%fft_plan)
+case ('run.fft_wisdom_file');              call put (run%global%fft_wisdom_file)
 case ('window.window_length');             run%slicing%window_length = rv
 case ('window.n_wavelength');              run%slicing%n_wavelength = iv
 case ('window.n_slice');                   run%slicing%n_slice = iv
@@ -987,6 +992,7 @@ case ('run.device_timing');                lv = run%global%device_timing
 case ('run.device_dep_mutate');            iv = run%global%device_dep_mutate
 case ('run.device_wake_mutate');           lv = run%global%device_wake_mutate
 case ('run.fft_plan');                     sv = run%global%fft_plan
+case ('run.fft_wisdom_file');              sv = run%global%fft_wisdom_file
 case ('window.window_length');             rv = run%slicing%window_length
 case ('window.n_wavelength');              iv = run%slicing%n_wavelength
 case ('window.n_slice');                   iv = run%slicing%n_slice

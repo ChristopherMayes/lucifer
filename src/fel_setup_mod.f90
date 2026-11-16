@@ -1799,21 +1799,23 @@ if (err_flag) return
 
 ! The plans of the transverse transform on the field's grid, made here on every thread
 ! so that the header and the stats file name the plan the run uses. Under
-! fft_plan = 'wisdom' a grid the recorded text does not hold, or an FFTW that does not
+! fft_plan = 'wisdom' a plan the wisdom file made is named 'wisdom_file', and a grid that
+! neither the recorded text nor the file holds, or an FFTW that does not
 ! accept the text, is planned by 'estimate'. The key then takes that value, marked as
 ! derived, and the header writes a warning line.
 
 call wavefront_fft2_plan_threads (size(wf%Ex, 1), size(wf%Ex, 2), err_flag)
 if (err_flag) return
 if (wavefront_fft2_plan_made() /= run%global%fft_plan) then
-  run%fft_plan_fallback = .true.
+  run%fft_plan_fallback = (wavefront_fft2_plan_made() == 'estimate')
   run%global%fft_plan = wavefront_fft2_plan_made()
   call fel_schema_mark (run, 'run.fft_plan', fel_origin_derived$)
   call wavefront_fft2_set_plan (trim(run%global%fft_plan), err_flag)
   if (err_flag) return
 endif
 call fel_record_str ('setup', 'fft_plan', 'How the plans of the transverse transform were made: wisdom, ' // &
-      'the measured plan the source records, estimate or measure.', trim(run%global%fft_plan))
+      'the measured plan the source records, wisdom_file, the measured plan a wisdom file records, ' // &
+      'estimate or measure.', trim(run%global%fft_plan))
 
 ! The escaped file is the bank's own, and a run without the bank has none to keep.
 

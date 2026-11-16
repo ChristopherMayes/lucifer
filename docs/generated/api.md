@@ -4067,6 +4067,29 @@ terminal output goes through out_io. The file-name echo lines are s_blank$, so
 scripts see bare names.
 ```
 
+(api-fel-fft-wisdom-path)=
+### `fel_fft_wisdom_path`
+
+*Function* `(key) result (path)`
+
+```
+Routine to return the wisdom file run.fft_wisdom_file names. A value other than
+'cache' is the path itself, and blank is no file. 'cache' is the environment variable
+LUCIFER_FFT_WISDOM_FILE where it is set, blank included, which is how the validation
+suite runs with no file. Else it is fft-wisdom-<FFTW version>-<host>.txt in the
+directory lucifer of XDG_CACHE_HOME, or of .cache in the home directory. The host is
+the system and processor of the build, since the wisdom of one processor's FFTW does
+not serve another's.
+```
+
+```
+Input:
+  key   -- character(*): The value of run.fft_wisdom_file.
+
+Output:
+  path  -- character(600): The file, blank for none.
+```
+
 (api-fel-dump-beam)=
 ### `fel_dump_beam`
 
@@ -9666,6 +9689,7 @@ keys of the input file, each table.key=value, read through the same schema after
 Usage:
   lucifer [--ascii | --unicode] [--verbose] [--progress <mode>] <input.toml> [<table>.<key>=<value> ...]
   lucifer --schema <file>
+  lucifer --fft-wisdom [<points> ...]
   lucifer --version
   lucifer --help
 ```
@@ -10443,7 +10467,9 @@ Output:
 
 ```
 Routine to set how the plans of wavefront_fft2 are made: 'wisdom', the plan the text
-of wavefront_wisdom_mod records and the estimated plan where it records none,
+of wavefront_wisdom_mod records, else the plan a wisdom file records
+(wavefront_fft2_set_wisdom_file), else the estimated plan. 'wisdom_file' is what
+wavefront_fft2_plan_made answers where the file made the plan, and sets the same,
 'estimate', FFTW_ESTIMATE, or 'measure', FFTW_MEASURE, whose choice can differ from
 run to run. Call it serially, before any transform. A thread whose cache was filled
 another way plans again at its next transform.
@@ -10451,7 +10477,7 @@ another way plans again at its next transform.
 
 ```
 Input:
-  name      -- character(*): 'wisdom', 'estimate' or 'measure'.
+  name      -- character(*): 'wisdom', 'wisdom_file', 'estimate' or 'measure'.
 
 Output:
   err_flag  -- logical: Set True if name is none of the three, False otherwise.
@@ -10464,14 +10490,81 @@ Output:
 
 ```
 Routine to return how the plans in the calling thread's cache were made: 'wisdom',
-'estimate' or 'measure'. Under 'wisdom' this is 'estimate' where the wisdom text
-gave no plan for the cached size. Every thread plans alike, so after
+'wisdom_file', 'estimate' or 'measure'. Under 'wisdom' this is 'wisdom_file' where
+the source's text gave no plan for the cached size and a file's did, and 'estimate'
+where neither did. Every thread plans alike, so after
 wavefront_fft2_plan_threads the calling thread's answer is every thread's.
 ```
 
 ```
 Output:
-  name  -- character(8): How the plans were made, blank if the cache is empty.
+  name  -- character(12): How the plans were made, blank if the cache is empty.
+```
+
+(api-wavefront-fft2-set-wisdom-file)=
+### `wavefront_fft2_set_wisdom_file`
+
+*Subroutine* `(file_name, found)`
+
+```
+Routine to read a file of FFTW wisdom, as wavefront_fft2_make_wisdom writes it, for
+the plans of wavefront_fft2 under 'wisdom' (wavefront_fft2_set_plan). The file is
+read here once and never again. A blank name, or a file that is not there or is
+empty, leaves no file's wisdom in use. Call it serially, before any transform.
+```
+
+```
+Input:
+  file_name  -- character(*): The file, or blank for none.
+
+Output:
+  found      -- logical: True if the file was read.
+```
+
+(api-wavefront-fft2-make-wisdom)=
+### `wavefront_fft2_make_wisdom`
+
+*Subroutine* `(file_name, n_side, state, seconds, err_flag)`
+
+```
+Routine to measure the plans of wavefront_fft2 for square grids and write FFTW's
+record of them, its wisdom, to a file that wavefront_fft2_set_wisdom_file reads.
+Each grid is planned at FFTW_PATIENT, in place, forward and backward, as
+wavefront_fft2_plan plans it. A grid the text of wavefront_wisdom_mod already gives a
+plan for is not measured, since a run plans it from that text, and a grid the file
+already holds is not measured again. The file is written only if a grid was measured,
+with what it held before, so a second call for the same grids leaves its bytes alone.
+
+A file that is there and that this FFTW does not accept, another version's, is an
+error, and it is not overwritten. Call this serially, outside any transform.
+```
+
+```
+Input:
+  file_name   -- character(*): The file to add to, made if it is not there.
+  n_side(:)   -- integer: The grids' points on a side.
+
+Output:
+  state(:)    -- integer: For each grid, wf_wisdom_in_source$, wf_wisdom_in_file$ or
+                   wf_wisdom_measured$.
+  seconds(:)  -- real(rp): The time the measurement of a grid took, 0 if not measured.
+  err_flag    -- logical: Set True if the file could not be read or written or a plan
+                   could not be made.
+```
+
+(api-wavefront-fftw-version)=
+### `wavefront_fftw_version`
+
+*Function* `() result (version)`
+
+```
+Routine to return the version FFTW states in the first word of its wisdom, as
+fftw-3.3.11, which names the wisdom a file can hold.
+```
+
+```
+Output:
+  version  -- character(32): The version, blank if FFTW exported nothing.
 ```
 
 (api-wavefront-wisdom-text)=

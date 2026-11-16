@@ -12,4 +12,8 @@ implicit none
 
 character(*), parameter :: lucifer_version$ = '@LUCIFER_VERSION_STRING@'
 
+! The system and the processor the build was made for, as CMake names them.
+
+character(*), parameter :: lucifer_host$ = '@LUCIFER_HOST@'
+
 end module

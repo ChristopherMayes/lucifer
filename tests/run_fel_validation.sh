@@ -326,6 +326,12 @@ cd "$WORK_DIR" || exit 1
 # every Genesis launch (measured, the tcp provider is always sufficient on one node).
 export FI_PROVIDER=tcp
 
+# A wisdom file of this machine (run.fft_wisdom_file) would plan the transforms the
+# source's record holds no plan for, and the digits recorded from this suite would then
+# belong to that file. The suite runs with none. A caller that means to run it from a
+# file, as the Linux CI job does, names the file in this variable.
+export LUCIFER_FFT_WISDOM_FILE="${LUCIFER_FFT_WISDOM_FILE-}"
+
 # Every section prints its wall time, so a regression in test cost is visible from the
 # validation suite's own output.
 

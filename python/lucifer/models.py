@@ -99,8 +99,10 @@ class Run:
     """Shift the device deposit's fixed-point scale, in bits. A check instrument."""
     device_wake_mutate: bool = False
     """Enlarge the device's chamber-wake decrement by 2^-4. A check instrument."""
-    fft_plan: Literal['wisdom', 'estimate', 'measure'] = 'wisdom'
-    """The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run."""
+    fft_plan: Literal['wisdom', 'wisdom_file', 'estimate', 'measure'] = 'wisdom'
+    """The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run. wisdom_file is wisdom, and is what a run records where a wisdom file made the plan"""
+    fft_wisdom_file: str = 'cache'
+    """The wisdom file fft_plan = wisdom plans from where the source records no plan: cache, the file of the cache directory, a path, or blank for none."""
 
 
 @dataclass

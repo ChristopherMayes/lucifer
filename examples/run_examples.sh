@@ -30,6 +30,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
 # BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../util/locations.sh"
+
+# The examples' recorded numbers are taken with no wisdom file of this machine
+# (run.fft_wisdom_file), unless the caller names one in this variable.
+export LUCIFER_FFT_WISDOM_FILE="${LUCIFER_FFT_WISDOM_FILE-}"
 FIG_DIR="$LUCIFER_DIR/docs/generated/examples"
 
 EXE=""

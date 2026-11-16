@@ -107,12 +107,13 @@ endif ()
 set (LUCIFER_VERSION "" CACHE STRING "The version to build as, in place of git's")
 find_package (Git QUIET)
 set (LUCIFER_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
+set (LUCIFER_HOST "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 set (LUCIFER_VERSION_FILE "${CMAKE_BINARY_DIR}/generated/fel_version_mod.f90")
 include (LuciferVersion)
 add_custom_target (lucifer_version
   COMMAND "${CMAKE_COMMAND}" "-DLUCIFER_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
           "-DLUCIFER_VERSION_FILE=${LUCIFER_VERSION_FILE}" "-DLUCIFER_VERSION=${LUCIFER_VERSION}"
-          "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}" -P "${CMAKE_SOURCE_DIR}/cmake/LuciferVersion.cmake"
+          "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}" "-DLUCIFER_HOST=${LUCIFER_HOST}" -P "${CMAKE_SOURCE_DIR}/cmake/LuciferVersion.cmake"
   BYPRODUCTS "${LUCIFER_VERSION_FILE}")
 
 # The library, liblucifer: every module under src/, the version module, the

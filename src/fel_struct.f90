@@ -237,6 +237,10 @@ type fel_global_struct
   ! does not hold is planned by 'estimate', and fel_setup_schedule then sets this to
   ! 'estimate', so that it names the plan in use.
   character(16) :: fft_plan = 'wisdom'
+  ! The wisdom file 'wisdom' plans from where the source's record holds no plan:
+  ! 'cache', the file of the user's cache directory (fel_fft_wisdom_path), a path, or
+  ! blank for none. 'lucifer --fft-wisdom' makes the file.
+  character(400) :: fft_wisdom_file = 'cache'
 end type
 
 !+
