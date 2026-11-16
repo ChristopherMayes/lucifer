@@ -97,7 +97,7 @@ The suite launches the five jobs at once, each from an absolute working director
 ./examples/run_examples.sh --no-figures
 ```
 
-The five run at once because they share only a source tree they read: separate work directories, separate output roots, and no shared state anywhere else. Nothing persists FFTW wisdom or writes outside its own directory. On an M3 Max the whole thing takes 7.7 minutes with the Genesis references cached and 9.2 without, against 25 minutes with every step in sequence and the references regenerated twice per run. The references are cached because they are a pure function of the reference binary and the input files that make them. The cache key names both and the pinned version besides, and each run says whether it hit or missed. Deleting `~/.cache/lucifer/genesis-refs` is always safe and costs one cold run.
+The five run at once because they share only a source tree they read: separate work directories, separate output roots, and no shared state anywhere else. No job reads a wisdom file of the machine or writes outside its own directory, and the three files the program and the suite keep in the cache directory are listed in [](user-guide.md#ug-cache). On an M3 Max the whole thing takes 7.7 minutes with the Genesis references cached and 9.2 without, against 25 minutes with every step in sequence and the references regenerated twice per run. The references are cached because they are a pure function of the reference binary and the input files that make them. The cache key names both and the pinned version besides, and each run says whether it hit or missed. Deleting `~/.cache/lucifer/genesis-refs` is always safe and costs one cold run.
 
 | step | cached | cold |
 |---|---|---|
