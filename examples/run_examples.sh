@@ -431,6 +431,12 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_genesis_names.py" --root "$LU
   exit 1
 fi
 
+# And the user guide's table of the cache directory lists the files the code places there.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_cache_page.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: the table of the cache directory and the code disagree."
+  exit 1
+fi
+
 # And a page links the glossary where it first uses one of the glossary's words.
 if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_glossary.py" --root "$LUCIFER_DIR"; then
   echo " FAIL: a page uses a glossary word before it links the glossary."

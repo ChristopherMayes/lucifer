@@ -33,7 +33,12 @@ of that history. The entries before that date describe that branch.
   `--fft-wisdom` to the file's bytes. The Linux CI job runs the command before the suite. The
   tracker's grid is always square, so the command takes square grids. The spectral propagator's
   transforms along tau stay on the estimate: a measured plan gains 2 and 7 percent at the
-  lengths 40 and 48 the suite runs (`docs/performance.md`).
+  lengths 40 and 48 the suite runs (`docs/performance.md`). The user guide gains a section on the
+  cache directory, `~/.cache/lucifer` or `XDG_CACHE_HOME`, that lists the three files kept there,
+  the wisdom file, the validation suite's Genesis4 reference sets and its device lock, with what
+  writes and reads each, the key or environment variable that places it elsewhere and what
+  removing it does. `tests/scripts/check_cache_page.py` holds that table to the code in the docs
+  workflow and the examples job.
 - 2026-11-15 Changed: the averaged field solve works in each thread's FFTW buffer, and the
   rounding of its arithmetic is fixed by the source. `fel_field_step` copied a plane into FFTW's
   aligned buffer and back at every transform, four copies and two passes a step with the source

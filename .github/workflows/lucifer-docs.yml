@@ -109,6 +109,11 @@ jobs:
       - name: Genesis4 names are linked
         run: python tests/scripts/check_genesis_names.py
 
+      # The user guide's table of the cache directory lists every file the program and the
+      # validation suite place there, with the variable that moves it.
+      - name: The cache directory's table agrees with the code
+        run: python tests/scripts/check_cache_page.py
+
       # A page links the glossary where it first uses one of the glossary's words.
       - name: Glossary words are linked at first use
         run: python tests/scripts/check_glossary.py
