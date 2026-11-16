@@ -9,6 +9,14 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-16 Changed: the Bmad transport model no longer asks `quad_mat2_calc` for the path-length
+  coefficients. `fel_transverse_track_bmad` calls Bmad's `quad_mat2_calc` twice a particle a
+  step, once a plane, and passed the optional `z_coef` and `dz_dpz_coef`, which Bmad then
+  computed and the routine never read, since the path length is advanced in `fel_advance`. The
+  two arguments are dropped and the matrix is the same. On one cell of FLASH1 at 528 slices of
+  8192 particles under Lucifer's own models, every array of the statistics file is unchanged and
+  the particle push takes 11.4 s where it took 12.0 s, the mean of three runs of each on 12
+  threads.
 - 2026-11-15 Added: a wisdom file of the machine, for the transforms the source's record of
   plans does not serve. `run.fft_plan = "wisdom"` planned from the text of
   `src/wavefront_wisdom_mod.f90`, which was measured with the FFTW of conda-forge on Apple silicon
