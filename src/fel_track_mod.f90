@@ -1878,7 +1878,7 @@ real(rp) delz
 logical leading
 
 real(rp) p0_mc, g_max, k1x_loc, k1y_loc, rel_p, k1xx, k1yy, k3l, kz
-real(rp) m2(2,2), dz_c(3), ddz_c(3)
+real(rp) m2(2,2)
 integer ip
 
 !
@@ -1919,9 +1919,9 @@ do ip = 1, sl%n
 
   if (leading) call octupole_kick ()
 
-  call quad_mat2_calc (k1xx, delz, rel_p, m2, dz_c, ddz_c)
+  call quad_mat2_calc (k1xx, delz, rel_p, m2)
   call apply_mat2 (sl%x(ip), sl%px(ip))
-  call quad_mat2_calc (k1yy, delz, rel_p, m2, dz_c, ddz_c)
+  call quad_mat2_calc (k1yy, delz, rel_p, m2)
   call apply_mat2 (sl%y(ip), sl%py(ip))
 
   if (.not. leading) call octupole_kick ()
