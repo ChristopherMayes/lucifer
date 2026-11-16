@@ -44,7 +44,7 @@ implicit none
 
 ! The recording machine and the day the rates were fitted, printed with the estimate.
 
-character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-11-14'
+character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-11-15'
 
 ! Fitted from the phase profile and the particles-against-the-grid tables of
 ! docs/performance.md (production build, gfortran 15.3), divided out to one thread. The
@@ -56,9 +56,9 @@ character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-11-
 ! grid or another FFTW runs, a 256-point transform takes 2.2 times as long on twelve
 ! threads, and the estimate does not carry that.
 
-real(rp), parameter :: fel_cost_push$ = 1.71e-7_rp     ! s per particle-step.
-real(rp), parameter :: fel_cost_deposit$ = 1.14e-8_rp  ! s per particle-step.
-real(rp), parameter :: fel_cost_solve$ = 2.04e-9_rp    ! s per grid point per log2(ngrid) per step.
+real(rp), parameter :: fel_cost_push$ = 1.67e-7_rp     ! s per particle-step.
+real(rp), parameter :: fel_cost_deposit$ = 5.15e-9_rp  ! s per particle-step.
+real(rp), parameter :: fel_cost_solve$ = 1.82e-9_rp    ! s per grid point per log2(ngrid) per step.
 
 ! The spectral propagator's pass along tau (fel_spectral_apply): a gather of every line
 ! of the window and its pad across the stack's stride, a transform pair of n_t points
@@ -75,25 +75,25 @@ real(rp), parameter :: fel_cost_solve$ = 2.04e-9_rp    ! s per grid point per lo
 real(rp), parameter :: fel_cost_tau$ = 6.72e-10_rp  ! s per point per log2(n_t) per pass.
 
 ! The thread scan's serial fraction, and the share of the walk the push and the solve
-! own. The share is 74.3, 75.9 and 79.1 percent over a factor of 16 in particles per
-! slice at 96 slices and 82.0 percent at 504 slices. The rest holds the bank's writes,
+! own. The share is 73.1, 74.7 and 78.3 percent over a factor of 16 in particles per
+! slice at 96 slices and 81.7 percent at 504 slices. The rest holds the bank's writes,
 ! about 2 s on each of those runs whatever its slice count, and the stats, which grow
 ! with the slices. The fit takes one constant over the set.
 
 real(rp), parameter :: fel_cost_serial$ = 0.0355_rp
-real(rp), parameter :: fel_cost_walk_share$ = 0.82_rp
+real(rp), parameter :: fel_cost_walk_share$ = 0.812_rp
 
 ! The device against the CPU, from the device table of docs/performance.md. The largest
-! window there is 7.7 times the twelve-thread CPU. The smallest input file gives the host
+! window there is 7.2 times the twelve-thread CPU. The smallest input file gives the host
 ! dispatch floor: 0.038 s over 89 steps.
 ! The four device points cannot carry a two-term fit of their own. The two largest share
 ! a particle count per slice and the smallest is the floor. So the device takes the CPU
 ! model divided by the ratio, plus the floor.
 !
-! Note: The ratio runs from 5.2 to 7.7 over the device table. This is the least certain
+! Note: The ratio runs from 4.7 to 7.2 over the device table. This is the least certain
 ! term, and the printed estimate names the backend.
 
-real(rp), parameter :: fel_cost_device$ = 7.7_rp
+real(rp), parameter :: fel_cost_device$ = 7.2_rp
 real(rp), parameter :: fel_cost_dispatch$ = 4.3e-4_rp  ! s per step, host side.
 integer, parameter :: fel_cost_device_threads$ = 12    ! The CPU thread count that ratio is against.
 

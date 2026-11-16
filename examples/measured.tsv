@@ -3,7 +3,7 @@ bmad_wake	lucifer.toml	beamlet_size	4
 bmad_wake	lucifer.toml	beamlet_size_derived	yes	
 bmad_wake	lucifer.toml	bunching_max	1.8033e-02	
 bmad_wake	lucifer.toml	bunching_max_s	5.6240e+01	m
-bmad_wake	lucifer.toml	bunching_peak	1.8020e-02	
+bmad_wake	lucifer.toml	bunching_peak	1.8004e-02	
 bmad_wake	lucifer.toml	energy_change	-1.1955e+06	eV
 bmad_wake	lucifer.toml	exit_bunching	1.7787e-02	
 bmad_wake	lucifer.toml	exit_bunching_max	5.6521e-02	
@@ -31,7 +31,7 @@ bmad_wake	lucifer.toml	initial_bunching	6.6356e-03
 bmad_wake	lucifer.toml	initial_energy	5.8038e+09	eV
 bmad_wake	lucifer.toml	initial_sigma_energy	5.1039e+05	eV
 bmad_wake	lucifer.toml	mode_peak_inside	1.6727e+08	W
-bmad_wake	lucifer.toml	mode_peak_s	5.6680e+01	m
+bmad_wake	lucifer.toml	mode_peak_s	5.6760e+01	m
 bmad_wake	lucifer.toml	n_particle	2048	
 bmad_wake	lucifer.toml	n_particle_derived	no	
 bmad_wake	lucifer.toml	n_record	1105	
@@ -183,7 +183,7 @@ coherent_source	lucifer.toml	beamlet_size	8
 coherent_source	lucifer.toml	beamlet_size_derived	no	
 coherent_source	lucifer.toml	bunching_max	3.4271e-01	
 coherent_source	lucifer.toml	bunching_max_s	4.0780e+01	m
-coherent_source	lucifer.toml	bunching_peak	3.2224e-01	
+coherent_source	lucifer.toml	bunching_peak	3.2798e-01	
 coherent_source	lucifer.toml	energy_change	-2.1383e+05	eV
 coherent_source	lucifer.toml	exit_bunching	2.7442e-01	
 coherent_source	lucifer.toml	exit_bunching_max	2.7442e-01	
@@ -206,7 +206,7 @@ coherent_source	lucifer.toml	initial_bunching	3.8856e-17
 coherent_source	lucifer.toml	initial_energy	5.8038e+09	eV
 coherent_source	lucifer.toml	initial_sigma_energy	4.7654e+05	eV
 coherent_source	lucifer.toml	mode_peak_inside	1.2854e+09	W
-coherent_source	lucifer.toml	mode_peak_s	4.2430e+01	m
+coherent_source	lucifer.toml	mode_peak_s	4.2750e+01	m
 coherent_source	lucifer.toml	n_particle	512	
 coherent_source	lucifer.toml	n_particle_derived	no	
 coherent_source	lucifer.toml	n_record	1105	
@@ -359,7 +359,7 @@ flash1	lucifer.toml	beamlet_size	4
 flash1	lucifer.toml	beamlet_size_derived	yes	
 flash1	lucifer.toml	bunching_max	1.3937e-01	
 flash1	lucifer.toml	bunching_max_s	2.5723e+01	m
-flash1	lucifer.toml	bunching_peak	1.5753e-01	
+flash1	lucifer.toml	bunching_peak	1.5652e-01	
 flash1	lucifer.toml	energy_change	-1.5579e+05	eV
 flash1	lucifer.toml	exit_bunching	1.3636e-01	
 flash1	lucifer.toml	exit_bunching_max	1.0000e+00	
@@ -387,13 +387,13 @@ flash1	lucifer.toml	initial_bunching	6.9032e-02
 flash1	lucifer.toml	initial_energy	6.6850e+08	eV
 flash1	lucifer.toml	initial_sigma_energy	2.8894e+05	eV
 flash1	lucifer.toml	mode_peak_inside	7.1520e+10	W
-flash1	lucifer.toml	mode_peak_s	3.1477e+01	m
+flash1	lucifer.toml	mode_peak_s	3.1577e+01	m
 flash1	lucifer.toml	n_particle	4096	
 flash1	lucifer.toml	n_particle_derived	no	
 flash1	lucifer.toml	n_record	361	
 flash1	lucifer.toml	n_slice	351	
 flash1	lucifer.toml	peak_power	7.1555e+10	W
-flash1	lucifer.toml	peak_power_s	3.1477e+01	m
+flash1	lucifer.toml	peak_power_s	3.1577e+01	m
 flash1	lucifer.toml	power_after_first_element	3.2071e+05	W
 flash1	lucifer.toml	power_after_first_element_per_slice	9.1369e+02	W
 flash1	lucifer.toml	slice_power_max_at_bunching_max	2.5016e+09	W
@@ -537,7 +537,7 @@ import	lucifer_from_file.toml	beamlet_size	8
 import	lucifer_from_file.toml	beamlet_size_derived	no	
 import	lucifer_from_file.toml	bunching_max	7.4945e-02	
 import	lucifer_from_file.toml	bunching_max_s	4.2750e+01	m
-import	lucifer_from_file.toml	bunching_peak	9.8447e-03	
+import	lucifer_from_file.toml	bunching_peak	9.8411e-03	
 import	lucifer_from_file.toml	energy_change	-1.2907e+02	eV
 import	lucifer_from_file.toml	exit_bunching	5.1719e-02	
 import	lucifer_from_file.toml	exit_bunching_max	2.5121e-01	
@@ -565,7 +565,7 @@ import	lucifer_from_file.toml	initial_bunching	5.3091e-02
 import	lucifer_from_file.toml	initial_energy	5.8038e+09	eV
 import	lucifer_from_file.toml	initial_sigma_energy	4.2617e+05	eV
 import	lucifer_from_file.toml	mode_peak_inside	3.0199e+05	W
-import	lucifer_from_file.toml	mode_peak_s	4.2510e+01	m
+import	lucifer_from_file.toml	mode_peak_s	4.2430e+01	m
 import	lucifer_from_file.toml	n_particle	2048	
 import	lucifer_from_file.toml	n_particle_derived	no	
 import	lucifer_from_file.toml	n_record	1105	
@@ -763,7 +763,7 @@ mixed_line	lucifer_averaged.toml	beamlet_size	4
 mixed_line	lucifer_averaged.toml	beamlet_size_derived	yes	
 mixed_line	lucifer_averaged.toml	bunching_max	2.6029e-01	
 mixed_line	lucifer_averaged.toml	bunching_max_s	3.7240e+01	m
-mixed_line	lucifer_averaged.toml	bunching_peak	2.5664e-01	
+mixed_line	lucifer_averaged.toml	bunching_peak	2.5530e-01	
 mixed_line	lucifer_averaged.toml	energy_change	-4.2764e+05	eV
 mixed_line	lucifer_averaged.toml	exit_bunching	1.9550e-01	
 mixed_line	lucifer_averaged.toml	exit_bunching_max	1.9550e-01	
@@ -786,7 +786,7 @@ mixed_line	lucifer_averaged.toml	initial_bunching	4.4450e-17
 mixed_line	lucifer_averaged.toml	initial_energy	5.8038e+09	eV
 mixed_line	lucifer_averaged.toml	initial_sigma_energy	5.0149e+05	eV
 mixed_line	lucifer_averaged.toml	mode_peak_inside	1.4404e+09	W
-mixed_line	lucifer_averaged.toml	mode_peak_s	3.7760e+01	m
+mixed_line	lucifer_averaged.toml	mode_peak_s	3.8000e+01	m
 mixed_line	lucifer_averaged.toml	n_particle	2048	
 mixed_line	lucifer_averaged.toml	n_particle_derived	no	
 mixed_line	lucifer_averaged.toml	n_record	1105	
@@ -804,7 +804,7 @@ sase	lucifer.toml	beamlet_size	4
 sase	lucifer.toml	beamlet_size_derived	yes	
 sase	lucifer.toml	bunching_max	1.8834e-02	
 sase	lucifer.toml	bunching_max_s	5.6760e+01	m
-sase	lucifer.toml	bunching_peak	1.8829e-02	
+sase	lucifer.toml	bunching_peak	1.8783e-02	
 sase	lucifer.toml	energy_change	-4.6079e+03	eV
 sase	lucifer.toml	exit_bunching	1.8638e-02	
 sase	lucifer.toml	exit_bunching_max	5.8189e-02	
@@ -832,13 +832,13 @@ sase	lucifer.toml	initial_bunching	6.6356e-03
 sase	lucifer.toml	initial_energy	5.8038e+09	eV
 sase	lucifer.toml	initial_sigma_energy	5.1039e+05	eV
 sase	lucifer.toml	mode_peak_inside	1.0519e+08	W
-sase	lucifer.toml	mode_peak_s	5.6680e+01	m
+sase	lucifer.toml	mode_peak_s	5.6240e+01	m
 sase	lucifer.toml	n_particle	2048	
 sase	lucifer.toml	n_particle_derived	no	
 sase	lucifer.toml	n_record	1105	
 sase	lucifer.toml	n_slice	96	
 sase	lucifer.toml	peak_power	1.0649e+08	W
-sase	lucifer.toml	peak_power_s	5.6240e+01	m
+sase	lucifer.toml	peak_power_s	5.6760e+01	m
 sase	lucifer.toml	power_after_first_element	5.4741e+06	W
 sase	lucifer.toml	power_after_first_element_per_slice	5.7022e+04	W
 sase	lucifer.toml	slice_power_max_at_bunching_max	6.5000e+06	W
@@ -850,7 +850,7 @@ sase_wake	lucifer.toml	beamlet_size	4
 sase_wake	lucifer.toml	beamlet_size_derived	yes	
 sase_wake	lucifer.toml	bunching_max	1.1181e-02	
 sase_wake	lucifer.toml	bunching_max_s	5.6760e+01	m
-sase_wake	lucifer.toml	bunching_peak	1.0962e-02	
+sase_wake	lucifer.toml	bunching_peak	1.0778e-02	
 sase_wake	lucifer.toml	energy_change	-4.2362e+06	eV
 sase_wake	lucifer.toml	exit_bunching	1.1175e-02	
 sase_wake	lucifer.toml	exit_bunching_max	2.8220e-02	
@@ -878,7 +878,7 @@ sase_wake	lucifer.toml	initial_bunching	6.6356e-03
 sase_wake	lucifer.toml	initial_energy	5.8038e+09	eV
 sase_wake	lucifer.toml	initial_sigma_energy	5.1039e+05	eV
 sase_wake	lucifer.toml	mode_peak_inside	8.5258e+07	W
-sase_wake	lucifer.toml	mode_peak_s	4.1990e+01	m
+sase_wake	lucifer.toml	mode_peak_s	4.2510e+01	m
 sase_wake	lucifer.toml	n_particle	2048	
 sase_wake	lucifer.toml	n_particle_derived	no	
 sase_wake	lucifer.toml	n_record	1105	
@@ -1079,7 +1079,7 @@ spontaneous	lucifer.toml	beamlet_size	4
 spontaneous	lucifer.toml	beamlet_size_derived	yes	
 spontaneous	lucifer.toml	bunching_max	2.9086e-01	
 spontaneous	lucifer.toml	bunching_max_s	3.9390e+01	m
-spontaneous	lucifer.toml	bunching_peak	2.8180e-01	
+spontaneous	lucifer.toml	bunching_peak	2.8065e-01	
 spontaneous	lucifer.toml	energy_change	-9.2710e+05	eV
 spontaneous	lucifer.toml	exit_bunching	2.2935e-01	
 spontaneous	lucifer.toml	exit_bunching_max	2.2935e-01	
@@ -1106,7 +1106,7 @@ spontaneous	lucifer.toml	initial_bunching	3.9308e-17
 spontaneous	lucifer.toml	initial_energy	5.8038e+09	eV
 spontaneous	lucifer.toml	initial_sigma_energy	5.0137e+05	eV
 spontaneous	lucifer.toml	mode_peak_inside	1.0822e+09	W
-spontaneous	lucifer.toml	mode_peak_s	3.8000e+01	m
+spontaneous	lucifer.toml	mode_peak_s	3.7680e+01	m
 spontaneous	lucifer.toml	n_particle	8192	
 spontaneous	lucifer.toml	n_particle_derived	no	
 spontaneous	lucifer.toml	n_record	1105	
@@ -1157,7 +1157,7 @@ spontaneous	lucifer_damping_only.toml	n_particle_derived	no
 spontaneous	lucifer_damping_only.toml	n_record	1105	
 spontaneous	lucifer_damping_only.toml	n_slice	1	
 spontaneous	lucifer_damping_only.toml	peak_power	1.0996e+09	W
-spontaneous	lucifer_damping_only.toml	peak_power_s	3.7760e+01	m
+spontaneous	lucifer_damping_only.toml	peak_power_s	3.7680e+01	m
 spontaneous	lucifer_damping_only.toml	power_after_first_element	4.0291e+03	W
 spontaneous	lucifer_damping_only.toml	power_after_first_element_per_slice	4.0291e+03	W
 spontaneous	lucifer_damping_only.toml	slice_power_max_at_bunching_max	1.0154e+09	W
@@ -1169,7 +1169,7 @@ steady_state	lucifer.toml	beamlet_size	4
 steady_state	lucifer.toml	beamlet_size_derived	yes	
 steady_state	lucifer.toml	bunching_max	3.0472e-01	
 steady_state	lucifer.toml	bunching_max_s	3.8941e+01	m
-steady_state	lucifer.toml	bunching_peak	2.9896e-01	
+steady_state	lucifer.toml	bunching_peak	2.9761e-01	
 steady_state	lucifer.toml	energy_change	-2.9250e+05	eV
 steady_state	lucifer.toml	exit_bunching	2.4836e-01	
 steady_state	lucifer.toml	exit_bunching_max	2.4836e-01	
@@ -1196,7 +1196,7 @@ steady_state	lucifer.toml	initial_bunching	3.9308e-17
 steady_state	lucifer.toml	initial_energy	5.8038e+09	eV
 steady_state	lucifer.toml	initial_sigma_energy	5.0137e+05	eV
 steady_state	lucifer.toml	mode_peak_inside	1.4598e+09	W
-steady_state	lucifer.toml	mode_peak_s	3.7240e+01	m
+steady_state	lucifer.toml	mode_peak_s	3.7760e+01	m
 steady_state	lucifer.toml	n_particle	8192	
 steady_state	lucifer.toml	n_particle_derived	no	
 steady_state	lucifer.toml	n_record	1105	
@@ -1214,7 +1214,7 @@ taper	lucifer.toml	beamlet_size	4
 taper	lucifer.toml	beamlet_size_derived	yes	
 taper	lucifer.toml	bunching_max	3.0436e-01	
 taper	lucifer.toml	bunching_max_s	3.8807e+01	m
-taper	lucifer.toml	bunching_peak	7.7904e-02	
+taper	lucifer.toml	bunching_peak	6.7283e-02	
 taper	lucifer.toml	energy_change	-2.9327e+06	eV
 taper	lucifer.toml	exit_bunching	6.7283e-02	
 taper	lucifer.toml	exit_bunching_max	6.7283e-02	
@@ -1241,13 +1241,13 @@ taper	lucifer.toml	initial_bunching	3.9308e-17
 taper	lucifer.toml	initial_energy	5.8038e+09	eV
 taper	lucifer.toml	initial_sigma_energy	5.0137e+05	eV
 taper	lucifer.toml	mode_peak_inside	8.7874e+09	W
-taper	lucifer.toml	mode_peak_s	5.6240e+01	m
+taper	lucifer.toml	mode_peak_s	5.7000e+01	m
 taper	lucifer.toml	n_particle	8192	
 taper	lucifer.toml	n_particle_derived	no	
 taper	lucifer.toml	n_record	1105	
 taper	lucifer.toml	n_slice	1	
 taper	lucifer.toml	peak_power	8.7996e+09	W
-taper	lucifer.toml	peak_power_s	5.6240e+01	m
+taper	lucifer.toml	peak_power_s	5.6760e+01	m
 taper	lucifer.toml	power_after_first_element	4.0672e+03	W
 taper	lucifer.toml	power_after_first_element_per_slice	4.0672e+03	W
 taper	lucifer.toml	slice_power_max_at_bunching_max	1.8906e+09	W

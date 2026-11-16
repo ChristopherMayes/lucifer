@@ -67,6 +67,7 @@ module fel_track_mod
 use fel_beam_mod
 use fel_collective_mod
 use fel_field_mod
+use fel_field_solve_mod
 use fel_fp32_mod
 use fel_device_mod
 use wavefront_mod
@@ -2813,7 +2814,8 @@ real(rp), optional :: kappa                    !   Both present when und%source_
 
 real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc, s_t, c_t
 complex(rp) cpart
-complex(rp), allocatable :: crsource(:,:)    ! Per-call source accumulator, thread safe.
+complex(rp), pointer, contiguous :: crsource(:,:)  ! The source accumulator, a buffer of the thread.
+complex(rp), pointer, contiguous :: work(:,:)      ! The plane being transformed, the thread's other buffer.
 integer ip, ix, iy, ngrid_arr(3), ngrid, ik
 logical on_grid, err
 character(*), parameter :: r_name = 'fel_field_step'
@@ -2838,7 +2840,11 @@ if (ik == 0) then
   return
 endif
 
-allocate (crsource(ngrid, ngrid))
+! The source accumulator and the plane's work array are the calling thread's two FFTW
+! buffers (wavefront_fft2_buffers). The thread keeps them from one call to the next, so
+! nothing is allocated here, and a transform runs on them where they lie.
+
+call wavefront_fft2_buffers (ngrid, ngrid, work, crsource, err);  if (err) return
 crsource = 0
 
 scl_w = fel_und_coupling(und, harm) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
@@ -2904,54 +2910,19 @@ if (und%filter%on) then
   ! angles, so the run completes with a plausible power curve. Only the Genesis4
   ! comparison tells the two apart.
 
-  if (.not. und%filter%mutate) then
-    call wavefront_fft2 (crsource, wf_fft_forward$, err);  if (err) return
-    crsource = crsource * fel_kernels(ik)%sigmoid
-  else
-    call wavefront_fft2 (crsource, wf_fft_forward$, err);  if (err) return
-  endif
+  call wavefront_fft2_aligned (2, wf_fft_forward$, err);  if (err) return
+  if (.not. und%filter%mutate) call fel_solve_filter (ngrid*ngrid, crsource, fel_kernels(ik)%sigmoid)
 
-  call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
-  if (und%filter%mutate) wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%sigmoid
+endif
 
-  if (allocated(wf%Ey)) then
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2 + 2 * und%pol(1) * crsource
-    call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
-    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
-    if (und%filter%mutate) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%sigmoid
-    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2 + 2 * und%pol(2) * crsource
-    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
-    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp)
-  else
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2 + 2 * crsource
-    call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
-  endif
+! Each plane is copied into the work buffer once, transformed, multiplied and
+! transformed back there, and written back by the last pass of its arithmetic.
 
+if (allocated(wf%Ey)) then
+  call solve_plane (wf%Ex(:,:,ifld), 2 * und%pol(1));  if (err) return
+  call solve_plane (wf%Ey(:,:,ifld), 2 * und%pol(2));  if (err) return
 else
-
-  ! Propagate and add: FFT, multiply by the cached exp(K2 delz), inverse FFT, normalize,
-  ! and add 2*crsource in real space.
-
-  call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
-  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2
-  call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
-
-  if (allocated(wf%Ey)) then
-
-    ! Two live polarizations: the element's source lands as pol * src on the pair, the
-    ! exact dual of the kick's conj(pol).E. Ey diffracts the same way as Ex.
-
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(1) * crsource
-    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
-    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2
-    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
-    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(2) * crsource
-  else
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
-  endif
-
+  call solve_plane (wf%Ex(:,:,ifld), (2.0_rp, 0.0_rp));  if (err) return
 endif
 
 err_flag = .false.
@@ -3007,6 +2978,51 @@ if (gsum <= 0) return
 crsource = crsource + (s_scaled / gsum) * gk
 
 end subroutine coherent_gaussian_source
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine solve_plane (e, p)
+!
+! Routine to advance one plane of the field by the step: the plane is transformed,
+! multiplied by the propagator and transformed back, and the source is added, in
+! Fourier space with the source filter on and in real space with it off. The plane is
+! copied into the thread's work buffer once, and the last pass writes it back. With the
+! filter on, crsource is already transformed, and under und%filter%mutate the sigmoid
+! multiplies the field's transform in place of the source's. The passes are those of
+! fel_field_solve_mod, where the rounding of each operation is fixed by the source.
+!
+! Input:
+!   e(ngrid,ngrid)  -- complex(rp): The plane.
+!   p               -- complex(rp): The factor on the source: 2 for a field of one
+!                        polarization, twice the plane's component of und%pol for two.
+!
+! Output:
+!   e(ngrid,ngrid)  -- complex(rp): The plane after the step.
+!-
+
+subroutine solve_plane (e, p)
+
+complex(rp) :: e(ngrid,ngrid), p
+integer n
+
+!
+
+n = ngrid * ngrid
+call fel_solve_copy (n, work, e)
+call wavefront_fft2_aligned (1, wf_fft_forward$, err);  if (err) return
+
+if (und%filter%on) then
+  if (und%filter%mutate) call fel_solve_filter (n, work, fel_kernels(ik)%sigmoid)
+  call fel_solve_propagate_add (n, work, fel_kernels(ik)%exp_k2, crsource, p)
+  call wavefront_fft2_aligned (1, wf_fft_backward$, err);  if (err) return
+  call fel_solve_normalize (n, e, work, real(n, rp))
+else
+  call fel_solve_propagate (n, work, fel_kernels(ik)%exp_k2)
+  call wavefront_fft2_aligned (1, wf_fft_backward$, err);  if (err) return
+  call fel_solve_normalize_add (n, e, work, real(n, rp), crsource, p)
+endif
+
+end subroutine solve_plane
 
 end subroutine fel_field_step
 

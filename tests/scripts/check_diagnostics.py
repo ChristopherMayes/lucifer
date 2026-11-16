@@ -1327,7 +1327,11 @@ def main():
     run(exe, wd, "pre2", PRE_NML.format(root="pre2", extra="  load_only = T\n"), threads="4")
     s2 = setup_values(wd / "pre2.stats.h5")
     tm2 = setup_values(wd / "pre2.stats.h5", "timing")
-    same = s == s2 and all(tm2[k] == tm[k] for k in tm2)
+    # init_beam and init_field are clocks of the two files' setup, which differ from run
+    # to run, so they are held to being present and are left out of the comparison.
+    clocks = ("init_beam", "init_field")
+    same = (s == s2 and all(tm2[k] == tm[k] for k in tm2 if k not in clocks)
+            and all(k in tm and k in tm2 for k in clocks))
     check("pre-run: load_only records the same setup and estimate as the run does", 0.0 if same else 1.0, 0.5,
           note=f"[{len(s2)} values of setup/, {len(tm2)} of timing/]")
     with h5py.File(wd / "pre2.stats.h5", "r") as f:

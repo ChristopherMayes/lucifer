@@ -68,6 +68,7 @@ implicit none
 
 type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k, n_over, i_skip
+integer(8) t_0, t_1, t_rate
 logical err, dev_usable, want_ascii, want_unicode, want_verbose
 character(400) param_file, arg
 character(400) :: progress = ''
@@ -255,11 +256,19 @@ if (err) stop 1
 call fel_setup_lattice (run, err)
 if (err) stop 1
 
+call system_clock (t_0, t_rate)
 call fel_init_beam (run, err)
 if (err) stop 1
+call system_clock (t_1)
+call fel_record_real ('timing', 'init_beam', 's', 'The time to read or build the beam and slice it, ' // &
+      'before the walk.', real(t_1 - t_0, rp) / t_rate)
 
+call system_clock (t_0)
 call fel_init_wavefront (run, err)
 if (err) stop 1
+call system_clock (t_1)
+call fel_record_real ('timing', 'init_field', 's', 'The time to read or build the field, before the walk.', &
+      real(t_1 - t_0, rp) / t_rate)
 
 call fel_setup_schedule (run, err)
 if (err) stop 1
@@ -327,12 +336,22 @@ if (err) stop 1
 ! time window holds record slice 1 + mod(is-1+first, nslice). Genesis's field writer
 ! does the same on the fly (fel-physics.md sec-slippage).
 
+! The final beam and field, timed, since on a short line they are a large part of
+! what a run takes outside its walk.
+
+call system_clock (t_0)
 call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err, &
                     s_pos = run%lat%branch(0)%ele(run%i_end)%s)
 if (err) stop 1
+call system_clock (t_1)
+call fel_record_real ('timing', 'final_beam', 's', 'The time to write the final beam file, after the walk.', &
+      real(t_1 - t_0, rp) / t_rate)
 
 call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err, ix_done = run%i_end)
 if (err) stop 1
+call system_clock (t_0)
+call fel_record_real ('timing', 'final_field', 's', 'The time to write the final field file, after the walk.', &
+      real(t_0 - t_1, rp) / t_rate)
 
 call fel_finalize_diagnostics (run, err)
 if (err) stop 1

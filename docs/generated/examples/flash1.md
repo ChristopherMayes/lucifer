@@ -101,9 +101,9 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | exit window energy | 3.9239e-05 | J |
 | exit pulse energy, the window's and the light slipped out of it | 3.9239e-05 | J |
 | peak power | 7.1555e+10 | W |
-| s of the peak power | 3.1477e+01 | m |
+| s of the peak power | 3.1577e+01 | m |
 | mode peak, power inside the split | 7.1520e+10 | W |
-| s of the mode peak | 3.1477e+01 | m |
+| s of the mode peak | 3.1577e+01 | m |
 | exit power inside the split | 7.1520e+10 | W |
 | exit power outside the split | 3.4536e+07 | W |
 | outside over inside, the run's maximum | 4.8288e-04 |  |
@@ -117,7 +117,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | exit bunching, the largest slice | 1.0000e+00 |  |
 | bunching, the maximum along the line of the mean |b| | 1.3937e-01 |  |
 | s of the bunching maximum | 2.5723e+01 | m |
-| bunching at the mode peak | 1.5753e-01 |  |
+| bunching at the mode peak | 1.5652e-01 |  |
 | power of the largest slice at the bunching maximum | 2.5016e+09 | W |
 | exit power of the largest slice | 2.8558e+09 | W |
 | mean slice energy at the start | 6.6850e+08 | eV |

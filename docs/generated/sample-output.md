@@ -50,7 +50,7 @@
  │ exit power       875.858 MW          │ exit pulse energy 292.155 pJ         │
  │ exit bunching    0.2484              │ window energy     292.155 pJ         │
  │ tracked to       57.000 m            │ element ends      48                 │
- │ split angle      2.985 µrad          │ mode peak at      37.240 m           │
+ │ split angle      2.985 µrad          │ mode peak at      37.760 m           │
  │ outside / inside 7.16e-4 (peak)      │ outside / inside  3.58e-3 (exit)     │
  ╰─────────────────────────────────────────────────────────────────────────────╯
 ```

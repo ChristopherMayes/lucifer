@@ -669,7 +669,13 @@ On a platform whose FFTW does not accept the recorded text, the second check bec
 
 The recorded text was measured on 2026-11-14 with fftw 3.3.11 on the machine of this document. Until then every plan was FFTW's estimate, so the digits recorded before that day belong to the estimated plan, and `run.fft_plan = "estimate"` reproduces them.
 
-(val-the-particlepath-cost-measured)=
+(val-solve-rounding)=
+## The rounding of the field solve
+
+Between its transforms the averaged field solve multiplies a plane by the step's propagator, divides it by the transform's points and adds the source. Those passes are `src/fel_field_solve_mod.f90`, and the rounding of each operation there is fixed by the source: every complex product is written out in its real and imaginary parts, each product is rounded before it is added or subtracted, and the file is compiled with `-ffp-contract=off`, so the compiler forms no fused multiply-add. The compiled passes hold none, by a disassembly of the release build of 2026-11-15.
+
+Before that day the same statements were complex array expressions in `fel_track_mod.f90`, which is compiled at `-O3` with contraction on. There the compiler multiplies two complex arrays with separate instructions or with fused ones, and which it chooses changed with the statements around the expression, so an edit to the routine that left its arithmetic alone could move the last bit of a run. Seven forms of one edit each moved a different case, by parts in $10^{16}$ of the window energy. With the rounding written in the source, the digits of the averaged solve belong to the source and no longer to the compiler's choice. They moved once with that change, at rounding level, and the levels of [](#val-levels-fft-plan) and of every other section were recorded after it.
+
 ## The particle-path cost: measured, two levers adopted
 
 A real 42 m case (131 slices) at 2048 particles/slice ran at parity with Genesis4 (96 vs 94 s, 12 threads vs 12 MPI ranks, same machine back-to-back). At 8192/slice it did not (164 vs 99 s). The per-element time stamps and an in-wiggler profile put the gap in one place: the FEL step's particle path (the RK4 + gather), whose cost quadrupled with the particles while the per-slice field FFTs (~68 s) stayed constant. [](performance.md#perf-the-transform-length) measures that crossover as a table, and [](performance.md#perf-the-phase-profile) is the standing phase profile every run records in `timing/` of its stats file and prints in the `timing` part of its closing block.
