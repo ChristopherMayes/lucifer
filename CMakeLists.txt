@@ -140,6 +140,13 @@ add_dependencies (lucifer_lib lucifer_version)
 # of arguments and -O3 re-contracts floating point. It applies in both configurations.
 set_source_files_properties (src/fel_track_mod.f90 PROPERTIES COMPILE_OPTIONS "-O3")
 
+# The passes of the averaged field solve write the rounding of each operation out
+# (src/fel_field_solve_mod.f90), and -ffp-contract=off keeps the compiler from fusing a
+# product with the addition after it, in both configurations. With contraction on, the
+# compiler's choice of fused instructions for a complex multiply changed with the
+# statements around it, and the last bit of a run changed with it.
+set_source_files_properties (src/fel_field_solve_mod.f90 PROPERTIES COMPILE_OPTIONS "-O3;-ffp-contract=off")
+
 if (LUCIFER_FFTW3F_LIBRARY)
   set_source_files_properties (src/fel_fp32_mod.f90 PROPERTIES COMPILE_DEFINITIONS LUCIFER_HAVE_FFTW3F)
   target_link_libraries (lucifer_lib PUBLIC "${LUCIFER_FFTW3F_LIBRARY}")

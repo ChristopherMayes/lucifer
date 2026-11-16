@@ -578,14 +578,20 @@ endif
 ! transverse samples from its own coordinates. Copies made by a loader share theirs to
 ! the bit, and nothing else does.
 
+! Each slice sorts its own particles and writes its own count, so the slices are counted
+! in parallel. On a file of 528 slices of 8192 particles the count was three fifths of
+! the time to read the beam.
+
 block
   integer, allocatable :: group(:)
   integer n_group
+  !$OMP PARALLEL DO private(sl, group, n_group) schedule(dynamic)
   do is = 1, n_win
     sl => beam%slice(is)
     call fel_transverse_groups (sl, group, n_group)
     sl%m_ind = fel_m_ind (sl, group, n_group)
   enddo
+  !$OMP END PARALLEL DO
 end block
 
 err_flag = .false.

@@ -9,6 +9,30 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-15 Changed: the averaged field solve works in each thread's FFTW buffer, and the
+  rounding of its arithmetic is fixed by the source. `fel_field_step` copied a plane into FFTW's
+  aligned buffer and back at every transform, four copies and two passes a step with the source
+  filter off, and allocated its megabyte source array once a slice a step. It now copies the
+  plane into the buffer once, transforms, multiplies and transforms back there, and writes the
+  plane back in the pass that divides by the transform's points, and the source is accumulated in
+  a second buffer the thread keeps (`wavefront_fft2_buffers`, `wavefront_fft2_aligned`).
+  `wavefront_fft2` keeps its interface. The passes are the new `src/fel_field_solve_mod.f90`,
+  where each complex product is written out in its parts and the file is compiled with
+  `-ffp-contract=off`. As complex array expressions in `fel_track_mod.f90`, at `-O3` with
+  contraction on, the compiler multiplied them with fused or with separate instructions as the
+  statements around them changed, so an edit that left the arithmetic alone moved the last bit of
+  a run. On one cell of FLASH1 at 528 slices of 8192 particles the field solve takes 7.0 s where
+  it took 10.9 s and the run 20.4 s where it took 25.0 s, against Genesis4's 19.1 s, and with
+  Lucifer's own models 22.7 s where it took 27.2 s. On the Benchmark1-SASE line at 96 slices of
+  2048 particles the field solve takes 11.3 s where it took 12.5 s and the walk 20.4 s where it
+  took 21.7 s. `timing/` of the statistics file gains `init_beam`, `init_field`, `final_beam`
+  and `final_field`, the seconds a run spends reading and writing its beam and field outside the
+  walk: 1.14, 0.05, 1.17 and 0.22 s on that cell. Reading a beam file counts each slice's
+  independent transverse samples in parallel, which took the read from 1.29 s. Fifteen rows
+  of `docs/generated/validation-measured.md` moved, each a difference at rounding level, no
+  Genesis4 tier's level moved in seven digits, and every tolerance holds unchanged.
+  The estimate of a run's time is refitted, with a worst residual of 10.7 percent
+  (`docs/performance.md`, `docs/validation.md`).
 - 2026-11-14 Changed: the transverse transform is planned from a record of a measured plan, and a
   run on a power-of-two grid takes less time. `wavefront_fft2` planned with `FFTW_ESTIMATE`, which
   gives the same plan in every run and, at a 256-point grid, a plan 2.2 times slower on twelve

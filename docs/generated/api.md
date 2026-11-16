@@ -2629,6 +2629,157 @@ fundamental wavelengths, Genesis's one Control::sample, and the records rotate i
 lockstep.
 ```
 
+## `fel_field_solve_mod.f90`
+
+(api-fel-field-solve-mod)=
+### `fel_field_solve_mod`
+
+*Module*
+
+```
+The passes of the averaged field solve over one plane of the field: the multiply by
+the step's propagator, the division by the transform's points and the addition of the
+source. fel_field_step (fel_track_mod) calls them between its transforms.
+
+The rounding of every operation here is fixed by the source. Each complex product is
+written out in its real and imaginary parts, a product is rounded before it is added
+or subtracted, and this file is compiled with -ffp-contract=off (CMakeLists.txt), so
+the compiler forms no fused multiply-add from them. The same statements written as
+complex array expressions in a file compiled at -O3 with contraction left on do not
+have one rounding: the compiler multiplies two complex arrays with separate
+instructions or with fused ones as the statements around them change, and the two
+differ in the last bit. A run's digits then moved when any line of the routine that
+held those expressions was edited. With the rounding written here, they do not.
+
+The arrays are explicit shape and carry no pointer or target attribute, so the
+compiler takes them as distinct and each loop is one pass over memory. The caller
+passes a plane of n by n points as n*n elements.
+```
+
+(api-fel-solve-copy)=
+### `fel_solve_copy`
+
+*Subroutine* `(n, w, e)`
+
+```
+Routine to copy a plane into the work buffer, w = e.
+```
+
+```
+Input:
+  n      -- integer: The plane's points.
+  e(n)   -- complex(rp): The plane.
+
+Output:
+  w(n)   -- complex(rp): Its copy.
+```
+
+(api-fel-solve-filter)=
+### `fel_solve_filter`
+
+*Subroutine* `(n, w, sigmoid)`
+
+```
+Routine to multiply a transform by the source filter's sigmoid, w = w * sigmoid.
+```
+
+```
+Input:
+  n           -- integer: The plane's points.
+  w(n)        -- complex(rp): A transform, the source's or under the filter's
+                   self-test the field's.
+  sigmoid(n)  -- real(rp): The sigmoid, in the transform's order.
+
+Output:
+  w(n)        -- complex(rp): The product.
+```
+
+(api-fel-solve-propagate)=
+### `fel_solve_propagate`
+
+*Subroutine* `(n, w, k)`
+
+```
+Routine to multiply a transformed plane by the step's propagator, w = w * k.
+```
+
+```
+Input:
+  n      -- integer: The plane's points.
+  w(n)   -- complex(rp): The plane's transform.
+  k(n)   -- complex(rp): The propagator.
+
+Output:
+  w(n)   -- complex(rp): The product.
+```
+
+(api-fel-solve-propagate-add)=
+### `fel_solve_propagate_add`
+
+*Subroutine* `(n, w, k, s, p)`
+
+```
+Routine to multiply a transformed plane by the step's propagator and add the
+transformed source, w = w * k + p * s. With the source filter on the source is added
+in Fourier space, before the one inverse transform.
+```
+
+```
+Input:
+  n      -- integer: The plane's points.
+  w(n)   -- complex(rp): The plane's transform.
+  k(n)   -- complex(rp): The propagator.
+  s(n)   -- complex(rp): The source's transform.
+  p      -- complex(rp): The factor on the source: 2 for a field of one polarization,
+              twice the plane's polarization component for a field of two.
+
+Output:
+  w(n)   -- complex(rp): The plane's transform after the step.
+```
+
+(api-fel-solve-normalize)=
+### `fel_solve_normalize`
+
+*Subroutine* `(n, e, w, rn)`
+
+```
+Routine to write a plane back from its inverse transform, e = w / rn, rn the
+transform's points, which an unnormalized transform pair multiplies by.
+```
+
+```
+Input:
+  n      -- integer: The plane's points.
+  w(n)   -- complex(rp): The inverse transform.
+  rn     -- real(rp): The transform's points.
+
+Output:
+  e(n)   -- complex(rp): The plane.
+```
+
+(api-fel-solve-normalize-add)=
+### `fel_solve_normalize_add`
+
+*Subroutine* `(n, e, w, rn, s, p)`
+
+```
+Routine to write a plane back from its inverse transform and add the source,
+e = w / rn + p * s. With the source filter off the source is added in real space.
+```
+
+```
+Input:
+  n      -- integer: The plane's points.
+  w(n)   -- complex(rp): The inverse transform.
+  rn     -- real(rp): The transform's points.
+  s(n)   -- complex(rp): The source.
+  p      -- complex(rp): The factor on the source: 2 for a field of one polarization,
+              twice the plane's polarization component for a field of two.
+
+Output:
+  e(n)   -- complex(rp): The plane after the step.
+```
+
 ## `fel_fp32_mod.f90`
 
 (api-fel-fp32-mod)=
@@ -8840,6 +8991,31 @@ The slice's bunching phasor is deposited as a Gaussian of the charge second mome
 scaled by kappa. It is normalized so the deposited sum equals the particle deposit's.
 ```
 
+(api-solve-plane)=
+### `solve_plane`
+
+*Subroutine* `(e, p)`
+
+```
+Routine to advance one plane of the field by the step: the plane is transformed,
+multiplied by the propagator and transformed back, and the source is added, in
+Fourier space with the source filter on and in real space with it off. The plane is
+copied into the thread's work buffer once, and the last pass writes it back. With the
+filter on, crsource is already transformed, and under und%filter%mutate the sigmoid
+multiplies the field's transform in place of the source's. The passes are those of
+fel_field_solve_mod, where the rounding of each operation is fixed by the source.
+```
+
+```
+Input:
+  e(ngrid,ngrid)  -- complex(rp): The plane.
+  p               -- complex(rp): The factor on the source: 2 for a field of one
+                       polarization, twice the plane's component of und%pol for two.
+
+Output:
+  e(ngrid,ngrid)  -- complex(rp): The plane after the step.
+```
+
 (api-fel-field-kernel-exp-k2)=
 ### `fel_field_kernel_exp_k2`
 
@@ -10155,6 +10331,60 @@ Input:
 Output:
   dat(:,:)    -- complex(wf_rp): Transformed data.
   err_flag    -- logical, optional: Set True on error, False otherwise.
+```
+
+(api-wavefront-fft2-buffers)=
+### `wavefront_fft2_buffers`
+
+*Subroutine* `(nx, ny, buf, buf2, err_flag)`
+
+```
+Routine to return the calling thread's work buffers for an nx by ny transform, making
+the thread's plans if its cache does not hold this size. The buffers are allocated by
+fftw_alloc_complex, so wavefront_fft2_aligned may transform either of them where it
+lies, with no copy. A caller that transforms a plane, works on the result and
+transforms back does all of it in a buffer, and copies the plane in once and out once.
+
+The buffers are the thread's until its next call of wavefront_fft2, which uses the
+first, or of any routine that transforms through it. They hold whatever was left in
+them. A change of size frees both.
+```
+
+```
+Input:
+  nx, ny    -- integer: Transform size.
+
+Output:
+  buf       -- complex(wf_rp), pointer, contiguous (:,:): The first buffer, nx by ny.
+  buf2      -- complex(wf_rp), pointer, contiguous (:,:), optional: A second buffer of
+                 the same size.
+  err_flag  -- logical, optional: Set True if a buffer or a plan could not be made.
+```
+
+(api-wavefront-fft2-aligned)=
+### `wavefront_fft2_aligned`
+
+*Subroutine* `(which, direction, err_flag)`
+
+```
+Routine to transform, where it lies, one of the calling thread's work buffers
+(wavefront_fft2_buffers). The sign convention and the normalization are those of
+wavefront_fft2.
+
+The buffer is named by its number and is not an argument. A plan run on an array
+whose alignment is not the one it was made with is undefined, and gfortran passes a
+packed copy of a pointer array to a contiguous dummy, so an array argument here would
+be transformed in a temporary.
+```
+
+```
+Input:
+  which      -- integer: 1 for the first buffer, 2 for the second.
+  direction  -- integer: wf_fft_forward$ or wf_fft_backward$.
+
+Output:
+  err_flag   -- logical: Set True if the buffer is not allocated or the direction is
+                  not one of the two.
 ```
 
 (api-wavefront-fft2-plan)=

@@ -11,9 +11,9 @@ The instrument is `src/fel_timer_mod.f90`. It accumulates wall clock per phase a
 
 Timers cannot see inside a parallel region. The [deposit](glossary.md#gl-deposit) and its FFT interleave per [slice](glossary.md#gl-slice), and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
 
-The tables below are also the calibration of the cost [estimate](glossary.md#gl-estimate) every run prints in its header. `src/fel_cost_mod.f90` holds the fitted rates, one for the particle [push](glossary.md#gl-push) and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the stats files the runs below wrote. Over the sixteen runs of this page the worst residual on the walk is 8.3 percent, on the 96-slice run at 512 particles a slice. The estimate is for this machine and says so on the line, and the `timing` part of the run's closing block prints the measured walk with its ratio to the estimate. Re-measuring this page means re-running that script and pasting its five constants back. A sixth rate, the [spectral propagator](glossary.md#gl-propagator)'s passes along tau, is fitted from the cost table of [](spectral-field.md#spectral-cost) by `tests/scripts/spectral_field.py cost`, which prints it from its own rows, and `fel_cost_passes` counts the passes a run makes, two a step and the [interludes](glossary.md#gl-interlude)' own. Under the spectral propagator the field solve's count is the field's planes and not the beam's slices, so a field sampled coarser than the slices ([](spectral-field.md#spectral-coarse)) is estimated at its own planes, and the sweep's table on that page gives the walk at each sampling.
+The tables below are also the calibration of the cost [estimate](glossary.md#gl-estimate) every run prints in its header. `src/fel_cost_mod.f90` holds the fitted rates, one for the particle [push](glossary.md#gl-push) and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the stats files the runs below wrote. Over the sixteen runs of this page the worst residual on the walk is 10.7 percent, on the 96-slice run at 512 particles a slice. The estimate is for this machine and says so on the line, and the `timing` part of the run's closing block prints the measured walk with its ratio to the estimate. Re-measuring this page means re-running that script and pasting its five constants back. A sixth rate, the [spectral propagator](glossary.md#gl-propagator)'s passes along tau, is fitted from the cost table of [](spectral-field.md#spectral-cost) by `tests/scripts/spectral_field.py cost`, which prints it from its own rows, and `fel_cost_passes` counts the passes a run makes, two a step and the [interludes](glossary.md#gl-interlude)' own. Under the spectral propagator the field solve's count is the field's planes and not the beam's slices, so a field sampled coarser than the slices ([](spectral-field.md#spectral-coarse)) is estimated at its own planes, and the sweep's table on that page gives the walk at each sampling.
 
-Two toolchains sit side by side on this page, and every table carries one line naming the toolchain, the machine and the day it was measured. The tables re-measured on 2026-10-24 were taken under gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the [recorded digits](glossary.md#gl-level) of [](validation.md) belong to since 2026-10-23. The tables kept from September 2026 were taken under gfortran 13.3 and the clang of 2025-06, and no later measurement has replaced them. Where a kept table and a re-measured one are compared, the comparison crosses the toolchain and the text says so. The tables re-measured on 2026-11-14 were taken under the recorded plan of the transverse transform, `run.fft_plan = "wisdom"` ([](#perf-the-transform-length)). Every table dated before that day was taken under FFTW's estimated plan, which is all the program made until then, so its CPU seconds on a power-of-two grid are longer than a run of today takes.
+Two toolchains sit side by side on this page, and every table carries one line naming the toolchain, the machine and the day it was measured. The tables re-measured on 2026-10-24 were taken under gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the [recorded digits](glossary.md#gl-level) of [](validation.md) belong to since 2026-10-23. The tables kept from September 2026 were taken under gfortran 13.3 and the clang of 2025-06, and no later measurement has replaced them. Where a kept table and a re-measured one are compared, the comparison crosses the toolchain and the text says so. The tables re-measured on 2026-11-14 and 2026-11-15 were taken under the recorded plan of the transverse transform, `run.fft_plan = "wisdom"` ([](#perf-the-transform-length)). Every table dated before that day was taken under FFTW's estimated plan, which is all the program made until then, so its CPU seconds on a power-of-two grid are longer than a run of today takes.
 
 (perf-reproducing)=
 ## Reproducing this
@@ -88,28 +88,26 @@ It takes the compile command from the production build's own makefile, so the re
 
 The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 256, 12 threads and the [source filter](glossary.md#gl-source-filter) at its default. Each column is one run. The `2026-10-24` columns are the same configuration under FFTW's estimated plan, the record this one replaces.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
 | phase | 96 slices | 2026-10-24 | 504 slices | 2026-10-24 |
 |---|---|---|---|---|
-| field solve (deposit and FFT) | 12.494 s, 57.6% | 25.152 s, 74.9% | 69.737 s, 60.5% | 124.885 s, 75.4% |
-| particle push (transverse maps, RK4) | 3.974 s, 18.3% | 4.199 s, 12.5% | 24.796 s, 21.5% | 21.031 s, 12.7% |
-| `= FEL step`, the sum of the phases inside it | 16.510 s, 76.1% | 29.406 s, 87.6% | 94.590 s, 82.1% | 145.972 s, 88.2% |
-| stats and diag | 2.638 s, 12.2% | 3.326 s, 9.9% | 15.876 s, 13.8% | 16.083 s, 9.7% |
-| slippage, with the [bank](glossary.md#gl-bank)'s writes | 2.106 s, 9.7% | 0.095 s, 0.3% | 2.427 s, 2.1% | 0.092 s, 0.1% |
-| field drift through the breaks | 0.305 s, 1.4% | 0.619 s, 1.8% | 1.611 s, 1.4% | 2.783 s, 1.7% |
-| [seam](glossary.md#gl-seam) interlude | 0.100 s, 0.5% | 0.096 s, 0.3% | 0.572 s, 0.5% | 0.469 s, 0.3% |
-| undulator prep (plans, kernel cache) | 0.042 s, 0.2% | 0.056 s, 0.2% | 0.057 s, 0.0% | 0.056 s, 0.0% |
+| field solve (deposit and FFT) | 11.324 s, 55.5% | 25.152 s, 74.9% | 60.978 s, 60.5% | 124.885 s, 75.4% |
+| particle push (transverse maps, RK4) | 3.929 s, 19.2% | 4.199 s, 12.5% | 21.355 s, 21.2% | 21.031 s, 12.7% |
+| `= FEL step`, the sum of the phases inside it | 15.294 s, 74.9% | 29.406 s, 87.6% | 82.378 s, 81.7% | 145.972 s, 88.2% |
+| stats and diag | 2.622 s, 12.8% | 3.326 s, 9.9% | 13.776 s, 13.7% | 16.083 s, 9.7% |
+| slippage, with the [bank](glossary.md#gl-bank)'s writes | 2.089 s, 10.2% | 0.095 s, 0.3% | 2.508 s, 2.5% | 0.092 s, 0.1% |
+| field drift through the breaks | 0.289 s, 1.4% | 0.619 s, 1.8% | 1.466 s, 1.5% | 2.783 s, 1.7% |
+| [seam](glossary.md#gl-seam) interlude | 0.092 s, 0.5% | 0.096 s, 0.3% | 0.505 s, 0.5% | 0.469 s, 0.3% |
+| undulator prep (plans, kernel cache) | 0.040 s, 0.2% | 0.056 s, 0.2% | 0.045 s, 0.0% | 0.056 s, 0.0% |
 | wake | 0.000 s, 0.0% | 0.000 s, 0.0% | 0.000 s, 0.0% | 0.000 s, 0.0% |
-| element end | 0.030 s, 0.1% | 0.030 s, 0.1% | 0.164 s, 0.1% | 0.142 s, 0.1% |
-| unaccounted | 0.004 s, 0.0% | 0.003 s, 0.0% | 0.007 s, 0.0% | 0.006 s, 0.0% |
-| walk | 21.692 s | 33.574 s | 115.249 s | 165.546 s |
+| element end | 0.030 s, 0.1% | 0.030 s, 0.1% | 0.171 s, 0.2% | 0.142 s, 0.1% |
+| unaccounted | 0.004 s, 0.0% | 0.003 s, 0.0% | 0.006 s, 0.0% | 0.006 s, 0.0% |
+| walk | 20.419 s | 33.574 s | 100.810 s | 165.546 s |
 
-The field solve takes half of what it took at 96 slices and 56 percent at 504, and the walk 65 and 70 percent. The plan of the transform is the whole of that: FFTW's estimated plan for a 256-point grid, which every run made until 2026-11-14, takes 2.2 times as long on twelve threads as the plan its planner finds by timing, and the program now makes that plan from a record of it ([](#perf-the-transform-length)). The field drift, which is the same transform, fell with it. The solve is still the largest phase, three fifths of the walk at both sizes.
+The field solve takes 45 percent of what it took at 96 slices and 49 percent at 504, and the walk 61 percent at both. The plan of the transform is most of that: FFTW's estimated plan for a 256-point grid, which every run made until 2026-11-14, takes 2.2 times as long on twelve threads as the plan its planner finds by timing, and the program now makes that plan from a record of it ([](#perf-the-transform-length)). The field drift, which is the same transform, fell with it. The rest is the solve's own passes over a plane. Since 2026-11-15 `fel_field_step` copies a plane into the thread's FFTW buffer once, transforms, multiplies and transforms back there, and writes the plane back in its last pass, where each transform had copied the plane in and out, and the source is accumulated in a second buffer the thread keeps. Under the recorded plan alone, on 2026-11-14, the two solves read 12.494 and 69.737 s. The solve is still the largest phase, more than half of the walk at both sizes.
 
 The slippage phase rose from 0.1 s to more than 2 s, and that is the bank. Since 2026-10-25 a run keeps the escaped field by default, and the planes that slip past the head are written to the pulse file inside the slippage phase, serially. The 504-slice run with `run.keep_escaped_field = false` spends 0.102 s there. The seconds are nearly the same at 96 and at 504 slices, since the planes that leave are counted by the steps and not by the [window](glossary.md#gl-window).
-
-The push at 504 slices reads 24.8 s against 21.0, 18 percent more, where the 96-slice push reads 5 percent less. The two columns are single runs taken twenty days apart, and nothing in the push changed between them.
 
 (perf-the-transform-length)=
 ## The transform length
@@ -134,17 +132,17 @@ At 32 and 64 points the two plans are the same to the timing's spread, and a run
 
 The walk at each grid follows. The input file is the phases input file above, 96 slices of 2048 [macroparticles](glossary.md#gl-macroparticle) over the full line, 12 threads, production build, varying only `grid_n_pts`, three runs at each grid and the best taken. The last column is the walk over the grid points, and at the small grids the particle work, which does not move with the grid, is most of it. The grids 151, 255 and 257 are not in the record, so they run the estimated plan, and the run says so on a warning line.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
 | ngrid | factors | plan in use | points | walk | seconds a point | walk, 2026-10-24 |
 |---|---|---|---|---|---|---|
-| 128 | 2^7 | recorded | 16384 | 8.817 s | 5.38e-4 | 12.563 s |
-| 151 | prime | estimated | 22801 | 23.567 s | 1.03e-3 | 22.575 s |
-| 255 | 3 x 5 x 17 | estimated | 65025 | 33.991 s | 5.23e-4 | 32.418 s |
-| 256 | 2^8 | recorded | 65536 | 21.519 s | 3.28e-4 | 32.308 s |
-| 257 | prime | estimated | 66049 | 58.278 s | 8.82e-4 | 53.614 s |
+| 128 | 2^7 | recorded | 16384 | 8.632 s | 5.27e-4 | 12.563 s |
+| 151 | prime | estimated | 22801 | 23.356 s | 1.02e-3 | 22.575 s |
+| 255 | 3 x 5 x 17 | estimated | 65025 | 32.900 s | 5.06e-4 | 32.418 s |
+| 256 | 2^8 | recorded | 65536 | 20.291 s | 3.10e-4 | 32.308 s |
+| 257 | prime | estimated | 66049 | 57.328 s | 8.68e-4 | 53.614 s |
 
-The 256-point grid now runs in 63 percent of the walk of the 255-point one, where the two were within 0.3 percent of each other under the estimated plan. The three grids on the estimated plan read 4 to 9 percent longer than on 2026-10-24, which is the bank's writes in the slippage phase, about 2 s a run ([](#perf-the-phase-profile)). A prime is the slowest on either plan, since the transform falls back to its general algorithm.
+The 256-point grid now runs in 62 percent of the walk of the 255-point one, where the two were within 0.3 percent of each other under the estimated plan. The three grids on the estimated plan read 1 to 7 percent longer than on 2026-10-24: the bank's writes in the slippage phase add about 2 s a run ([](#perf-the-phase-profile)), and the solve's passes take less than they did. A prime is the slowest on either plan, since the transform falls back to its general algorithm.
 
 The earlier version of this section assigned the longer solve at 256 points, against the 255 of the September record, to the FFTW library's handling of a power of two. That was the estimated plan: the same library transforms 256 points 2.2 times faster once its planner has timed the candidates. Genesis4 plans with `FFTW_MEASURE`, and the comparison against it on a 256-point grid is in [](#perf-flash1-cell).
 
@@ -154,17 +152,17 @@ The field solve and the particle push scale differently, so their ratio is a pro
 
 Each row is one run at that count.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
 | particles per slice | particle push | field solve | walk |
 |---|---|---|---|
-| 512 | 1.075 s, 5.9% | 12.473 s, 68.4% | 18.224 s |
-| 2048 | 3.974 s, 18.3% | 12.494 s, 57.6% | 21.692 s |
-| 8192 | 16.353 s, 42.4% | 14.133 s, 36.7% | 38.531 s |
+| 512 | 1.035 s, 6.1% | 11.276 s, 67.0% | 16.840 s |
+| 2048 | 3.929 s, 19.2% | 11.324 s, 55.5% | 20.419 s |
+| 8192 | 16.294 s, 44.1% | 12.625 s, 34.2% | 36.922 s |
 
-The push is linear in the particles (1.075, 3.974, 16.353 for 512, 2048, 8192) and the field solve is nearly flat (12.473, 12.494, 14.133). Three FFTs of $256^2$ points per slice per step take the same time whatever the particle count deposited into the grid. The push and the solve are equal near 7000 particles per slice at `ngrid` 256. Under the estimated plan, on 2026-10-24, the solve was 25 s in all three rows and the two were equal past 8192.
+The push is linear in the particles (1.035, 3.929, 16.294 for 512, 2048, 8192) and the field solve is nearly flat (11.276, 11.324, 12.625). Three FFTs of $256^2$ points per slice per step take the same time whatever the particle count deposited into the grid. The push and the solve are equal near 6200 particles per slice at `ngrid` 256. Under the estimated plan, on 2026-10-24, the solve was 25 s in all three rows and the two were equal past 8192.
 
-That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 12.36$ s and $d = 2.16 \times 10^{-4}$ s per particle. The slope is the deposit, and it is the 2.15e-4 of 2026-10-24, as it should be, since the deposit is this code's own arithmetic and the plan of the transform does not touch it. At 2048 particles per slice the fit predicts 12.36 s of transform and propagator plus 0.44 s of deposit, 12.80 s against the 12.494 s measured, a 2.5 percent residual on a two-point fit.
+That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 11.19$ s and $d = 1.76 \times 10^{-4}$ s per particle. The slope is the deposit. It was 2.15e-4 on 2026-10-24 and 2.16e-4 on 2026-11-14, under either plan, since the deposit is this code's own arithmetic. The deposit's loop is unchanged since then, and what changed is that it fills an array the thread keeps and no longer one allocated for the call. At 2048 particles per slice the fit predicts 11.19 s of transform and propagator plus 0.36 s of deposit, 11.55 s against the 11.324 s measured, a 2.0 percent residual on a two-point fit.
 
 [](validation.md#val-the-particlepath-cost-measured) measured a real 131-slice case where the particle path dominated at 8192 particles per slice while the field FFTs stayed constant. That is this table, and the two agree.
 
@@ -173,19 +171,19 @@ That flatness also splits the field solve without a profiler. Fitting the 512 an
 
 The configuration is 96 slices of 2048 particles per slice through the full line, on the same machine and build. The implied serial fraction inverts Amdahl's law, $f = (n/S - 1)/(n - 1)$, and bounds this configuration rather than the code.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
 | threads | walk | speedup | efficiency | implied serial |
 |---|---|---|---|---|
-| 1 | 186.0 s | 1.00 | the reference | |
-| 2 | 97.0 s | 1.92 | 96% | 4.3% |
-| 4 | 51.1 s | 3.64 | 91% | 3.3% |
-| 8 | 28.8 s | 6.45 | 81% | 3.4% |
-| 12 | 21.7 s | 8.57 | 71% | 3.6% |
+| 1 | 175.9 s | 1.00 | the reference | |
+| 2 | 93.0 s | 1.89 | 95% | 5.7% |
+| 4 | 48.7 s | 3.61 | 90% | 3.6% |
+| 8 | 26.9 s | 6.54 | 82% | 3.2% |
+| 12 | 20.4 s | 8.62 | 72% | 3.6% |
 
-The one-thread walk is half the 372.3 s of 2026-10-24, and the twelve-thread speedup is 8.57x against 11.22x. The parallel part of the walk shrank with the transform while the serial part grew: the slippage phase, serial, holds the bank's writes, 2.1 s of this run at every thread count, which is 1.1 percent of the one-thread walk and 9.7 percent of the twelve-thread one. The implied serial fraction is 3.3 to 4.3 percent over the sweep, and the estimate takes 3.55 percent, fitted over the whole sweep.
+The one-thread walk is 47 percent of the 372.3 s of 2026-10-24, and the twelve-thread speedup is 8.62x against 11.22x. The parallel part of the walk shrank with the transform while the serial part grew: the slippage phase, serial, holds the bank's writes, 2.1 s of this run at every thread count, which is 1.2 percent of the one-thread walk and 10.2 percent of the twelve-thread one. The implied serial fraction is 3.2 to 5.7 percent over the sweep, and the estimate takes 3.55 percent, fitted over the whole sweep.
 
-[](validation.md#val-parallelism-openmp-over-slices) records 3.97x at 8 threads on 32 slices in a debug build and says that is the floor of the scaling rather than its ceiling. At 96 slices in a production build the same 8 threads give 6.45x, so the claim holds.
+[](validation.md#val-parallelism-openmp-over-slices) records 3.97x at 8 threads on 32 slices in a debug build and says that is the floor of the scaling rather than its ceiling. At 96 slices in a production build the same 8 threads give 6.54x, so the claim holds.
 
 The slippage phase with the bank's writes is the largest serial phase, and the other serial phases this page names account for 0.7% of the walk. Two parallel regions are spawned per integration step (1068 steps, so about 4300 region entries).
 
@@ -196,52 +194,55 @@ The field-free drift is parallel over slices for the same reason. A time-depende
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
 
-The configuration is 96 slices of 2048 particles per slice on 12 threads with the filter at its default, sampled for 15 s at 1 ms, 79000 samples. The table is exclusive cost, categorized by symbol. The `2026-10-24` column is the same measurement under FFTW's estimated plan, the `2026-09-07` column the same under gfortran 13.3, and its `was` column the same with the filter off.
+The configuration is 96 slices of 2048 particles per slice on 12 threads with the filter at its default, sampled for 12 s at 1 ms, 60512 samples. The table is exclusive cost, categorized by symbol. The `2026-11-14` column is the same measurement before the field solve worked in the thread's buffers, the `2026-10-24` column the same under FFTW's estimated plan, and the `2026-09-07` column the same under gfortran 13.3.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
-| | share | 2026-10-24 | 2026-09-07 | was |
+| | share | 2026-11-14 | 2026-10-24 | 2026-09-07 |
 |---|---|---|---|---|
-| FFT transform, libfftw3 alone | 40.0% | | | |
-| the copies of `wavefront_fft2`, into FFTW's buffer and back | 9.4% | | | |
-| FFT transform (libfftw3, `wavefront_fft2`), the sum of the two rows above | 49.4% | 73.9% | 68.8% | 61.3% |
-| thread wait | 15.2% | 3.7% | 5.1% | 10.0% |
-| diagnostics | 7.7% | 5.3% | 5.5% | 4.6% |
-| transverse maps (`quad_mat2_calc`, and its `cexp`) | 6.2% | 4.2% | 4.9% | 5.9% |
-| deposit and propagator multiply | 5.1% | 2.8% | 4.9% | 5.7% |
-| longitudinal RK4 and ODE | 5.0% | 4.0% | 3.7% | 3.6% |
-| libm sin and cos | 4.4% | 3.0% | 6.5% | 8.5% |
-| libm, internals the sampler could not name | 3.6% | 2.8% | | |
-| allocating and freeing the source array of `fel_field_step` (`madvise`, `bzero`) | 2.0% | | | |
-| everything else | 1.4% | 0.3% | 0.7% | 0.5% |
+| FFT transform, libfftw3 alone | 41.5% | 40.0% | | |
+| FFTW's own copies and allocations (`memmove`, `madvise`) | 3.9% | | | |
+| the copies of `wavefront_fft2`, into FFTW's buffer and back | 0.5% | 9.4% | | |
+| FFT transform (libfftw3, `wavefront_fft2`), the sum of the three rows above | 45.9% | 49.4% | 73.9% | 68.8% |
+| thread wait | 16.4% | 15.2% | 3.7% | 5.1% |
+| diagnostics | 8.1% | 7.7% | 5.3% | 5.5% |
+| the field solve's passes over a plane (`fel_field_solve_mod`) and the deposit | 6.6% | 5.1% | 2.8% | 4.9% |
+| transverse maps (`quad_mat2_calc`, and its `cexp`) | 6.0% | 6.2% | 4.2% | 4.9% |
+| longitudinal RK4 and ODE | 5.3% | 5.0% | 4.0% | 3.7% |
+| libm sin and cos | 4.1% | 4.4% | 3.0% | 6.5% |
+| libm, internals the sampler could not name | 3.3% | 3.6% | 2.8% | |
+| allocating and freeing the source array of `fel_field_step` | 0.0% | 2.0% | | |
+| everything else | 4.3% | 1.4% | 0.3% | 0.7% |
 
-The transform's share fell by 24.5 points with the plan, and every other row rose as the walk shortened under it. The thread wait rose the most, to 15.2 percent: the slippage phase writes the bank's planes serially, 9.7 percent of this walk ([](#perf-the-phase-profile)), and eleven threads wait while one writes.
+On 2026-11-14 `wavefront_fft2` copied each plane into FFTW's buffer and back at every transform, and `fel_field_step` allocated its megabyte source array once a slice a step. The step now copies a plane in once and works in the buffer, and the copies that remain in `wavefront_fft2`, 0.5 percent, are the field's drift and the angular diagnostics, which were left as they are. The passes that replaced the copies carry the solve's arithmetic and one copy, 6.6 percent with the deposit.
 
-The copies are now a row of their own. `wavefront_fft2` copies each plane into a buffer FFTW allocated and copies the result back, since a plan run on an array of another alignment is undefined, and at the recorded plan's speed the two copies are 9.4 percent of the samples, a quarter of the transform's own time. With the allocation of the megabyte source array, which `fel_field_step` makes and frees once a slice a step, the field solve spends 11.4 percent of the samples moving and clearing memory around a transform that takes 40.0.
+The `memmove` and `madvise` samples that remain are FFTW's. The recorded plan of a 256-point transform is a buffered one: it copies rows into a buffer of its own, which it allocates and frees inside each transform. Part of what the row of 2026-11-14 assigned to the source array's allocation was this.
 
-An estimate of the field solve near 10% of a run holds only at many more particles per slice, where the table above shows the balance reversing. At these parameters it is 57.6% by the phase timer and 40.0% in the transform alone by samples.
+The thread wait is 16.4 percent: the slippage phase writes the bank's planes serially, 10.2 percent of this walk ([](#perf-the-phase-profile)), and eleven threads wait while one writes.
 
-`quad_mat2_calc` is Bmad's own quadrupole map, and its cost is a complex exponential per particle. `cexp` and the `exp` beneath it are most of the 6.2%. The libm sin and cos are the deposit's phase factor and the ODE's, through `fel_sincos`.
+An estimate of the field solve near 10% of a run holds only at many more particles per slice, where the table above shows the balance reversing. At these parameters it is 55.5% by the phase timer and 41.5% in the transform alone by samples.
+
+`quad_mat2_calc` is Bmad's own quadrupole map, and its cost is a complex exponential per particle. `cexp` and the `exp` beneath it are most of the 6.0%. The libm sin and cos are the deposit's phase factor and the ODE's, through `fel_sincos`.
 
 (perf-flash1-cell)=
 ## One FLASH1 cell against Genesis4
 
 The two codes are timed on one cell of the FLASH1 example ([](generated/examples/flash1.md)): one 165-period planar segment and the 0.8 m intersection with its doublet, 5.3045 m, in steps of one period. Both start from the same particles and the same dark field, which Genesis4 makes once: 528 slices of 12 wavelengths, 8192 particles a slice, a flat 2500 A, on a 256-point grid. There is no wake and no space charge, the source filter and the bank are off, and both codes write their final beam and field. Genesis4 runs at one MPI rank a performance core and Lucifer at one thread a core. `tests/perf/flash1_cell_table.sh` runs the six cases three times in rotation and prints the best wall time of each, as `/usr/bin/time` measures it, with the phases of that Lucifer run.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11, Genesis4 4.6.16 from conda-forge.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11, Genesis4 4.6.16 from conda-forge.*
 
-| run | wall | field solve | particle push | plan in use |
-|---|---|---|---|---|
-| Genesis4, ADI solver, 12 ranks | 19.35 s | | | |
-| Genesis4, FFT solver, 12 ranks | 19.14 s | | | |
-| Lucifer, Genesis4's models, `fft_plan = "wisdom"`, 12 threads | 24.98 s | 10.9 s | 10.0 s | wisdom |
-| Lucifer, Genesis4's models, `fft_plan = "estimate"`, 12 threads | 28.74 s | 14.4 s | 10.1 s | estimate |
-| Lucifer, its own models, `fft_plan = "wisdom"`, 12 threads | 27.17 s | 10.9 s | 12.0 s | wisdom |
-| Lucifer, its own models, `fft_plan = "estimate"`, 12 threads | 31.09 s | 14.5 s | 12.0 s | estimate |
+| run | wall | field solve | particle push | plan in use | wall, 2026-11-14 |
+|---|---|---|---|---|---|
+| Genesis4, ADI solver, 12 ranks | 19.43 s | | | | 19.35 s |
+| Genesis4, FFT solver, 12 ranks | 19.07 s | | | | 19.14 s |
+| Lucifer, Genesis4's models, `fft_plan = "wisdom"`, 12 threads | 20.40 s | 7.0 s | 10.0 s | wisdom | 24.98 s |
+| Lucifer, Genesis4's models, `fft_plan = "estimate"`, 12 threads | 28.07 s | 14.1 s | 10.0 s | estimate | 28.74 s |
+| Lucifer, its own models, `fft_plan = "wisdom"`, 12 threads | 22.73 s | 7.0 s | 11.9 s | wisdom | 27.17 s |
+| Lucifer, its own models, `fft_plan = "estimate"`, 12 threads | 30.25 s | 14.0 s | 11.9 s | estimate | 31.09 s |
 
-Under the estimated plan Lucifer took 1.50 times Genesis4's wall time with Genesis4's transport and interlude models and 1.62 times with its own. Under the recorded plan the two ratios are 1.31 and 1.42. Genesis4 plans its transform with `FFTW_MEASURE`, so the plan was 3.8 s of the 9.6 s between the two codes.
+With Genesis4's transport and interlude models Lucifer takes 1.07 times Genesis4's wall time, and with its own 1.19 times. Until 2026-11-14 the two ratios were 1.50 and 1.62, under the estimated plan, which is the row a platform without the recorded plan still runs. Genesis4 plans its transform with `FFTW_MEASURE`, so the plan was 3.8 s of the 9.6 s between the two codes. The field solve's passes were 3.9 s more of the solve under the recorded plan, 10.9 s on 2026-11-14 and 7.0 s now: this run turns the source filter off, where a plane was copied four times and passed over twice a step and is now copied once.
 
-What remains is in three places. The first is the field solve outside the transform. A sampling profile of the run with Genesis4's models under the recorded plan puts 54 percent of the field solve's samples in FFTW, 17 percent in allocating and freeing the source array, 13 percent in the copies of `wavefront_fft2` and 14 percent in the deposit and the propagator multiply. A sample of one Genesis4 rank puts a quarter of its samples in FFTW and its own transform routine, which over the 2.5 ms of processor time it takes a slice a step is close to two transforms at the measured plan's speed and little else. The second is the 3 s of each Lucifer run outside the [walk](glossary.md#gl-walk), reading the 363 MB beam and writing the final beam and field, which Genesis4's wall time also contains for its own files. The third, with Lucifer's own models, is the 2 s that the Bmad transport model adds to the push, `quad_mat2_calc` evaluated for every particle at every step. The push itself, at 10.0 s for $7.1 \times 10^8$ particle-steps, is 170 ns a particle-step on a thread.
+The 1.3 s that remain are in three places. The first is the files. The run spends 2.6 s outside its [walk](glossary.md#gl-walk), which `timing/` of the stats file splits: 1.14 s to read the 363 MB beam and slice it, 0.05 s to read the field, 1.17 s to write the final beam and 0.22 s to write the final field. The beam is read and written by Bmad's HDF5 routines, and Genesis4's wall time contains its own reading and writing. The second is what the field solve does beside the transform. A sampling profile of the run with Genesis4's models puts 73 percent of the field solve's samples in FFTW, 13 percent in the passes of `fel_field_solve_mod`, 9 percent in the deposit and 4 percent in the copies FFTW's buffered plan makes. The third, with Lucifer's own models, is the 1.9 s that the Bmad transport model adds to the push, `quad_mat2_calc` evaluated for every particle at every step. The push itself, at 10.0 s for $7.1 \times 10^8$ particle-steps, is 170 ns a particle-step on a thread, and a sample of one Genesis4 rank on 2026-11-14 put about three quarters of its 2.5 ms of processor time a slice a step outside its transform.
 
 (perf-the-sampling-split-unaveraged)=
 ## The sampling split, unaveraged mode
@@ -386,29 +387,29 @@ The unaveraged mode has its own twin, and it costs more than the averaged one be
 
 Every run prints an estimated walk in the `work` part of its header and the measured walk, with its ratio to the estimate, in the `timing` part of its closing block. The rates are fitted to the tables above and are this machine's. The estimate is measured here on the eleven comparison tiers and four examples, each run on its own rather than beside the other keystone jobs. A machine running five jobs at once measures the load and not the input file.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
 | run | filter | measured | estimate | estimate/measured |
 |---|---|---|---|---|
-| tier1 | off | 0.245 s | 0.278 s | 1.14 |
-| tier1_unavg | off | 8.93 s | 16.7 s | 1.87 |
-| tier2_bmad | off | 3.14 s | 3.34 s | 1.06 |
-| tier2_genesis | off | 3.13 s | 3.34 s | 1.07 |
-| td1 | off | 0.482 s | 0.581 s | 1.21 |
-| td2_bmad | off | 6.09 s | 6.97 s | 1.14 |
-| td2_genesis | off | 6.06 s | 6.97 s | 1.15 |
-| tdsase | off | 6.06 s | 6.97 s | 1.15 |
-| tdsc | off | 0.533 s | 0.581 s | 1.09 |
-| tdwk | off | 0.48 s | 0.581 s | 1.21 |
-| weight_split | off | 0.409 s | 0.44 s | 1.08 |
-| `sase` | on | 22 s | 20.9 s | 0.95 |
-| `steady_state` | on | 4.08 s | 3.34 s | 0.82 |
-| `taper` | on | 4.08 s | 3.34 s | 0.82 |
-| `flash1` | on | 14 s | 10.9 s | 0.78 |
+| tier1 | off | 0.242 s | 0.259 s | 1.07 |
+| tier1_unavg | off | 8.85 s | 15.5 s | 1.76 |
+| tier2_bmad | off | 3.09 s | 3.11 s | 1.01 |
+| tier2_genesis | off | 3.06 s | 3.11 s | 1.02 |
+| td1 | off | 0.45 s | 0.531 s | 1.18 |
+| td2_bmad | off | 5.79 s | 6.37 s | 1.10 |
+| td2_genesis | off | 5.77 s | 6.37 s | 1.10 |
+| tdsase | off | 5.67 s | 6.37 s | 1.12 |
+| tdsc | off | 0.507 s | 0.531 s | 1.05 |
+| tdwk | off | 0.452 s | 0.531 s | 1.17 |
+| weight_split | off | 0.423 s | 0.414 s | 0.98 |
+| `sase` | on | 20.8 s | 19.1 s | 0.92 |
+| `steady_state` | on | 3.9 s | 3.11 s | 0.80 |
+| `taper` | on | 3.92 s | 3.11 s | 0.79 |
+| `flash1` | on | 13.9 s | 10.2 s | 0.73 |
 
-Every row is inside a factor of two, and the table is `tests/scripts/estimate_vs_clock.py` over the fifteen runs. The rates are fitted with the source filter on, which the measurement of 2026-09-07 put at 58 percent of the transform rate with the push and deposit rates unchanged. The work outside the walk (parsing, building the beam and field, the final dumps) is 1 percent of the walk on these runs, and the estimate leaves it out. The filter column is what separates the two blocks. The examples take the default and read between 0.78 and 0.95. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)). Their field solve is therefore the cheaper two-transform one, while the rate costing it is the filtered default's. That is the 1.06 to 1.21 the tier block sits at, a property of the configuration rather than of the machine. On 2026-10-24, under the estimated plan and the rates fitted to it, the same fifteen rows read 0.87 to 1.94.
+Every row is inside a factor of two, and the table is `tests/scripts/estimate_vs_clock.py` over the fifteen runs. The rates are fitted with the source filter on, which the measurement of 2026-09-07 put at 58 percent of the transform rate with the push and deposit rates unchanged. The work outside the walk (parsing, building the beam and field, the final dumps) is 1 percent of the walk on these runs, and the estimate leaves it out. The filter column is what separates the two blocks. The examples take the default and read between 0.73 and 0.92. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)). Their field solve is therefore the cheaper two-transform one, while the rate costing it is the filtered default's. That is the 0.98 to 1.18 the tier block sits at, a property of the configuration rather than of the machine. On 2026-10-24, under the estimated plan and the rates fitted to it, the same fifteen rows read 0.87 to 1.94.
 
-`tier1_unavg` is the highest at 1.87, for a second reason. The unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period. The count carries those substeps while the rates it multiplies are the averaged path's. `steady_state` and `taper` read 0.82, one slice of 8192 particles over the full line, where the estimate's push rate, fitted at 2048 particles a slice, runs ahead of a push that is a third of the walk. `flash1` is the lowest at 0.78.
+`tier1_unavg` is the highest at 1.76, for a second reason. The unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period. The count carries those substeps while the rates it multiplies are the averaged path's. `steady_state` and `taper` read 0.80 and 0.79, one slice of 8192 particles over the full line, where the estimate's push rate, fitted at 2048 particles a slice, runs ahead of a push that is a third of the walk. `flash1` is the lowest at 0.73.
 
 (perf-frames)=
 ## The frame series, measured
@@ -509,16 +510,16 @@ Bmad's global `bmad.sr_wakes_on` chooses the interlude path for every element of
 
 The Metal backend ([](validation.md#val-device)) is run against the CPU path on the same input files: one 9 m Aramis segment of 89 steps at `ngrid` 256, with `comb_ds_save = -1` so both sides take stats at the element end only. The table gives walk seconds, best of three, on the M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps. The difference from its wall clock is the [host](glossary.md#gl-device) side of each step, dominated by the dispatch floor.
 
-*Measured 2026-11-14: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
+*Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 
 | case | CPU, 12 threads | device wall | device busy | ratio | 2026-10-24 |
 |---|---|---|---|---|---|
-| steady state, 1 x 8192 particles | 0.268 s | 0.052 s | 0.018 s | 5.2x | 7.3x |
-| SASE window, 24 x 4096, slippage live | 0.622 s | 0.111 s | 0.058 s | 5.6x | 6.1x |
-| SASE window, 96 x 8192 | 2.640 s | 0.341 s | 0.262 s | 7.7x | 9.1x |
-| dispatch floor: 1 x 1024, ngrid 64 | 0.030 s | 0.038 s | 0.012 s | 0.8x | 0.7x |
+| steady state, 1 x 8192 particles | 0.257 s | 0.055 s | 0.019 s | 4.7x | 7.3x |
+| SASE window, 24 x 4096, slippage live | 0.583 s | 0.117 s | 0.061 s | 5.0x | 6.1x |
+| SASE window, 96 x 8192 | 2.502 s | 0.346 s | 0.270 s | 7.2x | 9.1x |
+| dispatch floor: 1 x 1024, ngrid 64 | 0.029 s | 0.038 s | 0.013 s | 0.8x | 0.7x |
 
-The input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` in `tests/perf/`, and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-10-24, when the CPU ran FFTW's estimated plan and its walks were 0.436, 0.758, 3.509 and 0.032 s. The device transforms on the GPU and makes no FFTW plan, so its seconds moved by the spread of the measurement and the ratios fell with the CPU's walks. The other tables of this section and of the sections on the device below were measured before 2026-11-14, and their CPU columns are under the estimated plan.
+The input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` in `tests/perf/`, and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-10-24, when the CPU ran FFTW's estimated plan and its walks were 0.436, 0.758, 3.509 and 0.032 s. The device transforms on the GPU and makes no FFTW plan, so its seconds moved by the spread of the measurement and the ratios fell with the CPU's walks. The other tables of this section and of the sections on the device below were measured before 2026-11-14, and their CPU columns are under the estimated plan and the solve that copied each plane into and out of every transform.
 
 The chamber wake adds one addition a particle to the push and no pass, and the device's busy seconds do not resolve it. The two SASE windows with the wake of the validation suite's wake tier on, by the same script on the same day as their rows without it:
 

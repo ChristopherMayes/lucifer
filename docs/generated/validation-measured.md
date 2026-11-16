@@ -227,7 +227,7 @@ where the two builds agree to every printed digit.
 | shot noise, the occupants of each deposit cell, harmonic 1 | 1.0530e+00 | same | 5.6387e-01 to 1.4158e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 2 | 9.4860e-01 | same | 5.6663e-01 to 1.4227e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 3 | 9.0833e-01 | same | 5.5990e-01 to 1.4058e+00 |
-| mode split against the dump's far field | 0.0000e+00 | 3.3676e-16 | <= 1.0000e-06 |
+| mode split against the dump's far field | 4.4901e-16 | same | <= 1.0000e-06 |
 
 (val-levels-load)=
 ### `load`
@@ -374,7 +374,7 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| steady state, spectral against the slice run | 3.4998e-15 | 7.9773e-15 | <= 1.0000e-11 |
+| steady state, spectral against the slice run | 3.3782e-15 | 8.0291e-15 | <= 1.0000e-11 |
 | SASE tier with the source filter on, spectral against slices | 5.8944e-03 | same | <= 1.5000e-02 |
 | the derived coarse field against one plane a slice, SASE tier | 8.3631e-02 | same | <= 1.5000e-01 |
 | the derived coarse field's slices a plane, SASE tier | 4 | same | >= 1 |
@@ -844,11 +844,11 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.0948e-15 | 9.2767e-15 | <= 1.0000e-08 |
+| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.0948e-15 | 9.4586e-15 | <= 1.0000e-08 |
 | rotation, averaged: beam-size swap identity at exit | 2.2204e-16 | 0.0000e+00 | <= 1.0000e-08 |
 | rotation, unaveraged: power \|x-run - y-run\| / max, all records | 5.5091e-07 | 5.7792e-07 | <= 1.0000e-05 |
 | rotation, unaveraged: beam-size swap identity at exit | 2.2204e-16 | 6.6613e-16 | <= 1.0000e-08 |
-| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.1102e-15 | 1.5543e-15 | <= 5.0000e-02 |
+| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.3323e-15 | 1.5543e-15 | <= 5.0000e-02 |
 | crossed, averaged: afterburner floor, Px/Py (y must light up) | 1.1377e+02 | same | <= 2.0000e+02 |
 | crossed, averaged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.3978e-01 | same | <= 5.0000e-01 |
 | crossed, unaveraged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 2.5052e-06 | 2.5048e-06 | <= 5.0000e-02 |
@@ -862,7 +862,7 @@ where the two builds agree to every printed digit.
 | crossed: the pulse's lucifer/pulse rows equal the escaped file's, both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | crossed: the stated pulse and escaped files vs on disk, both polarizations, rel | 2.5231e-03 | same | <= 1.0000e-02 |
 | crossed: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| helical re-anchor: vector vs scalar path, shot-noise power | 1.5798e-14 | 1.5959e-14 | <= 1.0000e-12 |
+| helical re-anchor: vector vs scalar path, shot-noise power | 1.5959e-14 | 1.5636e-14 | <= 1.0000e-12 |
 | handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
 | handedness, averaged: the pair (1, -i) leaves the beam unmodulated | 3.6010e-06 | same | <= 1.0000e-02 |
 | handedness, unaveraged: the pair (1, +i) reproduces the scalar seed's energy modulation | 2.5204e-08 | same | <= 1.0000e-06 |
@@ -926,8 +926,8 @@ where the two builds agree to every printed digit.
 | wisdom twice: stats arrays that differ | 0 | same | = 0 |
 | the plan in use is wisdom or estimate |  | same | holds |
 | estimate: the stats file names estimate |  | same | holds |
-| wisdom against estimate: stats arrays that differ | 18 | same | >= 1 |
-| wisdom against estimate: window energy | 1.1517e-15 | 9.5978e-16 | <= 1.0000e-10 |
+| wisdom against estimate: stats arrays that differ | 21 | same | >= 1 |
+| wisdom against estimate: window energy | 7.6783e-16 | 9.5978e-16 | <= 1.0000e-10 |
 | measure: the stats file names measure |  | same | holds |
 | measure against estimate: window energy within 1e-10 |  | same | holds |
 | 127-point grid under wisdom: the plan in use is estimate |  | same | holds |
@@ -989,13 +989,13 @@ where the two builds agree to every printed digit.
 | h3both-final-h3.wf.h5 unitDimension |  | same | holds |
 | h3both-final-h3.wf.h5 photonEnergy wavelength | 0.0000e+00 | same | <= 3.3333e-17 |
 | h3both-final-h3.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.5569e-16 | 3.1138e-16 | <= 1.0000e-13 |
+| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.9693e-16 | 3.1138e-16 | <= 1.0000e-13 |
 | Fortran openPMD read-back, re-dump dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| Python Wavefront class energy (its Genesis path) | 1.1938e-12 | same | <= 1.0000e-09 |
-| Python openPMD reader (vs Genesis dump) | 1.5569e-16 | 3.1138e-16 | <= 1.0000e-13 |
+| Python Wavefront class energy (its Genesis path) | 1.1936e-12 | 1.1935e-12 | <= 1.0000e-09 |
+| Python openPMD reader (vs Genesis dump) | 1.9693e-16 | 3.1138e-16 | <= 1.0000e-13 |
 | Python openPMD write/read round trip exact | 0.0000e+00 | same | <= 5.0000e-01 |
 | Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 2.2538e-14 | 1.5543e-14 | <= 1.0000e-12 |
+| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 2.2427e-14 | 1.5543e-14 | <= 1.0000e-12 |
 | 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | bank bytes: h1's stated pulse file vs on disk, rel | 1.6024e-03 | same | <= 1.0000e-02 |
 | bank bytes: h3's stated pulse file vs on disk, rel | 1.6024e-03 | same | <= 1.0000e-02 |
@@ -1267,9 +1267,9 @@ where the two builds agree to every printed digit.
 | range: and its transverse origin is the whole window's [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refusal: a slice range outside the window refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: the knob at zero is the run that never named it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| interlude: cut into pieces, exit power against the whole element | 1.2341e-13 | 1.1814e-13 | <= 1.0000e-09 |
+| interlude: cut into pieces, exit power against the whole element | 1.2378e-13 | 1.1886e-13 | <= 1.0000e-09 |
 | interlude: cut into pieces, exit sigma_x against the whole element | 5.9606e-16 | same | <= 1.0000e-09 |
-| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.6838e-14 | 8.4642e-14 | <= 1.0000e-09 |
+| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.5928e-14 | 8.3368e-14 | <= 1.0000e-09 |
 | interlude: rows strictly inside the quadrupole, whole (0 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the quadrupole, cut (4 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the pipe, cut (9 expected) | 0 | same | <= 5.0000e-01 |
@@ -1282,7 +1282,7 @@ where the two builds agree to every printed digit.
 | interlude: and none where nothing is cut | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: a wake-carrying element is not cut | 0 | same | <= 5.0000e-01 |
 | interlude: and the elements without a wake still are | 0 | same | <= 5.0000e-01 |
-| interlude: the zero wake left the physics alone, so only the rows differ | 7.4631e-15 | 1.2742e-15 | <= 1.0000e-09 |
+| interlude: the zero wake left the physics alone, so only the rows differ | 6.1889e-15 | 2.0023e-15 | <= 1.0000e-09 |
 | interlude: refused with the transcribed Genesis interlude (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: with sr_wakes_on off the wake element is cut like any other | 0 | same | <= 5.0000e-01 |
 | interlude: and its physics is the whole-element run's | 0.0000e+00 | same | <= 1.0000e-09 |
@@ -1302,7 +1302,7 @@ where the two builds agree to every printed digit.
 | pulse file: its s_position is the final dump's, the exit plane [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | pulse file: the live slices are the final field, slice by slice, rel | 0.0000e+00 | same | <= 1.0000e-08 |
 | pulse file: plane n_slice + i carries the energy of escaped plane i, rel | 9.7700e-15 | 1.0103e-14 | <= 1.0000e-08 |
-| pulse file: its copy in Genesis's layout reads back as the pulse, slice by slice, rel | 2.1921e-16 | 2.0210e-16 | <= 1.0000e-12 |
+| pulse file: its copy in Genesis's layout reads back as the pulse, slice by slice, rel | 2.0210e-16 | same | <= 1.0000e-12 |
 | pulse file: Genesis imports the copy and re-dumps the same slice count | 0 | same | <= 5.0000e-01 |
 | pulse file: Genesis's re-dump is the pulse, slice by slice, rel | 2.1921e-16 | 2.0210e-16 | <= 1.0000e-12 |
 | pulse file: and its refposition is the pulse's z origin [m] | 0.0000e+00 | same | <= 1.0000e-18 |

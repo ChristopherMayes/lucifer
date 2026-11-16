@@ -166,7 +166,15 @@ integer, private, save :: wf_cache_mode = 0, wf_cache_made = 0
 type(C_PTR), private, save :: wf_plan_fwd = C_NULL_PTR
 type(C_PTR), private, save :: wf_plan_bwd = C_NULL_PTR
 type(C_PTR), private, save :: wf_buf_cptr = C_NULL_PTR
-complex(wf_rp), private, pointer, save :: wf_buf(:,:) => null()
+complex(wf_rp), private, pointer, contiguous, save :: wf_buf(:,:) => null()
+
+! A second buffer of the same size and alignment, for a caller that holds two planes at
+! once (wavefront_fft2_buffers). It is allocated at the first request and freed with
+! the cache.
+
+type(C_PTR), private, save :: wf_buf2_cptr = C_NULL_PTR
+complex(wf_rp), private, pointer, contiguous, save :: wf_buf2(:,:) => null()
+!$OMP threadprivate(wf_buf2_cptr, wf_buf2)
 integer, private, save :: wf_cache_nx = 0, wf_cache_ny = 0
 !$OMP threadprivate(wf_plan_fwd, wf_plan_bwd, wf_buf_cptr, wf_buf, wf_cache_nx, wf_cache_ny)
 
@@ -1099,8 +1107,8 @@ include 'fftw3.f03'
 complex(wf_rp) dat(:,:)
 integer direction
 logical, optional :: err_flag
-logical cache_ok
-integer nx, ny
+logical err
+complex(wf_rp), pointer, contiguous :: buf(:,:)
 character(*), parameter :: r_name = 'wavefront_fft2'
 
 !
@@ -1112,10 +1120,75 @@ if (direction /= wf_fft_forward$ .and. direction /= wf_fft_backward$) then
   return
 endif
 
-nx = size(dat, 1)
-ny = size(dat, 2)
+call wavefront_fft2_buffers (size(dat, 1), size(dat, 2), buf, err_flag = err)
+if (err) return
+
+! The transform runs on the thread's own buffer and not on the caller's array, so the
+! plan always sees the alignment it was created with. A caller that would save the two
+! copies works in the buffer itself (wavefront_fft2_buffers).
+
+buf = dat
+call wavefront_fft2_aligned (1, direction, err)
+if (err) return
+dat = buf
+
+if (present(err_flag)) err_flag = .false.
+
+end subroutine wavefront_fft2
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_buffers (nx, ny, buf, buf2, err_flag)
+!
+! Routine to return the calling thread's work buffers for an nx by ny transform, making
+! the thread's plans if its cache does not hold this size. The buffers are allocated by
+! fftw_alloc_complex, so wavefront_fft2_aligned may transform either of them where it
+! lies, with no copy. A caller that transforms a plane, works on the result and
+! transforms back does all of it in a buffer, and copies the plane in once and out once.
+!
+! The buffers are the thread's until its next call of wavefront_fft2, which uses the
+! first, or of any routine that transforms through it. They hold whatever was left in
+! them. A change of size frees both.
+!
+! Input:
+!   nx, ny    -- integer: Transform size.
+!
+! Output:
+!   buf       -- complex(wf_rp), pointer, contiguous (:,:): The first buffer, nx by ny.
+!   buf2      -- complex(wf_rp), pointer, contiguous (:,:), optional: A second buffer of
+!                  the same size.
+!   err_flag  -- logical, optional: Set True if a buffer or a plan could not be made.
+!-
+
+subroutine wavefront_fft2_buffers (nx, ny, buf, buf2, err_flag)
+
+include 'fftw3.f03'
+
+integer nx, ny
+complex(wf_rp), pointer, contiguous :: buf(:,:)
+complex(wf_rp), pointer, contiguous, optional :: buf2(:,:)
+logical, optional :: err_flag
+logical cache_ok
+character(*), parameter :: r_name = 'wavefront_fft2_buffers'
+
+!
+
+if (present(err_flag)) err_flag = .true.
+buf => null()
+if (present(buf2)) buf2 => null()
 
 call wavefront_fft2_plan (nx, ny, cache_ok)
+
+if (cache_ok .and. present(buf2) .and. .not. C_ASSOCIATED(wf_buf2_cptr)) then
+  wf_buf2_cptr = fftw_alloc_complex(int(nx, C_SIZE_T) * int(ny, C_SIZE_T))
+  if (C_ASSOCIATED(wf_buf2_cptr)) then
+    call C_F_POINTER (wf_buf2_cptr, wf_buf2, [nx, ny])
+  else
+    cache_ok = .false.
+  endif
+endif
 
 if (.not. cache_ok) then
   call out_io (s_error$, r_name, &
@@ -1124,7 +1197,58 @@ if (.not. cache_ok) then
   return
 endif
 
-wf_buf = dat
+buf => wf_buf
+if (present(buf2)) buf2 => wf_buf2
+if (present(err_flag)) err_flag = .false.
+
+end subroutine wavefront_fft2_buffers
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_aligned (which, direction, err_flag)
+!
+! Routine to transform, where it lies, one of the calling thread's work buffers
+! (wavefront_fft2_buffers). The sign convention and the normalization are those of
+! wavefront_fft2.
+!
+! The buffer is named by its number and is not an argument. A plan run on an array
+! whose alignment is not the one it was made with is undefined, and gfortran passes a
+! packed copy of a pointer array to a contiguous dummy, so an array argument here would
+! be transformed in a temporary.
+!
+! Input:
+!   which      -- integer: 1 for the first buffer, 2 for the second.
+!   direction  -- integer: wf_fft_forward$ or wf_fft_backward$.
+!
+! Output:
+!   err_flag   -- logical: Set True if the buffer is not allocated or the direction is
+!                   not one of the two.
+!-
+
+subroutine wavefront_fft2_aligned (which, direction, err_flag)
+
+include 'fftw3.f03'
+
+integer which, direction
+logical err_flag
+character(*), parameter :: r_name = 'wavefront_fft2_aligned'
+
+!
+
+err_flag = .true.
+
+if (direction /= wf_fft_forward$ .and. direction /= wf_fft_backward$) then
+  call out_io (s_error$, r_name, 'BAD TRANSFORM DIRECTION: \i0\ ', i_array = [direction])
+  return
+endif
+
+if (wf_cache_nx == 0 .or. (which == 1 .and. .not. associated(wf_buf)) .or. &
+    (which == 2 .and. .not. associated(wf_buf2)) .or. which < 1 .or. which > 2) then
+  call out_io (s_error$, r_name, 'WORK BUFFER \i0\ OF THIS THREAD IS NOT ALLOCATED.', i_array = [which])
+  return
+endif
 
 ! Passing the same array as both in and out is FFTW's documented way to ask for an
 ! in-place transform, as bmad/space_charge/fft_interface_mod.f90 does. gfortran -Wall
@@ -1132,18 +1256,26 @@ wf_buf = dat
 ! Aliasing those would be nonconforming for a normal Fortran procedure. This one is
 ! bind(C) with assumed-size dummies, so the arguments are passed by address with no copy
 ! in or out, and the aliasing is safe. Bmad's own build does not enable that warning.
+! The second buffer has the first's size and alignment, which is what a plan made on
+! the first requires of another array.
 
-if (direction == wf_fft_forward$) then
-  call fftw_execute_dft (wf_plan_fwd, wf_buf, wf_buf)
+if (which == 1) then
+  if (direction == wf_fft_forward$) then
+    call fftw_execute_dft (wf_plan_fwd, wf_buf, wf_buf)
+  else
+    call fftw_execute_dft (wf_plan_bwd, wf_buf, wf_buf)
+  endif
 else
-  call fftw_execute_dft (wf_plan_bwd, wf_buf, wf_buf)
+  if (direction == wf_fft_forward$) then
+    call fftw_execute_dft (wf_plan_fwd, wf_buf2, wf_buf2)
+  else
+    call fftw_execute_dft (wf_plan_bwd, wf_buf2, wf_buf2)
+  endif
 endif
 
-dat = wf_buf
+err_flag = .false.
 
-if (present(err_flag)) err_flag = .false.
-
-end subroutine wavefront_fft2
+end subroutine wavefront_fft2_aligned
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1188,6 +1320,9 @@ if (nx /= wf_cache_nx .or. ny /= wf_cache_ny .or. wf_cache_mode /= wf_plan_mode)
   if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
   if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
   if (C_ASSOCIATED(wf_buf_cptr)) call fftw_free(wf_buf_cptr)
+  if (C_ASSOCIATED(wf_buf2_cptr)) call fftw_free(wf_buf2_cptr)
+  wf_buf2_cptr = C_NULL_PTR
+  wf_buf2 => null()
   wf_plan_fwd = C_NULL_PTR
   wf_plan_bwd = C_NULL_PTR
   wf_buf_cptr = C_NULL_PTR
@@ -1414,6 +1549,9 @@ include 'fftw3.f03'
 if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
 if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
 if (C_ASSOCIATED(wf_buf_cptr)) call fftw_free(wf_buf_cptr)
+if (C_ASSOCIATED(wf_buf2_cptr)) call fftw_free(wf_buf2_cptr)
+wf_buf2_cptr = C_NULL_PTR
+wf_buf2 => null()
 wf_plan_fwd = C_NULL_PTR
 wf_plan_bwd = C_NULL_PTR
 wf_buf_cptr = C_NULL_PTR
