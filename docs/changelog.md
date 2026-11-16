@@ -9,6 +9,31 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-15 Added: a wisdom file of the machine, for the transforms the source's record of
+  plans does not serve. `run.fft_plan = "wisdom"` planned from the text of
+  `src/wavefront_wisdom_mod.f90`, which was measured with the FFTW of conda-forge on Apple silicon
+  for the power-of-two grids, and every other platform and grid fell back to FFTW's estimated
+  plan: both builds of the Linux CI job did, where a 256-point field solve read 2.69 s under the
+  estimate and 1.61 s under a measured plan. `lucifer --fft-wisdom [<points> ...]` measures the
+  plans of the square grids named, the powers of two from 32 to 2048 by default, at
+  `FFTW_PATIENT`, and adds them to a file of the user's cache directory, named for the FFTW
+  version and the build's processor. A grid the source's record serves, or the file holds, is not
+  measured, and a call that measures nothing leaves the file's bytes alone. Under `wisdom` the
+  planner tries the source's text, then the file, then the estimate, each text read, planned
+  from alone and forgotten. A run never measures and never writes the file, so runs from one
+  file repeat their last bits, and a run the source's text serves is planned the same whatever
+  file the machine carries. `setup/fft_plan` and the resolved input file name `wisdom_file`
+  where the file made the plan, and the fallback's warning line names the command. The new key
+  `run.fft_wisdom_file` takes `cache`, a path or an empty string for none, and the environment
+  variable `LUCIFER_FFT_WISDOM_FILE` stands for the cache file. The validation suite and
+  `examples/run_examples.sh` set it to nothing, so no recorded digit belongs to a file of the
+  recording machine, and no recorded digit moved. `check_fft_plan.py` measures a 127-point plan
+  into a cache of its own, holds two runs from it to the same bytes in every array of the
+  statistics file and to the estimated plan in the window energy, and holds a second
+  `--fft-wisdom` to the file's bytes. The Linux CI job runs the command before the suite. The
+  tracker's grid is always square, so the command takes square grids. The spectral propagator's
+  transforms along tau stay on the estimate: a measured plan gains 2 and 7 percent at the
+  lengths 40 and 48 the suite runs (`docs/performance.md`).
 - 2026-11-15 Changed: the averaged field solve works in each thread's FFTW buffer, and the
   rounding of its arithmetic is fixed by the source. `fel_field_step` copied a plane into FFTW's
   aligned buffer and back at every transform, four copies and two passes a step with the source

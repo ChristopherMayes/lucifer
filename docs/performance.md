@@ -144,6 +144,28 @@ The walk at each grid follows. The input file is the phases input file above, 96
 
 The 256-point grid now runs in 62 percent of the walk of the 255-point one, where the two were within 0.3 percent of each other under the estimated plan. The three grids on the estimated plan read 1 to 7 percent longer than on 2026-10-24: the bank's writes in the slippage phase add about 2 s a run ([](#perf-the-phase-profile)), and the solve's passes take less than they did. A prime is the slowest on either plan, since the transform falls back to its general algorithm.
 
+The record serves the FFTW it was measured with. On another platform, and for a grid that is not a power of two, `lucifer --fft-wisdom` measures the plan once into a file of the machine, and a run plans from that file as it plans from the record ([](input-reference.md#param-global-fft-wisdom-file)). The 127-point plan it measured here took 1.6 s to find.
+
+The [spectral propagator](glossary.md#gl-propagator)'s transforms along $\tau$ are one-dimensional, of the field's planes and the [pad](glossary.md#gl-pad)'s, and stay on FFTW's estimated plan. One in-place transform under each plan, timed through `util/make_fft_wisdom.py`'s binding, the call's own 0.1 µs included:
+
+*Measured 2026-11-15: Apple M3 Max, one thread, fftw 3.3.11 from conda-forge.*
+
+| length | estimated plan | measured plan | ratio |
+|---|---|---|---|
+| 40 | 172 ns | 168 ns | 1.02 |
+| 48 | 190 ns | 177 ns | 1.07 |
+| 64 | 218 ns | 173 ns | 1.26 |
+| 112 | 324 ns | 330 ns | 0.98 |
+| 128 | 410 ns | 308 ns | 1.33 |
+| 256 | 647 ns | 579 ns | 1.12 |
+| 520 | 1.79 µs | 1.48 µs | 1.22 |
+| 1040 | 3.36 µs | 3.06 µs | 1.10 |
+| 1296 | 3.93 µs | 3.46 µs | 1.14 |
+| 2048 | 5.91 µs | 5.50 µs | 1.07 |
+| 4228 | 51.3 µs | 54.1 µs | 0.95 |
+
+The validation suite's spectral section runs lengths 40 and 48, where the measured plan gains 2 and 7 percent of the transform, and the transform is one part of a pass that also gathers each line across the planes and scatters it back. No example runs the spectral propagator. The gain reaches a quarter to a third at 64 and 128 and a seventh at 1296, the 1280-plane window of [](#perf-device-tau), and a length is whatever the window and the pad make it, so a record in the source could not hold them. They are left on the estimate.
+
 The earlier version of this section assigned the longer solve at 256 points, against the 255 of the September record, to the FFTW library's handling of a power of two. That was the estimated plan: the same library transforms 256 points 2.2 times faster once its planner has timed the candidates. Genesis4 plans with `FFTW_MEASURE`, and the comparison against it on a 256-point grid is in [](#perf-flash1-cell).
 
 ## The particles against the grid

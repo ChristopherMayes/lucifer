@@ -56,7 +56,8 @@
 | `device_timing` | true/false | false |  |  | Per-pass device timing, one compute encoder a pass. Slows the run. |
 | `device_dep_mutate` | integer | `0` |  |  | Shift the device deposit's fixed-point scale, in bits. A check instrument. |
 | `device_wake_mutate` | true/false | false |  |  | Enlarge the device's chamber-wake decrement by 2^-4. A check instrument. |
-| `fft_plan` | string | `"wisdom"` |  | `"wisdom"`, `"estimate"`, `"measure"` | The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run. |
+| `fft_plan` | string | `"wisdom"` |  | `"wisdom"`, `"wisdom_file"`, `"estimate"`, `"measure"` | The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run. wisdom_file is wisdom, and is what a run records where a wisdom file made the plan |
+| `fft_wisdom_file` | string | `"cache"` |  |  | The wisdom file fft_plan = wisdom plans from where the source records no plan: cache, the file of the cache directory, a path, or blank for none. |
 <!-- end keys-run -->
 
 (keys-window)=

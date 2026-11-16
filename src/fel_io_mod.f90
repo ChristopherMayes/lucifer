@@ -28,7 +28,7 @@ use bmad_parser_struct, only: bp_com
 ! For bmad_version_date, the distribution's own version. Tao reports the same string.
 use bmad_version_mod, only: bmad_version_date
 ! For lucifer_version$, the version of this build, written by CMake into the build directory.
-use fel_version_mod, only: lucifer_version$
+use fel_version_mod, only: lucifer_version$, lucifer_host$
 !$ use omp_lib
 
 implicit none
@@ -47,6 +47,53 @@ character(16), parameter, private :: scaled_units(9) = [character(16) :: &
       'm', 'C', 'W', 'eV', 'rad', 'A', 'J', 's', 'm rad']
 
 contains
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_fft_wisdom_path (key) result (path)
+!
+! Routine to return the wisdom file run.fft_wisdom_file names. A value other than
+! 'cache' is the path itself, and blank is no file. 'cache' is the environment variable
+! LUCIFER_FFT_WISDOM_FILE where it is set, blank included, which is how the validation
+! suite runs with no file. Else it is fft-wisdom-<FFTW version>-<host>.txt in the
+! directory lucifer of XDG_CACHE_HOME, or of .cache in the home directory. The host is
+! the system and processor of the build, since the wisdom of one processor's FFTW does
+! not serve another's.
+!
+! Input:
+!   key   -- character(*): The value of run.fft_wisdom_file.
+!
+! Output:
+!   path  -- character(600): The file, blank for none.
+!-
+
+function fel_fft_wisdom_path (key) result (path)
+
+character(*) key
+character(600) path
+character(400) dir
+integer stat
+
+!
+
+path = key
+if (key /= 'cache') return
+
+call get_environment_variable ('LUCIFER_FFT_WISDOM_FILE', path, status = stat)
+if (stat == 0) return
+
+path = ''
+call get_environment_variable ('XDG_CACHE_HOME', dir, status = stat)
+if (stat /= 0 .or. dir == '') then
+  call get_environment_variable ('HOME', dir, status = stat)
+  if (stat /= 0 .or. dir == '') return
+  dir = trim(dir) // '/.cache'
+endif
+path = trim(dir) // '/lucifer/fft-wisdom-' // trim(wavefront_fftw_version()) // '-' // lucifer_host$ // '.txt'
+
+end function fel_fft_wisdom_path
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1437,7 +1484,8 @@ if (run%n_harm > 1 .and. .not. run%bparam%shot_noise .and. run%bparam%quiet_star
   call warn ('a harmonic is carried with shot_noise = false')
 endif
 if (run%fft_plan_fallback) call warn ('fft_plan = wisdom has no plan for a ' // int_str(n_grid(1)) // &
-      ' by ' // int_str(n_grid(2)) // ' transform, estimate is used')
+      ' by ' // int_str(n_grid(2)) // ' transform, estimate is used: lucifer --fft-wisdom ' // &
+      int_str(n_grid(1)) // ' makes one')
 
 end subroutine write_warnings
 

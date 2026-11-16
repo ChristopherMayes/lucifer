@@ -935,6 +935,13 @@ where the two builds agree to every printed digit.
 | 127-point grid under wisdom: the resolved input file names estimate |  | same | holds |
 | 127-point grid: stats arrays that differ from estimate | 0 | same | = 0 |
 | wisdom at 1 and 8 threads: stats arrays that differ | 0 | same | = 0 |
+| wisdom file: --fft-wisdom 127 measures the plan and writes one file |  | same | holds |
+| wisdom file: the plan in use is wisdom_file |  | same | holds |
+| wisdom file: the resolved input file names wisdom_file |  | same | holds |
+| wisdom file twice: stats arrays that differ | 0 | same | = 0 |
+| wisdom file against estimate: window energy within 1e-10 |  | same | holds |
+| wisdom file: a second --fft-wisdom 127 measures nothing and leaves the bytes |  | same | holds |
+| wisdom file turned off: stats arrays that differ from estimate | 0 | same | = 0 |
 
 (val-levels-harmonics)=
 ### `harmonics`

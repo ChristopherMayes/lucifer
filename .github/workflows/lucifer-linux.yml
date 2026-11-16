@@ -338,6 +338,19 @@ jobs:
       # declares, debug or production, and how many check sections run at once. Its exit
       # status is zero only if every tier passed. Run from the validate environment, which
       # is how the recording machine runs it.
+      # The transverse transform's measured plans, for the grids the suite runs. The source's
+      # record of plans was measured on Apple silicon and does not serve this runner's FFTW,
+      # so without this step every run here takes FFTW's estimated plan
+      # (docs/input-reference.md, run.fft_wisdom_file). The file is named in the
+      # environment, which is how the suite is told to run from it: left alone, the suite
+      # runs with no file, so that the recording machine's digits never depend on one.
+      - name: Measure the FFT plans into a wisdom file, ${{ matrix.build }} build
+        shell: bash
+        run: |
+          echo "LUCIFER_FFT_WISDOM_FILE=$RUNNER_TEMP/fft-wisdom.txt" >> "$GITHUB_ENV"
+          LUCIFER_FFT_WISDOM_FILE="$RUNNER_TEMP/fft-wisdom.txt" \
+              ./${{ matrix.dir }}/bin/lucifer --fft-wisdom 32 64 128 256 512
+
       - name: Validation suite against Genesis4, ${{ matrix.build }} build${{ env.NO_SECTIONS == 'true' && ', refusals and tiers alone' || '' }}
         shell: bash -o pipefail {0}
         env:

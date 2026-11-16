@@ -157,7 +157,20 @@ end type
 ! where the wisdom gave no plan.
 
 integer, parameter :: wf_plan_wisdom$ = 1, wf_plan_estimate$ = 2, wf_plan_measure$ = 3
-character(8), parameter :: wf_plan_name(3) = [character(8) :: 'wisdom', 'estimate', 'measure']
+integer, parameter :: wf_plan_wisdom_file$ = 4
+character(12), parameter :: wf_plan_name(4) = [character(12) :: 'wisdom', 'estimate', 'measure', 'wisdom_file']
+
+! What wavefront_fft2_make_wisdom found for a grid.
+
+integer, parameter :: wf_wisdom_in_source$ = 1, wf_wisdom_in_file$ = 2, wf_wisdom_measured$ = 3
+
+! The wisdom of a file, read once by wavefront_fft2_set_wisdom_file and held as a C
+! string. Under wf_plan_wisdom$ a transform the text of wavefront_wisdom_mod gives no
+! plan for is planned from this text, where it holds one, before the estimate. The text
+! of the source is tried first, so a transform it holds is planned the same whatever
+! file a machine carries. Shared, and set before any thread plans.
+
+character(:, kind = C_CHAR), allocatable, private, save :: wf_file_wisdom
 
 integer, private, save :: wf_plan_mode = wf_plan_wisdom$
 integer, private, save :: wf_cache_mode = 0, wf_cache_made = 0
@@ -1366,9 +1379,25 @@ if (nx /= wf_cache_nx .or. ny /= wf_cache_ny .or. wf_cache_mode /= wf_plan_mode)
         if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
         wf_cache_made = wf_plan_estimate$
       endif
+
+      ! The text of a file, where the source's text gave no plan: read, planned from
+      ! alone and forgotten in the same way.
+
+      if (wf_cache_made == wf_plan_estimate$ .and. allocated(wf_file_wisdom)) then
+        n_ok = fftw_import_wisdom_from_string(wf_file_wisdom)
+        wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  flags)
+        wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, flags)
+        call fftw_forget_wisdom()
+        if (C_ASSOCIATED(wf_plan_fwd) .and. C_ASSOCIATED(wf_plan_bwd)) then
+          wf_cache_made = wf_plan_wisdom_file$
+        else
+          if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
+          if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
+        endif
+      endif
     endif
 
-    if (wf_cache_made /= wf_plan_wisdom$) then
+    if (wf_cache_made /= wf_plan_wisdom$ .and. wf_cache_made /= wf_plan_wisdom_file$) then
       flags = FFTW_ESTIMATE
       if (wf_cache_made == wf_plan_measure$) flags = FFTW_MEASURE
       wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  flags)
@@ -1439,13 +1468,15 @@ end subroutine wavefront_fft2_plan_threads
 ! Subroutine wavefront_fft2_set_plan (name, err_flag)
 !
 ! Routine to set how the plans of wavefront_fft2 are made: 'wisdom', the plan the text
-! of wavefront_wisdom_mod records and the estimated plan where it records none,
+! of wavefront_wisdom_mod records, else the plan a wisdom file records
+! (wavefront_fft2_set_wisdom_file), else the estimated plan. 'wisdom_file' is what
+! wavefront_fft2_plan_made answers where the file made the plan, and sets the same,
 ! 'estimate', FFTW_ESTIMATE, or 'measure', FFTW_MEASURE, whose choice can differ from
 ! run to run. Call it serially, before any transform. A thread whose cache was filled
 ! another way plans again at its next transform.
 !
 ! Input:
-!   name      -- character(*): 'wisdom', 'estimate' or 'measure'.
+!   name      -- character(*): 'wisdom', 'wisdom_file', 'estimate' or 'measure'.
 !
 ! Output:
 !   err_flag  -- logical: Set True if name is none of the three, False otherwise.
@@ -1463,6 +1494,7 @@ err_flag = .false.
 
 select case (name)
 case ('wisdom');    wf_plan_mode = wf_plan_wisdom$
+case ('wisdom_file');  wf_plan_mode = wf_plan_wisdom$
 case ('estimate');  wf_plan_mode = wf_plan_estimate$
 case ('measure');   wf_plan_mode = wf_plan_measure$
 case default
@@ -1479,17 +1511,18 @@ end subroutine wavefront_fft2_set_plan
 ! Function wavefront_fft2_plan_made () result (name)
 !
 ! Routine to return how the plans in the calling thread's cache were made: 'wisdom',
-! 'estimate' or 'measure'. Under 'wisdom' this is 'estimate' where the wisdom text
-! gave no plan for the cached size. Every thread plans alike, so after
+! 'wisdom_file', 'estimate' or 'measure'. Under 'wisdom' this is 'wisdom_file' where
+! the source's text gave no plan for the cached size and a file's did, and 'estimate'
+! where neither did. Every thread plans alike, so after
 ! wavefront_fft2_plan_threads the calling thread's answer is every thread's.
 !
 ! Output:
-!   name  -- character(8): How the plans were made, blank if the cache is empty.
+!   name  -- character(12): How the plans were made, blank if the cache is empty.
 !-
 
 function wavefront_fft2_plan_made () result (name)
 
-character(8) name
+character(12) name
 
 !
 
@@ -1497,6 +1530,254 @@ name = ''
 if (wf_cache_nx > 0 .and. wf_cache_made > 0) name = wf_plan_name(wf_cache_made)
 
 end function wavefront_fft2_plan_made
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_set_wisdom_file (file_name, found)
+!
+! Routine to read a file of FFTW wisdom, as wavefront_fft2_make_wisdom writes it, for
+! the plans of wavefront_fft2 under 'wisdom' (wavefront_fft2_set_plan). The file is
+! read here once and never again. A blank name, or a file that is not there or is
+! empty, leaves no file's wisdom in use. Call it serially, before any transform.
+!
+! Input:
+!   file_name  -- character(*): The file, or blank for none.
+!
+! Output:
+!   found      -- logical: True if the file was read.
+!-
+
+subroutine wavefront_fft2_set_wisdom_file (file_name, found)
+
+character(*) file_name
+logical found
+integer iu, ios, n
+
+!
+
+found = .false.
+if (allocated(wf_file_wisdom)) deallocate (wf_file_wisdom)
+if (file_name == '') return
+
+inquire (file = trim(file_name), exist = found, size = n)
+if (.not. found .or. n < 1) then
+  found = .false.
+  return
+endif
+
+open (newunit = iu, file = trim(file_name), access = 'stream', form = 'unformatted', action = 'read', &
+      status = 'old', iostat = ios)
+if (ios /= 0) then
+  found = .false.
+  return
+endif
+allocate (character(n+1, kind = C_CHAR) :: wf_file_wisdom)
+read (iu, iostat = ios) wf_file_wisdom(1:n)
+close (iu)
+wf_file_wisdom(n+1:n+1) = C_NULL_CHAR
+if (ios /= 0) then
+  deallocate (wf_file_wisdom)
+  found = .false.
+endif
+
+end subroutine wavefront_fft2_set_wisdom_file
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_make_wisdom (file_name, n_side, state, seconds, err_flag)
+!
+! Routine to measure the plans of wavefront_fft2 for square grids and write FFTW's
+! record of them, its wisdom, to a file that wavefront_fft2_set_wisdom_file reads.
+! Each grid is planned at FFTW_PATIENT, in place, forward and backward, as
+! wavefront_fft2_plan plans it. A grid the text of wavefront_wisdom_mod already gives a
+! plan for is not measured, since a run plans it from that text, and a grid the file
+! already holds is not measured again. The file is written only if a grid was measured,
+! with what it held before, so a second call for the same grids leaves its bytes alone.
+!
+! A file that is there and that this FFTW does not accept, another version's, is an
+! error, and it is not overwritten. Call this serially, outside any transform.
+!
+! Input:
+!   file_name   -- character(*): The file to add to, made if it is not there.
+!   n_side(:)   -- integer: The grids' points on a side.
+!
+! Output:
+!   state(:)    -- integer: For each grid, wf_wisdom_in_source$, wf_wisdom_in_file$ or
+!                    wf_wisdom_measured$.
+!   seconds(:)  -- real(rp): The time the measurement of a grid took, 0 if not measured.
+!   err_flag    -- logical: Set True if the file could not be read or written or a plan
+!                    could not be made.
+!-
+
+subroutine wavefront_fft2_make_wisdom (file_name, n_side, state, seconds, err_flag)
+
+include 'fftw3.f03'
+
+character(*) file_name
+integer n_side(:), state(:)
+real(rp) seconds(:)
+logical err_flag
+
+type(C_PTR) buf_cptr, p_f, p_b
+complex(wf_rp), pointer :: buf(:,:)
+integer i, n
+integer(C_INT) n_ok
+integer(8) t_0, t_1, t_rate
+logical there, any_new
+character(*), parameter :: r_name = 'wavefront_fft2_make_wisdom'
+
+!
+
+err_flag = .true.
+state = 0
+seconds = 0
+
+! The grids the source's text already gives a plan for.
+
+call fftw_forget_wisdom()
+n_ok = fftw_import_wisdom_from_string(wavefront_wisdom_text())
+do i = 1, size(n_side)
+  if (has_plan(n_side(i))) state(i) = wf_wisdom_in_source$
+enddo
+call fftw_forget_wisdom()
+
+! The file's wisdom, then each grid it does not hold, measured on top of it.
+
+inquire (file = trim(file_name), exist = there)
+if (there) then
+  n_ok = fftw_import_wisdom_from_filename(trim(file_name) // C_NULL_CHAR)
+  if (n_ok == 0) then
+    call out_io (s_error$, r_name, 'THIS FFTW DOES NOT ACCEPT THE WISDOM OF: ' // trim(file_name), &
+                 'THE FILE IS LEFT AS IT IS. REMOVE IT, OR NAME ANOTHER.')
+    call fftw_forget_wisdom()
+    return
+  endif
+endif
+
+any_new = .false.
+call system_clock (t_0, t_rate)
+do i = 1, size(n_side)
+  if (state(i) /= 0) cycle
+  n = n_side(i)
+  if (has_plan(n)) then
+    state(i) = wf_wisdom_in_file$
+    cycle
+  endif
+  buf_cptr = fftw_alloc_complex(int(n, C_SIZE_T) * int(n, C_SIZE_T))
+  if (.not. C_ASSOCIATED(buf_cptr)) exit
+  call C_F_POINTER (buf_cptr, buf, [n, n])
+  call system_clock (t_0)
+  p_f = fftw_plan_dft_2d(n, n, buf, buf, FFTW_FORWARD,  FFTW_PATIENT)
+  p_b = fftw_plan_dft_2d(n, n, buf, buf, FFTW_BACKWARD, FFTW_PATIENT)
+  call system_clock (t_1)
+  if (C_ASSOCIATED(p_f)) call fftw_destroy_plan(p_f)
+  if (C_ASSOCIATED(p_b)) call fftw_destroy_plan(p_b)
+  call fftw_free(buf_cptr)
+  if (.not. C_ASSOCIATED(p_f) .or. .not. C_ASSOCIATED(p_b)) exit
+  state(i) = wf_wisdom_measured$
+  seconds(i) = real(t_1 - t_0, rp) / t_rate
+  any_new = .true.
+enddo
+
+if (any(state == 0)) then
+  call out_io (s_error$, r_name, 'FFTW COULD NOT MAKE A PLAN FOR A \i0\ BY \i0\ TRANSFORM.', &
+               i_array = [n_side(minloc(state, 1)), n_side(minloc(state, 1))])
+  call fftw_forget_wisdom()
+  return
+endif
+
+if (any_new) then
+  n_ok = fftw_export_wisdom_to_filename(trim(file_name) // C_NULL_CHAR)
+  if (n_ok == 0) then
+    call out_io (s_error$, r_name, 'CANNOT WRITE THE WISDOM TO: ' // trim(file_name))
+    call fftw_forget_wisdom()
+    return
+  endif
+endif
+
+call fftw_forget_wisdom()
+err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+! True if the planner's wisdom holds the in-place plans of an n by n transform.
+
+function has_plan (n) result (held)
+
+integer n
+logical held
+type(C_PTR) b_cptr, q_f, q_b
+complex(wf_rp), pointer :: b(:,:)
+integer(C_INT) flags
+
+!
+
+held = .false.
+b_cptr = fftw_alloc_complex(int(n, C_SIZE_T) * int(n, C_SIZE_T))
+if (.not. C_ASSOCIATED(b_cptr)) return
+call C_F_POINTER (b_cptr, b, [n, n])
+flags = ior(FFTW_PATIENT, FFTW_WISDOM_ONLY)
+q_f = fftw_plan_dft_2d(n, n, b, b, FFTW_FORWARD,  flags)
+q_b = fftw_plan_dft_2d(n, n, b, b, FFTW_BACKWARD, flags)
+held = C_ASSOCIATED(q_f) .and. C_ASSOCIATED(q_b)
+if (C_ASSOCIATED(q_f)) call fftw_destroy_plan(q_f)
+if (C_ASSOCIATED(q_b)) call fftw_destroy_plan(q_b)
+call fftw_free(b_cptr)
+
+end function has_plan
+
+end subroutine wavefront_fft2_make_wisdom
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function wavefront_fftw_version () result (version)
+!
+! Routine to return the version FFTW states in the first word of its wisdom, as
+! fftw-3.3.11, which names the wisdom a file can hold.
+!
+! Output:
+!   version  -- character(32): The version, blank if FFTW exported nothing.
+!-
+
+function wavefront_fftw_version () result (version)
+
+include 'fftw3.f03'
+
+character(32) version
+type(C_PTR) text_cptr
+character(kind = C_CHAR), pointer :: text(:)
+integer i
+
+interface
+  subroutine c_free (ptr) bind(C, name = 'free')
+    import :: C_PTR
+    type(C_PTR), value :: ptr
+  end subroutine
+end interface
+
+!
+
+version = ''
+text_cptr = fftw_export_wisdom_to_string()
+if (.not. C_ASSOCIATED(text_cptr)) return
+call C_F_POINTER (text_cptr, text, [40])
+
+! The text opens with a parenthesis, and the version runs to the first blank.
+
+do i = 2, 33
+  if (text(i) == ' ' .or. text(i) == C_NULL_CHAR) exit
+  version(i-1:i-1) = text(i)
+enddo
+call c_free (text_cptr)
+
+end function wavefront_fftw_version
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

@@ -26,6 +26,15 @@ One time-dependent probe, eight slices on a 128-point grid, is run:
      plan in use is `estimate`, the warning line is printed, the resolved input file
      names `estimate`, and every array is that of the same run under `estimate`.
   5. At one thread and at eight under `wisdom`. Every array is the same.
+  6. From a wisdom file. `lucifer --fft-wisdom 127` measures the 127-point plan into a
+     file of a cache directory this script makes, and never the user's. Two runs that
+     plan from the file name `wisdom_file` and give the same arrays, the window energy
+     agrees with the estimated plan's to RTOL, a second `--fft-wisdom 127` leaves the
+     file's bytes alone, and a run with `run.fft_wisdom_file = ""` beside that file
+     gives the arrays of `estimate`.
+
+Every run here but those of 6 has neither a home nor a cache directory in its
+environment, so no wisdom file of the machine reaches it.
 
 The script also prints the field solve's seconds on a 256-point grid under `estimate`
 and under `measure`. They are printed for a reader of the log and are not judged.
@@ -76,7 +85,7 @@ FLAT = """! flat keys; routed into the input file's tables by lucifer.flat.to_to
   ran_seed = 777
   keep_escaped_field = F
   fft_plan = "{plan}"
-&end
+{extra}&end
 """
 
 
@@ -97,11 +106,12 @@ def check_true(name, ok, note=""):
     FAILED = FAILED or not ok
 
 
-def run(exe, wd, root, plan, grid=128, window="8e-10", threads="8"):
+def run(exe, wd, root, plan, grid=128, window="8e-10", threads="8", env=None, extra=""):
     """Run the probe under one plan and return the program's printout."""
-    (wd / f"{root}.toml").write_text(to_toml(FLAT.format(root=root, plan=plan, grid=grid, window=window)))
+    (wd / f"{root}.toml").write_text(to_toml(FLAT.format(root=root, plan=plan, grid=grid, window=window,
+                                                         extra=extra)))
     r = subprocess.run([str(exe), f"{root}.toml"], cwd=wd, capture_output=True, text=True,
-                       env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
+                       env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin", **(env or {})})
     if r.returncode != 0:
         print(f"FAIL: {root} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
         sys.exit(1)
@@ -194,6 +204,38 @@ def main():
     # 5. One thread and eight.
     run(exe, wd, "fp_w1t", "wisdom", threads="1")
     check("wisdom at 1 and 8 threads: stats arrays that differ", differing(wd, "fp_w1", "fp_w1t"), 0, "equal")
+
+    # 6. A wisdom file, in a cache directory of this script's own.
+    cache = wd / "cache"
+    env_c = {"XDG_CACHE_HOME": str(cache)}
+
+    def make_file():
+        r = subprocess.run([str(exe), "--fft-wisdom", "127"], cwd=wd, capture_output=True, text=True,
+                           env={"PATH": "/usr/bin:/bin", **env_c})
+        if r.returncode != 0:
+            print(f"FAIL: --fft-wisdom exited {r.returncode}:\n{r.stdout[-1500:]}\n{r.stderr[-800:]}")
+            sys.exit(1)
+        files = sorted((cache / "lucifer").glob("fft-wisdom-*.txt"))
+        return r.stdout, (files[0].read_bytes() if len(files) == 1 else b"")
+
+    out_1, bytes_1 = make_file()
+    check_true("wisdom file: --fft-wisdom 127 measures the plan and writes one file",
+               "127 by 127: measured" in out_1 and len(bytes_1) > 0)
+    run(exe, wd, "fp_f1", "wisdom", grid=127, env=env_c)
+    run(exe, wd, "fp_f2", "wisdom", grid=127, env=env_c)
+    check_true("wisdom file: the plan in use is wisdom_file", plan_in_use(wd, "fp_f1") == "wisdom_file",
+               plan_in_use(wd, "fp_f1"))
+    check_true("wisdom file: the resolved input file names wisdom_file",
+               'fft_plan = "wisdom_file"   # derived' in (wd / "fp_f1.resolved.toml").read_text())
+    check("wisdom file twice: stats arrays that differ", differing(wd, "fp_f1", "fp_f2"), 0, "equal")
+    d_f = energy_difference(wd, "fp_f1", "fp_e127")
+    check_true(f"wisdom file against estimate: window energy within {RTOL:.0e}", d_f <= RTOL, f"{d_f:.3e}")
+    out_2, bytes_2 = make_file()
+    check_true("wisdom file: a second --fft-wisdom 127 measures nothing and leaves the bytes",
+               "127 by 127: in the file already" in out_2 and bytes_2 == bytes_1)
+    run(exe, wd, "fp_f0", "wisdom", grid=127, env=env_c, extra='  fft_wisdom_file = ""\n')
+    check("wisdom file turned off: stats arrays that differ from estimate",
+          differing(wd, "fp_f0", "fp_e127"), 0, "equal")
 
     # The field solve's seconds on a 256-point grid, for a reader of the log.
     for plan in ("estimate", "measure", "wisdom"):
