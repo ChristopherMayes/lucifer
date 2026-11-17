@@ -289,19 +289,19 @@ def on_axis(run, label, bounds, rec):
     center, height = peak_of(f, -0.5 / n, 0.5 / n)
     # The resonance of the lattice's undulator, against the carrier the run was given.
     detuning = run.und["lambda0"] / u.wavelength - 1
-    check(f"{label}: peak of the line less the undulator's resonance, in line widths",
+    check(f"{label}: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM",
           abs(center - detuning) * n / ur.LINE_WIDTH, bounds["peak"])
     width = width_of(f, center, height, 1.0 / n)
-    check(f"{label}: width of the line over 0.8859/N", width * n / ur.LINE_WIDTH,
+    check(f"{label}: FWHM of the fundamental peak over 0.8859/N", width * n / ur.LINE_WIDTH,
           [1 - bounds["width"], 1 + bounds["width"]], "range")
     zeros = f(center + np.arange(1, 4) / n) / height
-    check(f"{label}: line at the zeros nu = 1/N, 2/N and 3/N, over the peak", float(zeros.max()), bounds["zeros"])
+    check(f"{label}: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum", float(zeros.max()), bounds["zeros"])
     nu = center + np.linspace(-4.0 / n, 4.0 / n, 801)
     measured = f(nu) / height
     check(f"{label}: largest difference from sinc^2 over four lobes", float(np.abs(measured - ur.line(n, nu - center)).max()),
           bounds["sinc"])
     ratio = float(run.level(center)[0] / (u.on_axis_level() * run.spectrum(pred, center)[0]))
-    check(f"{label}: level on the axis over the closed form", ratio, [1 - bounds["level"], 1 + bounds["level"]], "range")
+    check(f"{label}: on-axis spectral intensity at the maximum over the closed form", ratio, [1 - bounds["level"], 1 + bounds["level"]], "range")
     rec[run.name] = dict(n_period=n, helical=u.helical, nu=(nu - center).tolist(), line=measured.tolist(),
                          center=center, detuning=detuning, width=width * n / ur.LINE_WIDTH, level=ratio,
                          planes=(np.abs(run.a0) / np.abs(run.a0).max()).tolist(), first_plane=run.first_plane)
@@ -345,18 +345,18 @@ def with_angle(run, label, x_max, bounds, rec, deposit=True, exact=True, spectra
     last = out["x"][-1]
     widths = n / ur.LINE_WIDTH
     if spectral:
-        check(f"{label}: ridge less the resonance, in line widths, at its largest over the wavenumbers",
+        check(f"{label}: frequency of the maximum at each transverse wavenumber less the resonance, in units of the FWHM, at its largest",
               float(np.abs(both[:, 1] - center0 - resonance(both[:, 0])).max() * widths), bounds["ridge"])
-        check(f"{label}: ridge at the widest wavenumber within x = {x_max:g}, less -x, in line widths",
+        check(f"{label}: frequency of the maximum at the widest wavenumber within x = {x_max:g}, less -x, in units of the FWHM",
               float((last[1] - center0 + last[0]) * widths), bounds["linear"], "range")
     else:
-        check(f"{label}: ridge less -x, in line widths, at its largest over the wavenumbers",
+        check(f"{label}: frequency of the maximum at each transverse wavenumber less -x, in units of the FWHM, at its largest",
               float(np.abs(both[:, 1] - center0 + both[:, 0]).max() * widths), bounds["ridge"])
         if exact:
-            check(f"{label}: ridge at the widest wavenumber within x = {x_max:g}, less the resonance, in line widths",
+            check(f"{label}: frequency of the maximum at the widest wavenumber within x = {x_max:g}, less the resonance, in units of the FWHM",
                   float((last[1] - center0 - resonance(last[0])) * widths), bounds["exact"], "range")
     if deposit:
-        check(f"{label}: level along the ridge over the deposit's own spectrum, less 1",
+        check(f"{label}: spectral intensity at the maximum of each transverse wavenumber over the spectrum of the deposited source, less 1",
               float(np.abs(both[:, 2] / both[:, 3] - 1).max()), bounds["deposit"])
         for axis in ("x", "y"):
             last = out[axis][-1]
@@ -395,11 +395,11 @@ def slice3(run, rec):
     center, height = peak_of(f, -0.5 / n, 0.5 / n)
     width = width_of(f, center, height, 1.0 / n)
     label = "FLASH1, slices of 3 wavelengths"
-    check(f"{label}: width of the line over 0.8859/N", width * n / ur.LINE_WIDTH,
+    check(f"{label}: FWHM of the fundamental peak over 0.8859/N", width * n / ur.LINE_WIDTH,
           [1 - BOUNDS["slice3"]["width"], 1 + BOUNDS["slice3"]["width"]], "range")
     s_sum = abs(run.s[1:n + 1, run.loaded[0]].sum())
     ratio = float(run.level(center)[0] / (u.on_axis_level() * s_sum ** 2))
-    check(f"{label}: level on the axis over the closed form", ratio,
+    check(f"{label}: on-axis spectral intensity at the maximum over the closed form", ratio,
           [1 - BOUNDS["slice3"]["level"], 1 + BOUNDS["slice3"]["level"]], "range")
     rec[run.name] = dict(width=width * n / ur.LINE_WIDTH, level=ratio)
 
@@ -412,7 +412,7 @@ def unaveraged(run, rec):
     f = lambda nu: run.spectrum(run.a0, nu)
     center, height = peak_of(f, -0.5 / n, 0.5 / n)
     width = width_of(f, center, height, 1.0 / n)
-    check(f"{label}: width of the line over 0.8859/N", width * n / ur.LINE_WIDTH, b["width"], "range")
+    check(f"{label}: FWHM of the fundamental peak over 0.8859/N", width * n / ur.LINE_WIDTH, b["width"], "range")
     nu = center + np.linspace(-4.0 / n, 4.0 / n, 801)
     measured = f(nu) / height
     check(f"{label}: largest difference from sinc^2 over four lobes",
@@ -421,7 +421,7 @@ def unaveraged(run, rec):
     # times the periods is the sum over periods of the averaged mode.
     s_sum = abs(run.s[1:, run.loaded[0]].mean()) * n
     ratio = float(run.level(center)[0] / (u.on_axis_level() * s_sum ** 2))
-    check(f"{label}: level on the axis over the closed form", ratio, b["level"], "range")
+    check(f"{label}: on-axis spectral intensity at the maximum over the closed form", ratio, b["level"], "range")
     rec[run.name] = dict(n_period=n, helical=u.helical, nu=(nu - center).tolist(), line=measured.tolist(),
                          center=center, width=width * n / ur.LINE_WIDTH, level=ratio,
                          planes=(np.abs(run.a0) / np.abs(run.a0).max()).tolist(), first_plane=run.first_plane)
@@ -508,7 +508,7 @@ def main():
     r = runs["flash55"]
     r.read(wd, keep_planes=False)
     on_axis(r, "FLASH1, 55 periods", TIGHT, rec)
-    check("FLASH1: width of the line at 55 periods over that at 165",
+    check("FLASH1: FWHM of the fundamental peak at 55 periods over that at 165",
           rec["us_flash55"]["width"] * 165 / (rec["us_flash"]["width"] * 55), [2.99, 3.01], "range")
 
     # What the beam and the window add.

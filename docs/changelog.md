@@ -16,21 +16,24 @@ of that history. The entries before that date describe that branch.
   run (`tests/scripts/report_undulator_spectrum.py`). The undulators are that of FLASH1, planar,
   at 165 periods and at 55 (`tests/bmad/und_flash1.bmad`), and the Delta afterburner of the LCLS
   in its circular mode at 707 eV and 4 GeV, helical, 100 periods (`tests/bmad/und_delta.bmad`).
-  The emitter is one loaded slice of 62 electrons, each plane of whose pulse is what the slice
-  radiated in one period, so one run gives the line with no average over seeds. On the axis the
-  line is `sinc^2(pi N nu)`: its width is 0.8859/N to four figures for the three undulators, and
-  it differs from `sinc^2` by 1.2e-5 of the peak at 165 periods, which is the difference of a
-  pulse sampled once a wavelength. Its level, in J s/sr an electron, is 1.0000 of the closed form
-  with the coupling factor of the planar and of the helical undulator. Away from the axis the line
-  is displaced by `nu = -x`, `x = gamma_z^2 (k_perp/k_0)^2`, to 3e-4 of the line width, where the
-  resonance of undulator radiation is `nu (1 + nu) = -x`: the default propagator diffracts every
-  frequency at the carrier's wavenumber and gives the red shift to first order, 5.2 line widths
-  from the resonance at x = 0.14. Under `field.propagator = "spectral"` the line is on the
-  resonance to 0.03 of the line width at 55 periods. The level along that ridge is the spectrum of the
-  deposited source to 3e-7, in the averaged mode and to 0.01 in the unaveraged one: neither
-  applies the angular factor of undulator radiation, which at x = 0.14 is 0.34 in the plane of the
-  oscillation for FLASH1. On the Metal device the 55-period line has the width and the level of
-  the CPU's, and its planes differ from the CPU's by 2.6e-4 of the largest, in seven rows of the device
+  The radiating beam is one loaded slice of 62 electrons, each plane of whose pulse is what the
+  slice radiated in one period, so one run gives the on-axis spectrum with no average over seeds.
+  The peak of that spectrum at the fundamental frequency is `sinc^2(pi N nu)`: its full width at
+  half maximum is 0.8859/N to four figures for the three undulators, and it differs from `sinc^2`
+  by 1.2e-5 of its maximum at 165 periods, which is the difference of a pulse sampled once a
+  wavelength. The energy radiated per unit angular frequency and solid angle at the maximum, in
+  J s/sr an electron, is 1.0000 of the closed form with the coupling factor of the planar and of
+  the helical undulator. Away from the axis the peak is displaced by `nu = -x`,
+  `x = gamma_z^2 (k_perp/k_0)^2`, to 3e-4 of its width, where the resonance of undulator
+  radiation is `nu (1 + nu) = -x`: the default propagator diffracts every frequency at the
+  carrier's wavenumber and gives the red shift to first order, 5.2 widths of the peak from the
+  resonance at x = 0.14. Under `field.propagator = "spectral"` the peak is on the resonance to
+  0.03 of its width at 55 periods. The radiated energy at the maximum of each transverse
+  wavenumber is the spectrum of the deposited source to 3e-7 in the averaged mode and to 0.01 in
+  the unaveraged one: neither applies the angular factor of undulator radiation, which at
+  x = 0.14 is 0.34 in the plane of the oscillation for FLASH1. On the Metal device the peak of
+  the 55-period undulator has the width and the maximum of the CPU's, and the planes of its
+  pulse differ from the CPU's by 2.6e-4 of the largest, in seven rows of the device
   section (`tests/scripts/check_device.py`). The section adds 78 rows to
   `docs/generated/validation-measured.md`, and the two builds agree in every digit of them.
 - 2026-11-16 Changed: the Bmad transport model evaluates its quadrupole matrix in its own particle

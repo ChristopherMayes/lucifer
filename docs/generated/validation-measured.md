@@ -745,11 +745,11 @@ where the two builds agree to every printed digit.
 | migrating wake record: refreshed loss rates vs CPU | 3.6770e-04 | same | <= 1.2000e-03 |
 | migrating wake window power, device vs CPU | 1.7742e-04 | same | <= 3.0000e-03 |
 | undulator spectrum, FLASH1, 55 periods, run.device = metal: planes that differ from the constant times conj(S), over the largest | 1.3046e-06 | same | <= 4.0000e-06 |
-| undulator spectrum, FLASH1, 55 periods, run.device = metal: peak of the line less the undulator's resonance, in line widths | 2.1042e-05 | same | <= 1.0000e-03 |
-| undulator spectrum, FLASH1, 55 periods, run.device = metal: width of the line over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| undulator spectrum, FLASH1, 55 periods, run.device = metal: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 7.8797e-09 | same | <= 1.0000e-06 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.1042e-05 | same | <= 1.0000e-03 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: FWHM of the fundamental peak over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 7.8797e-09 | same | <= 1.0000e-06 |
 | undulator spectrum, FLASH1, 55 periods, run.device = metal: largest difference from sinc^2 over four lobes | 1.1109e-04 | same | <= 5.0000e-04 |
-| undulator spectrum, FLASH1, 55 periods, run.device = metal: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: on-axis spectral intensity at the maximum over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
 | undulator spectrum, FLASH1, 55 periods, run.device = metal: planes that differ from the CPU's, over the largest | 2.6061e-04 | same | <= 8.0000e-04 |
 
 (val-levels-unaveraged)=
@@ -829,78 +829,78 @@ where the two builds agree to every printed digit.
 | Check | Debug | Production | Bound |
 |---|---|---|---|
 | FLASH1, 165 periods: planes that differ from the constant times conj(S), over the largest | 1.1990e-09 | same | <= 1.0000e-07 |
-| FLASH1, 165 periods: peak of the line less the undulator's resonance, in line widths | 7.7170e-05 | same | <= 1.0000e-03 |
-| FLASH1, 165 periods: width of the line over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, 165 periods: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 7.4417e-08 | same | <= 1.0000e-06 |
+| FLASH1, 165 periods: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 7.7170e-05 | same | <= 1.0000e-03 |
+| FLASH1, 165 periods: FWHM of the fundamental peak over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, 165 periods: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 7.4417e-08 | same | <= 1.0000e-06 |
 | FLASH1, 165 periods: largest difference from sinc^2 over four lobes | 1.2374e-05 | same | <= 5.0000e-04 |
-| FLASH1, 165 periods: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, 165 periods: ridge less -x, in line widths, at its largest over the wavenumbers | 2.9020e-04 | same | <= 2.0000e-03 |
-| FLASH1, 165 periods: ridge at the widest wavenumber within x = 0.14, less the resonance, in line widths | 5.2044e+00 | same | 4.9000e+00 to 5.5000e+00 |
-| FLASH1, 165 periods: level along the ridge over the deposit's own spectrum, less 1 | 2.4048e-07 | same | <= 1.0000e-05 |
+| FLASH1, 165 periods: on-axis spectral intensity at the maximum over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, 165 periods: frequency of the maximum at each transverse wavenumber less -x, in units of the FWHM, at its largest | 2.9020e-04 | same | <= 2.0000e-03 |
+| FLASH1, 165 periods: frequency of the maximum at the widest wavenumber within x = 0.14, less the resonance, in units of the FWHM | 5.2044e+00 | same | 4.9000e+00 to 5.5000e+00 |
+| FLASH1, 165 periods: spectral intensity at the maximum of each transverse wavenumber over the spectrum of the deposited source, less 1 | 2.4048e-07 | same | <= 1.0000e-05 |
 | FLASH1, 165 periods: the formula's factor at the widest wavenumber along x, over the model's | 3.4306e-01 | same | 3.3500e-01 to 3.5100e-01 |
 | FLASH1, 165 periods: the formula's factor at the widest wavenumber along y, over the model's | 1.0470e+00 | same | 1.0300e+00 to 1.0650e+00 |
 | Delta, 100 periods: planes that differ from the constant times conj(S), over the largest | 7.2331e-10 | same | <= 1.0000e-07 |
-| Delta, 100 periods: peak of the line less the undulator's resonance, in line widths | 2.8897e-05 | same | <= 1.0000e-03 |
-| Delta, 100 periods: width of the line over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| Delta, 100 periods: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 2.7284e-08 | same | <= 1.0000e-06 |
+| Delta, 100 periods: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.8897e-05 | same | <= 1.0000e-03 |
+| Delta, 100 periods: FWHM of the fundamental peak over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| Delta, 100 periods: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 2.7284e-08 | same | <= 1.0000e-06 |
 | Delta, 100 periods: largest difference from sinc^2 over four lobes | 3.3414e-05 | same | <= 5.0000e-04 |
-| Delta, 100 periods: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| Delta, 100 periods: ridge less -x, in line widths, at its largest over the wavenumbers | 1.3206e-04 | same | <= 2.0000e-03 |
-| Delta, 100 periods: ridge at the widest wavenumber within x = 0.2, less the resonance, in line widths | 7.9429e+00 | same | 7.6000e+00 to 8.3000e+00 |
-| Delta, 100 periods: level along the ridge over the deposit's own spectrum, less 1 | 6.2007e-08 | same | <= 1.0000e-05 |
+| Delta, 100 periods: on-axis spectral intensity at the maximum over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| Delta, 100 periods: frequency of the maximum at each transverse wavenumber less -x, in units of the FWHM, at its largest | 1.3206e-04 | same | <= 2.0000e-03 |
+| Delta, 100 periods: frequency of the maximum at the widest wavenumber within x = 0.2, less the resonance, in units of the FWHM | 7.9429e+00 | same | 7.6000e+00 to 8.3000e+00 |
+| Delta, 100 periods: spectral intensity at the maximum of each transverse wavenumber over the spectrum of the deposited source, less 1 | 6.2007e-08 | same | <= 1.0000e-05 |
 | Delta, 100 periods: the formula's factor at the widest wavenumber along x, over the model's | 3.8378e-01 | same | 3.7500e-01 to 3.9300e-01 |
 | Delta, 100 periods: the formula's factor at the widest wavenumber along y, over the model's | 3.8378e-01 | same | 3.7500e-01 to 3.9300e-01 |
 | FLASH1, 55 periods: planes that differ from the constant times conj(S), over the largest | 3.9430e-10 | same | <= 1.0000e-07 |
-| FLASH1, 55 periods: peak of the line less the undulator's resonance, in line widths | 2.5654e-05 | same | <= 1.0000e-03 |
-| FLASH1, 55 periods: width of the line over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, 55 periods: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 8.2614e-09 | same | <= 1.0000e-06 |
+| FLASH1, 55 periods: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.5654e-05 | same | <= 1.0000e-03 |
+| FLASH1, 55 periods: FWHM of the fundamental peak over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, 55 periods: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 8.2614e-09 | same | <= 1.0000e-06 |
 | FLASH1, 55 periods: largest difference from sinc^2 over four lobes | 1.1108e-04 | same | <= 5.0000e-04 |
-| FLASH1, 55 periods: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1: width of the line at 55 periods over that at 165 | 3.0004e+00 | same | 2.9900e+00 to 3.0100e+00 |
+| FLASH1, 55 periods: on-axis spectral intensity at the maximum over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1: FWHM of the fundamental peak at 55 periods over that at 165 | 3.0004e+00 | same | 2.9900e+00 to 3.0100e+00 |
 | FLASH1, emittance 1.5 um: planes that differ from the constant times conj(S), over the largest | 2.0931e-04 | same | <= 3.0000e-03 |
-| FLASH1, emittance 1.5 um: peak of the line less the undulator's resonance, in line widths | 2.6511e-01 | same | <= 1.0000e+00 |
-| FLASH1, emittance 1.5 um: width of the line over 0.8859/N | 1.0079e+00 | same | 8.0000e-01 to 1.2000e+00 |
-| FLASH1, emittance 1.5 um: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 1.6294e-02 | same | <= 3.0000e-01 |
+| FLASH1, emittance 1.5 um: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.6511e-01 | same | <= 1.0000e+00 |
+| FLASH1, emittance 1.5 um: FWHM of the fundamental peak over 0.8859/N | 1.0079e+00 | same | 8.0000e-01 to 1.2000e+00 |
+| FLASH1, emittance 1.5 um: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 1.6294e-02 | same | <= 3.0000e-01 |
 | FLASH1, emittance 1.5 um: largest difference from sinc^2 over four lobes | 1.7203e-02 | same | <= 4.0000e-01 |
-| FLASH1, emittance 1.5 um: level on the axis over the closed form | 1.0020e+00 | same | 9.9000e-01 to 1.0100e+00 |
+| FLASH1, emittance 1.5 um: on-axis spectral intensity at the maximum over the closed form | 1.0020e+00 | same | 9.9000e-01 to 1.0100e+00 |
 | FLASH1, energy spread 6e-4: planes that differ from the constant times conj(S), over the largest | 6.5587e-04 | same | <= 3.0000e-03 |
-| FLASH1, energy spread 6e-4: peak of the line less the undulator's resonance, in line widths | 2.7668e-01 | same | <= 1.0000e+00 |
-| FLASH1, energy spread 6e-4: width of the line over 0.8859/N | 9.4681e-01 | same | 8.0000e-01 to 1.2000e+00 |
-| FLASH1, energy spread 6e-4: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 5.9676e-02 | same | <= 3.0000e-01 |
+| FLASH1, energy spread 6e-4: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.7668e-01 | same | <= 1.0000e+00 |
+| FLASH1, energy spread 6e-4: FWHM of the fundamental peak over 0.8859/N | 9.4681e-01 | same | 8.0000e-01 to 1.2000e+00 |
+| FLASH1, energy spread 6e-4: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 5.9676e-02 | same | <= 3.0000e-01 |
 | FLASH1, energy spread 6e-4: largest difference from sinc^2 over four lobes | 9.7423e-02 | same | <= 4.0000e-01 |
-| FLASH1, energy spread 6e-4: level on the axis over the closed form | 1.0012e+00 | same | 9.9000e-01 to 1.0100e+00 |
+| FLASH1, energy spread 6e-4: on-axis spectral intensity at the maximum over the closed form | 1.0012e+00 | same | 9.9000e-01 to 1.0100e+00 |
 | FLASH1, window of 65 wavelengths: planes that differ from the constant times conj(S), over the largest | 1.1990e-09 | same | <= 1.0000e-07 |
-| FLASH1, window of 65 wavelengths: peak of the line less the undulator's resonance, in line widths | 7.7170e-05 | same | <= 1.0000e-03 |
-| FLASH1, window of 65 wavelengths: width of the line over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, window of 65 wavelengths: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 7.4417e-08 | same | <= 1.0000e-06 |
+| FLASH1, window of 65 wavelengths: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 7.7170e-05 | same | <= 1.0000e-03 |
+| FLASH1, window of 65 wavelengths: FWHM of the fundamental peak over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, window of 65 wavelengths: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 7.4417e-08 | same | <= 1.0000e-06 |
 | FLASH1, window of 65 wavelengths: largest difference from sinc^2 over four lobes | 1.2374e-05 | same | <= 5.0000e-04 |
-| FLASH1, window of 65 wavelengths: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, slices of 3 wavelengths: width of the line over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, slices of 3 wavelengths: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
-| FLASH1, emittance 1.5 um: ridge less -x, in line widths, at its largest over the wavenumbers | 2.0080e+00 | same | <= 4.0000e+00 |
-| FLASH1, emittance 1.5 um: ridge at the widest wavenumber within x = 0.14, less the resonance, in line widths | 5.3758e+00 | same | 3.0000e+00 to 8.0000e+00 |
+| FLASH1, window of 65 wavelengths: on-axis spectral intensity at the maximum over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, slices of 3 wavelengths: FWHM of the fundamental peak over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, slices of 3 wavelengths: on-axis spectral intensity at the maximum over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, emittance 1.5 um: frequency of the maximum at each transverse wavenumber less -x, in units of the FWHM, at its largest | 2.0080e+00 | same | <= 4.0000e+00 |
+| FLASH1, emittance 1.5 um: frequency of the maximum at the widest wavenumber within x = 0.14, less the resonance, in units of the FWHM | 5.3758e+00 | same | 3.0000e+00 to 8.0000e+00 |
 | FLASH1, source filter on: planes that differ from the constant times conj(S), over the largest | 2.0931e-04 | same | <= 3.0000e-03 |
-| FLASH1, source filter on: peak of the line less the undulator's resonance, in line widths | 2.6511e-01 | same | <= 1.0000e+00 |
-| FLASH1, source filter on: width of the line over 0.8859/N | 1.0079e+00 | same | 8.0000e-01 to 1.2000e+00 |
-| FLASH1, source filter on: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 1.6294e-02 | same | <= 3.0000e-01 |
+| FLASH1, source filter on: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.6511e-01 | same | <= 1.0000e+00 |
+| FLASH1, source filter on: FWHM of the fundamental peak over 0.8859/N | 1.0079e+00 | same | 8.0000e-01 to 1.2000e+00 |
+| FLASH1, source filter on: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 1.6294e-02 | same | <= 3.0000e-01 |
 | FLASH1, source filter on: largest difference from sinc^2 over four lobes | 1.7203e-02 | same | <= 4.0000e-01 |
-| FLASH1, source filter on: level on the axis over the closed form | 1.0020e+00 | same | 9.9000e-01 to 1.0100e+00 |
-| FLASH1, source filter on: ridge less -x, in line widths, at its largest over the wavenumbers | 4.0120e-01 | same | <= 1.5000e+00 |
+| FLASH1, source filter on: on-axis spectral intensity at the maximum over the closed form | 1.0020e+00 | same | 9.9000e-01 to 1.0100e+00 |
+| FLASH1, source filter on: frequency of the maximum at each transverse wavenumber less -x, in units of the FWHM, at its largest | 4.0120e-01 | same | <= 1.5000e+00 |
 | FLASH1, source filter on: energy at an angle over the filter off, less 1, at its largest inside 0.8 of the edge | 2.1482e-02 | same | <= 1.0000e-01 |
 | FLASH1, source filter on: energy at an angle over the filter off, at its largest outside 1.2 of the edge | 2.7839e-05 | same | <= 1.0000e-03 |
-| FLASH1, 55 periods, field.propagator = spectral: peak of the line less the undulator's resonance, in line widths | 2.5499e-05 | same | <= 1.0000e-03 |
-| FLASH1, 55 periods, field.propagator = spectral: width of the line over 0.8859/N | 1.0187e+00 | same | 9.6000e-01 to 1.0400e+00 |
-| FLASH1, 55 periods, field.propagator = spectral: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 3.4292e-04 | same | <= 2.0000e-03 |
+| FLASH1, 55 periods, field.propagator = spectral: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.5499e-05 | same | <= 1.0000e-03 |
+| FLASH1, 55 periods, field.propagator = spectral: FWHM of the fundamental peak over 0.8859/N | 1.0187e+00 | same | 9.6000e-01 to 1.0400e+00 |
+| FLASH1, 55 periods, field.propagator = spectral: spectrum at the zeros nu = 1/N, 2/N and 3/N, over its maximum | 3.4292e-04 | same | <= 2.0000e-03 |
 | FLASH1, 55 periods, field.propagator = spectral: largest difference from sinc^2 over four lobes | 1.5389e-02 | same | <= 4.0000e-02 |
-| FLASH1, 55 periods, field.propagator = spectral: level on the axis over the closed form | 9.6396e-01 | same | 9.4000e-01 to 1.0600e+00 |
-| FLASH1, 55 periods, field.propagator = spectral: ridge less the resonance, in line widths, at its largest over the wavenumbers | 3.1625e-02 | same | <= 1.0000e-01 |
-| FLASH1, 55 periods, field.propagator = spectral: ridge at the widest wavenumber within x = 0.08, less -x, in line widths | -4.6165e-01 | same | -5.5000e-01 to -3.8000e-01 |
-| FLASH1, 55 periods, unaveraged: width of the line over 0.8859/N | 1.0433e+00 | same | 1.0300e+00 to 1.0600e+00 |
+| FLASH1, 55 periods, field.propagator = spectral: on-axis spectral intensity at the maximum over the closed form | 9.6396e-01 | same | 9.4000e-01 to 1.0600e+00 |
+| FLASH1, 55 periods, field.propagator = spectral: frequency of the maximum at each transverse wavenumber less the resonance, in units of the FWHM, at its largest | 3.1625e-02 | same | <= 1.0000e-01 |
+| FLASH1, 55 periods, field.propagator = spectral: frequency of the maximum at the widest wavenumber within x = 0.08, less -x, in units of the FWHM | -4.6165e-01 | same | -5.5000e-01 to -3.8000e-01 |
+| FLASH1, 55 periods, unaveraged: FWHM of the fundamental peak over 0.8859/N | 1.0433e+00 | same | 1.0300e+00 to 1.0600e+00 |
 | FLASH1, 55 periods, unaveraged: largest difference from sinc^2 over four lobes | 3.8118e-02 | same | <= 8.0000e-02 |
-| FLASH1, 55 periods, unaveraged: level on the axis over the closed form | 9.3941e-01 | same | 9.2000e-01 to 9.6000e-01 |
-| FLASH1, 55 periods, unaveraged: ridge less -x, in line widths, at its largest over the wavenumbers | 1.7825e-02 | same | <= 6.0000e-02 |
-| FLASH1, 55 periods, unaveraged: ridge at the widest wavenumber within x = 0.14, less the resonance, in line widths | 1.7527e+00 | same | 1.6000e+00 to 1.9000e+00 |
-| FLASH1, 55 periods, unaveraged: level along the ridge over the deposit's own spectrum, less 1 | 1.0225e-02 | same | <= 3.0000e-02 |
+| FLASH1, 55 periods, unaveraged: on-axis spectral intensity at the maximum over the closed form | 9.3941e-01 | same | 9.2000e-01 to 9.6000e-01 |
+| FLASH1, 55 periods, unaveraged: frequency of the maximum at each transverse wavenumber less -x, in units of the FWHM, at its largest | 1.7825e-02 | same | <= 6.0000e-02 |
+| FLASH1, 55 periods, unaveraged: frequency of the maximum at the widest wavenumber within x = 0.14, less the resonance, in units of the FWHM | 1.7527e+00 | same | 1.6000e+00 to 1.9000e+00 |
+| FLASH1, 55 periods, unaveraged: spectral intensity at the maximum of each transverse wavenumber over the spectrum of the deposited source, less 1 | 1.0225e-02 | same | <= 3.0000e-02 |
 | FLASH1, 55 periods, unaveraged: the formula's factor at the widest wavenumber along x, over the model's | 3.4661e-01 | same | 3.3500e-01 to 3.6000e-01 |
 | FLASH1, 55 periods, unaveraged: the formula's factor at the widest wavenumber along y, over the model's | 1.0497e+00 | same | 1.0300e+00 to 1.0700e+00 |
 | a bunch: planes that differ from the constant times the sum of conj(S), over the largest | 1.1632e-06 | same | <= 1.0000e-04 |

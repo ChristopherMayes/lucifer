@@ -5,9 +5,9 @@
 <!-- begin fig-und-line -->
 :::{figure} generated/undulator-spectrum/line.svg
 :name: fig-und-line
-:alt: The line on the axis of three undulators on a logarithmic axis, as a function of the relative frequency times the number of periods, from minus four to four. The points of all three undulators lie on the curve of sinc squared, through its central lobe and three side lobes on each side. A fourth curve, of the unaveraged mode, follows the central lobe and has its minima displaced outward from the zeros of sinc squared by four percent, and its side lobes are higher at positive frequency than at negative frequency.
+:alt: The spectrum on the axis of three undulators on a logarithmic axis, as a function of the relative frequency times the number of periods, from minus four to four. The points of all three undulators lie on the curve of sinc squared, through its central lobe and three side lobes on each side. A fourth curve, of the unaveraged mode, follows the central lobe and has its minima displaced outward from the zeros of sinc squared by four percent, and its side lobes are higher at positive frequency than at negative frequency.
 
-The energy radiated on the axis per unit frequency and solid angle, divided by its value at the peak, as a function of $N\nu$, where $\nu = \omega/\omega_1 - 1$ and $N$ is the number of periods. Each point is the squared magnitude of the Fourier sum, over the planes of the pulse, of the field of one run summed over $x$ and $y$ in each plane. The curve is $\mathrm{sinc}^2(\pi N\nu)$. The pulse of each run consists of $N$ equal planes, of which this curve is the spectrum. The largest difference from the curve is 1.2e-05 for FLASH1 at 165 periods, 0.00011 at 55 periods and 3.3e-05 for the Delta undulator. The difference is that of a pulse sampled once per wavelength, $(\pi\nu)^2/3$ of the line ([](#und-on-axis)). The continuous colored curve is the run of `fel_method = unaveraged` at 55 periods, whose pulse does not consist of equal planes ([](#fig-und-pulse)). It differs from $\mathrm{sinc}^2$ by 0.038 of the peak: its minima lie outside the zeros of the line, and its side lobes are higher above the fundamental than below it, which are both effects of the ramps of the field at the ends of the undulator in that model ([](#und-unaveraged)).
+The spectral intensity on the axis, divided by its maximum, as a function of $N\nu$, where $\nu = \omega/\omega_1 - 1$ and $N$ is the number of periods. Each point is the squared magnitude of the Fourier sum, over the planes of the pulse, of the field of one run summed over $x$ and $y$ in each plane. The curve is $\mathrm{sinc}^2(\pi N\nu)$. The pulse of each run consists of $N$ equal planes, of which this curve is the spectrum. The largest difference from the curve is 1.2e-05 for FLASH1 at 165 periods, 0.00011 at 55 periods and 3.3e-05 for the Delta undulator. The difference is that of a pulse sampled once per wavelength, the fraction $(\pi\nu)^2/3$ ([](#und-on-axis)). The continuous colored curve is the run of `fel_method = unaveraged` at 55 periods, whose pulse does not consist of equal planes ([](#fig-und-pulse)). It differs from $\mathrm{sinc}^2$ by 0.038 of the maximum: its minima lie outside the zeros of the curve, and its side lobes are higher above the fundamental frequency than below it, which are both effects of the ramps of the field at the ends of the undulator in that model ([](#und-unaveraged)).
 :::
 <!-- end fig-und-line -->
 
@@ -23,18 +23,18 @@ The magnitude of the zero-angle component of each plane of the pulse, $E_0(p)$, 
 <!-- begin fig-und-ridge -->
 :::{figure} generated/undulator-spectrum/ridge.svg
 :name: fig-und-ridge
-:alt: The relative frequency of the ridge as a function of x, the square of the transverse wavenumber in units of the carrier wavenumber over gamma z, from zero to 0.2. The points of both undulators and of both planes lie on the straight line minus x. The dashed curve of the resonance of undulator radiation lies below the line, by 0.03 at x of 0.14. The points of the spectral propagator lie on the dashed curve.
+:alt: The relative frequency of the maximum of the spectrum as a function of x, the square of the transverse wavenumber in units of the carrier wavenumber over gamma z, from zero to 0.2. The points of both undulators and of both planes lie on the straight line minus x. The dashed curve of the resonance of undulator radiation lies below the straight line, by 0.03 at x of 0.14. The points of the spectral propagator lie on the dashed curve.
 
-The relative frequency $\nu$ at which the spectrum at the transverse wavenumber $k_\perp$ is largest, as a function of $x$. The solid line is $-x$, which the envelope equation gives, and the dashed curve is the resonance of undulator radiation, $\nu(1 + \nu) = -x$. The largest distance of the points from $-x$, in units of the line width $0.8859/N$, is 0.00029 for FLASH1 along $x$, 6.7e-05 along $y$, 0.00013 for the Delta undulator and 0.018 in the unaveraged mode. At the widest wavenumber of FLASH1, $x = 0.139$, the resonance is at $\nu = -0.1672$ and the run at $-0.1392$, and at that of the Delta undulator, $x = 0.195$, the two are $-0.2653$ and $-0.1949$. With `field.propagator = "spectral"`, at 55 periods, the largest distance of the points from the resonance is 0.032 of the line width.
+The relative frequency $\nu$ at which the spectrum at the transverse wavenumber $k_\perp$ is largest, as a function of $x$. The solid line is $-x$, which the envelope equation gives, and the dashed curve is the resonance of undulator radiation, $\nu(1 + \nu) = -x$. The largest distance of the points from $-x$, in units of the full width at half maximum of the peak, $0.8859/N$, is 0.00029 for FLASH1 along $x$, 6.7e-05 along $y$, 0.00013 for the Delta undulator and 0.018 in the unaveraged mode. At the widest wavenumber of FLASH1, $x = 0.139$, the resonance is at $\nu = -0.1672$ and the run at $-0.1392$, and at that of the Delta undulator, $x = 0.195$, the two are $-0.2653$ and $-0.1949$. With `field.propagator = "spectral"`, at 55 periods, the largest distance of the points from the resonance is 0.032 of that width.
 :::
 <!-- end fig-und-ridge -->
 
 <!-- begin fig-und-angular -->
 :::{figure} generated/undulator-spectrum/angular.svg
 :name: fig-und-angular
-:alt: The level along the ridge divided by the level on the axis, as a function of x. The points of the runs are at 1 for every x. The curves of the formula for FLASH1 fall along x to 0.34 at x of 0.14 and rise along y to 1.05, and that for the Delta undulator falls to 0.38 at x of 0.2.
+:alt: The spectral intensity at the maximum of each transverse wavenumber divided by that on the axis, as a function of x. The points of the runs are at 1 for every x. The curves of the formula for FLASH1 fall along x to 0.34 at x of 0.14 and rise along y to 1.05, and that for the Delta undulator falls to 0.38 at x of 0.2.
 
-The energy per unit frequency and per unit area of transverse wavenumber at the peak of the line, $w(k_\perp)$, divided by its value on the axis, as a function of $x$. The curves are those of undulator radiation, $W_1(\theta)/k^2$ at $\theta = k_\perp/k$, in the colors of the points. The points are the runs, each divided by the spectrum of the source that the slice deposits in one step, which removes the response of the grid to a point. The runs give 1 at every wavenumber: the model applies no angular factor. At the widest wavenumber the formula gives 0.343 for FLASH1 along $x$ and 1.047 along $y$, at $x = 0.139$, and 0.384 for the Delta undulator at $x = 0.195$. The unaveraged mode gives 0.990 at $x = 0.139$.
+The energy per unit frequency and per unit area of transverse wavenumber at the maximum of the spectrum, $w(k_\perp)$, divided by its value on the axis, as a function of $x$. The curves are those of undulator radiation, $W_1(\theta)/k^2$ at $\theta = k_\perp/k$, in the colors of the points. The points are the runs, each divided by the spectrum of the source that the slice deposits in one step, which removes the response of the grid to a point. The runs give 1 at every wavenumber: the model applies no angular factor. At the widest wavenumber the formula gives 0.343 for FLASH1 along $x$ and 1.047 along $y$, at $x = 0.139$, and 0.384 for the Delta undulator at $x = 0.195$. The unaveraged mode gives 0.990 at $x = 0.139$.
 :::
 <!-- end fig-und-angular -->
 
@@ -50,26 +50,26 @@ The energy radiated at the angle $\theta$ with `run.source_filter = true`, divid
 <!-- begin fig-und-beam -->
 :::{figure} generated/undulator-spectrum/beam.svg
 :name: fig-und-beam
-:alt: Two lines of one slice as a function of the relative frequency times the number of periods, with the curve of sinc squared. The line of the beam with emittance and the line of the beam with energy spread are each displaced from the curve by a fraction of its width, and their first zeros are filled in.
+:alt: Two spectra of one slice as a function of the relative frequency times the number of periods, with the curve of sinc squared. The spectrum of the beam with emittance and that of the beam with energy spread are each displaced from the curve by a fraction of its width, and their first zeros are filled in.
 
-The line on the axis of one slice of 62 electrons in 165 periods of the FLASH1 undulator, with the normalized emittance of FLASH1, 1.5 µm, and with its relative energy spread, $6 \times 10^{-4}$, each divided by its largest value, and the curve $\mathrm{sinc}^2(\pi N\nu)$. Each is one draw of the shot noise. The peak is displaced by -0.27 of the line width with the emittance and by -0.28 with the energy spread, and the width is 1.008 and 0.947 of $0.8859/N$.
+The spectrum on the axis of one slice of 62 electrons in 165 periods of the FLASH1 undulator, with the normalized emittance of FLASH1, 1.5 µm, and with its relative energy spread, $6 \times 10^{-4}$, each divided by its largest value, and the curve $\mathrm{sinc}^2(\pi N\nu)$. Each is one realization of the shot noise. The maximum is displaced by -0.27 of the width of the peak with the emittance and by -0.28 with the energy spread, and the width is 1.008 and 0.947 of $0.8859/N$.
 :::
 <!-- end fig-und-beam -->
 
 <!-- begin fig-und-bunch -->
 :::{figure} generated/undulator-spectrum/bunch.svg
 :name: fig-und-bunch
-:alt: The mean spectrum on the axis of a bunch of 1024 slices as a function of the relative frequency times the number of periods. The points scatter about the line of one electron multiplied by the number of electrons.
+:alt: The mean spectrum on the axis of a bunch of 1024 slices as a function of the relative frequency times the number of periods. The points scatter about the spectrum of one electron multiplied by the number of electrons.
 
-The spectrum on the axis of a bunch of 1024 slices, 63913 electrons, in 55 periods of the FLASH1 undulator: the mean of 8 seeds, divided by $N_e N^2 W_1(0)$. The curve is the line of one electron. The energy on the axis, which is the sum over the line, divided by that of one electron times $N_e$, has a mean of 0.965 over the seeds and a standard deviation of 0.122.
+The spectrum on the axis of a bunch of 1024 slices, 63913 electrons, in 55 periods of the FLASH1 undulator: the mean of 8 seeds, divided by $N_e N^2 W_1(0)$. The curve is the spectrum of one electron. The energy on the axis, which is the sum over the frequencies of the figure, divided by that of one electron times $N_e$, has a mean of 0.965 over the seeds and a standard deviation of 0.122.
 :::
 <!-- end fig-und-bunch -->
 
 <!-- begin tab-und-line -->
-```{table} The line on the axis of each undulator, from one loaded slice with no beam size and no energy spread. The width is the full width at half maximum in units of $0.8859/N$, the level is $W(0)$ divided by $N^2 W_1(0)\,|S|^2$, and the last two columns are the largest values of $|W(\nu)/W(0) - \mathrm{sinc}^2(\pi N\nu)|$ for $|N\nu| \le 4$ and of $W(m/N)/W(0)$ for $m = 1, 2, 3$.
+```{table} The fundamental peak of the on-axis spectrum of each undulator, from one loaded slice with no beam size and no energy spread. Here $W(\nu)$ is the spectral intensity on the axis. The width is the full width at half maximum of the peak in units of $0.8859/N$, the intensity is $W(0)$ divided by $N^2 W_1(0)\,|S|^2$, and the last two columns are the largest values of $|W(\nu)/W(0) - \mathrm{sinc}^2(\pi N\nu)|$ for $|N\nu| \le 4$ and of $W(m/N)/W(0)$ for $m = 1, 2, 3$.
 :name: tab-und-line
 
-| undulator | $N$ | width | level | difference from $\mathrm{sinc}^2$ | at the zeros |
+| undulator | $N$ | width | intensity | difference from $\mathrm{sinc}^2$ | at the zeros |
 |---|---|---|---|---|---|
 | FLASH1, planar | 165 | 1.0000 | 1.0000 | 1.2e-05 | 7.4e-08 |
 | FLASH1, planar | 55 | 1.0001 | 1.0000 | 0.00011 | 8.3e-09 |
