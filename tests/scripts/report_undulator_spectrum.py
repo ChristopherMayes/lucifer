@@ -75,6 +75,13 @@ def draw_line(plt, lp, path, rec):
         y = np.array(r["line"])
         ax.semilogy(x[k * 3::16], np.maximum(y[k * 3::16], 1e-12), "o", ms=3.2, color=lp.COLORS[k], label=label)
         worst[key] = float(np.abs(y - ur.line(r["n_period"], np.array(r["nu"]))).max())
+    # The unaveraged mode's pulse does not consist of equal planes, so its line is drawn
+    # whole: its minima are 4% outside the zeros, which sparse points would not show.
+    r = rec["us_unavg"]
+    y = np.array(r["line"])
+    ax.semilogy(np.array(r["nu"]) * r["n_period"], np.maximum(y, 1e-12), lw=0.9, color=lp.COLORS[3],
+                label="FLASH1, $N = 55$, unaveraged")
+    worst["us_unavg"] = float(np.abs(y - ur.line(r["n_period"], np.array(r["nu"]))).max())
     ax.set_ylim(1e-7, 2)
     ax.set_xlabel(r"$N\nu$")
     ax.set_ylabel(r"$W(\nu)/W(0)$")
@@ -261,7 +268,9 @@ def main():
     lines += figure("line", "The line on the axis of three undulators on a logarithmic axis, as a function of the "
                     "relative frequency times the number of periods, from minus four to four. The points of all "
                     "three undulators lie on the curve of sinc squared, through its central lobe and three side "
-                    "lobes on each side.",
+                    "lobes on each side. A fourth curve, of the unaveraged mode, follows the central lobe and has "
+                    "its minima displaced outward from the zeros of sinc squared by four percent, and its side lobes "
+                    "are higher at positive frequency than at negative frequency.",
                     "The energy radiated on the axis per unit frequency and solid angle, divided by its value at the "
                     "peak, as a function of $N\\nu$, where $\\nu = \\omega/\\omega_1 - 1$ and $N$ is the number of "
                     "periods. Each point is the squared magnitude of the Fourier sum, over the planes of the pulse, of the "
@@ -270,7 +279,10 @@ def main():
                     f"The largest difference from the curve is {two(line['us_flash'])} for FLASH1 at 165 periods, "
                     f"{two(line['us_flash55'])} at 55 periods and {two(line['us_delta'])} for the Delta undulator. "
                     "The difference is that of a pulse sampled once per wavelength, $(\\pi\\nu)^2/3$ of the line "
-                    "([](#und-on-axis)).")
+                    "([](#und-on-axis)). The continuous colored curve is the run of `fel_method = unaveraged` at 55 periods, "
+                    "whose pulse does not consist of equal planes ([](#fig-und-pulse)). It differs from "
+                    f"$\\mathrm{{sinc}}^2$ by {two(line['us_unavg'])} of the peak: its minima lie outside the zeros of the line, and its side lobes are higher "
+                    "above the fundamental than below it ([](#und-unaveraged)).")
     lines += figure("pulse", "The magnitude of the zero-angle component of each plane of the pulse as a function of "
                     "the plane's position, for a 55-period undulator. In the averaged mode it is one value over 55 "
                     "planes and zero outside them. In the unaveraged mode the first and the last two planes are lower.",
