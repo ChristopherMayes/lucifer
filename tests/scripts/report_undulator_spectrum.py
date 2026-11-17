@@ -85,7 +85,8 @@ def draw_line(plt, lp, path, rec):
     ax.set_ylim(1e-7, 2)
     ax.set_xlabel(r"$N\nu$")
     ax.set_ylabel(r"$W(\nu)/W(0)$")
-    ax.legend(frameon=False, fontsize=8)
+    # Above the axes: the curves fill the frame down to its lower edge.
+    ax.legend(frameon=False, fontsize=8, ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.0))
     lp.save(fig, path)
     plt.close(fig)
     return worst
@@ -282,7 +283,8 @@ def main():
                     "([](#und-on-axis)). The continuous colored curve is the run of `fel_method = unaveraged` at 55 periods, "
                     "whose pulse does not consist of equal planes ([](#fig-und-pulse)). It differs from "
                     f"$\\mathrm{{sinc}}^2$ by {two(line['us_unavg'])} of the peak: its minima lie outside the zeros of the line, and its side lobes are higher "
-                    "above the fundamental than below it ([](#und-unaveraged)).")
+                    "above the fundamental than below it, which are both effects of the ramps of the field at the "
+                    "ends of the undulator in that model ([](#und-unaveraged)).")
     lines += figure("pulse", "The magnitude of the zero-angle component of each plane of the pulse as a function of "
                     "the plane's position, for a 55-period undulator. In the averaged mode it is one value over 55 "
                     "planes and zero outside them. In the unaveraged mode the first and the last two planes are lower.",
