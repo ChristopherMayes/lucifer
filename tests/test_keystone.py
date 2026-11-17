@@ -11,7 +11,7 @@ it exactly. No job judges a wall clock.
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the ten page sets and requires the Markdown diff to be empty. Before it
+regenerates the eleven page sets and requires the Markdown diff to be empty. Before it
 runs a generator, the sixth test verifies for itself that all five outcomes are present
 and successful. So it does not lean on test order and cannot pass on a partial run.
 Nothing here builds. Both trees are prerequisites and are checked before any job
@@ -28,7 +28,7 @@ What the contract means in practice:
 - xdist is refused (conftest.py beside this file). A session fixture runs once per
   worker, so a parallel run would launch the five jobs several times over, into the
   same work directories.
-- The regeneration test writes into the tree: the ten generated page sets, under
+- The regeneration test writes into the tree: the eleven generated page sets, under
   docs/generated and, for the schema and the models, python/lucifer. The keystone writes
   them by design. An empty diff then shows
   that the committed pages agree with what the sources generate.
@@ -322,7 +322,7 @@ def test_job(keystone: Keystone, name: str) -> None:
 
 
 def test_regeneration(keystone: Keystone) -> None:
-    """Regenerate the ten page sets and require no diff, after all five jobs passed.
+    """Regenerate the eleven page sets and require no diff, after all five jobs passed.
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
@@ -372,6 +372,10 @@ def test_regeneration(keystone: Keystone) -> None:
         (str(SCRIPTS / "report_tier_figures.py"), "--work-dir", str(art / "wd-prd"),
          "--results", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation"),
          "--page", str(GENERATED / "validation-figures.md")),
+        # The undulator-radiation page's figures, captions and table, from the curves the
+        # production pass's undulator-spectrum section wrote in its kept work directory.
+        (str(SCRIPTS / "report_undulator_spectrum.py"), "--work-dir", str(art / "wd-prd"),
+         "--out", str(GENERATED / "undulator-spectrum"), "--page", str(GENERATED / "undulator-spectrum.md")),
     )
     for gen in generators:
         # A Python generator runs under this interpreter; the tracker's --schema and the

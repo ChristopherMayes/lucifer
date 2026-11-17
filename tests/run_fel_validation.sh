@@ -769,12 +769,12 @@ echo
 # passes share while it runs, and the CPU sections of either pass carry on beside
 # it (scripts/with_lock.py).
 
-SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous element-offsets two-polarization beam-format fft-plan harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
+SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous undulator-spectrum element-offsets two-polarization beam-format fft-plan harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
 
 # The launch order is longest first, by the section times of one debug pass (device
 # 116 s, source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section
 # is not left to run alone at the end. The printed order is SECTION_ORDER regardless.
-LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format fft-plan load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
+LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format fft-plan undulator-spectrum load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
 
 SECTIONS="$WORK_DIR/sections"
 DEVICE_LOCK="${LUCIFER_DEVICE_LOCK:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/device.lock}"
@@ -949,6 +949,15 @@ sec_spontaneous () {
   echo "--- spontaneous-emission checks (FEL modes vs Bmad radiation vs analytic) -----"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_spontaneous.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
     || { echo "FAIL: spontaneous checks; outputs kept in: $1" >&2; return 1; }
+}
+
+# The spontaneous radiation of one undulator against the closed forms of undulator
+# radiation: the line on the axis, its level, and the red shift with angle.
+
+sec_undulator_spectrum () {
+  echo "--- undulator-spectrum checks (one undulator against the formulas) --------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_undulator_spectrum.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: undulator-spectrum checks; outputs kept in: $1" >&2; return 1; }
 }
 
 sec_element_offsets () {

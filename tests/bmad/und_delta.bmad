@@ -1,0 +1,21 @@
+! The LCLS Delta afterburner in its circular mode (check_undulator_spectrum.py): 3.2 m
+! at a 32 mm period (Nuhn et al., FEL2013 TUPSO52), with the beam energy and photon
+! energy of Lutman et al., Nature Photonics 10, 468 (2016): 4 GeV and 707 eV. The field
+! is the one that puts the resonance there, a helical strength of 2.3908.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 4e9
+
+beginning[beta_a]  = 10
+beginning[alpha_a] = 0
+beginning[beta_b]  = 10
+beginning[alpha_b] = 0
+
+UND: wiggler, l = 3.2, l_period = 0.032, field_calc = helical_model, &
+     b_max = 0.80015309, fel_method = averaged, ds_step = 0.032
+
+SEG: line = (UND)
+
+use, SEG

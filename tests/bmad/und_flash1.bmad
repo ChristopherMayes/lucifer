@@ -1,0 +1,24 @@
+! The FLASH1 undulator alone (check_undulator_spectrum.py): planar, 27.3 mm period,
+! 0.47 T, at 668 MeV, as examples/flash1/flash1.bmad has it. UND is one segment of 165
+! periods, and UND55 is a third of it, for the width of the line as 1/N. No quadrupole
+! follows, so the radiation at the exit is the undulator's own.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 6.684941e8
+
+beginning[beta_a]  = 10
+beginning[alpha_a] = 0
+beginning[beta_b]  = 10
+beginning[alpha_b] = 0
+
+UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = planar_model, &
+     b_max = 0.47, fel_method = averaged, ds_step = 0.0273
+
+UND55: UND, l = 1.5015
+
+SEG:   line = (UND)
+SEG55: line = (UND55)
+
+use, SEG

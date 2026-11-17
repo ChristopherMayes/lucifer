@@ -24,7 +24,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 31 in all.
+Every section below ran and passed on both builds, 32 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -45,6 +45,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `device`
 - `unaveraged`
 - `spontaneous`
+- `undulator-spectrum`
 - `element-offsets`
 - `two-polarization`
 - `beam-format`
@@ -814,6 +815,90 @@ where the two builds agree to every printed digit.
 | fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.3485e-01 | same | 0.0000e+00 to 2.5000e-01 |
 | fluctuations: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
 | ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.7421e-12 | 5.2661e-12 | 0.0000e+00 to 1.0000e-03 |
+
+(val-levels-undulator-spectrum)=
+### `undulator-spectrum`
+
+| Check | Debug | Production | Bound |
+|---|---|---|---|
+| FLASH1, 165 periods: planes that differ from the constant times conj(S), over the largest | 1.1990e-09 | same | <= 1.0000e-07 |
+| FLASH1, 165 periods: peak of the line less the undulator's resonance, in line widths | 7.7170e-05 | same | <= 1.0000e-03 |
+| FLASH1, 165 periods: width of the line over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, 165 periods: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 7.4417e-08 | same | <= 1.0000e-06 |
+| FLASH1, 165 periods: largest difference from sinc^2 over four lobes | 1.2374e-05 | same | <= 5.0000e-04 |
+| FLASH1, 165 periods: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, 165 periods: ridge less -x, in line widths, at its largest over the wavenumbers | 2.9020e-04 | same | <= 2.0000e-03 |
+| FLASH1, 165 periods: ridge at the widest wavenumber within x = 0.14, less the resonance, in line widths | 5.2044e+00 | same | 4.9000e+00 to 5.5000e+00 |
+| FLASH1, 165 periods: level along the ridge over the deposit's own spectrum, less 1 | 2.4048e-07 | same | <= 1.0000e-05 |
+| FLASH1, 165 periods: the formula's factor at the widest wavenumber along x, over the model's | 3.4306e-01 | same | 3.3500e-01 to 3.5100e-01 |
+| FLASH1, 165 periods: the formula's factor at the widest wavenumber along y, over the model's | 1.0470e+00 | same | 1.0300e+00 to 1.0650e+00 |
+| Delta, 100 periods: planes that differ from the constant times conj(S), over the largest | 7.2331e-10 | same | <= 1.0000e-07 |
+| Delta, 100 periods: peak of the line less the undulator's resonance, in line widths | 2.8897e-05 | same | <= 1.0000e-03 |
+| Delta, 100 periods: width of the line over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| Delta, 100 periods: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 2.7284e-08 | same | <= 1.0000e-06 |
+| Delta, 100 periods: largest difference from sinc^2 over four lobes | 3.3414e-05 | same | <= 5.0000e-04 |
+| Delta, 100 periods: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| Delta, 100 periods: ridge less -x, in line widths, at its largest over the wavenumbers | 1.3206e-04 | same | <= 2.0000e-03 |
+| Delta, 100 periods: ridge at the widest wavenumber within x = 0.2, less the resonance, in line widths | 7.9429e+00 | same | 7.6000e+00 to 8.3000e+00 |
+| Delta, 100 periods: level along the ridge over the deposit's own spectrum, less 1 | 6.2007e-08 | same | <= 1.0000e-05 |
+| Delta, 100 periods: the formula's factor at the widest wavenumber along x, over the model's | 3.8378e-01 | same | 3.7500e-01 to 3.9300e-01 |
+| Delta, 100 periods: the formula's factor at the widest wavenumber along y, over the model's | 3.8378e-01 | same | 3.7500e-01 to 3.9300e-01 |
+| FLASH1, 55 periods: planes that differ from the constant times conj(S), over the largest | 3.9430e-10 | same | <= 1.0000e-07 |
+| FLASH1, 55 periods: peak of the line less the undulator's resonance, in line widths | 2.5654e-05 | same | <= 1.0000e-03 |
+| FLASH1, 55 periods: width of the line over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, 55 periods: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 8.2614e-09 | same | <= 1.0000e-06 |
+| FLASH1, 55 periods: largest difference from sinc^2 over four lobes | 1.1108e-04 | same | <= 5.0000e-04 |
+| FLASH1, 55 periods: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1: width of the line at 55 periods over that at 165 | 3.0004e+00 | same | 2.9900e+00 to 3.0100e+00 |
+| FLASH1, emittance 1.5 um: planes that differ from the constant times conj(S), over the largest | 2.0931e-04 | same | <= 3.0000e-03 |
+| FLASH1, emittance 1.5 um: peak of the line less the undulator's resonance, in line widths | 2.6511e-01 | same | <= 1.0000e+00 |
+| FLASH1, emittance 1.5 um: width of the line over 0.8859/N | 1.0079e+00 | same | 8.0000e-01 to 1.2000e+00 |
+| FLASH1, emittance 1.5 um: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 1.6294e-02 | same | <= 3.0000e-01 |
+| FLASH1, emittance 1.5 um: largest difference from sinc^2 over four lobes | 1.7203e-02 | same | <= 4.0000e-01 |
+| FLASH1, emittance 1.5 um: level on the axis over the closed form | 1.0020e+00 | same | 9.9000e-01 to 1.0100e+00 |
+| FLASH1, energy spread 6e-4: planes that differ from the constant times conj(S), over the largest | 6.5587e-04 | same | <= 3.0000e-03 |
+| FLASH1, energy spread 6e-4: peak of the line less the undulator's resonance, in line widths | 2.7668e-01 | same | <= 1.0000e+00 |
+| FLASH1, energy spread 6e-4: width of the line over 0.8859/N | 9.4681e-01 | same | 8.0000e-01 to 1.2000e+00 |
+| FLASH1, energy spread 6e-4: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 5.9676e-02 | same | <= 3.0000e-01 |
+| FLASH1, energy spread 6e-4: largest difference from sinc^2 over four lobes | 9.7423e-02 | same | <= 4.0000e-01 |
+| FLASH1, energy spread 6e-4: level on the axis over the closed form | 1.0012e+00 | same | 9.9000e-01 to 1.0100e+00 |
+| FLASH1, window of 65 wavelengths: planes that differ from the constant times conj(S), over the largest | 1.1990e-09 | same | <= 1.0000e-07 |
+| FLASH1, window of 65 wavelengths: peak of the line less the undulator's resonance, in line widths | 7.7170e-05 | same | <= 1.0000e-03 |
+| FLASH1, window of 65 wavelengths: width of the line over 0.8859/N | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, window of 65 wavelengths: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 7.4417e-08 | same | <= 1.0000e-06 |
+| FLASH1, window of 65 wavelengths: largest difference from sinc^2 over four lobes | 1.2374e-05 | same | <= 5.0000e-04 |
+| FLASH1, window of 65 wavelengths: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, slices of 3 wavelengths: width of the line over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, slices of 3 wavelengths: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| FLASH1, emittance 1.5 um: ridge less -x, in line widths, at its largest over the wavenumbers | 2.0080e+00 | same | <= 4.0000e+00 |
+| FLASH1, emittance 1.5 um: ridge at the widest wavenumber within x = 0.14, less the resonance, in line widths | 5.3758e+00 | same | 3.0000e+00 to 8.0000e+00 |
+| FLASH1, source filter on: planes that differ from the constant times conj(S), over the largest | 2.0931e-04 | same | <= 3.0000e-03 |
+| FLASH1, source filter on: peak of the line less the undulator's resonance, in line widths | 2.6511e-01 | same | <= 1.0000e+00 |
+| FLASH1, source filter on: width of the line over 0.8859/N | 1.0079e+00 | same | 8.0000e-01 to 1.2000e+00 |
+| FLASH1, source filter on: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 1.6294e-02 | same | <= 3.0000e-01 |
+| FLASH1, source filter on: largest difference from sinc^2 over four lobes | 1.7203e-02 | same | <= 4.0000e-01 |
+| FLASH1, source filter on: level on the axis over the closed form | 1.0020e+00 | same | 9.9000e-01 to 1.0100e+00 |
+| FLASH1, source filter on: ridge less -x, in line widths, at its largest over the wavenumbers | 4.0120e-01 | same | <= 1.5000e+00 |
+| FLASH1, source filter on: energy at an angle over the filter off, less 1, at its largest inside 0.8 of the edge | 2.1482e-02 | same | <= 1.0000e-01 |
+| FLASH1, source filter on: energy at an angle over the filter off, at its largest outside 1.2 of the edge | 2.7839e-05 | same | <= 1.0000e-03 |
+| FLASH1, 55 periods, field.propagator = spectral: peak of the line less the undulator's resonance, in line widths | 2.5499e-05 | same | <= 1.0000e-03 |
+| FLASH1, 55 periods, field.propagator = spectral: width of the line over 0.8859/N | 1.0187e+00 | same | 9.6000e-01 to 1.0400e+00 |
+| FLASH1, 55 periods, field.propagator = spectral: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 3.4292e-04 | same | <= 2.0000e-03 |
+| FLASH1, 55 periods, field.propagator = spectral: largest difference from sinc^2 over four lobes | 1.5389e-02 | same | <= 4.0000e-02 |
+| FLASH1, 55 periods, field.propagator = spectral: level on the axis over the closed form | 9.6396e-01 | same | 9.4000e-01 to 1.0600e+00 |
+| FLASH1, 55 periods, field.propagator = spectral: ridge less the resonance, in line widths, at its largest over the wavenumbers | 3.1625e-02 | same | <= 1.0000e-01 |
+| FLASH1, 55 periods, field.propagator = spectral: ridge at the widest wavenumber within x = 0.08, less -x, in line widths | -4.6165e-01 | same | -5.5000e-01 to -3.8000e-01 |
+| FLASH1, 55 periods, unaveraged: width of the line over 0.8859/N | 1.0433e+00 | same | 1.0300e+00 to 1.0600e+00 |
+| FLASH1, 55 periods, unaveraged: largest difference from sinc^2 over four lobes | 3.8118e-02 | same | <= 8.0000e-02 |
+| FLASH1, 55 periods, unaveraged: level on the axis over the closed form | 9.3941e-01 | same | 9.2000e-01 to 9.6000e-01 |
+| FLASH1, 55 periods, unaveraged: ridge less -x, in line widths, at its largest over the wavenumbers | 1.7825e-02 | same | <= 6.0000e-02 |
+| FLASH1, 55 periods, unaveraged: ridge at the widest wavenumber within x = 0.14, less the resonance, in line widths | 1.7527e+00 | same | 1.6000e+00 to 1.9000e+00 |
+| FLASH1, 55 periods, unaveraged: level along the ridge over the deposit's own spectrum, less 1 | 1.0225e-02 | same | <= 3.0000e-02 |
+| FLASH1, 55 periods, unaveraged: the formula's factor at the widest wavenumber along x, over the model's | 3.4661e-01 | same | 3.3500e-01 to 3.6000e-01 |
+| FLASH1, 55 periods, unaveraged: the formula's factor at the widest wavenumber along y, over the model's | 1.0497e+00 | same | 1.0300e+00 to 1.0700e+00 |
+| a bunch: planes that differ from the constant times the sum of conj(S), over the largest | 1.1632e-06 | same | <= 1.0000e-04 |
+| a bunch: energy on the axis over one electron's times the electrons, mean of 8 seeds | 9.6515e-01 | same | 8.5000e-01 to 1.1500e+00 |
+| a bunch: the same, the seeds' standard deviation | 1.2225e-01 | same | <= 3.0000e-01 |
 
 (val-levels-element-offsets)=
 ### `element-offsets`
