@@ -9,6 +9,19 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-16 Changed: the Bmad transport model evaluates its quadrupole matrix in its own particle
+  loop. `fel_transverse_track_bmad` called Bmad's `quad_mat2_calc` twice a particle a step, a
+  call into Bmad's library that the compiler could not place in the loop. The routine now carries
+  that matrix as a transcription of `quad_mat2_calc`, takes the sine and cosine of the focusing
+  plane from one call of `fel_sincos`, and advances a plane with no focusing, the x plane of a
+  planar element without `kx`, as the drift the matrix is at zero strength. The arithmetic is
+  Bmad's and its rounding is not: on one cell of FLASH1 at 528 slices of 8192 particles under
+  Lucifer's own models, 57 of the 166 arrays of the statistics file differ from the run before,
+  by 1e-15 of themselves or less. On that cell the particle push takes 10.3 s where it took
+  11.4 s, against 10.0 s under Genesis4's transport model, and the run 21.6 s where it took
+  22.7 s. Four rows of `docs/generated/validation-measured.md` moved, each a difference at the
+  level of rounding: the rotation and crossed-field rows near 1e-15 and two rows of the
+  `fft-plan` section. The loop still makes one scalar sine and cosine call a particle.
 - 2026-11-16 Changed: the Bmad transport model no longer asks `quad_mat2_calc` for the path-length
   coefficients. `fel_transverse_track_bmad` calls Bmad's `quad_mat2_calc` twice a particle a
   step, once a plane, and passed the optional `z_coef` and `dz_dpz_coef`, which Bmad then

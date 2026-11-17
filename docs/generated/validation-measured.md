@@ -844,11 +844,11 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.0948e-15 | 9.4586e-15 | <= 1.0000e-08 |
+| rotation, averaged: power \|x-run - y-run\| / max, all records | 7.4577e-15 | 6.7301e-15 | <= 1.0000e-08 |
 | rotation, averaged: beam-size swap identity at exit | 2.2204e-16 | 0.0000e+00 | <= 1.0000e-08 |
 | rotation, unaveraged: power \|x-run - y-run\| / max, all records | 5.5091e-07 | 5.7792e-07 | <= 1.0000e-05 |
 | rotation, unaveraged: beam-size swap identity at exit | 2.2204e-16 | 6.6613e-16 | <= 1.0000e-08 |
-| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.3323e-15 | 1.5543e-15 | <= 5.0000e-02 |
+| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.5543e-15 | same | <= 5.0000e-02 |
 | crossed, averaged: afterburner floor, Px/Py (y must light up) | 1.1377e+02 | same | <= 2.0000e+02 |
 | crossed, averaged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.3978e-01 | same | <= 5.0000e-01 |
 | crossed, unaveraged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 2.5052e-06 | 2.5048e-06 | <= 5.0000e-02 |
@@ -926,8 +926,8 @@ where the two builds agree to every printed digit.
 | wisdom twice: stats arrays that differ | 0 | same | = 0 |
 | the plan in use is wisdom or estimate |  | same | holds |
 | estimate: the stats file names estimate |  | same | holds |
-| wisdom against estimate: stats arrays that differ | 21 | same | >= 1 |
-| wisdom against estimate: window energy | 7.6783e-16 | 9.5978e-16 | <= 1.0000e-10 |
+| wisdom against estimate: stats arrays that differ | 19 | same | >= 1 |
+| wisdom against estimate: window energy | 7.6783e-16 | same | <= 1.0000e-10 |
 | measure: the stats file names measure |  | same | holds |
 | measure against estimate: window energy within 1e-10 |  | same | holds |
 | 127-point grid under wisdom: the plan in use is estimate |  | same | holds |

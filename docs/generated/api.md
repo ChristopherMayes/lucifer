@@ -8643,9 +8643,11 @@ Output:
 ```
 Routine to advance the transverse coordinates with the transverse maps of Bmad's own
 periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened (fel-physics.md
-sec-element). This is the default transport. Quadrupole bodies go through
-quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
-half-octupole edge kicks. They use the tracking-local k1 values, and never the stored
+sec-element). This is the default transport. Quadrupole bodies take the matrix of
+Bmad's quad_mat2_calc, transcribed into plane_mat2 below, with the per-particle
+1/rel_p^2 chromatic scaling and the half-octupole edge kicks. A plane with no
+focusing, the x plane of a planar element without kx, is advanced as the drift that
+matrix is at k1 = 0. They use the tracking-local k1 values, and never the stored
 k1x/k1y attributes, whose helical sign disagrees.
 
 The kernel's z bookkeeping (path-length dz terms, low-energy correction, the
@@ -8702,6 +8704,20 @@ Routine to apply the wiggle-plane octupole-like kick of Bmad's wiggler body map
 Routine to rotate one particle's transverse coordinates by the tilt angle whose
 cosine and sine are (c, s). Passing s > 0 rotates into the wiggle frame and s < 0
 rotates out of it.
+```
+
+(api-plane-mat2)=
+### `plane_mat2`
+
+*Subroutine* `(k1)`
+
+```
+Routine to set m2 to the 2x2 map of a quadrupole body of strength k1 over delz, for
+a particle of momentum rel_p. This is the matrix of Bmad's quad_mat2_calc
+(bmad/low_level/quad_mat2_calc.f90), transcribed statement for statement so that the
+compiler can place it in the particle loop: k1 < 0 focuses, k1 > 0 defocuses, and
+below |sqrt(k1)| delz = 1e-10 the series is taken. The sine and cosine are one call
+of fel_sincos. Bmad's path-length coefficients are not computed (see the header).
 ```
 
 (api-apply-mat2)=

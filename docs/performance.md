@@ -244,7 +244,7 @@ The thread wait is 16.4 percent: the slippage phase writes the bank's planes ser
 
 An estimate of the field solve near 10% of a run holds only at many more particles per slice, where the table above shows the balance reversing. At these parameters it is 55.5% by the phase timer and 41.5% in the transform alone by samples.
 
-`quad_mat2_calc` is Bmad's own quadrupole map, and its cost is a complex exponential per particle. `cexp` and the `exp` beneath it are most of the 6.0%. The libm sin and cos are the deposit's phase factor and the ODE's, through `fel_sincos`.
+`quad_mat2_calc` is Bmad's own quadrupole map, a sine and a cosine of one argument per particle per plane, which the compiler evaluates together through `cexp`. That call and the `exp` beneath it are most of the 6.0%. Since 2026-11-16 `fel_transverse_track_bmad` carries the matrix as a transcription and Bmad's routine is not called ([](#perf-flash1-cell)), and this table has not been measured again. The libm sin and cos are the deposit's phase factor and the ODE's, through `fel_sincos`.
 
 (perf-flash1-cell)=
 ## One FLASH1 cell against Genesis4
@@ -264,7 +264,7 @@ The two codes are timed on one cell of the FLASH1 example ([](generated/examples
 
 With Genesis4's transport and interlude models Lucifer takes 1.07 times Genesis4's wall time, and with its own 1.19 times. Until 2026-11-14 the two ratios were 1.50 and 1.62, under the estimated plan, which is the row a platform without the recorded plan still runs. Genesis4 plans its transform with `FFTW_MEASURE`, so the plan was 3.8 s of the 9.6 s between the two codes. The field solve's passes were 3.9 s more of the solve under the recorded plan, 10.9 s on 2026-11-14 and 7.0 s now: this run turns the source filter off, where a plane was copied four times and passed over twice a step and is now copied once.
 
-The 1.3 s that remain are in three places. The first is the files. The run spends 2.6 s outside its [walk](glossary.md#gl-walk), which `timing/` of the stats file splits: 1.14 s to read the 363 MB beam and slice it, 0.05 s to read the field, 1.17 s to write the final beam and 0.22 s to write the final field. The beam is read and written by Bmad's HDF5 routines, and Genesis4's wall time contains its own reading and writing. The second is what the field solve does beside the transform. A sampling profile of the run with Genesis4's models puts 73 percent of the field solve's samples in FFTW, 13 percent in the passes of `fel_field_solve_mod`, 9 percent in the deposit and 4 percent in the copies FFTW's buffered plan makes. The third, with Lucifer's own models, is the 1.9 s that the Bmad transport model adds to the push, `quad_mat2_calc` evaluated for every particle at every step. The push itself, at 10.0 s for $7.1 \times 10^8$ particle-steps, is 170 ns a particle-step on a thread, and a sample of one Genesis4 rank on 2026-11-14 put about three quarters of its 2.5 ms of processor time a slice a step outside its transform.
+The 1.3 s that remain are in three places. The first is the files. The run spends 2.6 s outside its [walk](glossary.md#gl-walk), which `timing/` of the stats file splits: 1.14 s to read the 363 MB beam and slice it, 0.05 s to read the field, 1.17 s to write the final beam and 0.22 s to write the final field. The beam is read and written by Bmad's HDF5 routines, and Genesis4's wall time contains its own reading and writing. The second is what the field solve does beside the transform. A sampling profile of the run with Genesis4's models puts 73 percent of the field solve's samples in FFTW, 13 percent in the passes of `fel_field_solve_mod`, 9 percent in the deposit and 4 percent in the copies FFTW's buffered plan makes. The third, with Lucifer's own models, is the 1.9 s that the Bmad transport model adds to the push, `quad_mat2_calc` evaluated for every particle at every step. Since 2026-11-16 that is 0.3 s: `fel_transverse_track_bmad` evaluates the same matrix in its own particle loop, with one paired sine and cosine a particle in the focusing plane and a drift in the plane without focusing, and the push of this run with Lucifer's own models takes 10.3 s where it took 12.0 s, against 10.0 s with Genesis4's. The push itself, at 10.0 s for $7.1 \times 10^8$ particle-steps, is 170 ns a particle-step on a thread, and a sample of one Genesis4 rank on 2026-11-14 put about three quarters of its 2.5 ms of processor time a slice a step outside its transform.
 
 (perf-the-sampling-split-unaveraged)=
 ## The sampling split, unaveraged mode
@@ -372,7 +372,7 @@ None of the hot per-particle loops is among the vectorized. The compiler rejects
 | loop | routine | what blocks it |
 |---|---|---|
 | the particle loop | `fel_transverse_track` | `fel_apply_focus`, called per particle, branches inside |
-| the particle loop | `fel_transverse_track_bmad` | the same, plus `quad_mat2_calc` |
+| the particle loop | `fel_transverse_track_bmad` | the same, plus `quad_mat2_calc`, until 2026-11-16, and `fel_sincos` since |
 | the particle loop | `fel_advance` | `faw`, `fel_sincos` and `fel_runge_kutta`, called per particle |
 | the particle loop of the multi-harmonic twin | `fel_advance` | the same |
 | the deposit's particle loop | `fel_field_step` | `if (.not. on_grid) cycle`, and the report also names `statement clobbers memory: fel_grid_weights` |

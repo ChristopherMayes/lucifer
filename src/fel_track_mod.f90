@@ -1831,9 +1831,11 @@ end subroutine fel_transverse_track
 !
 ! Routine to advance the transverse coordinates with the transverse maps of Bmad's own
 ! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened (fel-physics.md
-! sec-element). This is the default transport. Quadrupole bodies go through
-! quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
-! half-octupole edge kicks. They use the tracking-local k1 values, and never the stored
+! sec-element). This is the default transport. Quadrupole bodies take the matrix of
+! Bmad's quad_mat2_calc, transcribed into plane_mat2 below, with the per-particle
+! 1/rel_p^2 chromatic scaling and the half-octupole edge kicks. A plane with no
+! focusing, the x plane of a planar element without kx, is advanced as the drift that
+! matrix is at k1 = 0. They use the tracking-local k1 values, and never the stored
 ! k1x/k1y attributes, whose helical sign disagrees.
 !
 ! The kernel's z bookkeeping (path-length dz terms, low-energy correction, the
@@ -1919,9 +1921,13 @@ do ip = 1, sl%n
 
   if (leading) call octupole_kick ()
 
-  call quad_mat2_calc (k1xx, delz, rel_p, m2)
-  call apply_mat2 (sl%x(ip), sl%px(ip))
-  call quad_mat2_calc (k1yy, delz, rel_p, m2)
+  if (k1x_loc == 0) then                   ! plane_mat2's matrix at k1 = 0.
+    sl%x(ip) = sl%x(ip) + (delz / rel_p) * sl%px(ip)
+  else
+    call plane_mat2 (k1xx)
+    call apply_mat2 (sl%x(ip), sl%px(ip))
+  endif
+  call plane_mat2 (k1yy)
   call apply_mat2 (sl%y(ip), sl%py(ip))
 
   if (.not. leading) call octupole_kick ()
@@ -1966,6 +1972,43 @@ t1 = c * x + s * y;   y = -s * x + c * y;   x = t1
 t1 = c * px + s * py; py = -s * px + c * py; px = t1
 
 end subroutine rot_xy
+
+!+
+! Subroutine plane_mat2 (k1)
+!
+! Routine to set m2 to the 2x2 map of a quadrupole body of strength k1 over delz, for
+! a particle of momentum rel_p. This is the matrix of Bmad's quad_mat2_calc
+! (bmad/low_level/quad_mat2_calc.f90), transcribed statement for statement so that the
+! compiler can place it in the particle loop: k1 < 0 focuses, k1 > 0 defocuses, and
+! below |sqrt(k1)| delz = 1e-10 the series is taken. The sine and cosine are one call
+! of fel_sincos. Bmad's path-length coefficients are not computed (see the header).
+!-
+
+subroutine plane_mat2 (k1)
+
+real(rp) k1, sqrt_k, sk_l, k_l2, cx, sx
+
+sqrt_k = sqrt(abs(k1))
+sk_l = sqrt_k * delz
+
+if (abs(sk_l) < 1d-10) then
+  k_l2 = k1 * delz**2
+  cx = 1 + k_l2 / 2
+  sx = (1 + k_l2 / 6) * delz
+elseif (k1 < 0) then       ! focus
+  call fel_sincos (sk_l, sx, cx)
+  sx = sx / sqrt_k
+else                       ! defocus
+  cx = cosh(sk_l)
+  sx = sinh(sk_l) / sqrt_k
+endif
+
+m2(1,1) = cx
+m2(1,2) = sx / rel_p
+m2(2,1) = k1 * sx * rel_p
+m2(2,2) = cx
+
+end subroutine plane_mat2
 
 !+
 ! Subroutine apply_mat2 (v, vp)
