@@ -29,8 +29,10 @@ of that history. The entries before that date describe that branch.
   resonance to 0.03 of the line width at 55 periods. The level along that ridge is the spectrum of the
   deposited source to 3e-7, in the averaged mode and to 0.01 in the unaveraged one: neither
   applies the angular factor of undulator radiation, which at x = 0.14 is 0.34 in the plane of the
-  oscillation for FLASH1. The section adds 78 rows to `docs/generated/validation-measured.md`, and
-  the two builds agree in every digit of them.
+  oscillation for FLASH1. On the Metal device the 55-period line has the width and the level of
+  the CPU's, and its planes differ from the CPU's by 2.6e-4 of the largest, in seven rows of the device
+  section (`tests/scripts/check_device.py`). The section adds 78 rows to
+  `docs/generated/validation-measured.md`, and the two builds agree in every digit of them.
 - 2026-11-16 Changed: the Bmad transport model evaluates its quadrupole matrix in its own particle
   loop. `fel_transverse_track_bmad` called Bmad's `quad_mat2_calc` twice a particle a step, a
   call into Bmad's library that the compiler could not place in the loop. The routine now carries

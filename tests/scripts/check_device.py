@@ -91,6 +91,12 @@ physics alone, the check can fail, and everything the backend does not cover is 
    run under the spectral propagator lands against the CPU's. On a migrating window
    the wake record holds the CPU's refreshes. See wake().
 
+16. The spontaneous radiation of one undulator (docs/undulator-spectrum.md). One loaded
+   slice in 55 periods of the FLASH1 undulator, in a window that holds the whole pulse,
+   since a device run keeps no pulse file. The line on the axis and its level are held
+   as check_undulator_spectrum.py holds the CPU's, and the planes of the device's pulse
+   to the CPU's. See undulator_spectrum().
+
 The deposit accumulates in fixed point, so two device runs of one input file agree bit for
 bit, and checks 8, 9 and the unaveraged section assert that. Against the CPU the
 device is held to the ceilings, and the read-only proof compares FP64 outputs only.
@@ -481,6 +487,7 @@ def main():
     unaveraged(args, wd, exe)
     spectral(args, wd, exe)
     wake(args, wd, exe)
+    undulator_spectrum(args, wd, exe)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0
@@ -1896,6 +1903,16 @@ def element_offsets(args, wd, exe):
         diff = max(diff, num / den)
     ok("device vs CPU, exit orbit with an x_offset, y_offset, kx and kick (all)", f"{diff:.3e}",
        f"<= {OFFSET_CEIL:.1e}", diff <= OFFSET_CEIL, num=diff, bound=OFFSET_CEIL, kind="max")
+
+
+def undulator_spectrum(args, wd, exe):
+    """The 55-period FLASH1 undulator of check_undulator_spectrum.py on the device: its
+    on_device() runs the emitter on the device and on the CPU and holds the rows."""
+    global FAILED
+    import check_undulator_spectrum as us
+    (wd / "und_flash1.bmad").write_bytes((pathlib.Path(args.latdir) / "und_flash1.bmad").read_bytes())
+    if not us.on_device(exe, wd):
+        FAILED = True
 
 
 def genesis_harmonics(args, wd, exe):
