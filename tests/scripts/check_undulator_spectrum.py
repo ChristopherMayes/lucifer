@@ -43,6 +43,10 @@ particle's electrons, the script holds:
                 axis of each run against that of its own S, and the energy on the axis
                 over what one electron radiates times the electrons.
 
+The device runs the 55-period undulator in check_device.py, through on_device() here,
+since a device run holds that section's lock. The device keeps no pulse file, so its
+window holds the whole pulse and read() takes the planes from the final field.
+
 The curves the page draws are written to undulator_spectrum.json in the work directory,
 from which report_undulator_spectrum.py draws them. The pulse files are removed.
 
@@ -61,7 +65,7 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from lucifer.field import read_pulse
+from lucifer.field import read_field, read_pulse
 from lucifer.flat import to_toml
 
 import pool
@@ -122,6 +126,10 @@ BOUNDS = dict(
     unavg=dict(width=[1.03, 1.06], sinc=0.08, level=[0.92, 0.96], ridge=0.06, exact=[1.6, 1.9], deposit=0.03,
                factor_x=[0.335, 0.360], factor_y=[1.03, 1.07]),
     bunch=dict(emitter=1e-4, energy=[0.85, 1.15], scatter=0.3),
+    # The device computes in single precision. Its line and level are inside the bounds
+    # of the CPU's runs. Its planes follow its own S to 1.3e-6 and differ from the CPU's
+    # planes by 2.6e-4 of the largest, and those two bounds are three times these.
+    device=dict(TIGHT, emitter=4e-6, planes=8e-4),
 )
 
 
@@ -143,11 +151,13 @@ class Run:
     """One run of the emitter: what it was started with, and what it radiated."""
 
     def __init__(self, name, und, n_period, window, grid=128, emit=1e-14, sig_pz=1e-6, filter="F",
-                 n_wavelength=1, n_loaded=1, n_particle=512, seed=777, lines="", extra=""):
+                 n_wavelength=1, n_loaded=1, n_particle=512, seed=777, lines="", extra="", device=False):
         self.name, self.und, self.n_period, self.window = name, und, n_period, window
         self.grid, self.emit, self.sig_pz, self.filter = grid, emit, sig_pz, filter
         self.n_wavelength, self.n_loaded, self.n_particle = n_wavelength, n_loaded, n_particle
-        self.seed, self.lines, self.extra = seed, lines, extra
+        self.seed, self.lines, self.extra, self.device = seed, lines, extra, device
+        if device:
+            self.extra += '  device = "metal"\n'
         self.u = ur.Undulator(und["e_tot"], und["b_max"], und["l_period"], n_period, und["helical"])
 
     def start(self, exe, wd, threads="4"):
@@ -177,12 +187,22 @@ class Run:
             sys.exit(1)
 
     def read(self, wd, keep_planes=True):
-        """Read the pulse and the slices' S along the undulator, and remove the pulse."""
+        """Read the pulse and the slices' S along the undulator, and remove the pulse.
+        A run whose window held the whole pulse wrote no pulse file, and its planes are
+        those of the final field, in the same order."""
         path = wd / f"{self.name}-pulse.wf.h5"
-        w = read_pulse(path).wavefront
-        field = np.asarray(w.Ex)
-        self.dx, self.dz = float(w.dx), float(w.dz)
-        self.cell = float(w.dx) * float(w.dy)
+        if path.exists():
+            w = read_pulse(path).wavefront
+            field = np.asarray(w.Ex)
+            self.dx, self.dz = float(w.dx), float(w.dz)
+            self.cell = float(w.dx) * float(w.dy)
+        else:
+            if keep_planes:
+                sys.exit(f"{self.name}: no pulse file, and the final field is read on the axis only")
+            f = read_field(wd / f"{self.name}-final.wf.h5")
+            field = np.moveaxis(f["u"], 0, -1)
+            self.dx, self.dz = float(f["dx"]), float(f["dz"])
+            self.cell = float(f["dx"]) * float(f["dy"])
         self.a0 = field.sum(axis=(0, 1))                       # The zero-angle component of each plane.
         if keep_planes:
             f2 = np.fft.fft2(field, axes=(0, 1))
@@ -195,7 +215,7 @@ class Run:
         self.s = electrons * b * np.exp(1j * phase)             # (record, slice)
         self.electrons = float(electrons[0].sum())
         self.loaded = np.nonzero(electrons[0])[0]
-        path.unlink()
+        path.unlink(missing_ok=True)
         (wd / f"{self.name}-final.wf.h5").unlink(missing_ok=True)
 
     # The pulse as the slices' S predicts it. A slice radiates one plane a period, which
@@ -406,6 +426,25 @@ def unaveraged(run, rec):
                          center=center, width=width * n / ur.LINE_WIDTH, level=ratio,
                          planes=(np.abs(run.a0) / np.abs(run.a0).max()).tolist(), first_plane=run.first_plane)
     with_angle(run, label, 0.14, b, rec)
+
+
+def on_device(exe, wd):
+    """The 55-period undulator on the device and on the CPU, in a window that holds the
+    whole pulse: the device's line and level as the CPU's are held, and the planes of the
+    two pulses against each other. Called by check_device.py. Returns whether it passed."""
+    b = BOUNDS["device"]
+    label = "undulator spectrum, FLASH1, 55 periods, run.device = metal"
+    cpu = Run("us_dev_cpu", FLASH, 55, 129, lines="use, SEG55")
+    run = Run("us_dev", FLASH, 55, 129, lines="use, SEG55", device=True)
+    for r in (cpu, run):
+        r.start(exe, wd)
+        r.read(wd, keep_planes=False)
+    on_axis(run, label, b, {})
+    mine = run.a0[run.first_plane:run.first_plane + run.n_period]
+    theirs = cpu.a0[cpu.first_plane:cpu.first_plane + cpu.n_period]
+    check(f"{label}: planes that differ from the CPU's, over the largest",
+          float(np.abs(mine - theirs).max() / np.abs(theirs).max()), b["planes"])
+    return not FAILED
 
 
 def a_bunch(runs, wd, rec):

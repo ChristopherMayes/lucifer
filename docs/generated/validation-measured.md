@@ -744,6 +744,13 @@ where the two builds agree to every printed digit.
 | migrating wake record: refreshes at the CPU's positions | 49 | same | >= 2 |
 | migrating wake record: refreshed loss rates vs CPU | 3.6770e-04 | same | <= 1.2000e-03 |
 | migrating wake window power, device vs CPU | 1.7742e-04 | same | <= 3.0000e-03 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: planes that differ from the constant times conj(S), over the largest | 1.3046e-06 | same | <= 4.0000e-06 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: peak of the line less the undulator's resonance, in line widths | 2.1042e-05 | same | <= 1.0000e-03 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: width of the line over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: line at the zeros nu = 1/N, 2/N and 3/N, over the peak | 7.8797e-09 | same | <= 1.0000e-06 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: largest difference from sinc^2 over four lobes | 1.1109e-04 | same | <= 5.0000e-04 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: level on the axis over the closed form | 1.0000e+00 | same | 9.9900e-01 to 1.0010e+00 |
+| undulator spectrum, FLASH1, 55 periods, run.device = metal: planes that differ from the CPU's, over the largest | 2.6061e-04 | same | <= 8.0000e-04 |
 
 (val-levels-unaveraged)=
 ### `unaveraged`

@@ -580,6 +580,7 @@ Two undulators are run: the FLASH1 undulator (`tests/bmad/und_flash1.bmad`, plan
 - The level along that ridge is held to the spectrum of the source that the slice deposits, which shows that neither model applies an angular factor, and the factor of undulator radiation is recorded beside it.
 - The source filter is held to keep the energy below its edge and to remove it above, on a beam of FLASH1's emittance.
 - The lines of a beam with FLASH1's emittance and with its energy spread, of a window shorter than the slippage, of slices of three wavelengths and of the unaveraged mode are held at the levels they measure.
+- The 55-period undulator is also run on the device, in the device section (`check_device.py`, [](#val-device)), which holds the device's lock: its line and its level are held to the bounds of the CPU's runs, and its planes to those of the CPU's run at three times the difference measured.
 - A bunch of 1024 slices at eight seeds is held to the sum of its slices' radiation in each run, and its energy on the axis to that of one electron times the electrons within the scatter of the seeds.
 
 The two builds agree in every recorded digit of the section.
