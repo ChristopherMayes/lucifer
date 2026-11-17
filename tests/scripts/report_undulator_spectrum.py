@@ -264,7 +264,9 @@ def main():
                     "lobes on each side.",
                     "The energy radiated on the axis per unit frequency and solid angle, divided by its value at the "
                     "peak, as a function of $N\\nu$, where $\\nu = \\omega/\\omega_1 - 1$ and $N$ is the number of "
-                    "periods. The points are one run of each undulator, and the curve is $\\mathrm{sinc}^2(\\pi N\\nu)$. "
+                    "periods. Each point is the squared magnitude of the Fourier sum, over the planes of the pulse, of the "
+                    "field of one run summed over $x$ and $y$ in each plane. The curve is $\\mathrm{sinc}^2(\\pi N\\nu)$. "
+                    "The pulse of each run consists of $N$ equal planes, of which this curve is the spectrum. "
                     f"The largest difference from the curve is {two(line['us_flash'])} for FLASH1 at 165 periods, "
                     f"{two(line['us_flash55'])} at 55 periods and {two(line['us_delta'])} for the Delta undulator. "
                     "The difference is that of a pulse sampled once per wavelength, $(\\pi\\nu)^2/3$ of the line "

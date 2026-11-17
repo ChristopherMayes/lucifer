@@ -126,7 +126,11 @@ One loaded slice thus gives the line in a single run, with no average over seeds
 ```
 
 (und-on-axis)=
-## The line on the axis
+## The on-axis spectrum
+
+The spectrum is computed from the field of the pulse file, which holds the complex amplitude $E(x, y, p)$ that the run propagated to the exit of the undulator. The field is summed over $x$ and $y$ in each plane, which gives $E_0(p)$, and the Fourier sum of $E_0(p)$ over the planes of the pulse is evaluated at each relative frequency $\nu$. The squared magnitude of this sum, divided by its value at the peak, is the quantity that [](#fig-und-line) shows. It is the transform of Eq. [](#eq-und-transform) at zero transverse wavenumber. The sums $S_j$ of the [statistics file](glossary.md#gl-statistics-file) do not enter the figure. They are used in the comparison of Eq. [](#eq-und-plane) and in the normalization of [](#und-level) only.
+
+The emitter of these runs is a slice whose $S$ does not change along the undulator, so that the pulse on the axis consists of $N$ equal planes ([](#fig-und-pulse)). The shape of the spectrum then follows from three properties of the run: the field advances by exactly one plane in each period, every period deposits the same source, and no part of the pulse is lost at the ends of the undulator or of the window. The agreement of [](#fig-und-line) with the line establishes these three properties. It is not an independent test of the shape of the line, because $N$ equal planes can have no other spectrum. The spectra of pulses whose planes are not equal are those of [](#und-beam) and [](#und-unaveraged).
 
 The pulse of a run is sampled once per slice, which is once per wavelength here. The spectrum of $N$ equal samples is
 
@@ -139,7 +143,7 @@ which has the zeros of the line and differs from it by $(\pi\nu)^2/3$ of its val
 The width of the line is equal to $0.8859/N$ to four figures for the three undulators ([](#tab-und-line)), and the ratio of the width at 55 periods to that at 165 is 3.0004. The level of the line at its zeros is less than $10^{-7}$ of the peak. The center of the line is at the fundamental of the undulator as Eq. [](#eq-und-resonance) gives it from the field and the energy that the lattice states, to $10^{-4}$ of the line width.
 
 (und-level)=
-## The level on the axis
+## The on-axis spectral intensity
 
 The field of a run is the complex amplitude $E(x, y, p)$ of a wave of wavenumber $k_0$, in volts per meter, on a grid of cells $\Delta x\,\Delta y$ and planes that are one slice apart, which is the time $\Delta t = \lambda/c$ for slices of one wavelength. The intensity of the wave is $\epsilon_0 c\,|E|^2/2$, and the energy of the pulse is the sum of the intensity over the cells and the planes multiplied by $\Delta x\,\Delta y\,\Delta t$. Let
 
@@ -186,7 +190,7 @@ The difference between the two propagators is small at the angles of an amplifie
 ```
 
 (und-factor)=
-## The level away from the axis
+## The off-axis spectral intensity
 
 The source of Eq. [](fel-physics.md#eq-source) is deposited at the transverse position of each particle and does not depend on the direction in which the radiation leaves. The level of the line at a transverse wavenumber is therefore the level on the axis multiplied by the squared magnitude of the transverse transform of the deposited source. For the beam of these runs, whose size is far below a cell of the grid, that transform is the response of the bilinear deposit to a point, which decreases toward the Nyquist wavenumber of the grid.
 
