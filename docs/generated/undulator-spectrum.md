@@ -7,7 +7,7 @@
 :name: fig-und-line
 :alt: The line on the axis of three undulators on a logarithmic axis, as a function of the relative frequency times the number of periods, from minus four to four. The points of all three undulators lie on the curve of sinc squared, through its central lobe and three side lobes on each side.
 
-The energy radiated on the axis per unit frequency and solid angle, divided by its value at the peak, as a function of $N\nu$, where $\nu = \omega/\omega_1 - 1$ and $N$ is the number of periods. The points are one run of each undulator, and the curve is $\mathrm{sinc}^2(\pi N\nu)$. The largest difference from the curve is 1.2e-05 for FLASH1 at 165 periods, 0.00011 at 55 periods and 3.3e-05 for the Delta undulator. The difference is that of a pulse sampled once per wavelength, $(\pi\nu)^2/3$ of the line ([](#und-on-axis)).
+The energy radiated on the axis per unit frequency and solid angle, divided by its value at the peak, as a function of $N\nu$, where $\nu = \omega/\omega_1 - 1$ and $N$ is the number of periods. Each point is the squared magnitude of the Fourier sum, over the planes of the pulse, of the field of one run summed over $x$ and $y$ in each plane. The curve is $\mathrm{sinc}^2(\pi N\nu)$. The pulse of each run consists of $N$ equal planes, of which this curve is the spectrum. The largest difference from the curve is 1.2e-05 for FLASH1 at 165 periods, 0.00011 at 55 periods and 3.3e-05 for the Delta undulator. The difference is that of a pulse sampled once per wavelength, $(\pi\nu)^2/3$ of the line ([](#und-on-axis)).
 :::
 <!-- end fig-und-line -->
 
