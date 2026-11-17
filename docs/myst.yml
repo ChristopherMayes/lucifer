@@ -17,6 +17,7 @@ project:
         - file: notebooks/output.ipynb
     - file: fel-physics.md
     - file: shot-noise.md
+    - file: undulator-spectrum.md
     - file: validation.md
     - file: performance.md
     - file: startup-noise.md

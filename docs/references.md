@@ -81,6 +81,19 @@ These are the sources of [](startup-noise.md#prior-work), each read for that pag
 (ref-hwang-qiang)=
 **Artificial noise from mesh migration.** K. Hwang and J. Qiang, [Phys. Rev. Accel. Beams **21**, 120702 (2018)](https://doi.org/10.1103/PhysRevAccelBeams.21.120702). An improved shot-noise model under period averaging, suppressing the artificial noise that particle migration across the longitudinal mesh produces.
 
+## Sources of the undulator-radiation page
+
+These are the sources of [](undulator-spectrum.md).
+
+(ref-jackson)=
+**The radiation of a moving charge.** J. D. Jackson, *Classical Electrodynamics*, 3rd ed. (Wiley, New York, 1999), Sec. 14.5. The energy radiated per unit frequency and solid angle as an integral over the trajectory, Eq. 14.67, which `tests/scripts/undulator_radiation.py` evaluates over one period of an ideal undulator.
+
+(ref-kim)=
+**Undulator radiation.** K.-J. Kim, [AIP Conf. Proc. **184**, 565 (1989)](https://doi.org/10.1063/1.38046). The line of an undulator of $N$ periods, its resonance as a function of angle, and the level on the axis with the coupling factor $[JJ]$ of a planar undulator. The helical undulator is treated by B. M. Kincaid, [J. Appl. Phys. **48**, 2684 (1977)](https://doi.org/10.1063/1.324138).
+
+(ref-delta)=
+**The Delta undulator of the LCLS.** H.-D. Nuhn et al., [Proc. FEL2013, TUPSO52, p. 348](https://proceedings.jacow.org/FEL2013/papers/tupso52.pdf): a variable-polarization undulator 3.2 m long with a period of 32 mm. A. A. Lutman et al., [Nature Photon. **10**, 468 (2016)](https://doi.org/10.1038/nphoton.2016.79): circularly polarized pulses at 707 eV from a beam of 4 GeV. `tests/bmad/und_delta.bmad` takes its length, period, beam energy and photon energy from these two.
+
 ## Standards
 
 **openPMD**, with the beamphysics extension for particle dumps and EXT_Wavefront for field dumps. The only dump format this code writes. Note: openPMD's `unitSI` is load-bearing, which is the opposite of the [statistics file](glossary.md#gl-statistics-file)'s convention, so the two never appear in one file. See [](fel-physics.md#sec-openpmd) and [](BMAD-STATS-SPEC.md).
