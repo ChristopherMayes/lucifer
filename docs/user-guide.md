@@ -77,7 +77,7 @@ The file vocabulary of a run has four extensions:
 |---|---|---|
 | `.toml` | you | The input file: the lattice at the top and the tables `[run]`, `[window]`, `[beam]`, `[field]`, `[wake]`, `[space_charge]` and `[bmad]` |
 | `.bmad` | you | A Bmad lattice, named by the input file's `lattice`. Variants call a shared one and override it |
-| `.h5` | the run | HDF5, openPMD throughout: the statistics file, and the beam and field dumps |
+| `.h5` | the run | HDF5: the statistics file, a `bmad-stats` file, and the beam and field dumps, which are openPMD |
 | `.txt` | the run | The named streams, one per subject: diag, [ledger](glossary.md#gl-ledger), import, fp32, migration, wake |
 
 What each written file holds is the output section below, and what to do with it is [`reading-output.md`](reading-output.md).

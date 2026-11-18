@@ -186,7 +186,7 @@ The push is linear in the particles (1.035, 3.929, 16.294 for 512, 2048, 8192) a
 
 That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 11.19$ s and $d = 1.76 \times 10^{-4}$ s per particle. The slope is the deposit. It was 2.15e-4 on 2026-10-24 and 2.16e-4 on 2026-11-14, under either plan, since the deposit is this code's own arithmetic. The deposit's loop is unchanged since then, and what changed is that it fills an array the thread keeps and no longer one allocated for the call. At 2048 particles per slice the fit predicts 11.19 s of transform and propagator plus 0.36 s of deposit, 11.55 s against the 11.324 s measured, a 2.0 percent residual on a two-point fit.
 
-[](validation.md#val-the-particlepath-cost-measured) measured a real 131-slice case where the particle path dominated at 8192 particles per slice while the field FFTs stayed constant. That is this table, and the two agree.
+[](validation.md#val-particle-path) measured a real 131-slice case where the particle path dominated at 8192 particles per slice while the field FFTs stayed constant. That is this table, and the two agree.
 
 (perf-thread-scaling)=
 ## Thread scaling
@@ -348,7 +348,7 @@ Neither probe build is a candidate implementation, and the audit rules the inlin
 | $\lvert \theta \rvert < 10^6$ | 24 ulp | 34% |
 | $\lvert \theta \rvert < 10^8$ | 2681 ulp | 34% |
 
-The shim it would replace was admitted at one ulp on $2 \times 10^{-6}$ of arguments, 73 mismatches in a 44M-point sweep ([](validation.md#val-the-particlepath-cost-measured)). This candidate is six ulp on a third of them, five orders of magnitude more arguments and six times the error, so it cannot be recorded as a 1-ulp change. The error is the two-term reduction rather than the kernels. A reduction accurate enough to reach one ulp costs arithmetic that eats a 3.2% gain. The range is also not a constant. $\theta$ carries the common phase accumulating along the line, so a longer line moves toward the degradation with nothing to detect it.
+The shim it would replace was admitted at one ulp on $2 \times 10^{-6}$ of arguments, 73 mismatches in a 44M-point sweep ([](validation.md#val-particle-path)). This candidate is six ulp on a third of them, five orders of magnitude more arguments and six times the error, so it cannot be recorded as a 1-ulp change. The error is the two-term reduction rather than the kernels. A reduction accurate enough to reach one ulp costs arithmetic that eats a 3.2% gain. The range is also not a constant. $\theta$ carries the common phase accumulating along the line, so a longer line moves toward the degradation with nothing to detect it.
 
 The version of this that could pay is a vectorized pair inside a loop that vectorizes, where one reduction amortizes over a whole vector. The averaged path has no such loop, for the reasons in the audit section below.
 
