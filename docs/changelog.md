@@ -9,6 +9,21 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-17 Fixed: statements in the documentation that the program had moved past. `docs/index.md`
+  gave the device to the averaged method alone, listed the unaveraged mode among what the device
+  refuses and stated a speedup of 7x to 12x: the device runs both methods, refuses space charge,
+  spontaneous radiation, the coherent source and Bmad element wakes on an FEL element, and
+  `docs/performance.md` measures 4.7x to 7.2x on a 256-point grid. `docs/input-reference.md` said
+  the device refuses two live polarizations in the unaveraged mode and the escaped-field bank, where
+  it runs the first and keeps the bank under the spectral propagator, and said the pulse and escaped
+  files are in Genesis4's field format, where they are openPMD. `docs/validation.md` quoted thread
+  speedups of 7.00x and 9.59x where `docs/performance.md` has 6.54x and 8.62x, named the smoke test
+  under `tests/` where it is `programs/lucifer_smoke_test.f90`, and called `field.harmonics` a
+  namelist. `docs/genesis4.md` said Lucifer is driven by three namelists. The count of check
+  sections, twenty-eight in `docs/index.md` and twenty-nine in `README.md`, is replaced by a link to
+  the list. The two references in `docs/performance.md` to the particle-path section of
+  `docs/validation.md` resolved to nothing, and the section now carries the label
+  `val-particle-path`.
 - 2026-11-17 Fixed: the description of an input key is written in full. A key's description was
   stored in 240 characters (`fel_key_struct` of `src/fel_schema_mod.f90`) and a longer one was
   cut without a message, so the descriptions of `field.propagator` and `field.n_wavelength`

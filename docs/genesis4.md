@@ -42,7 +42,7 @@ Genesis4 has, and Lucifer does not:
 
 ## Translating settings
 
-Genesis4 is driven by namelists over its own lattice format. Lucifer is driven by three namelists over a Bmad lattice, with the FEL parameters living on the elements. The parameter reference is [](input-reference.md).
+Genesis4 is driven by namelists over its own lattice format. Lucifer is driven by one TOML input file over a Bmad lattice, with the FEL parameters living on the elements. The parameter reference is [](input-reference.md).
 
 | Genesis4 | Lucifer | Note |
 |---|---|---|

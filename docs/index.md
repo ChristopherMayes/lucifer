@@ -21,7 +21,7 @@ Lucifer has:
 - **Phasing between segments**, following the real geometry in absolute time tracking and autophased in the default relative mode.
 - **Spontaneous emission** turned on by Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
-- **A GPU backend** for the averaged method on Apple Silicon (`run.device = "metal"`). The beam and the field stay resident on the device through each FEL element, harmonic field sets, both polarizations and slice migration included. It is measured between 7x and 12x against twelve CPU cores and checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
+- **A GPU backend** on Apple Silicon (`run.device = "metal"`), for the averaged and the unaveraged method. The beam and the field stay resident on the device through each FEL element, with harmonic field sets, both polarizations, slice migration, the chamber wake in the averaged method and the [spectral propagator](glossary.md#gl-propagator). On a 256-point grid the device is 4.7 to 7.2 times as fast as twelve CPU threads, and on a single slice of 1024 particles on a 64-point grid it is slower than the CPU ([](performance.md#perf-device)). The device is checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
 - **openPMD** particle and field dumps in both directions, and a self-describing [statistics file](glossary.md#gl-statistics-file) described by [](BMAD-STATS-SPEC.md).
 - **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever [load](glossary.md#gl-load) there is.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
@@ -67,7 +67,7 @@ Lucifer does not have:
 - Elliptical polarization beyond the tilt-honored planar and helical limits.
 - One-to-one particle tracking, and the particle sorting it implies.
 - Undulator field errors.
-- On the GPU: collective effects and the unaveraged mode, each refused. A CUDA backend, which the device interface is shaped for.
+- On the GPU: space charge, spontaneous radiation, the coherent source and Bmad element wakes on an FEL element, each refused. A CUDA backend, which the device interface is shaped for.
 - MPI. The shared-memory design is a design decision rather than a gap, and a case for adding MPI would rest on a measurement.
 
-Validation runs on eleven comparison tiers and twenty-eight [check sections](glossary.md#gl-validation-suite), on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants. Three are measured model differences rather than defects, and one shows nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).
+Validation runs on eleven comparison tiers and the [check sections](glossary.md#gl-validation-suite) that [](validation.md) lists, on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants. Three are measured model differences rather than defects, and one shows nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).
