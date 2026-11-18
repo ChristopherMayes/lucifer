@@ -9,6 +9,14 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-17 Fixed: the description of an input key is written in full. A key's description was
+  stored in 240 characters (`fel_key_struct` of `src/fel_schema_mod.f90`) and a longer one was
+  cut without a message, so the descriptions of `field.propagator` and `field.n_wavelength`
+  ended in the middle of a sentence and that of `run.fft_plan` lost its period, in
+  `python/lucifer/schema.json`, in the docstrings of `python/lucifer/models.py`, in the key
+  tables of `docs/input-reference.md`, in the attributes under `params/` of the stats file and
+  in the message of a refused value. The description is now a string of its own length. No
+  other key's description changed, and no recorded digit moved.
 - 2026-11-16 Added: the spontaneous radiation of one undulator is held to the closed forms of
   undulator radiation, in the `undulator-spectrum` section of the validation suite
   (`tests/scripts/check_undulator_spectrum.py`) and on a page of its own,
