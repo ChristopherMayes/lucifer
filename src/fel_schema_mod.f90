@@ -61,7 +61,7 @@ type fel_key_struct
   integer :: kind = 0
   character(16) :: unit = ''
   character(32) :: label = ''
-  character(240) :: descrip = ''
+  character(:), allocatable :: descrip
   real(rp) :: lo = -huge(1.0_rp), hi = huge(1.0_rp)
   logical :: lo_open = .false., hi_open = .false.
   logical :: recorded = .true.
@@ -864,6 +864,7 @@ integer i
 
 !
 
+key%descrip = ''
 call fel_schema_table (keys)
 do i = 1, size(keys)
   if (trim(keys(i)%table) // '.' // trim(keys(i)%name) /= dotted) cycle

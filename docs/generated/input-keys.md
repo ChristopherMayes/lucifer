@@ -56,7 +56,7 @@
 | `device_timing` | true/false | false |  |  | Per-pass device timing, one compute encoder a pass. Slows the run. |
 | `device_dep_mutate` | integer | `0` |  |  | Shift the device deposit's fixed-point scale, in bits. A check instrument. |
 | `device_wake_mutate` | true/false | false |  |  | Enlarge the device's chamber-wake decrement by 2^-4. A check instrument. |
-| `fft_plan` | string | `"wisdom"` |  | `"wisdom"`, `"wisdom_file"`, `"estimate"`, `"measure"` | The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run. wisdom_file is wisdom, and is what a run records where a wisdom file made the plan |
+| `fft_plan` | string | `"wisdom"` |  | `"wisdom"`, `"wisdom_file"`, `"estimate"`, `"measure"` | The plan of the transverse transform: wisdom, the measured plan the source records; estimate, FFTW's estimated plan; or measure, a plan measured in this run. wisdom_file is wisdom, and is what a run records where a wisdom file made the plan. |
 | `fft_wisdom_file` | string | `"cache"` |  |  | The wisdom file fft_plan = wisdom plans from where the source records no plan: cache, the file of the cache directory, a path, or blank for none. |
 <!-- end keys-run -->
 
@@ -130,8 +130,8 @@
 | `seed_waist_size` | real | `0` | m | from 0 | The seed's intensity 1/e^2 radius. |
 | `seed_polarization` | string | `"x"` |  | `"x"`, `"y"` | The seed's polarization, x or y. |
 | `harmonics` | list of integers | `[1]` |  |  | The field set: 1 first, then further harmonic numbers in increasing order. |
-| `propagator` | string | `"slices"` |  | `"slices"`, `"spectral"` | The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slip |
-| `n_wavelength` | integer | `0` | wavelengths | from 0 | The field's plane along tau, a whole multiple of window.n_wavelength. 0 takes the window's slice under the slice propagator, which holds one plane a slice and takes no other, and under the spectral propagator derives a fraction of the coope |
+| `propagator` | string | `"slices"` |  | `"slices"`, `"spectral"` | The field propagator: slices, one transverse transform per slice at the reference wavenumber and the slippage by whole slices; or spectral, the whole window transformed in (x, y, tau), each mode diffracted at its own wavenumber and the slippage a continuous phase ramp, the light it carries past the head banked as the escaped field. |
+| `n_wavelength` | integer | `0` | wavelengths | from 0 | The field's plane along tau, a whole multiple of window.n_wavelength. 0 takes the window's slice under the slice propagator, which holds one plane a slice and takes no other, and under the spectral propagator derives a fraction of the cooperation length in whole slices, cut so the window keeps 8 planes. A stated value above a quarter of the cooperation length is refused, unless it is the window's own slice. |
 <!-- end keys-field -->
 
 (keys-wake)=
