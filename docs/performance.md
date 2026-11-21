@@ -213,6 +213,24 @@ A steady-state run gets nothing from threads. The parallelism is over slices, an
 
 The field-free drift is parallel over slices for the same reason. A time-dependent line makes one `wavefront_drift` call per field-free element. With that call's slice loop serial, a 590-slice, 256-point case took about 0.5 s per element on one core, the largest serial block of the walk.
 
+(perf-electrons)=
+### Every electron of the LCLS window, on 12 and on 128 cores
+
+The run is the example `lcls_electrons` ([](generated/examples/lcls_electrons.md)): the 30.8 pC window of LCLS loaded with `beam.load_mode = "electrons"` ([](fel-physics.md#sec-electrons)), 192,386,391 particles in 300 slices on a 128-point grid, 1254 steps over 132 m with 96 field-free elements between the segments. The two runs gave the same exit power, pulse energy and bunching to every digit the program prints.
+
+*Measured 2026-11-21. Apple M3 Max: 12 threads, gfortran 15.3.0, with another program on the same cores for the first hour of the run. NERSC Perlmutter CPU node: two AMD EPYC 7763, 128 cores, 512 GB, 128 threads bound to cores and spread, gfortran 15.3.0 and Bmad from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"` with the plan measured on the node.*
+
+| phase | M3 Max, 12 threads | Perlmutter, 128 threads | ratio |
+|---|---|---|---|
+| particle push | 4330 s | 970 s | 4.5 |
+| interludes | 375 s | 1235 s | 0.30 |
+| statistics | 1253 s | 224 s | 5.6 |
+| field solve | 746 s | 194 s | 3.8 |
+| walk | 6704 s | 2623 s | 2.6 |
+| memory at the peak | 16.9 GB | 30.9 GB | |
+
+The particle push, the statistics and the field solve are 3.8 to 5.6 times as fast on the node, and the walk 2.6 times. The interludes are the exception: they take 3.3 times as long on 128 threads as on 12, and are 47 percent of the node's walk. In an interlude each thread converts one slice at a time to a Bmad bunch of 224 bytes per particle, tracks it through the element with `track1_bunch` and converts it back, 144 MB allocated and written per slice per element. In thread-seconds the push takes 2.4 times as much on the node as on the M3 Max and the interlude 35 times as much, so relative to the push the interlude takes 15 times as many thread-seconds on the node as on the M3 Max. What limits it has not been measured. The memory beyond the 13.1 GB of the particles is mostly those bunches, one per thread.
+
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
 

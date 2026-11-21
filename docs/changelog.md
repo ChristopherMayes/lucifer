@@ -26,7 +26,9 @@ of that history. The entries before that date describe that branch.
   are refused above 2147483647 particles. A new key, `run.write_final_beam`, says whether the
   beam at the exit is written. It is on by default and off in the electrons mode, where the file
   would hold every electron. The example `examples/lcls_electrons` tracks the 192,386,391
-  electrons of the LCLS window in 17 GB and 1 h 52 min on twelve cores: its gain length is
+  electrons of the LCLS window in 17 GB and 1 h 52 min on twelve cores, and in 31 GB and 44 min
+  on a node of 128 cores, where the interludes take 47 percent of the walk
+  (`docs/performance.md`): its gain length is
   3.537 m and its saturation point 65.02 m, where the weight load of `examples/lcls` has
   3.549 m and 65.20 m. The `electron-load` section of the validation suite
   (`tests/scripts/check_electron_load.py`) holds the load's counts, its bunching at one over the
