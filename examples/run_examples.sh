@@ -16,6 +16,9 @@
 # has run.sh for that. Where run.sh finds its files is checked here, through its
 # --show-locations option and from a directory outside both checkouts.
 #
+# lcls_electrons is not run here either. It tracks every electron of the LCLS window,
+# 1.9e8 particles in 17 GB, for over an hour on twelve cores.
+#
 # Usage:
 #
 #   run_examples.sh [--exe <lucifer>] [--python <python3>] [--dpi <n>] [--no-figures]
@@ -154,6 +157,7 @@ DIRS=()
 for dir in */; do
   dir="${dir%/}"
   [[ "$dir" == "saturation_demo" ]] && continue
+  [[ "$dir" == "lcls_electrons" ]] && continue
   # The input files run lucifer.toml first, then the rest in byte order. A directory's input files can
   # depend on each other: import's lucifer_from_file.toml reads the bunch its lucifer.toml
   # writes. The glob's own order follows the locale's collation, under which

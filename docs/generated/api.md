@@ -98,6 +98,16 @@ A slice that holds less than one electron in all is counted apart, since no load
 it has a physical level.
 ```
 
+(api-fel-migrate-work-struct)=
+### `fel_migrate_work_struct`
+
+*Struct*
+
+```
+What fel_migrate_slices holds for one slice during a call: the particles that leave it,
+the replay of the serial scan, and the particles copied out on their way.
+```
+
 (api-fel-weight-draw-struct)=
 ### `fel_weight_draw_struct`
 
@@ -1174,8 +1184,8 @@ Output:
   err_flag    -- logical: Set True on error (a lost particle), False otherwise.
 ```
 
-(api-fel-migrate-slices)=
-### `fel_migrate_slices`
+(api-fel-migrate-slices-serial)=
+### `fel_migrate_slices_serial`
 
 *Subroutine* `(beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)`
 
@@ -1203,9 +1213,10 @@ whose destination lies beyond the window are dropped, and their charge is counte
 charge_dropped. Genesis discards them silently at the world edges (sec-migration).
 The accounting is this port's own, so conservation can be checked.
 
-The routine is serial. It is called between the parallel regions at the caller's
-stride, so the result does not depend on the thread count. A single-slice beam returns
-at once, since a steady-state slice is periodic and migration has no meaning there.
+The routine is serial, and it defines the order the particles of a slice are left in.
+fel_migrate_slices gives the same slices in threads and calls this routine in the one
+case it does not reproduce. A single-slice beam returns at once, since a steady-state
+slice is periodic and migration has no meaning there.
 ```
 
 ```
@@ -1215,7 +1226,7 @@ Input:
 
 Output:
   beam             -- fel_beam_struct: Particles re-sliced. Slice fill counts updated.
-  n_moved          -- integer: Number of particles moved between slices (this call).
+  n_moved          -- integer(8): Number of particles moved between slices (this call).
   charge_dropped   -- real(rp): Charge of particles dropped off the window ends [C].
   drop_re, drop_im -- real(rp): Weighted phasor sum(w*e^{i theta}) of the dropped
                        particles, at their phase when dropped. Lets the caller check
@@ -1230,6 +1241,78 @@ Output:
                        after the event no longer holds them. Huge when no particle was
                        examined.
   err_flag         -- logical: Set True on error, False otherwise.
+```
+
+(api-fel-migrate-slices)=
+### `fel_migrate_slices`
+
+*Subroutine* `(beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)`
+
+```
+Routine to move particles between slices when their ponderomotive phase leaves the
+slice window, in threads. The slices it leaves are those of fel_migrate_slices_serial
+to the bit, at any thread count: the same particles in each slice, in the same order.
+That routine's header gives the criterion and the meaning of the outputs.
+
+The serial routine scans the slices upward. In a slice it scans the particles upward,
+and a particle that leaves is replaced by the last particle of the slice, which is then
+examined in its place. A particle sent to a higher slice is appended to it before that
+slice is scanned, and one sent to a lower slice after. The order this leaves is found
+here without the scan:
+
+  1. In threads, a slice lists the positions of its particles that leave, each with its
+     destination. The phase arithmetic is the serial routine's.
+  2. The particles a slice receives from below are counted. Its array at the moment the
+     serial scan would reach it is its own particles followed by those.
+  3. In threads, the scan of a slice is replayed on the list alone. A pointer walks the
+     leaving positions upward and another walks the array's end downward. The replay
+     gives the order the particles leave in and, for each place vacated, the place its
+     replacement is taken from. The particles that leave are copied out in that order
+     and the slice's own replacements are made.
+  4. Each particle that leaves is given its place in its destination, in the order of
+     the serial appends: by source slice, then by the order of leaving. The sums over
+     the dropped particles are taken in the same order, so they have the serial bits.
+  5. In threads, the particles are written to those places.
+
+The serial scan examines a particle received from below a second time, in its new
+slice. Its shifted phase lies in the window to rounding. Where rounding puts it outside,
+the serial scan sends it on, and the replay above does not follow that. Step 1 computes
+the second examination, and if any particle would be sent on, the whole call is made by
+fel_migrate_slices_serial instead.
+```
+
+```
+Input:
+  beam        -- fel_beam_struct: The beam.
+  ks          -- real(rp): Radiation wavenumber twopi/wavelength [1/m].
+
+Output:
+  beam             -- fel_beam_struct: Particles re-sliced. Slice fill counts updated.
+  n_moved          -- integer(8): Number of particles moved between slices (this call).
+  charge_dropped   -- real(rp): Charge of particles dropped off the window ends [C].
+  drop_re, drop_im -- real(rp): Weighted phasor of the dropped particles.
+  margin           -- real(rp): The smallest distance in phase [rad] from a particle
+                       examined to a slice boundary. Huge when none was examined.
+  err_flag         -- logical: Set True on error, False otherwise.
+```
+
+(api-fel-beams-identical)=
+### `fel_beams_identical`
+
+*Function* `(beam_a, beam_b) result (identical)`
+
+```
+Routine to say whether two beams hold the same particles in the same slices in the same
+order, every coordinate, weight and label equal to the bit. The migration check compares
+the slices of fel_migrate_slices with those of fel_migrate_slices_serial by it.
+```
+
+```
+Input:
+  beam_a, beam_b -- fel_beam_struct: The two beams.
+
+Output:
+  identical      -- logical: True if they are the same.
 ```
 
 (api-fel-phi0-rate)=
@@ -1638,7 +1721,7 @@ Output:
   nstep       -- integer: FEL integration steps, summed over the segments the walk
                    covers. An unaveraged segment counts its substeps, since it
                    integrates and deposits on each.
-  n_particle  -- integer: Macroparticles in the window.
+  n_particle  -- integer(8): Macroparticles in the window.
   n_pstep     -- real(rp): Particle-steps, the product of the two. Real since it
                    passes 2^31 on an ordinary time-dependent run.
   n_gpt       -- real(rp): Transverse grid points the field solve touches per step,
@@ -3452,6 +3535,18 @@ Rank 0 is a true HDF5 scalar. Counts are stored as integers and *not* as floats.
 Input and output as fel_h5_real, with val integer.
 ```
 
+(api-fel-h5-int8-rank0)=
+### `fel_h5_int8_rank0`
+
+*Subroutine* `(id, name, unit, label, descrip, axes, val, error)`
+
+```
+Routine to write one 8-byte integer as a scalar dataset with its four documentation
+attributes. A count of particles passes the largest default integer above 2^31 - 1.
+
+Input and output as fel_h5_real, with val integer(8).
+```
+
 (api-fel-h5-flag-rank-n)=
 ### `fel_h5_flag_rank<n>`
 
@@ -3781,7 +3876,7 @@ Output:
 
 ```
 The starting state of a run. fel_init_beam reads an openPMD dump of slices, or loads a
-beam_init bunch by load_mode (sampled or kept). fel_init_wavefront reads an openPMD
+beam_init bunch by load_mode (sampled, kept or as single electrons). fel_init_wavefront reads an openPMD
 wavefront or generates the Gaussian seed, and adds the harmonic entries.
 Errors return through err_flag, and nothing here stops.
 ```
@@ -3796,7 +3891,9 @@ Routine to build the beam. It reads an openPMD particle dump of slices (beam.fil
 loads a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
 described bunch takes the analytic generator. A file, beam.position_file, takes
 the resampler of fel_import_mod. In the keep mode every particle of the bunch stays as
-a beamlet of copies. The routine applies the beam-side check instruments
+a beamlet of copies. In the electrons mode every electron of a described bunch is one
+particle (load_electrons), and a bunch file of single electrons is kept as it is.
+The routine applies the beam-side check instruments
 (split_weights, swap_beam_xy) and sets run%nslice. One seed (run.ran_seed) governs
 generation, resampling and noise. Errors return through err_flag, and nothing here stops.
 ```
@@ -3822,6 +3919,49 @@ with no file (fel-physics.md sec-loading). The transverse planes are matched Gau
 on the lattice Twiss, and the per-slice current is derived. With the quiet start the
 particles are beamlets on a uniform ponderomotive phase grid. Without it they are
 independent particles. Shot noise is imposed where asked.
+```
+
+(api-load-electrons)=
+### `load_electrons`
+
+*Subroutine* `(cur, n_slice_e, p0_mc)`
+
+```
+Routine for load_mode = "electrons" from a described bunch (fel-physics.md sec-loading).
+Every electron of the bunch is one particle. The charge of the window is counted as the
+nearest whole number of electrons, as the weight load counts it (fel_weight_start), and
+each particle has the window's charge over that number, which is e to one part in twice
+the count. The loaded charge is then the window's exactly.
+
+The counts of the slices are one multinomial draw, taken in order from the program's
+random stream: a slice takes a binomial share of the electrons not yet given, by its
+share of the charge not yet loaded. An electron then draws its four transverse
+coordinates from the matched Gaussian, its energy from the Gaussian of beam.sig_pz and
+its phase evenly over the wavelengths of its slice. No two electrons share a coordinate,
+so the bunching of a slice of N electrons has the mean square 1/N at every harmonic,
+and nothing is imposed.
+
+Each slice draws from a random state of its own, seeded on the run's seed and the
+slice's index. The slices are filled in threads, and the load is the same at any thread
+count.
+```
+
+```
+Input:
+  cur(:)    -- real(rp): The current of each slice [A].
+  n_slice_e -- integer: Slices.
+  p0_mc     -- real(rp): Reference momentum p0/(m_e c).
+```
+
+(api-slice-seed)=
+### `slice_seed`
+
+*Function* `(seed, ix_slice) result (seed_s)`
+
+```
+Routine to give the seed of one slice's random state in the electrons mode. The seeds
+of the slices of a run are distinct, and they are positive, since a seed of zero is
+taken from the clock.
 ```
 
 (api-check-beam-init-contract)=
@@ -5484,6 +5624,40 @@ Input:
   value   -- integer: The count.
 ```
 
+(api-fel-record-int8)=
+### `fel_record_int8`
+
+*Subroutine* `(group, name, descrip, value)`
+
+```
+Routine to hold one count of particles for the stats file, as an 8-byte integer.
+```
+
+```
+Input:
+  group   -- character(*): setup, run or timing.
+  name    -- character(*): The dataset's name.
+  descrip -- character(*): Its description.
+  value   -- integer(8): The count.
+```
+
+(api-fel-int8-str)=
+### `fel_int8_str`
+
+*Function* `(value) result (str)`
+
+```
+Routine to write an 8-byte integer as a string, as int_str does a default integer.
+```
+
+```
+Input:
+  value -- integer(8): The number.
+
+Output:
+  str   -- character(:), allocatable: Its digits.
+```
+
 (api-fel-record-flag)=
 ### `fel_record_flag`
 
@@ -5700,6 +5874,25 @@ Input:
 
 Output:
   key     -- fel_key_struct: The key. A name no key has gives a key with a blank name.
+```
+
+(api-fel-schema-is-set)=
+### `fel_schema_is_set`
+
+*Function* `(run, dotted) result (is_set)`
+
+```
+Routine to say whether the input file or the command line gave a key a value.
+```
+
+```
+Input:
+  run    -- fel_run_struct: The run state.
+  dotted -- character(*): The key as table.key, beam.n_particle.
+
+Output:
+  is_set -- logical: True if the key was set. False for a default or a derived value,
+              and for a key the table does not have.
 ```
 
 (api-fel-schema-mark)=
@@ -7795,7 +7988,7 @@ Bmad's own chart.
 
 ```
 Routine to run slice migration at the per-element stride.
-Migration runs serially, between the parallel regions. It is called after z_now is
+Migration runs between the parallel regions. It is called after z_now is
 advanced. So each drop report carries the z of the diagnostic record it precedes, and
 the conservation timeline can be rebuilt from the log.
 

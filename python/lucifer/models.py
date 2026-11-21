@@ -73,6 +73,8 @@ class Run:
     """Write the Genesis-comparison text diag file, which is large."""
     write_initial: bool = False
     """Dump the initial state before tracking."""
+    write_final_beam: bool = True
+    """Write the beam at the exit, <out_root>-final.beam.h5. Unset, it is written, except in the electrons mode of beam.load_mode, where the file holds every electron."""
     load_only: bool = False
     """Build the initial state, dump it, stop."""
     keep_escaped_field: bool = True
@@ -158,8 +160,8 @@ class Beam:
     """The flat profile's lower z bound, read under grid only. [m]"""
     z_max: float = 0.0
     """The flat profile's upper z bound, read under grid only. [m]"""
-    load_mode: Literal['sample', 'keep'] = 'sample'
-    """How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, or keep, every particle kept with the counts following the charge."""
+    load_mode: Literal['sample', 'keep', 'electrons'] = 'sample'
+    """How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, keep, every particle kept with the counts following the charge, or electrons, one particle for every electron of the bunch."""
     quiet_start: bool = True
     """Load beamlets of beamlet_size phase copies, quiet below that harmonic."""
     beamlet_size: int = 0

@@ -1,6 +1,6 @@
 # FEL examples
 
-The examples are self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates and what to look for in the plot. The quantities measured on each run are in a table on the example's page, written by the runner.
+The examples are self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates and what to look for in the plot. The quantities measured on each run are in a table on the example's page, written by the runner. `lcls_electrons/` is run by hand, since it takes over an hour, and its README states what its run measured.
 
 The validation suite, which compares against Genesis4, is in `tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`docs/fel-physics.md`](../docs/fel-physics.md).
 
@@ -45,6 +45,7 @@ Times are wall clock for a production build on twelve cores. A debug build is se
 | [`chicane/`](chicane/) | A four-bend chicane between segments in absolute time: half a wavelength of geometry flips gain to absorption | about a second each |
 | [`coherent_source/`](coherent_source/) | Tanaka's coherent-source retrieval against the per-particle deposit | a couple of seconds each |
 | [`saturation_demo/`](saturation_demo/) | The full 57 m case to saturation, three trackers from identical dumps, one clock. Needs genesis4 | about twenty-five minutes |
+| [`lcls_electrons/`](lcls_electrons/) | The LCLS window of [`lcls/`](lcls/) with one particle for every electron, $1.9\times10^{8}$ of them. Needs 17 GB | over an hour on twelve cores |
 
 ## What each feature is exemplified by
 
@@ -69,7 +70,7 @@ The table has one row per feature declared in [the introduction](../docs/index.m
 | A GPU backend for the averaged method | [`steady_state/`](steady_state/), [`sase/`](sase/), [`harmonics/`](harmonics/), [`crossed_undulator/`](crossed_undulator/) and [`migration/`](migration/) run on it with `run.device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
 | openPMD dumps in both directions | [`steady_state/`](steady_state/) writes mid-run, [`import/`](import/) round-trips a bunch through a file, [`frames/`](frames/) writes a series along z, [`saturation_demo/`](saturation_demo/) reads Genesis4's |
 | A self-describing statistics file | Every example writes one |
-| One load path | [`import/`](import/) |
+| One load path | [`import/`](import/), and [`lcls_electrons/`](lcls_electrons/) for the electrons mode |
 | A coherent source model | [`coherent_source/`](coherent_source/) |
 
 Thread independence is a few commands rather than a directory. The threads divide the slices, so it takes a time-dependent example. Add `run.write_diag = true` to `migration/lucifer.toml` and run it twice:

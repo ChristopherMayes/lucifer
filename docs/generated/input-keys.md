@@ -43,6 +43,7 @@
 | `ran_seed` | integer | `12345` |  |  | The one random seed: generation, import and noise. |
 | `write_diag` | true/false | false |  |  | Write the Genesis-comparison text diag file, which is large. |
 | `write_initial` | true/false | false |  |  | Dump the initial state before tracking. |
+| `write_final_beam` | true/false | true |  |  | Write the beam at the exit, <out_root>-final.beam.h5. Unset, it is written, except in the electrons mode of beam.load_mode, where the file holds every electron. |
 | `load_only` | true/false | false |  |  | Build the initial state, dump it, stop. |
 | `keep_escaped_field` | true/false | true |  |  | Keep the light slippage carries out of the window, as the whole pulse at the exit. On by default, since the light is what an FEL makes. A run whose window holds all its light writes no file. |
 | `write_escaped` | true/false | false |  |  | Also write the escaped file, each plane of the bank as it left the window. Off by default, since the pulse holds the same light at the exit with each plane's transmission position and params. Needs keep_escaped_field. |
@@ -89,7 +90,7 @@
 | `z_distribution` | string | `"RAN_GAUSS"` |  | `""`, `"RAN_GAUSS"`, `"GRID"` in any case | The current profile: ran_gauss, a Gaussian of sig_z, or grid, flat from z_min to z_max. |
 | `z_min` | real | `0` | m |  | The flat profile's lower z bound, read under grid only. |
 | `z_max` | real | `0` | m |  | The flat profile's upper z bound, read under grid only. |
-| `load_mode` | string | `"sample"` |  | `"sample"`, `"keep"` | How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, or keep, every particle kept with the counts following the charge. |
+| `load_mode` | string | `"sample"` |  | `"sample"`, `"keep"`, `"electrons"` | How the bunch becomes slices: sample, n_particle in a slice with weights from the slice charge, keep, every particle kept with the counts following the charge, or electrons, one particle for every electron of the bunch. |
 | `quiet_start` | true/false | true |  |  | Load beamlets of beamlet_size phase copies, quiet below that harmonic. |
 | `beamlet_size` | integer | `0` |  | from 0 | Copies per beamlet. 0 derives it: twice the highest harmonic of field.harmonics plus 2, and in the sample mode the smallest divisor of n_particle at or above that. A size not above twice the highest harmonic is refused. |
 | `shot_noise` | true/false | false |  |  | Impose the physical noise on the load's groups. Time-dependent windows only. |

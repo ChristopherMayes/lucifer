@@ -9,6 +9,29 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-21 Added: `beam.load_mode = "electrons"` loads one particle for every electron of the
+  bunch. The charge of the window is counted as a whole number of electrons, the slices' numbers
+  are one multinomial draw with that total, and every electron has its own transverse
+  coordinates, energy and phase, so the shot noise is the load's own and nothing is imposed
+  (`load_electrons` of `src/fel_init_mod.f90`, `docs/fel-physics.md`). Each slice has a random
+  state of its own and the slices are loaded in threads, the same at any thread count. A value
+  other than the default in `beam.n_particle`, `quiet_start`, `beamlet_size`,
+  `beamlet_min_electrons` or `shot_noise_method` is refused in this mode, and a bunch file is
+  accepted only if each of its particles is one electron. `fel_migrate_slices` now runs in
+  threads and leaves the slices of the serial scan to the bit, which `run.migrate_check` compares
+  at every pass against `fel_migrate_slices_serial`: on 1e5 electrons per slice a pass takes a
+  sixth of the serial time on twelve threads. The particle label, the count of macroparticles in
+  the stats file (`setup/n_macroparticle`, now an 8-byte integer) and the count of particles
+  moved are 8-byte integers. A beam file and a Bmad element wake, which go through a Bmad bunch,
+  are refused above 2147483647 particles. A new key, `run.write_final_beam`, says whether the
+  beam at the exit is written. It is on by default and off in the electrons mode, where the file
+  would hold every electron. The example `examples/lcls_electrons` tracks the 192,386,391
+  electrons of the LCLS window in 17 GB and 1 h 52 min on twelve cores: its gain length is
+  3.537 m and its saturation point 65.02 m, where the weight load of `examples/lcls` has
+  3.549 m and 65.20 m. The `electron-load` section of the validation suite
+  (`tests/scripts/check_electron_load.py`) holds the load's counts, its bunching at one over the
+  number of electrons at nine wavenumbers, its moments, the refusals, a bunch file, a tracked
+  run with migration and the start-up energy against the weight load. No recorded digit moved.
 - 2026-11-17 Fixed: statements in the documentation that the program had moved past. `docs/index.md`
   gave the device to the averaged method alone, listed the unaveraged mode among what the device
   refuses and stated a speedup of 7x to 12x: the device runs both methods, refuses space charge,

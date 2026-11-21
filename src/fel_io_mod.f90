@@ -885,7 +885,8 @@ character(64) host
 character(:), allocatable :: stamp
 real(rp) n_pstep, n_gpt, secs, q_max, cur_peak, l_1d, l_coop, window, slip, dx, half, eps, ds_first
 real(rp) e_slice, e_beamlet, b_pulse, b_dev
-integer nfel, n_omp, ie, i, nstep, n_particle, ngrid, nstep_unavg, n_grid(3), is, is_max, nbeamlet, n_rot
+integer(8) n_particle
+integer nfel, n_omp, ie, i, nstep, ngrid, nstep_unavg, n_grid(3), is, is_max, nbeamlet, n_rot
 integer je_first, n_harm_lit
 logical any_segment, any_storage, any_warning
 character(16) backend
@@ -960,8 +961,10 @@ enddo
 call add_keys (c_beam, 'beam', '', skip = noise_keys)
 call add_keys (c_beam, 'beam.resample', 'resample.')
 call add_keys (c_field, 'field', '')
-call fel_column_rule (c_field, 'noise')
-call add_keys (c_field, 'beam', '', only = noise_keys)
+if (run%bparam%load_mode /= 'electrons') then
+  call fel_column_rule (c_field, 'noise')
+  call add_keys (c_field, 'beam', '', only = noise_keys)
+endif
 
 call fel_box_rule (fel_rule_mid$, 'beam', 'field', .not. any_segment, .true.)
 call fel_box_columns (c_beam, c_field)
@@ -1044,8 +1047,9 @@ if (run%global%source_filter .and. run%filter_edge > 0) then
 endif
 call fel_column_add (c_left, 'electrons / slice', number_text(e_slice))
 call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
-call fel_column_add (c_left, 'macroparticles', int_str(n_particle))
-if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0) then
+call fel_column_add (c_left, 'macroparticles', fel_int8_str(n_particle))
+if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0 .and. &
+    run%bparam%load_mode /= 'electrons') then
   call fel_column_add (c_left, 'beamlets / slice', int_str(nbeamlet))
   e_beamlet = e_slice / nbeamlet
   call fel_column_add (c_right, 'electrons / beamlet', number_text(e_beamlet))
@@ -1093,7 +1097,7 @@ call fel_record_int ('setup', 'grid_n_pts', 'The transverse grid''s points on a 
 call fel_record_real ('setup', 'filter_edge', 'rad', 'The source filter''s edge angle, 0 with the filter off.', &
       merge(run%filter_edge, 0.0_rp, run%global%source_filter))
 call fel_record_real ('setup', 'electrons_per_slice', '1', 'The electrons in the slice with the most charge.', e_slice)
-call fel_record_int ('setup', 'n_macroparticle', 'The macroparticles of the whole bunch.', n_particle)
+call fel_record_int8 ('setup', 'n_macroparticle', 'The macroparticles of the whole bunch.', n_particle)
 call fel_record_int ('setup', 'beamlets_per_slice', 'The beamlets in the slice with the most charge.', nbeamlet)
 call fel_record_int ('setup', 'beamlet_size', 'The macroparticles of one beamlet.', run%bparam%beamlet_size)
 call fel_record_real ('setup', 'step', 'm', 'The integration step of the first FEL element.', ds_first)
@@ -1475,12 +1479,14 @@ endif
 if (l_1d > 0 .and. ds_first > 0) then
   if (l_1d / ds_first < 5) call warn ('gain length / step = ' // number_text(l_1d / ds_first) // ', under 5')
 endif
-if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0) then
+if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0 .and. &
+    run%bparam%load_mode /= 'electrons') then
   if (nbeamlet < 128) call warn ('beamlets / slice = ' // int_str(nbeamlet) // ', under 128')
   if (run%bparam%shot_noise .and. e_slice / nbeamlet < 1) call warn ('electrons / beamlet = ' // &
         number_text(e_slice / nbeamlet) // ', under 1')
 endif
-if (run%n_harm > 1 .and. .not. run%bparam%shot_noise .and. run%bparam%quiet_start) then
+if (run%n_harm > 1 .and. .not. run%bparam%shot_noise .and. run%bparam%quiet_start .and. &
+    run%bparam%load_mode /= 'electrons') then
   call warn ('a harmonic is carried with shot_noise = false')
 endif
 if (run%fft_plan_fallback) call warn ('fft_plan = wisdom has no plan for a ' // int_str(n_grid(1)) // &
@@ -1584,7 +1590,7 @@ if (run%ffield(1)%slip%timerun) then
   enddo
 endif
 if (run%global%migrate .and. run%nslice > 1) then
-  call fel_column_add (c_left, 'particles migrated', int_str(run%n_moved_tot))
+  call fel_column_add (c_left, 'particles migrated', fel_int8_str(run%n_moved_tot))
   call fel_column_add (c_right, 'charge dropped', si_text(run%charge_dropped_tot, 'C'))
 endif
 if (run%fp32%on) then
@@ -1675,7 +1681,7 @@ do ie = run%i_start, run%i_end
   write (dname, '(2a, i0, 2a)') trim(root), '-at', ie, '-', trim(run%lat%branch(0)%ele(ie)%name)
   call note_dumps (trim(dname), run%dump_beam_here(ie), run%dump_field_here(ie))
 enddo
-call note_dumps (trim(root) // '-final', .true., .true.)
+call note_dumps (trim(root) // '-final', run%global%write_final_beam, .true.)
 do ih = 1, run%n_harm
   if (run%n_banked(ih) == 0) cycle
   if (run%global%write_escaped) call note_file (trim(fel_bank_file_name(run, ih, 'escaped')))
@@ -1731,7 +1737,8 @@ if (cvg%ok) then
     if (n_shown >= n_thin_max$) cycle
     n_shown = n_shown + 1
     write (line, '(a, i0, 3a, i0, 2a)') 'slice ', is, ' at ', &
-          si_text((is - 1) * run%fbeam%slice_spacing, 'm'), ': ', nbl, ' beamlets, outside / inside ', &
+          si_text((is - 1) * run%fbeam%slice_spacing, 'm'), ': ', nbl, &
+          trim(merge(' electrons', ' beamlets ', run%bparam%load_mode == 'electrons')) // ', outside / inside ', &
           number_text(ratio_s)
     call warn_result (trim(line))
   enddo

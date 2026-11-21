@@ -1,0 +1,53 @@
+# LCLS with one particle for every electron
+
+The example runs in one command, with Bmad only, on a machine with 17 GB of memory free:
+
+    ../../build-release/bin/lucifer lucifer.toml
+    python -m lucifer.plot lcls_electrons.stats.h5
+
+This is the window of `../lcls`, the 3 kA slab of LCLS at 1.5 Angstrom, loaded with `beam.load_mode = "electrons"` ([the electrons mode](../../docs/fel-physics.md#sec-electrons)). The lattice is that example's, and the input file differs from it in one key: `load_mode` stands where `shot_noise` stood. The window holds 30.8 pC, and the run tracks each of its 192,386,391 electrons as a particle of its own through the 132 m line.
+
+It is run by hand and not by `run_examples.sh`, since it takes over an hour on twelve cores. The numbers below are from the run of 2026-11-21 on an Apple M3 Max, twelve threads, GNU Fortran 15.3.0.
+
+## What the load is
+
+Each slice of 68 wavelengths holds 641,000 electrons on average, in a number drawn so that the window holds its charge exactly. Every electron has its own transverse coordinates, energy and phase. There are no beamlets, no quiet start and no imposed noise: the shot noise is the fluctuation of the electrons themselves. The mean bunching of a slice at the entrance is 1.14e-3, where independent phases give $\sqrt{\pi/4N}$ = 1.11e-3 for 641,000 electrons.
+
+The input file states no `beam.n_particle`, `quiet_start`, `beamlet_size` or `shot_noise_method`, and a value other than the default in any of them is refused in this mode. The grid and the step are derived as in `../lcls`.
+
+## What the run measures
+
+The example `../lcls` represents the same window with 2048 macroparticles per slice under the weight load, 614,400 in all. The two runs are one seed each.
+
+| quantity | this run | `../lcls` |
+|---|---|---|
+| particles | 192,386,391 | 614,400 |
+| gain length | 3.537 m | 3.549 m |
+| saturation point, where the mean bunching peaks | 65.02 m | 65.20 m |
+| mean bunching there | 0.402 | 0.396 |
+| largest slice power there | 36.9 GW | 37.0 GW |
+| pulse energy at the exit | 278.3 µJ | 285.4 µJ |
+| mean energy change per electron at the exit | -9.48 MeV | -9.71 MeV |
+| power outside the split angle over the power inside | 2.3e-5 | 6.1e-4 |
+
+The gain length, the saturation point and the power at saturation agree to under one percent, and the pulse energy at the exit to 2.5 percent. The published values these compare with are in the README of `../lcls`. The last row is the one that differs: the power radiated at wide angles by the macroparticles of the weight load is 27 times that of the electrons, which are 313 times as many in a slice.
+
+## What the run takes
+
+| | |
+|---|---|
+| memory at its peak | 16.9 GB |
+| the particles alone, at 68 bytes per electron | 13.1 GB |
+| wall time | 1 h 52 min, with another program on the same cores for the first hour |
+| particle push | 4330 s, 65 percent of the walk |
+| statistics | 1253 s, 19 percent |
+| field solve | 746 s, 11 percent |
+| interludes | 375 s, 6 percent |
+
+The memory beyond the particles is the field, the record of the run, and the Bmad bunch each thread makes of one slice at a time in an interlude, at 224 bytes per particle, so it grows with the number of threads. The program's estimate for this run alone on these cores is 99 minutes.
+
+The beam at the exit is not written: `run.write_final_beam` is off in this mode unless the input file sets it, since the file would hold every electron. The field and the pulse are written as in any run.
+
+## Migration
+
+`run.migrate = true` moves an electron to the neighboring slice when its phase leaves its own. With one electron per particle a move separates nothing, so the radiation that migration adds to a beamlet load ([slice migration](../../docs/fel-physics.md#sec-migration)) does not arise. The pass runs in threads.

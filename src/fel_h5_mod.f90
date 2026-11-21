@@ -58,6 +58,7 @@ end interface
 
 interface fel_h5_int
   module procedure fel_h5_int_rank0
+  module procedure fel_h5_int8_rank0
   module procedure fel_h5_int_rank1
   module procedure fel_h5_int_rank2
 end interface
@@ -286,6 +287,48 @@ call H5Sclose_f (s_id, h5_err)
 call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_int_rank0
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_h5_int8_rank0 (id, name, unit, label, descrip, axes, val, error)
+!
+! Routine to write one 8-byte integer as a scalar dataset with its four documentation
+! attributes. A count of particles passes the largest default integer above 2^31 - 1.
+!
+! Input and output as fel_h5_real, with val integer(8).
+!-
+
+subroutine fel_h5_int8_rank0 (id, name, unit, label, descrip, axes, val, error)
+
+integer(hid_t) id, s_id, d_id, t_id
+integer(8) val
+integer(8), target :: buf
+integer h5_err
+logical error
+character(*) name, unit, label, descrip, axes
+type (c_ptr) f_ptr
+
+!
+
+t_id = h5kind_to_type(8, H5_INTEGER_KIND)
+call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
+call H5Dcreate_f (id, name, t_id, s_id, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  return
+endif
+buf = val
+f_ptr = c_loc(buf)
+call H5Dwrite_f (d_id, t_id, f_ptr, h5_err)
+error = error .or. (h5_err < 0)
+call H5Dclose_f (d_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+
+call annotate (id, name, unit, label, descrip, axes, error)
+
+end subroutine fel_h5_int8_rank0
 
 !------------------------------------------------------------------------------
 

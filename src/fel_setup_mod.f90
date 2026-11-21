@@ -58,9 +58,10 @@ logical, pointer :: is_fel(:)
 character(400) lat_file
 character(16) interlude_model
 character(1) seed_polarization
-logical migrate, reference_run, err
+logical migrate, reference_run, err, electrons
 integer harmonics(9)
 integer n_harm, ih, h_max, m_size
+character(24) bad_key
 character(*), parameter :: r_name = 'fel_setup_lattice'
 
 !
@@ -222,7 +223,45 @@ enddo
 ! refused at or under it, where a harmonic is carried.
 
 h_max = maxval(harmonics)
-if (run%bparam%beamlet_size == 0) then
+
+! In the electrons mode every particle is one electron with its own coordinates
+! (fel-physics.md sec-loading). The load has no beamlets and no imposed noise, so the keys
+! that describe them have nothing to set, and a value other than the default in one of
+! them is refused. The defaults are not read. Neither is beam.shot_noise, whose two
+! values give the same load. A default is accepted where the input states it, since
+! <out_root>.resolved.toml states every key.
+
+electrons = (run%bparam%load_mode == 'electrons')
+if (electrons) then
+  bad_key = ''
+  if (.not. run%bparam%quiet_start)               bad_key = 'QUIET_START'
+  if (run%bparam%beamlet_size /= 0)               bad_key = 'BEAMLET_SIZE'
+  if (run%beam_init%n_particle /= 0)              bad_key = 'N_PARTICLE'
+  if (run%bparam%beamlet_min_electrons /= 1)      bad_key = 'BEAMLET_MIN_ELECTRONS'
+  if (run%bparam%shot_noise_method /= 'weight')   bad_key = 'SHOT_NOISE_METHOD'
+  if (bad_key /= '') then
+    call out_io (s_error$, r_name, 'BEAM.' // trim(bad_key) // ' IS SET WITH ' // &
+                 'beam.load_mode = "electrons".', 'THAT LOAD HAS ONE PARTICLE FOR EVERY ELECTRON, ' // &
+                 'NO BEAMLETS AND NO IMPOSED NOISE.', 'POSSIBLE SOLUTION: REMOVE THE KEY.')
+    err_flag = .true.;  return
+  endif
+  if (run%resample%use_beam_init) then
+    call out_io (s_error$, r_name, 'beam.load_mode = "electrons" IS SET WITH beam.resample.use_beam_init,', &
+                 'WHICH IS A CHECK ROUTE OF THE SAMPLE MODE.')
+    err_flag = .true.;  return
+  endif
+
+  ! The beam file of this load holds every electron of the bunch, 68 bytes each, and is
+  ! written through a Bmad bunch of 224 bytes a particle. It is written where the input
+  ! asks for it.
+
+  if (.not. fel_schema_is_set (run, 'run.write_final_beam')) then
+    run%global%write_final_beam = .false.
+    call fel_schema_mark (run, 'run.write_final_beam', fel_origin_derived$)
+  endif
+endif
+
+if (run%bparam%beamlet_size == 0 .and. .not. electrons) then
   m_size = 2 * h_max + 2
   if (run%bparam%quiet_start .and. run%bparam%load_mode == 'sample' .and. &
       .not. run%resample%use_beam_init) then
@@ -259,7 +298,9 @@ endif
 ! applies only where shot noise is asked for. The weight load (fel_weight_noise) carries
 ! the noise at every harmonic below beamlet_size, so its limit is beamlet_size - 1.
 
-if (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
+if (electrons) then
+  ! Independent electrons have the shot noise at every harmonic.
+elseif (run%bparam%shot_noise .and. run%bparam%shot_noise_method == 'weight') then
   if (maxval(harmonics) > run%bparam%beamlet_size - 1) then
     call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
                  'NOISE AT, WHICH IS BEAMLET_SIZE - 1 = \i0\ UNDER shot_noise_method = "weight".', &
@@ -281,7 +322,7 @@ endif
 ! the input file says nothing about it.
 
 if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. h_max > 1 .and. &
-    run%bparam%beamlet_size < 2 * h_max + 1) then
+    run%bparam%beamlet_size < 2 * h_max + 1 .and. .not. electrons) then
   call out_io (s_error$, r_name, 'BEAM.BEAMLET_SIZE = \i0\ IS NOT ABOVE TWICE THE HIGHEST HARMONIC CARRIED, ' // &
                '\i0\ . THE BUNCHING AT A LOWER', 'HARMONIC WOULD APPEAR AT THAT ONE. ' // &
                'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE, OR LEAVE IT UNSET.', &

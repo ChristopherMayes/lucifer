@@ -80,8 +80,9 @@ type fel_slice_struct
   real(rp), allocatable :: weight(:)   ! Macroparticle charge [C]
   ! A label that follows the macroparticle. It is unique over the window and unchanged by
   ! migration, so a frame series can be read as trajectories (docs/reading-output.md).
-  ! Written as openPMD's id record through coord_struct%ix_user.
-  integer, allocatable :: id(:)
+  ! Written as openPMD's id record through coord_struct%ix_user. It is an 8-byte
+  ! integer, since a beam of single electrons passes 2^31 - 1 particles above 344 pC.
+  integer(8), allocatable :: id(:)
   integer :: n = 0                     ! Fill count.
   ! Independent transverse samples at load: (sum_g W_g)^2 / sum_g W_g^2 over the groups
   ! of particles that share transverse coordinates. This is the beamlet count for uniform
@@ -147,6 +148,29 @@ type fel_noise_tally_struct
   integer :: method = 1            ! How the noise was imposed, fel_noise_first_order$ or fel_noise_weight$.
   real(rp) :: n_counted = 0        ! Electrons counted into weights by the weight load.
   real(rp) :: q_unit = 0           ! The charge of one of them in the sample mode [C].
+end type
+
+!+
+! Struct fel_migrate_work_struct
+!
+! What fel_migrate_slices holds for one slice during a call: the particles that leave it,
+! the replay of the serial scan, and the particles copied out on their way.
+!-
+
+type fel_migrate_work_struct
+  integer :: n_mover = 0                    ! Particles that leave the slice.
+  integer :: n_fill = 0                     ! Vacated places that take a replacement.
+  integer :: n_left = 0                     ! Fill count once they have left, with the arrivals from below.
+  integer, allocatable :: pos(:)            ! Their positions in the slice, ascending.
+  integer, allocatable :: dest(:)           ! Destination slice of each. 0: dropped off the window.
+  integer, allocatable :: order(:)          ! The order they leave in, as indices into pos.
+  integer, allocatable :: hole(:)           ! A vacated place.
+  integer, allocatable :: from(:)           ! The place its replacement is taken from.
+  integer, allocatable :: place_below(:)    ! Place of each particle received from below.
+  integer, allocatable :: place(:)          ! Place of each leaving particle in its destination.
+  real(rp), allocatable :: x(:), px(:), y(:), py(:), z(:), pz(:), weight(:)   ! Copied out, in leaving order.
+  real(rp), allocatable :: theta(:)         ! Phase of each when it left [rad].
+  integer(8), allocatable :: id(:)
 end type
 
 ! How the shot noise is imposed, beam.shot_noise_method (docs/shot-noise.md): through the
@@ -727,7 +751,7 @@ do is = 1, n_win
       call out_io (s_error$, r_name, 'CHECKPOINT ORDER DOES NOT MATCH THE RECORDS: ' // &
            'PARTICLE \i0\ OF SLICE \i0\ IS id \i0\ IN THE GROUP AND \i0\ IN THE RECORDS.', &
            'THE FILE: ' // trim(file_name), &
-           i_array = [ip, is, ids(k), sl%id(ip)])
+           i_array = [ip, is, ids(k), int(sl%id(ip))])
       return
     endif
     dz_fold = fel_beta_of(p0_mc, sl%pz(ip)) * phi0_c * wavelength / twopi
@@ -1023,6 +1047,16 @@ character(*), parameter :: r_name = 'fel_write_openpmd_beam'
 err_flag = .true.
 nslice = size(beam%slice)
 
+! The file is written through Bmad's bunch, whose particles are indexed by a default
+! integer and whose ix_user holds the label.
+
+if (sum(int(beam%slice(:)%n, 8)) > huge(1)) then
+  call out_io (s_error$, r_name, 'A BEAM OF ' // fel_int8_str(sum(int(beam%slice(:)%n, 8))) // &
+               ' PARTICLES IS NOT WRITTEN: ' // trim(file_name), &
+               'A BEAM FILE HOLDS AT MOST ' // int_str(huge(1)) // ' PARTICLES.')
+  return
+endif
+
 ! The slices to write. Only a frame series carries a range of the window. Then the patch
 ! count is the range's length, and the file says which range it is.
 
@@ -1239,7 +1273,8 @@ subroutine fel_assign_ids (beam)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
-integer is, ip, next
+integer(8) next
+integer is, ip
 
 !
 
@@ -1280,7 +1315,8 @@ end subroutine fel_assign_ids
 subroutine fel_slice_reallocate (sl, capacity)
 
 type (fel_slice_struct) sl
-integer capacity
+integer(8), allocatable :: id(:)
+integer capacity, n_old
 
 !
 
@@ -1293,7 +1329,14 @@ if (allocated(sl%x)) then
   call re_allocate (sl%z, capacity)
   call re_allocate (sl%pz, capacity)
   call re_allocate (sl%weight, capacity)
-  call re_allocate (sl%id, capacity)
+
+  ! The labels by hand, since re_allocate has no 8-byte integer. A new place has no label.
+
+  n_old = size(sl%id)
+  allocate (id(capacity))
+  id(1:n_old) = sl%id
+  id(n_old+1:) = -1
+  call move_alloc (id, sl%id)
 else
   allocate (sl%x(capacity), sl%px(capacity), sl%y(capacity), sl%py(capacity), &
             sl%z(capacity), sl%pz(capacity), sl%weight(capacity), sl%id(capacity))
@@ -2715,7 +2758,7 @@ do ip = 1, sl%n
   ! reference momentum changes, and must not touch vec(6) here.
   call init_coord (bunch%particle(ip), vec, ele, loc, electron$, shift_vec6 = .false., s_pos = s_pos)
   bunch%particle(ip)%charge = sl%weight(ip)
-  bunch%particle(ip)%ix_user = sl%id(ip)
+  bunch%particle(ip)%ix_user = int(sl%id(ip))
   bunch%particle(ip)%t = bunch%particle(ip)%t + t_place
 enddo
 
@@ -2838,6 +2881,15 @@ if (abs(ele%value(p0c$) - beam%p0c) > 1e-10_rp * beam%p0c) then
   return
 endif
 
+! A Bmad bunch is indexed by a default integer.
+
+if (sum(int(beam%slice(:)%n, 8)) > huge(1)) then
+  call out_io (s_error$, r_name, 'A BEAM OF ' // fel_int8_str(sum(int(beam%slice(:)%n, 8))) // &
+               ' PARTICLES CANNOT BE ONE BMAD BUNCH,', 'WHICH HOLDS AT MOST ' // int_str(huge(1)) // &
+               '. THE WAKE OF ELEMENT ' // trim(ele%name) // ' NEEDS THE WHOLE WINDOW AS ONE BUNCH.')
+  return
+endif
+
 p0_mc = fel_p0_mc(beam)
 ntot = 0
 do is = 1, size(beam%slice)
@@ -2956,7 +3008,7 @@ end subroutine fel_split_slices
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
+! Subroutine fel_migrate_slices_serial (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
 ! slice window. This is the weighted generalization of Genesis's one4one-only
@@ -2981,9 +3033,10 @@ end subroutine fel_split_slices
 ! charge_dropped. Genesis discards them silently at the world edges (sec-migration).
 ! The accounting is this port's own, so conservation can be checked.
 !
-! The routine is serial. It is called between the parallel regions at the caller's
-! stride, so the result does not depend on the thread count. A single-slice beam returns
-! at once, since a steady-state slice is periodic and migration has no meaning there.
+! The routine is serial, and it defines the order the particles of a slice are left in.
+! fel_migrate_slices gives the same slices in threads and calls this routine in the one
+! case it does not reproduce. A single-slice beam returns at once, since a steady-state
+! slice is periodic and migration has no meaning there.
 !
 ! Input:
 !   beam        -- fel_beam_struct: The beam.
@@ -2991,7 +3044,7 @@ end subroutine fel_split_slices
 !
 ! Output:
 !   beam             -- fel_beam_struct: Particles re-sliced. Slice fill counts updated.
-!   n_moved          -- integer: Number of particles moved between slices (this call).
+!   n_moved          -- integer(8): Number of particles moved between slices (this call).
 !   charge_dropped   -- real(rp): Charge of particles dropped off the window ends [C].
 !   drop_re, drop_im -- real(rp): Weighted phasor sum(w*e^{i theta}) of the dropped
 !                        particles, at their phase when dropped. Lets the caller check
@@ -3008,18 +3061,18 @@ end subroutine fel_split_slices
 !   err_flag         -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
+subroutine fel_migrate_slices_serial (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl, sd
 real(rp) ks, charge_dropped, drop_re, drop_im, margin
-integer n_moved
+integer(8) n_moved
 logical err_flag
 
 real(rp) p0_mc, slen, theta, beta, z_new, frac
 integer sample
 integer ia, ib, il, nslice, atar, idest
-character(*), parameter :: r_name = 'fel_migrate_slices'
+character(*), parameter :: r_name = 'fel_migrate_slices_serial'
 
 !
 
@@ -3089,7 +3142,346 @@ enddo
 
 err_flag = .false.
 
+end subroutine fel_migrate_slices_serial
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
+!
+! Routine to move particles between slices when their ponderomotive phase leaves the
+! slice window, in threads. The slices it leaves are those of fel_migrate_slices_serial
+! to the bit, at any thread count: the same particles in each slice, in the same order.
+! That routine's header gives the criterion and the meaning of the outputs.
+!
+! The serial routine scans the slices upward. In a slice it scans the particles upward,
+! and a particle that leaves is replaced by the last particle of the slice, which is then
+! examined in its place. A particle sent to a higher slice is appended to it before that
+! slice is scanned, and one sent to a lower slice after. The order this leaves is found
+! here without the scan:
+!
+!   1. In threads, a slice lists the positions of its particles that leave, each with its
+!      destination. The phase arithmetic is the serial routine's.
+!   2. The particles a slice receives from below are counted. Its array at the moment the
+!      serial scan would reach it is its own particles followed by those.
+!   3. In threads, the scan of a slice is replayed on the list alone. A pointer walks the
+!      leaving positions upward and another walks the array's end downward. The replay
+!      gives the order the particles leave in and, for each place vacated, the place its
+!      replacement is taken from. The particles that leave are copied out in that order
+!      and the slice's own replacements are made.
+!   4. Each particle that leaves is given its place in its destination, in the order of
+!      the serial appends: by source slice, then by the order of leaving. The sums over
+!      the dropped particles are taken in the same order, so they have the serial bits.
+!   5. In threads, the particles are written to those places.
+!
+! The serial scan examines a particle received from below a second time, in its new
+! slice. Its shifted phase lies in the window to rounding. Where rounding puts it outside,
+! the serial scan sends it on, and the replay above does not follow that. Step 1 computes
+! the second examination, and if any particle would be sent on, the whole call is made by
+! fel_migrate_slices_serial instead.
+!
+! Input:
+!   beam        -- fel_beam_struct: The beam.
+!   ks          -- real(rp): Radiation wavenumber twopi/wavelength [1/m].
+!
+! Output:
+!   beam             -- fel_beam_struct: Particles re-sliced. Slice fill counts updated.
+!   n_moved          -- integer(8): Number of particles moved between slices (this call).
+!   charge_dropped   -- real(rp): Charge of particles dropped off the window ends [C].
+!   drop_re, drop_im -- real(rp): Weighted phasor of the dropped particles.
+!   margin           -- real(rp): The smallest distance in phase [rad] from a particle
+!                        examined to a slice boundary. Huge when none was examined.
+!   err_flag         -- logical: Set True on error, False otherwise.
+!-
+
+subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl, sd
+type (fel_migrate_work_struct), allocatable, target :: work(:)
+type (fel_migrate_work_struct), pointer :: wk
+real(rp) ks, charge_dropped, drop_re, drop_im, margin
+integer(8) n_moved
+logical err_flag
+
+real(rp) p0_mc, slen, theta, beta, z_new, frac, margin_s
+integer sample
+integer ia, ib, il, nslice, atar, idest, i, j, k, f, b, n, n_dep, n_need
+integer, allocatable :: n_below(:), n_above(:), i_below(:), i_above(:)
+logical sent_on
+
+!
+
+err_flag = .true.
+n_moved = 0
+charge_dropped = 0
+drop_re = 0
+drop_im = 0
+margin = huge(1.0_rp)
+
+nslice = size(beam%slice)
+if (nslice < 2) then
+  err_flag = .false.
+  return
+endif
+
+sample = beam%n_wavelength
+p0_mc = fel_p0_mc(beam)
+slen = ks * beam%slice_spacing            ! Window length in phase: 2*pi*sample.
+
+allocate (work(nslice), n_below(nslice), n_above(nslice), i_below(nslice), i_above(nslice))
+
+! Step 1. The particles that leave each slice.
+
+sent_on = .false.
+
+!$omp parallel do schedule(dynamic, 4) default(shared) &
+!$omp     private(ia, ib, sl, wk, beta, theta, atar, frac, idest, z_new, margin_s) &
+!$omp     reduction(min: margin) reduction(.or.: sent_on)
+do ia = 1, nslice
+  sl => beam%slice(ia)
+  wk => work(ia)
+  margin_s = huge(1.0_rp)
+  allocate (wk%pos(max(16, sl%n / 64)), wk%dest(max(16, sl%n / 64)))
+  do ib = 1, sl%n
+    beta = fel_beta_of(p0_mc, sl%pz(ib))
+    theta = beam%phi0 + ks * sl%z(ib) / beta
+    atar = int(floor(theta / slen))
+    frac = theta / slen - atar
+    margin_s = min(margin_s, min(frac, 1 - frac) * slen)
+    if (atar == 0) cycle
+
+    idest = ia + atar
+    if (idest < 1 .or. idest > nslice) idest = 0
+    if (wk%n_mover == size(wk%pos)) then
+      call re_allocate (wk%pos, 2 * wk%n_mover)
+      call re_allocate (wk%dest, 2 * wk%n_mover)
+    endif
+    wk%n_mover = wk%n_mover + 1
+    wk%pos(wk%n_mover) = ib
+    wk%dest(wk%n_mover) = idest
+
+    ! The second examination of a particle sent to a higher slice.
+
+    if (idest > ia) then
+      z_new = sl%z(ib) - atar * beta * beam%slice_spacing
+      theta = beam%phi0 + ks * z_new / beta
+      atar = int(floor(theta / slen))
+      frac = theta / slen - atar
+      margin_s = min(margin_s, min(frac, 1 - frac) * slen)
+      if (atar /= 0) sent_on = .true.
+    endif
+  enddo
+  margin = min(margin, margin_s)
+enddo
+!$omp end parallel do
+
+if (sent_on) then
+  deallocate (work)
+  call fel_migrate_slices_serial (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
+  return
+endif
+
+! Step 2. What each slice receives from below and from above.
+
+n_below = 0;  n_above = 0
+do ia = 1, nslice
+  wk => work(ia)
+  do j = 1, wk%n_mover
+    idest = wk%dest(j)
+    if (idest > ia) then
+      n_below(idest) = n_below(idest) + 1
+    elseif (idest > 0) then
+      n_above(idest) = n_above(idest) + 1
+    endif
+  enddo
+enddo
+
+! Step 3. The replay of each slice's scan, the particles that leave copied out in their
+! order, and the slice's own replacements.
+
+!$omp parallel do schedule(dynamic, 4) default(shared) &
+!$omp     private(ia, sl, wk, n, k, il, f, b, n_dep, i, j, ib, beta, theta, atar, n_need)
+do ia = 1, nslice
+  sl => beam%slice(ia)
+  wk => work(ia)
+  n = sl%n
+  k = wk%n_mover
+
+  ! The places of the particles received from below: after the slice's own, unless the
+  ! replay moves one into a vacated place.
+
+  allocate (wk%place_below(n_below(ia)))
+  do j = 1, n_below(ia)
+    wk%place_below(j) = n + j
+  enddo
+
+  allocate (wk%order(k), wk%hole(k), wk%from(k))
+  il = n + n_below(ia)                    ! The last place of the array.
+  f = 1;  b = k
+  n_dep = 0
+  do while (f <= b)
+    n_dep = n_dep + 1
+    wk%order(n_dep) = f
+    do
+      if (il == wk%pos(f)) then           ! The vacated place is the last: nothing replaces it.
+        il = il - 1
+        exit
+      endif
+      if (b > f .and. wk%pos(b) == il) then
+
+        ! The last particle leaves too. The serial scan moves it into the vacated place
+        ! and sends it on from there.
+
+        n_dep = n_dep + 1
+        wk%order(n_dep) = b
+        b = b - 1
+        il = il - 1
+      else
+        wk%n_fill = wk%n_fill + 1
+        wk%hole(wk%n_fill) = wk%pos(f)
+        wk%from(wk%n_fill) = il
+        if (il > n) wk%place_below(il - n) = wk%pos(f)
+        il = il - 1
+        exit
+      endif
+    enddo
+    f = f + 1
+  enddo
+  wk%n_left = il
+
+  ! The particles that leave, in order, each with the z of its new slice. The phase of a
+  ! dropped particle is kept for the sums.
+
+  allocate (wk%x(k), wk%px(k), wk%y(k), wk%py(k), wk%z(k), wk%pz(k), wk%weight(k), wk%id(k), wk%place(k))
+  allocate (wk%theta(k))
+  do i = 1, k
+    j = wk%order(i)
+    ib = wk%pos(j)
+    beta = fel_beta_of(p0_mc, sl%pz(ib))
+    theta = beam%phi0 + ks * sl%z(ib) / beta
+    atar = int(floor(theta / slen))
+    wk%theta(i) = theta
+    wk%x(i) = sl%x(ib);   wk%px(i) = sl%px(ib)
+    wk%y(i) = sl%y(ib);   wk%py(i) = sl%py(ib)
+    wk%z(i) = sl%z(ib) - atar * beta * beam%slice_spacing
+    wk%pz(i) = sl%pz(ib)
+    wk%weight(i) = sl%weight(ib)
+    wk%id(i) = sl%id(ib)
+  enddo
+
+  ! The slice's own replacements. A place is vacated once and a particle moved once, so
+  ! their order does not matter. A replacement taken from the particles received from
+  ! below is written in step 5.
+
+  do i = 1, wk%n_fill
+    ib = wk%hole(i);  il = wk%from(i)
+    if (il > n) cycle
+    sl%x(ib) = sl%x(il);   sl%px(ib) = sl%px(il)
+    sl%y(ib) = sl%y(il);   sl%py(ib) = sl%py(il)
+    sl%z(ib) = sl%z(il);   sl%pz(ib) = sl%pz(il)
+    sl%weight(ib) = sl%weight(il)
+    sl%id(ib) = sl%id(il)
+  enddo
+
+  ! Room for what arrives, with a margin so that the next arrivals do not copy the slice.
+
+  n_need = wk%n_left + n_above(ia)
+  if (n_need > size(sl%x)) call fel_slice_reallocate (sl, n_need + n_need / 16 + 16)
+  sl%n = n_need
+enddo
+!$omp end parallel do
+
+! Step 4. The place of each particle in its destination, and the sums over the dropped
+! particles, both in the order of the serial routine.
+
+i_below = 0;  i_above = 0
+do ia = 1, nslice
+  wk => work(ia)
+  do i = 1, wk%n_mover
+    idest = wk%dest(wk%order(i))
+    if (idest == 0) then
+      charge_dropped = charge_dropped + wk%weight(i)
+      drop_re = drop_re + wk%weight(i) * cos(wk%theta(i))
+      drop_im = drop_im + wk%weight(i) * sin(wk%theta(i))
+      wk%place(i) = 0
+    elseif (idest > ia) then
+      i_below(idest) = i_below(idest) + 1
+      wk%place(i) = work(idest)%place_below(i_below(idest))
+      n_moved = n_moved + 1
+    else
+      i_above(idest) = i_above(idest) + 1
+      wk%place(i) = work(idest)%n_left + i_above(idest)
+      n_moved = n_moved + 1
+    endif
+  enddo
+enddo
+
+! Step 5. The particles into their places. No two have the same place.
+
+!$omp parallel do schedule(dynamic, 4) default(shared) private(ia, wk, sd, i, ib)
+do ia = 1, nslice
+  wk => work(ia)
+  do i = 1, wk%n_mover
+    ib = wk%place(i)
+    if (ib == 0) cycle
+    sd => beam%slice(wk%dest(wk%order(i)))
+    sd%x(ib) = wk%x(i);   sd%px(ib) = wk%px(i)
+    sd%y(ib) = wk%y(i);   sd%py(ib) = wk%py(i)
+    sd%z(ib) = wk%z(i);   sd%pz(ib) = wk%pz(i)
+    sd%weight(ib) = wk%weight(i)
+    sd%id(ib) = wk%id(i)
+  enddo
+enddo
+!$omp end parallel do
+
+err_flag = .false.
+
 end subroutine fel_migrate_slices
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_beams_identical (beam_a, beam_b) result (identical)
+!
+! Routine to say whether two beams hold the same particles in the same slices in the same
+! order, every coordinate, weight and label equal to the bit. The migration check compares
+! the slices of fel_migrate_slices with those of fel_migrate_slices_serial by it.
+!
+! Input:
+!   beam_a, beam_b -- fel_beam_struct: The two beams.
+!
+! Output:
+!   identical      -- logical: True if they are the same.
+!-
+
+function fel_beams_identical (beam_a, beam_b) result (identical)
+
+type (fel_beam_struct), target :: beam_a, beam_b
+type (fel_slice_struct), pointer :: sa, sb
+integer is, n
+logical identical
+
+!
+
+identical = .false.
+if (size(beam_a%slice) /= size(beam_b%slice)) return
+do is = 1, size(beam_a%slice)
+  sa => beam_a%slice(is)
+  sb => beam_b%slice(is)
+  n = sa%n
+  if (sb%n /= n) return
+  if (n == 0) cycle
+  if (any(sa%x(1:n) /= sb%x(1:n)) .or. any(sa%px(1:n) /= sb%px(1:n))) return
+  if (any(sa%y(1:n) /= sb%y(1:n)) .or. any(sa%py(1:n) /= sb%py(1:n))) return
+  if (any(sa%z(1:n) /= sb%z(1:n)) .or. any(sa%pz(1:n) /= sb%pz(1:n))) return
+  if (any(sa%weight(1:n) /= sb%weight(1:n)) .or. any(sa%id(1:n) /= sb%id(1:n))) return
+enddo
+identical = .true.
+
+end function fel_beams_identical
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

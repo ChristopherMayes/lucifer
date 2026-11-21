@@ -129,7 +129,7 @@ contains
 !   nstep       -- integer: FEL integration steps, summed over the segments the walk
 !                    covers. An unaveraged segment counts its substeps, since it
 !                    integrates and deposits on each.
-!   n_particle  -- integer: Macroparticles in the window.
+!   n_particle  -- integer(8): Macroparticles in the window.
 !   n_pstep     -- real(rp): Particle-steps, the product of the two. Real since it
 !                    passes 2^31 on an ordinary time-dependent run.
 !   n_gpt       -- real(rp): Transverse grid points the field solve touches per step,
@@ -148,7 +148,8 @@ type (branch_struct), pointer :: branch
 type (ele_struct), pointer :: ele
 real(rp) n_pstep, n_gpt, lambda_w
 integer, optional :: nrec_unavg
-integer nstep, n_particle, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
+integer(8) n_particle
+integer nstep, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
 
 !
 
@@ -180,7 +181,7 @@ do ie = run%i_start, run%i_end
   endif
 enddo
 
-n_particle = sum(run%fbeam%slice%n)
+n_particle = sum(int(run%fbeam%slice%n, 8))
 n_pstep = real(n_particle, rp) * nstep
 
 n_grid = wavefront_shape(run%ffield(1)%wf)
@@ -277,7 +278,8 @@ subroutine fel_cost_estimate (run, secs, backend)
 
 type (fel_run_struct), target :: run
 real(rp) secs, n_pstep, n_gpt, t_one, speedup, pts_plane, n_tau, t_tau
-integer nstep, n_particle, ngrid, nstep_unavg, nrec_unavg, n_rec, n_omp, n_eff, n_t, n_pad
+integer(8) n_particle
+integer nstep, ngrid, nstep_unavg, nrec_unavg, n_rec, n_omp, n_eff, n_t, n_pad
 integer n_int_kernel, n_int_slip
 character(*) backend
 

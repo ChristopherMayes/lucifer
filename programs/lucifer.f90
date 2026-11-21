@@ -402,9 +402,11 @@ if (err) stop 1
 ! what a run takes outside its walk.
 
 call system_clock (t_0)
-call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err, &
-                    s_pos = run%lat%branch(0)%ele(run%i_end)%s)
-if (err) stop 1
+if (run%global%write_final_beam) then
+  call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err, &
+                      s_pos = run%lat%branch(0)%ele(run%i_end)%s)
+  if (err) stop 1
+endif
 call system_clock (t_1)
 call fel_record_real ('timing', 'final_beam', 's', 'The time to write the final beam file, after the walk.', &
       real(t_1 - t_0, rp) / t_rate)

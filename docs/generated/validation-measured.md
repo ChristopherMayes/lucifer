@@ -24,7 +24,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 32 in all.
+Every section below ran and passed on both builds, 33 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -34,6 +34,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `thread-independence`
 - `shot-noise`
 - `load`
+- `electron-load`
 - `sase-startup`
 - `seam-wake`
 - `import`
@@ -246,6 +247,36 @@ where the two builds agree to every printed digit.
 | in-cone startup, Gaussian bunch in sample mode | 4.3087e-02 | same | <= 3.5000e-01 |
 | in-cone startup, Gaussian bunch in sample mode, fewer beamlets in the slices of little charge | 2.1412e-01 | same | <= 3.5000e-01 |
 | in-cone startup, Gaussian bunch in sample mode, the weight load, mean of 4 seeds | 3.1388e-02 | same | <= 3.5000e-01 |
+
+(val-levels-electron-load)=
+### `electron-load`
+
+| Check | Debug | Production | Bound |
+|---|---|---|---|
+| electrons load: particles less the window's electrons | 0.0000e+00 | same | = 0 |
+| electrons load: weight against the window's charge over its electrons | 5.3291e-15 | same | <= 1.0000e-12 |
+| electrons load: loaded charge against the window's | 5.1070e-15 | same | <= 1.0000e-12 |
+| electrons load: <\|S(k)\|^2> / N against 1, worst of 9 wavenumbers | 2.9331e-02 | same | <= 7.8125e-02 |
+| electrons load: correlation of S between neighboring slices | 7.3019e-03 | same | <= 5.5351e-02 |
+| electrons load: variance of the slice counts against the multinomial's | 1.2888e-02 | same | <= 1.1070e-01 |
+| electrons load: rms of x against the described beam's | 1.2378e-05 | same | <= 2.7621e-03 |
+| electrons load: rms of y against the described beam's | 5.3650e-04 | same | <= 2.7621e-03 |
+| electrons load: rms of pz against the described beam's | 7.1031e-04 | same | <= 2.7621e-03 |
+| electrons load: the same file at 1 thread and at 8 |  | same | holds |
+| electrons load: beam.quiet_start = F is refused with the key named |  | same | holds |
+| electrons load: beam.beamlet_size = 8 is refused with the key named |  | same | holds |
+| electrons load: beam.n_particle = 512 is refused with the key named |  | same | holds |
+| electrons load: beam.beamlet_min_electrons = 0 is refused with the key named |  | same | holds |
+| electrons load: beam.shot_noise_method = first_order is refused with the key named |  | same | holds |
+| electrons load: the resolved input file loads the same beam |  | same | holds |
+| electrons from a file: particles kept | 20000 | same | = 20000 |
+| electrons from a file: weight against e | 2.2204e-16 | same | <= 1.0000e-12 |
+| electrons from a file: the keep mode's dump of the same file with no copies |  | same | holds |
+| electrons from a file: particles of two electrons are refused |  | same | holds |
+| electrons with migration: moves, each compared with the serial routine | 37631 | same | >= 10000 |
+| electrons with migration: particles outside their slice's window | 0 | same | = 0 |
+| electrons with migration: the same final beam and field at 1 thread and at 8 |  | same | holds |
+| electrons against the weight load: pulse energy after one undulator, ratio less 1 | 9.4381e-02 | same | <= 3.0000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`

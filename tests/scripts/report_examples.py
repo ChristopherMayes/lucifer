@@ -41,7 +41,8 @@ MAX_EMBED_BYTES = 4000
 
 # run_examples.sh does not run these, so their pages carry no figure. saturation_demo
 # needs the genesis4 binary and its own clock, and it has run.sh and a report of its own.
-NO_FIGURE = ("saturation_demo",)
+# lcls_electrons tracks every electron of its window and takes over an hour.
+NO_FIGURE = ("saturation_demo", "lcls_electrons")
 
 # The index page's own name. The site serves a page under its file stem, so this cannot
 # be index.md: that collides with the site's own index and is served as /index-1.
