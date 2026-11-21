@@ -2,7 +2,7 @@
 ! Module fel_init_mod
 !
 ! The starting state of a run. fel_init_beam reads an openPMD dump of slices, or loads a
-! beam_init bunch by load_mode (sampled or kept). fel_init_wavefront reads an openPMD
+! beam_init bunch by load_mode (sampled, kept or as single electrons). fel_init_wavefront reads an openPMD
 ! wavefront or generates the Gaussian seed, and adds the harmonic entries.
 ! Errors return through err_flag, and nothing here stops.
 !-
@@ -28,7 +28,9 @@ contains
 ! loads a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
 ! described bunch takes the analytic generator. A file, beam.position_file, takes
 ! the resampler of fel_import_mod. In the keep mode every particle of the bunch stays as
-! a beamlet of copies. The routine applies the beam-side check instruments
+! a beamlet of copies. In the electrons mode every electron of a described bunch is one
+! particle (load_electrons), and a bunch file of single electrons is kept as it is.
+! The routine applies the beam-side check instruments
 ! (split_weights, swap_beam_xy) and sets run%nslice. One seed (run.ran_seed) governs
 ! generation, resampling and noise. Errors return through err_flag, and nothing here stops.
 !
@@ -56,7 +58,7 @@ character(16) load_mode
 character(400) out_root
 character(400) field_file(9)
 logical quiet_start, shot_noise, gen_test_weights, resample_split_weights, skip_empty
-logical split_weights, swap_beam_xy, err
+logical split_weights, swap_beam_xy, err, electrons
 type (fel_weight_draw_struct) weight_draw
 integer beamlet_size, ran_seed, is, noise_method
 real(rp) beamlet_min_electrons
@@ -107,6 +109,17 @@ split_weights = run%bparam%split_weights
 swap_beam_xy = run%bparam%swap_beam_xy
 ran_seed = run%global%ran_seed
 out_root = run%global%out_root
+
+! The electrons mode has one particle for every electron, each with its own phase, and
+! no beamlets. The noise is the load's own and none is imposed. fel_setup_lattice has
+! refused an input that set the keys of the beamlets or of the imposed noise.
+
+electrons = (load_mode == 'electrons')
+if (electrons) then
+  quiet_start = .false.
+  shot_noise = .false.
+  beamlet_size = 1
+endif
 field_file = run%field_file
 lambda0 = run%winit%lambda0
 window_length = run%slicing%window_length
@@ -209,7 +222,7 @@ if (beam_file /= '') then
   if (err) then
     err_flag = .true.;  return
   endif
-elseif (load_mode == 'keep') then
+elseif (load_mode == 'keep' .or. (electrons .and. beam_init%position_file /= '')) then
   call keep_initial_state ()
   if (err_flag) return
 elseif (beam_init%position_file /= '' .or. resample%use_beam_init) then
@@ -283,7 +296,9 @@ endif
 call check_beam_init_contract ()
 
 npart_gen = beam_init%n_particle
-if (npart_gen < 1 .or. beamlet_size < 1 .or. (quiet_start .and. mod(npart_gen, beamlet_size) /= 0)) then
+if (electrons) then
+  ! The count of a slice is drawn from its charge (load_electrons).
+elseif (npart_gen < 1 .or. beamlet_size < 1 .or. (quiet_start .and. mod(npart_gen, beamlet_size) /= 0)) then
   call out_io (s_error$, r_name, 'BEAM.N_PARTICLE (MACROPARTICLES PER SLICE HERE) MUST BE A', &
                                  'POSITIVE MULTIPLE OF BEAMLET_SIZE.')
   err_flag = .true.;  return
@@ -412,6 +427,11 @@ if (shot_noise .and. nslice_gen < 2) then
   call out_io (s_error$, r_name, 'SHOTNOISE NEEDS A TIME-DEPENDENT WINDOW, THE SAME RULE AS GENESIS.')
   err_flag = .true.;  return
 endif
+if (electrons .and. nslice_gen < 2) then
+  call out_io (s_error$, r_name, 'beam.load_mode = "electrons" NEEDS A TIME-DEPENDENT WINDOW.', &
+               'ONE PERIODIC SLICE OF ELECTRONS IS A BUNCH TRAIN AND NOT A BUNCH.')
+  err_flag = .true.;  return
+endif
 
 mbase = npart_gen / beamlet_size
 if (gen_test_weights .and. mod(mbase, 2) /= 0) then
@@ -458,6 +478,11 @@ elseif (zlen_gen > 0) then
   enddo
 else
   cur_gen(1) = beam_init%bunch_charge * c_light / spacing_gen
+endif
+
+if (electrons) then
+  call load_electrons (cur_gen, nslice_gen, p0_mc)
+  return
 endif
 
 call ran_seed_put (ran_seed)
@@ -650,6 +675,170 @@ if (shot_noise) then
 endif
 
 end subroutine generate_initial_state
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine load_electrons (cur, n_slice_e, p0_mc)
+!
+! Routine for load_mode = "electrons" from a described bunch (fel-physics.md sec-loading).
+! Every electron of the bunch is one particle. The charge of the window is counted as the
+! nearest whole number of electrons, as the weight load counts it (fel_weight_start), and
+! each particle has the window's charge over that number, which is e to one part in twice
+! the count. The loaded charge is then the window's exactly.
+!
+! The counts of the slices are one multinomial draw, taken in order from the program's
+! random stream: a slice takes a binomial share of the electrons not yet given, by its
+! share of the charge not yet loaded. An electron then draws its four transverse
+! coordinates from the matched Gaussian, its energy from the Gaussian of beam.sig_pz and
+! its phase evenly over the wavelengths of its slice. No two electrons share a coordinate,
+! so the bunching of a slice of N electrons has the mean square 1/N at every harmonic,
+! and nothing is imposed.
+!
+! Each slice draws from a random state of its own, seeded on the run's seed and the
+! slice's index. The slices are filled in threads, and the load is the same at any thread
+! count.
+!
+! Input:
+!   cur(:)    -- real(rp): The current of each slice [A].
+!   n_slice_e -- integer: Slices.
+!   p0_mc     -- real(rp): Reference momentum p0/(m_e c).
+!-
+
+subroutine load_electrons (cur, n_slice_e, p0_mc)
+
+type (fel_slice_struct), pointer :: sl
+type (random_state_struct), allocatable :: state(:)
+type (random_state_struct) state_saved
+real(rp) cur(:), p0_mc
+real(rp), allocatable :: n_e(:)
+real(rp) q_total, q_unit, q_left, q_slice, n_left, n_total, ks_l, eg_x, eg_y, delgam
+real(rp) u, v, gam, p_mc
+integer n_slice_e, is_e, ip, n_s, seed_now
+character(*), parameter :: r_name = 'load_electrons'
+
+!
+
+q_total = sum(cur) * fbeam%slice_spacing / c_light
+if (q_total <= 0) then
+  call out_io (s_error$, r_name, 'THE WINDOW HOLDS NO CHARGE.')
+  err_flag = .true.;  return
+endif
+n_total = max(1.0_rp, anint(q_total / e_charge))
+q_unit = q_total / n_total
+
+! The random state of each slice. ran_seed_put seeds the state of this thread, which is
+! then copied. The seed in force is read back, since run.ran_seed = 0 takes one from the
+! clock. The program's own stream is put back for the counts.
+
+call ran_seed_put (ran_seed)
+call ran_seed_get (seed_now)
+allocate (state(n_slice_e), n_e(n_slice_e))
+do is_e = 1, n_slice_e
+  call ran_seed_put (slice_seed(seed_now, is_e))
+  call ran_default_state (get_state = state(is_e))
+enddo
+call ran_seed_put (seed_now)
+
+! One Gaussian number is drawn here so that the tables of the converter are made before
+! the threads start.
+
+state_saved = state(1)
+call ran_gauss (u, state_saved)
+
+! The counts. The last slice with charge takes what is left.
+
+n_left = n_total
+q_left = q_total
+do is_e = 1, n_slice_e
+  q_slice = cur(is_e) * fbeam%slice_spacing / c_light
+  if (q_slice <= 0 .or. n_left <= 0) then
+    n_e(is_e) = 0
+  elseif (q_left - q_slice <= 1e-12_rp * q_total) then
+    n_e(is_e) = n_left
+  else
+    n_e(is_e) = fel_ran_binomial (n_left, q_slice / q_left)
+  endif
+  n_left = n_left - n_e(is_e)
+  q_left = q_left - q_slice
+enddo
+
+! A slice's arrays are indexed by a default integer.
+
+if (maxval(n_e) > 0.9_rp * huge(1)) then
+  call out_io (s_error$, r_name, 'A SLICE WOULD HOLD \es10.3\ ELECTRONS, MORE THAN A SLICE CAN INDEX.', &
+               'POSSIBLE SOLUTION: A SMALLER window.n_wavelength.', r_array = [maxval(n_e)])
+  err_flag = .true.;  return
+endif
+
+ks_l = twopi / lambda0
+eg_x = beam_init%a_norm_emit / p0_mc
+eg_y = beam_init%b_norm_emit / p0_mc
+delgam = (p0_mc**2 / gamma0) * beam_init%sig_pz
+
+! The fill. A slice is allocated with room for the particles that migrate into it, so
+! that the first arrival does not copy the slice.
+
+!$omp parallel do schedule(dynamic) default(shared) private(is_e, sl, n_s, ip, u, v, gam, p_mc)
+do is_e = 1, n_slice_e
+  sl => fbeam%slice(is_e)
+  n_s = nint(n_e(is_e))
+  call fel_slice_reallocate (sl, n_s + n_s / 16 + 16)
+  sl%n = n_s
+  sl%m_ind = max(1, n_s)
+  do ip = 1, n_s
+    call ran_gauss (u, state(is_e));  call ran_gauss (v, state(is_e))
+    sl%x(ip)  = sqrt(eg_x * tw_beta_x) * u
+    sl%px(ip) = sqrt(eg_x / tw_beta_x) * (v - tw_alpha_x * u)
+    call ran_gauss (u, state(is_e));  call ran_gauss (v, state(is_e))
+    sl%y(ip)  = sqrt(eg_y * tw_beta_y) * u
+    sl%py(ip) = sqrt(eg_y / tw_beta_y) * (v - tw_alpha_y * u)
+    call ran_gauss (u, state(is_e))
+    gam = gamma0 + delgam * u
+    p_mc = sqrt(gam**2 - 1)
+    sl%pz(ip) = (p_mc - p0_mc) / p0_mc
+
+    ! To the stored chart: z = beta theta / ks with phi0 = 0.
+
+    call ran_uniform (u, state(is_e))
+    sl%z(ip) = (p_mc / gam) * (twopi * window_sample * u) / ks_l
+    sl%weight(ip) = q_unit
+  enddo
+enddo
+!$omp end parallel do
+
+fbeam%beamlet_size = 1
+fbeam%one4one = .true.
+
+call out_io (s_info$, r_name, 'Loaded \es14.7\ electrons, one particle each, in \i0\ slices.', &
+             '  Electrons per slice: \es10.3\ to \es10.3\ ', &
+             r_array = [n_total, minval(n_e), maxval(n_e)], i_array = [n_slice_e])
+
+end subroutine load_electrons
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function slice_seed (seed, ix_slice) result (seed_s)
+!
+! Routine to give the seed of one slice's random state in the electrons mode. The seeds
+! of the slices of a run are distinct, and they are positive, since a seed of zero is
+! taken from the clock.
+!-
+
+function slice_seed (seed, ix_slice) result (seed_s)
+
+integer seed, ix_slice, seed_s
+integer(8) mix
+
+!
+
+mix = int(abs(seed), 8) * 1000003_8 + int(ix_slice, 8) * 7919_8 + 12345_8
+seed_s = 1 + int(mod(mix, 2147483629_8))
+
+end function slice_seed
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -925,7 +1114,7 @@ type (coord_struct), pointer :: cp
 type (fel_slice_struct), pointer :: sl
 real(rp), allocatable :: s_k(:)
 real(rp) p0_mc, p_mc, gam, beta_p, ks_l, spacing_k, smin, ttotal, offset, theta0, w_copy
-real(rp) floor_max, wsum
+real(rp) floor_max, wsum, q_sum, q_lo, q_hi
 integer, allocatable :: isl(:), nfill(:), group_w(:)
 type (fel_noise_tally_struct) tally
 integer nalive, nslice_k, ncopy, ip, i, is_g, im, n_out, rule_seen, n_group_w
@@ -979,6 +1168,22 @@ if (sum(bp%particle%charge, mask = bp%particle%state == alive$) <= 0) then
   call out_io (s_error$, r_name, 'BUNCH HAS ZERO TOTAL CHARGE; NOTHING WOULD LASE.', &
     'AN openPMD FILE WITHOUT CHARGE DATA, OR AN UNSET beam.bunch_charge, LOADS DARK.')
   err_flag = .true.;  return
+endif
+
+! In the electrons mode a bunch file is taken only where each of its particles is one
+! electron: equal charges, whose sum is as many electrons as there are particles.
+
+if (electrons) then
+  q_sum = sum(bp%particle%charge, mask = bp%particle%state == alive$)
+  q_lo = minval(bp%particle%charge, mask = bp%particle%state == alive$)
+  q_hi = maxval(bp%particle%charge, mask = bp%particle%state == alive$)
+  if (q_hi - q_lo > 1e-9_rp * q_hi .or. nint(q_sum / e_charge, 8) /= int(nalive, 8)) then
+    call out_io (s_error$, r_name, 'beam.load_mode = "electrons" AND THE PARTICLES OF THE BUNCH FILE ARE NOT', &
+                 'SINGLE ELECTRONS: \i0\ PARTICLES OF \es12.5\ TO \es12.5\ C HOLD \es12.5\ ELECTRONS.', &
+                 'POSSIBLE SOLUTION: beam.load_mode = "keep" OR "sample".', &
+                 i_array = [nalive], r_array = [q_lo, q_hi, q_sum / e_charge])
+    err_flag = .true.;  return
+  endif
 endif
 
 allocate (s_k(size(bp%particle)), isl(size(bp%particle)))
@@ -1048,7 +1253,7 @@ fbeam%slice_spacing = spacing_k
 fbeam%n_wavelength = window_sample
 fbeam%s0 = 0
 fbeam%beamlet_size = ncopy
-fbeam%one4one = .false.
+fbeam%one4one = electrons
 if (allocated(fbeam%slice)) deallocate (fbeam%slice)
 allocate (fbeam%slice(nslice_k))
 do is_g = 1, nslice_k
@@ -1104,6 +1309,8 @@ do is_g = 1, nslice_k
   endif
   if (quiet_start) then
     sl%m_ind = fel_m_ind (sl, beamlet_groups(sl%n, ncopy), sl%n / ncopy)
+  elseif (electrons) then
+    sl%m_ind = sl%n                       ! Every electron is a sample of its own.
   else
     call fel_transverse_groups (sl, group_w, n_group_w)
     sl%m_ind = fel_m_ind (sl, group_w, n_group_w)

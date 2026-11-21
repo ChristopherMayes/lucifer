@@ -198,6 +198,7 @@ type fel_global_struct
   integer :: ran_seed = 12345                ! The one RNG seed (generation, import, noise).
   logical :: write_diag = .false.            ! The Genesis-comparison text diag file (large).
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
+  logical :: write_final_beam = .true.       ! Write the beam at the exit. Unset, False in the electrons mode.
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
   logical :: keep_escaped_field = .true.     ! Keep the escaped light, as the pulse.
   logical :: write_escaped = .false.         ! Also write the escaped file, each plane as it left.
@@ -346,6 +347,8 @@ type fel_beam_init_param_struct
   ! "keep" keeps every real particle as a beamlet of beamlet_size copies at
   ! weight/beamlet_size. The counts follow the charge, so the correlations of a
   ! start-to-end bunch survive whole.
+  ! "electrons" loads one particle for every electron of the bunch, each with its own
+  ! coordinates. The noise is the load's own, and the two switches below are not read.
   character(16) :: load_mode = 'sample'
   ! The two switches of the load. quiet_start makes beamlets of copies with phases spread
   ! over 2 pi about each particle's own. The load then has no bunching at any harmonic
@@ -464,7 +467,7 @@ type fel_run_struct
   ! Running counters and ledger terms.
   real(rp) :: u_spont_cum = 0, e_rad_cum = 0
   real(rp) :: charge_dropped_tot = 0, b_dev_max = 0
-  integer :: n_moved_tot = 0
+  integer(8) :: n_moved_tot = 0
   ! Diagnostics state.
   type (fel_slice_diag_struct), allocatable :: bdiag_arr(:)
   real(rp), allocatable :: fpow_arr(:), fonax_arr(:)

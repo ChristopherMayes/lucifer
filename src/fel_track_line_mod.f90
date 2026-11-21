@@ -65,7 +65,8 @@ logical, pointer :: is_fel(:), dump_beam_here(:), dump_field_here(:)
 type (fel_slice_diag_struct), pointer :: bdiag_arr(:)
 real(rp), pointer :: fpow_arr(:), fonax_arr(:)
 real(rp), pointer :: z_now, u_spont_cum, e_rad_cum, charge_dropped_tot, b_dev_max
-integer, pointer :: n_moved_tot, iu_diag, iu_ledger, iu_wake
+integer(8), pointer :: n_moved_tot
+integer, pointer :: iu_diag, iu_ledger, iu_wake
 integer iu_mig
 
 type (bunch_struct) bunch
@@ -685,9 +686,10 @@ if (migrate) then
   write (iu_mig, '(a, es24.15e3)') 'charge_dropped_total ', charge_dropped_tot
   if (migrate_check) write (iu_mig, '(a, es24.15e3)') 'worst_bunching_deviation ', b_dev_max
   close (iu_mig)
-  call out_io (s_info$, r_name, 'Migration moved \i0\ particles, dropped \es12.4\ C off the window ends;' // &
+  call out_io (s_info$, r_name, 'Migration moved ' // fel_int8_str(n_moved_tot) // &
+               ' particles, dropped \es12.4\ C off the window ends;' // &
                ' per-event rows in ' // trim(out_root) // '.migration.txt', &
-               i_array = [n_moved_tot], r_array = [charge_dropped_tot])
+               r_array = [charge_dropped_tot])
 endif
 
 call fel_toc (fel_t_walk$)
@@ -739,7 +741,7 @@ end subroutine apply_bmad_wake_kick
 ! Subroutine do_migrate ()
 !
 ! Routine to run slice migration at the per-element stride.
-! Migration runs serially, between the parallel regions. It is called after z_now is
+! Migration runs between the parallel regions. It is called after z_now is
 ! advanced. So each drop report carries the z of the diagnostic record it precedes, and
 ! the conservation timeline can be rebuilt from the log.
 !
@@ -752,8 +754,10 @@ end subroutine apply_bmad_wake_kick
 
 subroutine do_migrate ()
 
+type (fel_beam_struct) beam_serial
 real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum, dev, mrg
-integer nm
+real(rp) chd_s, d_re_s, d_im_s, mrg_s
+integer(8) nm, nm_s
 
 if (.not. migrate) return
 call fel_tic (fel_t_migration$)
@@ -773,9 +777,30 @@ endif
 
 if (migrate_check) call whole_beam_phasor (sb_re, sb_im, wsum)
 
+! With migrate_check a copy of the beam is migrated by the serial routine, and the slices
+! of the two must be the same to the bit.
+
+if (migrate_check) then
+  beam_serial = fbeam
+  call fel_migrate_slices_serial (beam_serial, ks, nm_s, chd_s, d_re_s, d_im_s, mrg_s, err)
+  if (err) then
+    err_flag = .true.;  return
+  endif
+endif
+
 call fel_migrate_slices (fbeam, ks, nm, chd, d_re, d_im, mrg, err)
 if (err) then
   err_flag = .true.;  return
+endif
+
+if (migrate_check) then
+  if (.not. fel_beams_identical(fbeam, beam_serial) .or. nm /= nm_s .or. chd /= chd_s .or. &
+      d_re /= d_re_s .or. d_im /= d_im_s .or. mrg /= mrg_s) then
+    call out_io (s_error$, r_name, 'fel_migrate_slices AND fel_migrate_slices_serial DIFFER AT s = \es14.6\ m:', &
+                 fel_int8_str(nm) // ' AND ' // fel_int8_str(nm_s) // ' PARTICLES MOVED. PLEASE REPORT THIS!', &
+                 r_array = [z_now])
+    err_flag = .true.;  return
+  endif
 endif
 n_moved_tot = n_moved_tot + nm
 charge_dropped_tot = charge_dropped_tot + chd

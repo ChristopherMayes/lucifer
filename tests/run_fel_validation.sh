@@ -769,12 +769,12 @@ echo
 # passes share while it runs, and the CPU sections of either pass carry on beside
 # it (scripts/with_lock.py).
 
-SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous undulator-spectrum element-offsets two-polarization beam-format fft-plan harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
+SECTION_ORDER="shot-noise load electron-load sase-startup seam-wake import migration collective source-filter spectral fp32-lockstep device unaveraged spontaneous undulator-spectrum element-offsets two-polarization beam-format fft-plan harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
 
 # The launch order is longest first, by the section times of one debug pass (device
 # 116 s, source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section
 # is not left to run alone at the end. The printed order is SECTION_ORDER regardless.
-LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format fft-plan undulator-spectrum load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
+LAUNCH_ORDER="device source-filter spectral spontaneous unaveraged import element-offsets two-polarization diagnostics sase-startup phasing beam-format fft-plan undulator-spectrum load electron-load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
 
 SECTIONS="$WORK_DIR/sections"
 DEVICE_LOCK="${LUCIFER_DEVICE_LOCK:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/device.lock}"
@@ -804,6 +804,16 @@ sec_load () {
   echo "--- the load path (keep exactness, split invariance, in-cone startup, refusals) ----"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_load.py" --exe "$EXE" --workdir "$1" \
     || { echo "FAIL: load path; outputs kept in: $1" >&2; return 1; }
+}
+
+# The electrons load, one particle for every electron, is held to what independent
+# electrons are: the counts, the bunching at one over the count, the described moments.
+# Its tracked run compares the threaded migration with the serial routine at every call.
+
+sec_electron_load () {
+  echo "--- the electrons load (statistics, refusals, a bunch file, migration, start-up) ---"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_electron_load.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: electrons load; outputs kept in: $1" >&2; return 1; }
 }
 
 sec_sase_startup () {

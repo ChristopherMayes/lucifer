@@ -37,7 +37,7 @@ KEYS = {
         "source_filter_width", "source_filter_mutate", "track_start", "track_end",
         "continuation", "comb_ds_save", "interlude_ds_step", "dump_beam_at", "dump_field_at",
         "dump_at_comb", "dump_slice_first", "dump_slice_last", "dump_reduced", "ran_seed",
-        "write_diag", "write_initial", "load_only", "keep_escaped_field", "write_escaped",
+        "write_diag", "write_initial", "write_final_beam", "load_only", "keep_escaped_field", "write_escaped",
         "migrate", "migrate_check", "reference_run", "record_environment", "fp32_check",
         "fp32_mutate", "device", "device_timing", "device_dep_mutate", "device_wake_mutate",
         "fft_plan", "fft_wisdom_file",

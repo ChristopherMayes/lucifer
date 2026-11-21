@@ -207,7 +207,7 @@ The program's terminal output is formatted for reading and carries no contract b
 | File | What |
 |---|---|
 | `<out_root>.stats.h5` | The run: per-record beam, field and Twiss data, the lattice table, and the axes and parameters to read them by. Self-describing (see [`reading-output.md`](reading-output.md)) |
-| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis4 dump can. At an eligible boundary both carry the `lucifer` checkpoint group a continuation reads (`run.continuation = true`). `tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
+| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file is written under `run.write_final_beam`, which is on unless `beam.load_mode = "electrons"`. The beam file carries the per-particle weight, which no Genesis4 dump can. At an eligible boundary both carry the `lucifer` checkpoint group a continuation reads (`run.continuation = true`). `tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
 | `<out_root>.diag.txt` | The per-record Genesis4-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
 | `<out_root>.import.txt` | The load record: the per-slice current profile, with the bunch's analysis moments from the resampler or the per-slice counts and first moments from the keep mode. Written at load time, so it exists under `load_only = true` |

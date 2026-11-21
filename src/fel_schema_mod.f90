@@ -161,6 +161,9 @@ call add ('run', 'write_diag', key_logical$, '', 'write diag', &
       'Write the Genesis-comparison text diag file, which is large.')
 call add ('run', 'write_initial', key_logical$, '', 'write initial', &
       'Dump the initial state before tracking.')
+call add ('run', 'write_final_beam', key_logical$, '', 'write final beam', &
+      'Write the beam at the exit, <out_root>-final.beam.h5. Unset, it is written, except ' // &
+      'in the electrons mode of beam.load_mode, where the file holds every electron.')
 call add ('run', 'load_only', key_logical$, '', 'load only', &
       'Build the initial state, dump it, stop.')
 call add ('run', 'keep_escaped_field', key_logical$, '', 'keep escaped', &
@@ -242,8 +245,9 @@ call add ('beam', 'z_max', key_real$, 'm', 'z max', &
       'The flat profile''s upper z bound, read under grid only.')
 call add ('beam', 'load_mode', key_string$, '', 'load mode', &
       'How the bunch becomes slices: sample, n_particle in a slice with weights from the ' // &
-      'slice charge, or keep, every particle kept with the counts following the charge.', &
-      allowed = [character(16) :: 'sample', 'keep'])
+      'slice charge, keep, every particle kept with the counts following the charge, or ' // &
+      'electrons, one particle for every electron of the bunch.', &
+      allowed = [character(16) :: 'sample', 'keep', 'electrons'])
 call add ('beam', 'quiet_start', key_logical$, '', 'quiet start', &
       'Load beamlets of beamlet_size phase copies, quiet below that harmonic.')
 call add ('beam', 'beamlet_size', key_int$, '', 'beamlet size', &
@@ -571,6 +575,7 @@ case ('run.dump_reduced');                 run%global%dump_reduced = lv
 case ('run.ran_seed');                     run%global%ran_seed = iv
 case ('run.write_diag');                   run%global%write_diag = lv
 case ('run.write_initial');                run%global%write_initial = lv
+case ('run.write_final_beam');             run%global%write_final_beam = lv
 case ('run.load_only');                    run%global%load_only = lv
 case ('run.keep_escaped_field');           run%global%keep_escaped_field = lv;  run%bank_set = .true.
 case ('run.write_escaped');                run%global%write_escaped = lv
@@ -878,6 +883,44 @@ end function fel_schema_key
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function fel_schema_is_set (run, dotted) result (is_set)
+!
+! Routine to say whether the input file or the command line gave a key a value.
+!
+! Input:
+!   run    -- fel_run_struct: The run state.
+!   dotted -- character(*): The key as table.key, beam.n_particle.
+!
+! Output:
+!   is_set -- logical: True if the key was set. False for a default or a derived value,
+!               and for a key the table does not have.
+!-
+
+function fel_schema_is_set (run, dotted) result (is_set)
+
+type (fel_run_struct), target :: run
+type (fel_key_struct), allocatable :: keys(:)
+character(*) dotted
+integer i
+logical is_set
+
+!
+
+is_set = .false.
+if (.not. allocated(run%key_origin)) return
+call fel_schema_table (keys)
+do i = 1, size(keys)
+  if (trim(keys(i)%table) // '.' // trim(keys(i)%name) /= dotted) cycle
+  is_set = (run%key_origin(i) == fel_origin_file$ .or. run%key_origin(i) == fel_origin_command$)
+  return
+enddo
+
+end function fel_schema_is_set
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_schema_mark (run, dotted, origin)
 !
 ! Routine to record where a key's value came from, which the setup calls for a value it
@@ -979,6 +1022,7 @@ case ('run.dump_reduced');                 lv = run%global%dump_reduced
 case ('run.ran_seed');                     iv = run%global%ran_seed
 case ('run.write_diag');                   lv = run%global%write_diag
 case ('run.write_initial');                lv = run%global%write_initial
+case ('run.write_final_beam');             lv = run%global%write_final_beam
 case ('run.load_only');                    lv = run%global%load_only
 case ('run.keep_escaped_field');           lv = run%global%keep_escaped_field
 case ('run.write_escaped');                lv = run%global%write_escaped

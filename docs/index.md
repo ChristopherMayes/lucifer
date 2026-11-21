@@ -23,7 +23,7 @@ Lucifer has:
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
 - **A GPU backend** on Apple Silicon (`run.device = "metal"`), for the averaged and the unaveraged method. The beam and the field stay resident on the device through each FEL element, with harmonic field sets, both polarizations, slice migration, the chamber wake in the averaged method and the [spectral propagator](glossary.md#gl-propagator). On a 256-point grid the device is 4.7 to 7.2 times as fast as twelve CPU threads, and on a single slice of 1024 particles on a 64-point grid it is slower than the CPU ([](performance.md#perf-device)). The device is checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
 - **openPMD** particle and field dumps in both directions, and a self-describing [statistics file](glossary.md#gl-statistics-file) described by [](BMAD-STATS-SPEC.md).
-- **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever [load](glossary.md#gl-load) there is.
+- **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling, kept particle by particle or loaded as one particle for every electron, quietened if asked, with the physical noise imposed on whatever [load](glossary.md#gl-load) there is.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
 
 (intro-two-methods)=

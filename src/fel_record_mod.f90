@@ -23,10 +23,12 @@ use fel_h5_mod
 implicit none
 
 private
-public :: fel_record_real, fel_record_int, fel_record_flag, fel_record_str, fel_record_file
+public :: fel_record_real, fel_record_int, fel_record_int8, fel_record_flag, fel_record_str, fel_record_file
+public :: fel_int8_str
 public :: fel_record_write, fel_record_com, fel_record_common_struct, fel_record_entry_struct
 
 integer, parameter :: fel_record_real$ = 1, fel_record_int$ = 2, fel_record_flag$ = 3, fel_record_str$ = 4
+integer, parameter :: fel_record_int8$ = 5
 
 type fel_record_entry_struct
   character(16) :: group = ''            ! setup, run or timing.
@@ -36,6 +38,7 @@ type fel_record_entry_struct
   integer :: kind = 0                    ! fel_record_real$, _int$, _flag$ or _str$.
   real(rp) :: r = 0                      ! A real value.
   integer :: i = 0                       ! An integer value.
+  integer(8) :: i8 = 0                   ! A count that may pass the largest default integer.
   logical :: flag = .false.              ! A logical value.
   character(300) :: s = ''               ! A string value.
   logical :: written = .false.           ! Already in the file.
@@ -158,6 +161,62 @@ ix = new_entry(group, name, '1', descrip, fel_record_int$)
 fel_record_com%entry(ix)%i = value
 
 end subroutine fel_record_int
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_record_int8 (group, name, descrip, value)
+!
+! Routine to hold one count of particles for the stats file, as an 8-byte integer.
+!
+! Input:
+!   group   -- character(*): setup, run or timing.
+!   name    -- character(*): The dataset's name.
+!   descrip -- character(*): Its description.
+!   value   -- integer(8): The count.
+!-
+
+subroutine fel_record_int8 (group, name, descrip, value)
+
+character(*) group, name, descrip
+integer(8) value
+integer ix
+
+!
+
+ix = new_entry(group, name, '1', descrip, fel_record_int8$)
+fel_record_com%entry(ix)%i8 = value
+
+end subroutine fel_record_int8
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_int8_str (value) result (str)
+!
+! Routine to write an 8-byte integer as a string, as int_str does a default integer.
+!
+! Input:
+!   value -- integer(8): The number.
+!
+! Output:
+!   str   -- character(:), allocatable: Its digits.
+!-
+
+function fel_int8_str (value) result (str)
+
+integer(8) value
+character(:), allocatable :: str
+character(24) buf
+
+!
+
+write (buf, '(i0)') value
+str = trim(buf)
+
+end function fel_int8_str
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -317,6 +376,8 @@ do ig = 1, size(groups)
       call fel_h5_real (g_id, trim(en%name), trim(en%unit), label_of(en%name), trim(en%descrip), '', en%r, err)
     case (fel_record_int$)
       call fel_h5_int (g_id, trim(en%name), '1', label_of(en%name), trim(en%descrip), '', en%i, err)
+    case (fel_record_int8$)
+      call fel_h5_int (g_id, trim(en%name), '1', label_of(en%name), trim(en%descrip), '', en%i8, err)
     case (fel_record_flag$)
       call fel_h5_flag (g_id, trim(en%name), label_of(en%name), trim(en%descrip), en%flag, err)
     case (fel_record_str$)
