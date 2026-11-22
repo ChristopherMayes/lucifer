@@ -165,6 +165,7 @@ Power per slice inside (top) and outside (bottom) 3 µrad against z, at 1.57 µm
 
 The power outside the cut is inversely proportional to the beamlet count and independent of the particle count at a fixed beamlet count. This is the coherent emission of each beamlet with itself.
 
+(emission-inside-the-mode)=
 ## Emission inside the mode
 
 The power within the cut follows the same curve for every grid and every particle count ([](#fig-sn-split), right), within the statistical fluctuation of the interior mean. That fluctuation is about 25 percent for 150 slices and a coherence length of about 10 slices. At z = 37.2 m it is 1.8 to 3.9 GW per slice in fifteen of the sixteen simulations. The saturation point of the doubled line falls between 28 and 33 m in every simulation, against the estimate of 30.5 m. The saturated power lies between the two estimates of 0.5 and 8.1 GW. The interior bunching factor at 37 m is 0.20 to 0.30 in the same fifteen simulations.
