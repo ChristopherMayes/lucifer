@@ -468,6 +468,9 @@ type fel_run_struct
   real(rp) :: u_spont_cum = 0, e_rad_cum = 0
   real(rp) :: charge_dropped_tot = 0, b_dev_max = 0
   integer(8) :: n_moved_tot = 0
+  ! The seam interlude's time by part, summed over the threads [thread s]: the memory of
+  ! the Bmad bunches, the slices into bunches, track1_bunch, the bunches into slices.
+  real(rp) :: t_interlude(4) = 0
   ! Diagnostics state.
   type (fel_slice_diag_struct), allocatable :: bdiag_arr(:)
   real(rp), allocatable :: fpow_arr(:), fonax_arr(:)
