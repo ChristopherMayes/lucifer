@@ -50,6 +50,7 @@ The averaged method's transverse maps have a third option behind them, the trans
 | know what is checked and at what [level](glossary.md#gl-level) | [](validation.md) |
 | know where a run spends its time | [](performance.md) |
 | know what noise the load imposes when a [beamlet](glossary.md#gl-beamlet) holds few electrons | [](shot-noise.md) |
+| track every electron of a bunch as a particle of its own | [](electrons-mode.md) |
 | see the radiation of one undulator beside the formulas of undulator radiation | [](undulator-spectrum.md) |
 | choose the grid, the window and the particle count for a SASE run | [](fel-physics.md#sec-convergence), with the measurements in [](startup-noise.md) |
 | run something and see a figure | [](generated/examples/examples.md) |

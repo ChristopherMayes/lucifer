@@ -12,7 +12,7 @@ The example runs in one command, with Bmad only, on a machine with 17 GB of memo
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot lcls_electrons.stats.h5
 
-This is the window of `../lcls`, the 3 kA slab of LCLS at 1.5 Angstrom, loaded with `beam.load_mode = "electrons"` ([the electrons mode](../../fel-physics.md#sec-electrons)). The lattice is that example's, and the input file differs from it in one key: `load_mode` stands where `shot_noise` stood. The window holds 30.8 pC, and the run tracks each of its 192,386,391 electrons as a particle of its own through the 132 m line.
+This is the window of `../lcls`, the 3 kA slab of LCLS at 1.5 Angstrom, loaded with `beam.load_mode = "electrons"` ([the electrons mode](../../electrons-mode.md)). The lattice is that example's, and the input file differs from it in one key: `load_mode` stands where `shot_noise` stood. The window holds 30.8 pC, and the run tracks each of its 192,386,391 electrons as a particle of its own through the 132 m line.
 
 It is run by hand and not by `run_examples.sh`, since it takes over an hour on twelve cores. The numbers below are from the run of 2026-11-21 on an Apple M3 Max, twelve threads, GNU Fortran 15.3.0.
 

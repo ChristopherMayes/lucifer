@@ -9,6 +9,15 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-22 Added: a page for the electrons mode, `docs/electrons-mode.md`. It has two parts. The first
+  describes the mode and holds no result of a run: the load, the keys the mode uses and refuses, the
+  number of particles and their memory as a table and a figure by charge, on the host in FP64 and on
+  the device in FP32, the run time, and the limits of the mode. The second, Measurements on the
+  examples, holds every measured number: the memory and the run time of `lcls_electrons` on 12 and on
+  128 cores, the migration pass, and the comparison with the weight load.
+  `docs/figures/electrons_memory_figure.py` draws the figure and prints the table. The text was a
+  section of `docs/fel-physics.md`, which keeps a summary under the same anchor. The comparison over 48 seeds is
+  now a table by position along the line. `docs/validation.md` said that comparison was over 16 seeds.
 - 2026-11-22 Changed: the pages that lead to the electrons mode. `docs/user-guide.md` has a section,
   The three loads, that states what each value of `beam.load_mode` loads and what determines the
   number of particles. `docs/shot-noise.md` says in its introduction and in its Scope section that the
