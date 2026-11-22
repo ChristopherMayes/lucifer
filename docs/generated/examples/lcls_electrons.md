@@ -51,7 +51,7 @@ The gain length, the saturation point and the power at saturation agree to under
 | field solve | 746 s, 11 percent |
 | interludes | 375 s, 6 percent |
 
-The memory beyond the particles is the field, the record of the run, and the Bmad bunch each thread makes of one slice at a time in an interlude, at 224 bytes per particle, so it grows with the number of threads. The program's estimate for this run alone on these cores is 99 minutes. On a node of 128 cores the same run took 44 minutes and 30.9 GB, with the same result to every printed digit, and its phases are in [the performance page](../../performance.md#perf-electrons).
+The memory beyond the particles is the field, the record of the run, and the Bmad bunch each thread makes of one slice at a time in an interlude, at 224 bytes per particle, so it grows with the number of threads. The program's estimate for this run alone on these cores is 99 minutes. On a node of 128 cores the same run takes 25 minutes and 31.3 GB, with the same result to every printed digit, and its phases are in [the performance page](../../performance.md#perf-electrons).
 
 The beam at the exit is not written: `run.write_final_beam` is off in this mode unless the input file sets it, since the file would hold every electron. The field and the pulse are written as in any run.
 

@@ -216,20 +216,39 @@ The field-free drift is parallel over slices for the same reason. A time-depende
 (perf-electrons)=
 ### Every electron of the LCLS window, on 12 and on 128 cores
 
-The run is the example `lcls_electrons` ([](generated/examples/lcls_electrons.md)): the 30.8 pC window of LCLS loaded with `beam.load_mode = "electrons"` ([](fel-physics.md#sec-electrons)), 192,386,391 particles in 300 slices on a 128-point grid, 1254 steps over 132 m with 96 field-free elements between the segments. The two runs gave the same exit power, pulse energy and bunching to every digit the program prints.
+The run is the example `lcls_electrons` ([](generated/examples/lcls_electrons.md)): the 30.8 pC window of LCLS loaded with `beam.load_mode = "electrons"` ([](fel-physics.md#sec-electrons)), 192,386,391 particles in 300 slices on a 128-point grid, 1254 steps over 132 m with 96 field-free elements between the segments. The runs gave the same exit power, pulse energy and bunching to every digit the program prints.
 
 *Measured 2026-11-21. Apple M3 Max: 12 threads, gfortran 15.3.0, with another program on the same cores for the first hour of the run. NERSC Perlmutter CPU node: two AMD EPYC 7763, 128 cores, 512 GB, 128 threads bound to cores and spread, gfortran 15.3.0 and Bmad from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"` with the plan measured on the node.*
 
-| phase | M3 Max, 12 threads | Perlmutter, 128 threads | ratio |
+| phase | M3 Max, 12 threads | Perlmutter, 128 threads, one branch | Perlmutter, 128 threads, a branch for each thread |
 |---|---|---|---|
-| particle push | 4330 s | 970 s | 4.5 |
-| interludes | 375 s | 1235 s | 0.30 |
-| statistics | 1253 s | 224 s | 5.6 |
-| field solve | 746 s | 194 s | 3.8 |
-| walk | 6704 s | 2623 s | 2.6 |
-| memory at the peak | 16.9 GB | 30.9 GB | |
+| particle push | 4330 s | 970 s | 974 s |
+| interludes | 375 s | 1235 s | 133 s |
+| statistics | 1253 s | 224 s | 217 s |
+| field solve | 746 s | 194 s | 195 s |
+| walk | 6704 s | 2623 s | 1519 s |
+| memory at the peak | 16.9 GB | 30.9 GB | 31.3 GB |
 
-The particle push, the statistics and the field solve are 3.8 to 5.6 times as fast on the node, and the walk 2.6 times. The interludes are the exception: they take 3.3 times as long on 128 threads as on 12, and are 47 percent of the node's walk. In an interlude each thread converts one slice at a time to a Bmad bunch of 224 bytes per particle, tracks it through the element with `track1_bunch` and converts it back, 144 MB allocated and written per slice per element. In thread-seconds the push takes 2.4 times as much on the node as on the M3 Max and the interlude 35 times as much, so relative to the push the interlude takes 15 times as many thread-seconds on the node as on the M3 Max. What limits it has not been measured. The memory beyond the 13.1 GB of the particles is mostly those bunches, one per thread.
+The M3 Max run and the first node run had one branch of the lattice for all the threads of an interlude, and the second node run has a branch for each thread, which the next section measures. With it the node's walk is 4.4 times as fast as the M3 Max's, and the interludes are 9 percent of it.
+
+In the first node run the particle push, the statistics and the field solve are 3.8 to 5.6 times as fast as on the M3 Max, and the walk 2.6 times. The interludes are the exception: they take 3.3 times as long on 128 threads as on 12, and are 47 percent of that walk. In an interlude each thread converts one slice at a time to a Bmad bunch of 224 bytes per particle, tracks it through the element with `track1_bunch` and converts it back, 144 MB allocated and written per slice per element. In thread-seconds the push takes 2.4 times as much on the node as on the M3 Max and the interlude 35 times as much, so relative to the push the interlude takes 15 times as many thread-seconds on the node as on the M3 Max. That run was made with one branch for all the threads, and what limited it is measured below. The memory beyond the 13.1 GB of the particles is mostly those bunches, one per thread.
+
+#### The interlude, by part
+
+An interlude takes each slice through Bmad's `track1_bunch`, one slice in each thread. Its time was measured by part on a line of one LCLS undulator and six of its breaks, 18 drifts and quadrupoles, with the same $1.9\times10^{8}$ electrons, on the same node. The parts are summed over the threads, and `timing/` of the stats file records them as `interlude_to_bunch`, `interlude_track` and `interlude_to_slice`.
+
+*Measured 2026-11-21 on the Perlmutter CPU node above.*
+
+| threads | wall time, one branch | wall time, a branch for each thread | `track1_bunch`, one branch | `track1_bunch`, a branch each | to bunches | to slices |
+|---|---|---|---|---|---|---|
+| 16 | 458 s | 76.3 s | 6480 s | 792 s | 356 s | 46 s |
+| 32 | 331 s | 46.7 s | 8960 s | 901 s | 400 s | 78 s |
+| 64 | 231 s | 27.0 s | 12720 s | 978 s | 411 s | 177 s |
+| 128 | 225 s | 25.6 s | 22640 s | 1277 s | 746 s | 422 s |
+
+The last two columns are with a branch for each thread. With one branch for all the threads the thread time in `track1_bunch` rose with the number of threads, and from 64 to 128 threads the interlude did not get shorter. Bmad's `check_aperture_limit` sets `param%unstable_factor` to zero at each call, twice for every particle, and `param` was the one `lat_param_struct` of the lattice's branch, so every thread wrote one memory location for every particle. At 128 threads the processors retired 0.19 instructions per cycle, with no time in the kernel and six cache misses per particle, and 89 percent of the cycles were on three stores to the stack that follow those two calls. Each thread now tracks through a copy of the element whose branch is its own, and the interlude takes 25.6 s where it took 225 s.
+
+What remains at 128 threads is divided almost evenly between `track1_bunch` and the two conversions, whose thread time rises with the number of threads as that of `track1_bunch` no longer does. A particle of a Bmad bunch is 224 bytes, and the conversions write and read every one of them for every element.
 
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
