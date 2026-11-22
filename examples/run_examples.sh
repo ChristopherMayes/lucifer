@@ -447,6 +447,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_glossary.py" --root "$LUCIFER
   exit 1
 fi
 
+# And every reference to a label of the manual names a label that exists: a reference by
+# label, a link by page and anchor, and a section that a comment of the source cites.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_labels.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a reference names a label the manual does not define, or a label is defined twice."
+  exit 1
+fi
+
 # And every page of the site's contents declares its kind in its front matter.
 if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_page_kinds.py" --root "$LUCIFER_DIR"; then
   echo " FAIL: a page of the site's contents does not declare its kind."
