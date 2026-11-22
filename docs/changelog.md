@@ -9,6 +9,18 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-21 Changed: the seam interlude keeps one Bmad bunch for each thread. An interlude takes
+  each slice through Bmad's `track1_bunch`, and it allocated the slice's bunch, 224 bytes a
+  particle, for every slice of every element and freed it again. On twelve threads that was 12
+  percent of the interlude's thread time and grew with the number of threads, 0.37 thread-seconds
+  at two threads and 1.41 at twelve on 9.6e6 electrons. Each thread now keeps its bunch's
+  particle array for the whole walk, at the size of the largest slice it has met, and the
+  interlude of that run takes 0.91 s where it took 1.03 s. Every particle is converted and
+  tracked as before, and no result changes. `timing/` of the stats file gains
+  `interlude_to_bunch`, `interlude_track` and `interlude_to_slice`, the interlude's time in the
+  conversion to bunches, in `track1_bunch` and in the conversion back, summed over the threads.
+  A particle's label is no longer read back from the bunch after an interlude, where a label
+  above 2147483647 did not fit.
 - 2026-11-21 Added: `beam.load_mode = "electrons"` loads one particle for every electron of the
   bunch. The charge of the window is counted as a whole number of electrons, the slices' numbers
   are one multinomial draw with that total, and every electron has its own transverse

@@ -85,7 +85,9 @@ character(16) interlude_model
 type (ele_struct), target :: slice_ele          ! One interlude piece, element_slice_iterator's.
 type (ele_struct), pointer :: ele_p             ! The element the piece's arithmetic reads.
 integer i_piece, n_piece
-real(rp) t_part(4), t_0, t_1
+real(rp) t_part(3), t_0, t_1
+type (bunch_struct), allocatable :: bunch_keep(:)
+integer it, n_thread
 real(rp) l_piece, f_piece, z_ele0
 character(*), parameter :: r_name = 'track_fel_line'
 
@@ -171,6 +173,12 @@ endif
 
 n_moved_tot = 0
 run%t_interlude = 0
+
+! One bunch for each thread, which the seam interlude keeps from slice to slice.
+
+n_thread = 1
+!$ n_thread = omp_get_max_threads()
+allocate (bunch_keep(0:n_thread-1))
 charge_dropped_tot = 0
 b_dev_max = 0
 
@@ -510,7 +518,7 @@ do ie = run%i_start, run%i_end
 
         if (bmad_com%radiation_fluctuations_on) then
           do is = 1, nslice
-            call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch, err)
+            call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch, err, reuse = .true.)
             if (err) then
               err_flag = .true.;  return
             endif
@@ -519,7 +527,7 @@ do ie = run%i_start, run%i_end
               call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
               err_flag = .true.;  return
             endif
-            call fel_bunch_to_slice (bunch, ele_p, fbeam%slice(is), err)
+            call fel_bunch_to_slice (bunch, ele_p, fbeam%slice(is), err, tracked = .true.)
             if (err) then
               err_flag = .true.;  return
             endif
@@ -527,7 +535,7 @@ do ie = run%i_start, run%i_end
         else
           err = .false.
           t_part = 0
-          !$OMP parallel do firstprivate(err) private(t_0, t_1) reduction(.or.: err_flag) &
+          !$OMP parallel do firstprivate(err) private(t_0, t_1, it) reduction(.or.: err_flag) &
           !$OMP     reduction(+: t_part) schedule(static)
           do is = 1, nslice
             if (.not. err) then
@@ -537,21 +545,26 @@ do ie = run%i_start, run%i_end
               ! Note: An OMP private clause on a subroutine-level scratch leaves the
               ! derived type's components improperly initialized under gfortran. That
               ! gives a 2x bunching shift (docs/validation.md).
+              !
+              ! Its particle array is the thread's own, kept in bunch_keep for the
+              ! whole walk and moved into the scratch bunch and back, so the bunch is
+              ! default-initialized each iteration and its 224 bytes a particle are
+              ! allocated once (fel_slice_to_bunch).
 
               block
                 type (bunch_struct) bunch_l
+                it = 0
+                !$ it = omp_get_thread_num()
                 t_0 = fel_timer_run_seconds()
-                allocate (bunch_l%particle(fbeam%slice(is)%n))
+                call move_alloc (bunch_keep(it)%particle, bunch_l%particle)
+                call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch_l, err, reuse = .true.)
                 t_1 = fel_timer_run_seconds();  t_part(1) = t_part(1) + (t_1 - t_0);  t_0 = t_1
-                call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch_l, err)
-                t_1 = fel_timer_run_seconds();  t_part(2) = t_part(2) + (t_1 - t_0);  t_0 = t_1
                 if (.not. err) call track1_bunch (bunch_l, ele_p, err)
-                t_1 = fel_timer_run_seconds();  t_part(3) = t_part(3) + (t_1 - t_0);  t_0 = t_1
-                if (.not. err) call fel_bunch_to_slice (bunch_l, ele_p, fbeam%slice(is), err)
-                t_1 = fel_timer_run_seconds();  t_part(4) = t_part(4) + (t_1 - t_0);  t_0 = t_1
+                t_1 = fel_timer_run_seconds();  t_part(2) = t_part(2) + (t_1 - t_0);  t_0 = t_1
+                if (.not. err) call fel_bunch_to_slice (bunch_l, ele_p, fbeam%slice(is), err, tracked = .true.)
+                call move_alloc (bunch_l%particle, bunch_keep(it)%particle)
+                t_1 = fel_timer_run_seconds();  t_part(3) = t_part(3) + (t_1 - t_0)
                 if (err) err_flag = .true.
-                deallocate (bunch_l%particle)
-                t_part(1) = t_part(1) + (fel_timer_run_seconds() - t_0)
               end block
             endif
           enddo
