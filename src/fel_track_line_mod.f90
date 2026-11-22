@@ -85,6 +85,7 @@ character(16) interlude_model
 type (ele_struct), target :: slice_ele          ! One interlude piece, element_slice_iterator's.
 type (ele_struct), pointer :: ele_p             ! The element the piece's arithmetic reads.
 integer i_piece, n_piece
+real(rp) t_part(4), t_0, t_1
 real(rp) l_piece, f_piece, z_ele0
 character(*), parameter :: r_name = 'track_fel_line'
 
@@ -169,6 +170,7 @@ if (any_unavg) then
 endif
 
 n_moved_tot = 0
+run%t_interlude = 0
 charge_dropped_tot = 0
 b_dev_max = 0
 
@@ -524,7 +526,9 @@ do ie = run%i_start, run%i_end
           enddo
         else
           err = .false.
-          !$OMP parallel do firstprivate(err) reduction(.or.: err_flag) schedule(static)
+          t_part = 0
+          !$OMP parallel do firstprivate(err) private(t_0, t_1) reduction(.or.: err_flag) &
+          !$OMP     reduction(+: t_part) schedule(static)
           do is = 1, nslice
             if (.not. err) then
 
@@ -536,14 +540,23 @@ do ie = run%i_start, run%i_end
 
               block
                 type (bunch_struct) bunch_l
+                t_0 = fel_timer_run_seconds()
+                allocate (bunch_l%particle(fbeam%slice(is)%n))
+                t_1 = fel_timer_run_seconds();  t_part(1) = t_part(1) + (t_1 - t_0);  t_0 = t_1
                 call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch_l, err)
+                t_1 = fel_timer_run_seconds();  t_part(2) = t_part(2) + (t_1 - t_0);  t_0 = t_1
                 if (.not. err) call track1_bunch (bunch_l, ele_p, err)
+                t_1 = fel_timer_run_seconds();  t_part(3) = t_part(3) + (t_1 - t_0);  t_0 = t_1
                 if (.not. err) call fel_bunch_to_slice (bunch_l, ele_p, fbeam%slice(is), err)
+                t_1 = fel_timer_run_seconds();  t_part(4) = t_part(4) + (t_1 - t_0);  t_0 = t_1
                 if (err) err_flag = .true.
+                deallocate (bunch_l%particle)
+                t_part(1) = t_part(1) + (fel_timer_run_seconds() - t_0)
               end block
             endif
           enddo
           !$OMP end parallel do
+          run%t_interlude = run%t_interlude + t_part
           if (err_flag) then
             call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
             return
