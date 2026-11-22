@@ -32,8 +32,11 @@ project:
       children:
         - file: generated/examples/examples.md
         - file: generated/examples/steady_state.md
+        - file: generated/examples/frames.md
         - file: generated/examples/taper.md
         - file: generated/examples/sase.md
+        - file: generated/examples/flash1.md
+        - file: generated/examples/lcls.md
         - file: generated/examples/sase_wake.md
         - file: generated/examples/bmad_wake.md
         - file: generated/examples/space_charge.md
@@ -47,6 +50,7 @@ project:
         - file: generated/examples/chicane.md
         - file: generated/examples/coherent_source.md
         - file: generated/examples/saturation_demo.md
+        - file: generated/examples/lcls_electrons.md
     - file: generated/api.md
     - file: generated/python-api.md
     - file: generated/layouts.md
