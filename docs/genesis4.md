@@ -30,7 +30,7 @@ Lucifer has, and Genesis4 does not:
 - **Per-particle weights** throughout, including weighted shot noise and weighted diagnostics. No Genesis4 dump format carries a weight.
 - **The unaveraged mode**, integrating the real undulator field with no period averaging and no resonance approximation.
 - **Bmad element wakes** applied across the whole time [window](glossary.md#gl-window), and every non-FEL element tracked by Bmad itself: real quadrupoles, chicanes, patches, apertures and collimators.
-- **Slice migration**, moving particles between slices when their ponderomotive phase leaves the slice window. With `load_mode = "keep"`, which keeps every real particle at its own weight, migration is what Genesis4's one-to-one tracking and its sorting do ([](fel-physics.md#sec-loading), [](fel-physics.md#sec-migration)).
+- **Slice migration**, moving particles between slices when their ponderomotive phase leaves the slice window. With `load_mode = "keep"`, which keeps every real particle at its own weight, migration is what Genesis4's one-to-one tracking and its sorting do ([](#sec-loading), [](#sec-migration)).
 - **A lattice**, in Bmad's sense. FEL parameters are element attributes, so one lattice serves tracking, optics and layout.
 - **A self-describing statistics file**, described by [](BMAD-STATS-SPEC.md).
 
