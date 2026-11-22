@@ -118,6 +118,12 @@ jobs:
       - name: Glossary words are linked at first use
         run: python tests/scripts/check_glossary.py
 
+      # A reference by label, a link by page and anchor and a section cited in a comment of
+      # the source each name a label the manual defines, and no label is defined twice.
+      # The link check above reads the file of a link and not its anchor.
+      - name: Label references resolve
+        run: python tests/scripts/check_labels.py
+
       # Every page of the site's contents declares its kind in its front matter: tutorial,
       # how-to, reference, explanation or record.
       - name: Pages declare their kind
