@@ -16,7 +16,9 @@ of that history. The entries before that date describe that branch.
   applied in it. The pages of the examples `frames`, `flash1`, `lcls` and `lcls_electrons` were built
   but absent from the contents of the site, and `docs/myst.yml` now lists them. `docs/fel-physics.md`
   stated the comparison of the two loads on the window of `sase` twice, once with 16 seeds and once
-  with 48. The sentence with 16 seeds was left from an earlier measurement and is removed.
+  with 48. The sentence with 16 seeds was left from an earlier measurement and is removed. Four sentences of
+  `docs/user-guide.md` that spoke of what a method costs or buys now state the run time and what the
+  method computes.
 - 2026-11-21 Fixed: an interlude no longer loses its threads to one variable of Bmad's. Bmad's
   `check_aperture_limit` sets `param%unstable_factor` to zero at each call, twice for every
   particle, and `param` belongs to the branch of the lattice, which all the threads of an
