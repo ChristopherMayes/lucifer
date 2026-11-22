@@ -7970,6 +7970,32 @@ Output:
   err_flag  -- logical: Set True on any tracking or I/O error. False otherwise.
 ```
 
+(api-private-elements)=
+### `private_elements`
+
+*Subroutine* `(ele_in)`
+
+```
+Routine to give each thread an element of its own to hand to track1_bunch, whose branch
+is the thread's own as well.
+
+Bmad's check_aperture_limit sets param%unstable_factor to zero at each of its calls,
+two for every particle, and param is the branch's, which track1_bunch_hom finds through
+the element's branch pointer. With one branch for all the threads each of those writes
+takes the cache line from another core. On the 128 cores of a node the time of an
+interlude in track1_bunch was 22600 thread-seconds where 4400 were the tracking, and
+it grew by 144 cycles a particle for each thread.
+
+A thread's branch has the lattice's parameters and points at the lattice's elements,
+which are only read. The element is a copy, and so is its lord where it is a slice of
+an element, since Bmad takes the branch of a slice from its lord.
+```
+
+```
+Input:
+  ele_in -- ele_struct: The element or the piece of one the interlude tracks through.
+```
+
 (api-apply-bmad-wake-kick)=
 ### `apply_bmad_wake_kick`
 
