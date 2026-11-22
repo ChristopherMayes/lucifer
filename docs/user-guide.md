@@ -53,6 +53,19 @@ The FEL method is Bmad's own `fel_method` attribute, set on the element as any a
 
 A lattice writes them as it writes any attribute, `fel_method = unaveraged`, and a class statement sets them too, `wiggler::*[FEL_METHOD] = unaveraged`. The averaged method's maps have one more option behind them, `run.transport_model`, described in [`input-reference.md`](input-reference.md).
 
+(ug-loads)=
+## The three loads
+
+The key `beam.load_mode` selects how the bunch is represented by the particles of the [slices](glossary.md#gl-slice). The three modes are described in [](fel-physics.md#sec-loading), and the key in [](input-reference.md#param-beam-load-mode).
+
+| `load_mode` | the particles of a slice | what determines their number |
+|---|---|---|
+| `"sample"`, the default | [Macroparticles](glossary.md#gl-macroparticle) generated from the distribution of the bunch, arranged in [beamlets](glossary.md#gl-beamlet) of evenly spaced phases. The shot noise is imposed on them under `shot_noise = true` by `beam.shot_noise_method` ([](shot-noise.md)). | `beam.n_particle`, which is 512 beamlets when it is not set. It does not depend on the charge. |
+| `"keep"` | The particles of a bunch, each retained at its own coordinates as a beamlet of copies ([](fel-physics.md#sec-import)). Every moment of the bunch is preserved slice by slice. | The bunch, which `beam_init` generates or reads from a file. |
+| `"electrons"` | One particle for every electron, each with its own coordinates and phase ([](fel-physics.md#sec-electrons)). There are no beamlets, and the shot noise is a property of the load. | The charge of the [window](glossary.md#gl-window): $6.24\times10^{6}$ particles per pC. |
+
+In the electrons mode the keys of the beamlets and of the imposed noise are not used, and a value other than the default in any of them is refused. The memory of the particles is 68 bytes per electron, 13 GB for a window of 30.8 pC, and the run time of the particle push is proportional to the number of electrons. The example [`lcls_electrons`](generated/examples/lcls_electrons.md) tracks the $1.9\times10^{8}$ electrons of such a window and compares the result with that of the sample mode, and [](performance.md#perf-electrons) gives its run time on twelve cores and on 128.
+
 ## Running
 
 A run is one input file, a TOML file that names the lattice:

@@ -9,6 +9,14 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-22 Changed: the pages that lead to the electrons mode. `docs/user-guide.md` has a section,
+  The three loads, that states what each value of `beam.load_mode` loads and what determines the
+  number of particles. `docs/shot-noise.md` says in its introduction and in its Scope section that the
+  mode has the shot noise by construction and that neither method of `beam.shot_noise_method` is
+  applied in it. The pages of the examples `frames`, `flash1`, `lcls` and `lcls_electrons` were built
+  but absent from the contents of the site, and `docs/myst.yml` now lists them. `docs/fel-physics.md`
+  stated the comparison of the two loads on the window of `sase` twice, once with 16 seeds and once
+  with 48. The sentence with 16 seeds was left from an earlier measurement and is removed.
 - 2026-11-21 Fixed: an interlude no longer loses its threads to one variable of Bmad's. Bmad's
   `check_aperture_limit` sets `param%unstable_factor` to zero at each call, twice for every
   particle, and `param` belongs to the branch of the lattice, which all the threads of an
