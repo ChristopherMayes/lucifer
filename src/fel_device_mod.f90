@@ -990,7 +990,7 @@ end subroutine fel_device_set_kernel
 ! Subroutine fel_device_set_filter (dev, im, sigmoid)
 !
 ! Routine to upload the source filter's sigmoid for one field member
-! (fel-physics.md sec-source-filter). The table is real and the same for every member,
+! (manual sec-source-filter). The table is real and the same for every member,
 ! since it is built on the grid's own normalized frequency axis and carries no
 ! wavelength. It uses the propagator's per-member layout so one device kernel serves
 ! both multiplies.

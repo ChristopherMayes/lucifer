@@ -5,7 +5,7 @@
 ! arbitrary times and weights, into the evenly spaced, equal-population slices the FEL
 ! step needs. The method is Genesis 1.3 v4's own, transcribed from SDDSBeam.cpp. The
 ! class name is historical: it reads plain HDF5. Method, Genesis provenance and
-! validation are in docs/fel-physics.md (sec-import). The only weighted
+! validation are in the manual (sec-import). The only weighted
 ! generalization: the slice current is c*sum(w)/dslen where Genesis counts particles.
 ! The two are identical for uniform weights.
 !
@@ -218,7 +218,7 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice))
 
-! The slice loop (fel-physics.md sec-import). Slice centers are at
+! The slice loop (manual sec-import). Slice centers are at
 ! (islice-1)*slice_spacing. Candidates come from the dslen window, with strict
 ! inequalities.
 
@@ -537,7 +537,7 @@ end subroutine fel_import_bunch
 ! Subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg,
 !                            ex, ey, bx, by, ax, ay)
 !
-! Routine to compute Genesis's analyse moments (fel-physics.md sec-import): unweighted
+! Routine to compute Genesis's analyse moments (manual sec-import): unweighted
 ! means, variances and Twiss over the particles with s0 < s < s1, on the slopes. The
 ! emittance is ex = sqrt(|var_x*var_px - cov^2|)*gavg, a normalized emittance through
 ! the mean energy. bx = var_x*gavg/ex and ax = -cov*gavg/ex. The moments are unweighted
@@ -618,7 +618,7 @@ end subroutine analyse_window
 ! &importdistribution input, and not a dump. The file has flat datasets t [s],
 ! p [gamma*beta], x, y [m], xp, yp [slopes], and the total charge. t = -tau/c with
 ! tau = -z/beta, so Genesis's s = -c*t reproduces this port's window position exactly.
-! Both codes then bin the same particle set the same way (fel-physics.md sec-import).
+! Both codes then bin the same particle set the same way (manual sec-import).
 ! Dead particles are skipped.
 !
 ! Input:

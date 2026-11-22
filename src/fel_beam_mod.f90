@@ -45,7 +45,7 @@
 ! step, and coord_struct is about 224 bytes against the 56 needed. coord_struct appears
 ! only at element boundaries. The arrays are allocated to a capacity that may exceed the
 ! fill count n. So slice migration can move particles without reallocating each step
-! (fel-physics.md sec-migration).
+! (manual sec-migration).
 !-
 
 module fel_beam_mod
@@ -115,7 +115,7 @@ type fel_beam_struct
   real(rp) :: s0 = 0               ! Start of the time window [m].
   integer :: beamlet_size = 0      ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
-  logical :: quiver_in_px = .false. ! Momentum convention (fel-physics.md sec-unaveraged).
+  logical :: quiver_in_px = .false. ! Momentum convention (manual sec-unaveraged).
                                    !   False: stored px excludes the undulator quiver. This
                                    !   is the averaged chart, and the only convention the
                                    !   averaged code accepts. True: the unaveraged tracker
@@ -364,7 +364,7 @@ end function
 ! happens when the unaveraged tracker leaves its region without restoring the averaged
 ! convention. Every averaged-physics or seam entry point calls this. A hard-edge handoff
 ! injects spurious transverse momentum of order K/gamma, comparable to the beam
-! divergence. Downstream it shows as unexplained emittance growth (fel-physics.md
+! divergence. Downstream it shows as unexplained emittance growth (manual
 ! sec-unaveraged).
 !
 ! Input:
@@ -1357,7 +1357,7 @@ end subroutine fel_slice_reallocate
 ! Each beamlet's amplitude draws on its *real* electron count, the beamlet's charge over
 ! e. For uniform weights this is Genesis's slice-uniform ne/mpart. It makes
 ! <|b(h)|^2> = 1/N_lambda exact for any cross-beamlet weight distribution
-! (fel-physics.md sec-noise). Kicks accumulate from the unperturbed phases, as Genesis's
+! (manual sec-noise). Kicks accumulate from the unperturbed phases, as Genesis's
 ! work array does: two ran_uniform draws per (harmonic, beamlet), in Genesis's loop
 ! order. The built-in loader and the distribution import share this routine, so the two
 ! stay one implementation.
@@ -1427,7 +1427,7 @@ end subroutine fel_fawley_noise
 ! Subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, n_clamp)
 !
 ! Routine to impose physical shot noise on a load whose groups are not contiguous
-! beamlets (fel-physics.md sec-noise). The algorithm is that of fel_fawley_noise. For
+! beamlets (manual sec-noise). The algorithm is that of fel_fawley_noise. For
 ! each harmonic and each group, one amplitude is drawn on the group's real electron
 ! count, and one phase. Every member's phase is shifted by it. Only how the members are
 ! found differs. fel_fawley_noise is kept for the beamlets the loader makes, since the
@@ -1529,7 +1529,7 @@ end function beamlet_groups
 !                              islice, method, draw, tally, rule, floor_n_lambda, err_flag)
 !
 ! Routine to impose physical shot noise on one slice's load, whatever made it
-! (fel-physics.md sec-noise). Two things happen in order.
+! (manual sec-noise). Two things happen in order.
 !
 ! First the floor is computed: max over h of |b(h)|^2 times N_lambda. This is the load's
 ! own bunching against the physical level, swept over every harmonic the beamlets are
@@ -1700,7 +1700,7 @@ end subroutine fel_impose_noise
 ! Subroutine fel_slice_fill (n_beamlet, beamlet_size, n_period, theta)
 !
 ! Routine to give the quiet phases of a slice that is n_period radiation wavelengths long
-! (docs/fel-physics.md sec-quiet). The slice holds the charge of all its periods, so its
+! (manual sec-quiet). The slice holds the charge of all its periods, so its
 ! macroparticles stand over all of them and not in one. The N = n_beamlet * beamlet_size
 ! macroparticles stand on one even grid over the slice, at (j + 1/2) n_period / N periods
 ! for j = 0 to N - 1. The charge in any stretch of the slice is then the same to one
@@ -2432,7 +2432,7 @@ end subroutine fel_report_noise
 ! |b(h)|^2 over h = 1..hmax, weighted, with b(h) = sum w e^{i h theta} / sum w. Times
 ! N_lambda this is the load's own bunching against the physical level of 1. A load whose
 ! floor is not far below that cannot carry imposed noise, since the two would add
-! (fel-physics.md sec-noise). The sweep covers every harmonic the load is declared to
+! (manual sec-noise). The sweep covers every harmonic the load is declared to
 ! resolve, and not only the imposed ones. An unquiet pattern can park its floor on a
 ! harmonic the imposition never touches and still corrupt the dynamics.
 !
@@ -2709,7 +2709,7 @@ err_flag = .true.
 ! A caller writing a frame from inside an unaveraged segment does not. The kinetic px is
 ! the particle's real transverse momentum, which is what an openPMD momentum record
 ! means. Only a continuation would misread it, and no frame from inside a segment is one
-! (fel-physics.md sec-unaveraged, docs/reading-output.md).
+! (manual sec-unaveraged, docs/reading-output.md).
 
 if (.not. logic_option(.false., kinetic_ok)) then
   call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
@@ -3035,7 +3035,7 @@ end subroutine fel_split_slices
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
 ! slice window. This is the weighted generalization of Genesis's one4one-only
-! Sorting::localSort (fel-physics.md sec-migration). It works for any beam because each
+! Sorting::localSort (manual sec-migration). It works for any beam because each
 ! particle carries its own charge.
 !
 ! The criterion is Genesis's, in this code's chart. The derived phase
@@ -3518,7 +3518,7 @@ end function fel_beams_identical
 !   dphi0/ds = ku_like + ks*(1 - 1/beta0)
 !
 ! where ku_like is the undulator wavenumber inside an undulator. In field-free regions it
-! is Genesis's drift surrogate ks/(2*gamma0^2). The caller supplies it (fel-physics.md
+! is Genesis's drift surrogate ks/(2*gamma0^2). The caller supplies it (manual
 ! sec-chart). beta0 is the reference beta from p0_mc. With the per-particle
 ! theta_j = phi0 - ks*tau_j this reproduces Genesis's dtheta/ds = ks*(1 - 1/beta_z) + ku_like
 ! exactly, because -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
@@ -3610,7 +3610,7 @@ end function fel_n_wavelength
 !
 ! Routine to compute the per-slice beam diagnostics, weighted. These are Genesis's
 ! DiagBeam::calc definitions with 1/N generalized to w_j/sum(w). The variances are
-! two-pass (fel-physics.md sec-numerics). Uniform weights reproduce Genesis exactly up to
+! two-pass (manual sec-numerics). Uniform weights reproduce Genesis exactly up to
 ! the regrouped arithmetic. Positions and sizes are of x and y directly. mean_px and
 ! mean_py are in Bmad's normalization P/p0. Multiply by fel_p0_mc for Genesis's
 ! gamma*beta. The routine also gives N_eff and the derived current.
@@ -3667,7 +3667,7 @@ g1 = g1/wsum
 x1 = x1/wsum
 y1 = y1/wsum
 
-! Second pass for the variances (fel-physics.md sec-numerics). The one-pass
+! Second pass for the variances (manual sec-numerics). The one-pass
 ! <v^2> - <v>^2 form loses sigma to cancellation once the mean is large against the
 ! spread. For gamma ~ 1e4 with sigma ~ 1e-3 the one-pass noise is of order sigma itself.
 ! It showed as spurious sigma_gamma jitter under uniform wake kicks.

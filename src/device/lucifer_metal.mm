@@ -2354,7 +2354,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBuffer:p->bFault offset:0 atIndex:9];
         [e dispatchThreads:grid threadsPerThreadgroup:tgp];
 
-        // The source filter (fel-physics.md sec-source-filter). The CPU adds the filtered
+        // The source filter (manual sec-source-filter). The CPU adds the filtered
         // source in Fourier space, inside the field's own transform pair, because it has one
         // to spare. The fused solve here adds the source in real space in its last pass, so
         // the source is filtered in place first and the solve is left exactly as it was:

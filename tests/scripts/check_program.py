@@ -207,7 +207,7 @@ def run_nml(exe, wd, root, nml_text):
 
 def h5_identical(fa, fb):
     # meta/ is excluded. Provenance is held in datasets, since HDF5 caps an attribute at
-    # 64 kB (fel-physics.md, sec-meta), and meta/timestamp differs between any two runs.
+    # 64 kB (manual sec-meta), and meta/timestamp differs between any two runs.
     # Nothing in meta/ is physics, and timing/ is the wall clock.
     with h5py.File(fa) as a, h5py.File(fb) as b:
         na, nb = [], []
@@ -719,7 +719,7 @@ def main():
                  stats_of(wd / "cbn.stats.h5")
 
     # First, what the comparison below rests on. The record number is the axis and s is
-    # a variable on it (fel-physics.md, sec-stats). Matching rows by s holds only while s
+    # a variable on it (manual sec-stats). Matching rows by s holds only while s
     # does not repeat, and s can repeat: a zero-length element that applies a wake kick
     # sits at the plane where the element before it ended. Every repeat must therefore
     # straddle an element boundary. A repeat inside one element would be a defect in the
@@ -745,7 +745,7 @@ def main():
 
     # comb < 0: the element ends, and nothing else. Bmad's comb semantics drop the comb
     # there. This tracker always keeps the element ends, because the stats file carries
-    # one record axis and marks the ends inside it (fel-physics.md, sec-stats). So a
+    # one record axis and marks the ends inside it (manual sec-stats). So a
     # comb < 0 run is a file whose every record is an element end, at the positions where
     # the every-record run put them.
     ok = bool(np.all(sn["at_end"])) and len(sn["s"]) == int(s0["at_end"].sum())

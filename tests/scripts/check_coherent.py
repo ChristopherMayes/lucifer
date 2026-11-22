@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks of the coherent source (fel-physics.md, sec-coherent-source), implemented from
+Checks of the coherent source (manual sec-coherent-source), implemented from
 Tanaka, PRAB 27, 030703 (2024): SIMPLEX's coherent source driving Lucifer's field.
 
   1. Every other check in the validation suite leaves source_model at its default, the deposit,

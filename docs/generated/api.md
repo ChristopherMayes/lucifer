@@ -62,7 +62,7 @@ The arrays are packed because the FEL step advances every particle every interna
 step, and coord_struct is about 224 bytes against the 56 needed. coord_struct appears
 only at element boundaries. The arrays are allocated to a capacity that may exceed the
 fill count n. So slice migration can move particles without reallocating each step
-(fel-physics.md sec-migration).
+(manual sec-migration).
 ```
 
 (api-fel-slice-struct)=
@@ -241,7 +241,7 @@ Routine to refuse a beam whose stored px still carries the undulator quiver. Tha
 happens when the unaveraged tracker leaves its region without restoring the averaged
 convention. Every averaged-physics or seam entry point calls this. A hard-edge handoff
 injects spurious transverse momentum of order K/gamma, comparable to the beam
-divergence. Downstream it shows as unexplained emittance growth (fel-physics.md
+divergence. Downstream it shows as unexplained emittance growth (manual
 sec-unaveraged).
 ```
 
@@ -548,7 +548,7 @@ Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights.
 Each beamlet's amplitude draws on its *real* electron count, the beamlet's charge over
 e. For uniform weights this is Genesis's slice-uniform ne/mpart. It makes
 <|b(h)|^2> = 1/N_lambda exact for any cross-beamlet weight distribution
-(fel-physics.md sec-noise). Kicks accumulate from the unperturbed phases, as Genesis's
+(manual sec-noise). Kicks accumulate from the unperturbed phases, as Genesis's
 work array does: two ran_uniform draws per (harmonic, beamlet), in Genesis's loop
 order. The built-in loader and the distribution import share this routine, so the two
 stay one implementation.
@@ -580,7 +580,7 @@ Output:
 
 ```
 Routine to impose physical shot noise on a load whose groups are not contiguous
-beamlets (fel-physics.md sec-noise). The algorithm is that of fel_fawley_noise. For
+beamlets (manual sec-noise). The algorithm is that of fel_fawley_noise. For
 each harmonic and each group, one amplitude is drawn on the group's real electron
 count, and one phase. Every member's phase is shifted by it. Only how the members are
 found differs. fel_fawley_noise is kept for the beamlets the loader makes, since the
@@ -628,7 +628,7 @@ Output:
                              islice, method, draw, tally, rule, floor_n_lambda, err_flag)
 
 Routine to impose physical shot noise on one slice's load, whatever made it
-(fel-physics.md sec-noise). Two things happen in order.
+(manual sec-noise). Two things happen in order.
 
 First the floor is computed: max over h of |b(h)|^2 times N_lambda. This is the load's
 own bunching against the physical level, swept over every harmonic the beamlets are
@@ -691,7 +691,7 @@ Routine to renumber sparse cell labels to 1..n_group.
 
 ```
 Routine to give the quiet phases of a slice that is n_period radiation wavelengths long
-(docs/fel-physics.md sec-quiet). The slice holds the charge of all its periods, so its
+(manual sec-quiet). The slice holds the charge of all its periods, so its
 macroparticles stand over all of them and not in one. The N = n_beamlet * beamlet_size
 macroparticles stand on one even grid over the slice, at (j + 1/2) n_period / N periods
 for j = 0 to N - 1. The charge in any stretch of the slice is then the same to one
@@ -960,7 +960,7 @@ Routine to compute how quiet a load is before noise is imposed on it: the larges
 |b(h)|^2 over h = 1..hmax, weighted, with b(h) = sum w e^{i h theta} / sum w. Times
 N_lambda this is the load's own bunching against the physical level of 1. A load whose
 floor is not far below that cannot carry imposed noise, since the two would add
-(fel-physics.md sec-noise). The sweep covers every harmonic the load is declared to
+(manual sec-noise). The sweep covers every harmonic the load is declared to
 resolve, and not only the imposed ones. An unquiet pattern can park its floor on a
 harmonic the imposition never touches and still corrupt the dynamics.
 ```
@@ -1200,7 +1200,7 @@ Output:
 ```
 Routine to move particles between slices when their ponderomotive phase leaves the
 slice window. This is the weighted generalization of Genesis's one4one-only
-Sorting::localSort (fel-physics.md sec-migration). It works for any beam because each
+Sorting::localSort (manual sec-migration). It works for any beam because each
 particle carries its own charge.
 
 The criterion is Genesis's, in this code's chart. The derived phase
@@ -1335,7 +1335,7 @@ phase:
   dphi0/ds = ku_like + ks*(1 - 1/beta0)
 
 where ku_like is the undulator wavenumber inside an undulator. In field-free regions it
-is Genesis's drift surrogate ks/(2*gamma0^2). The caller supplies it (fel-physics.md
+is Genesis's drift surrogate ks/(2*gamma0^2). The caller supplies it (manual
 sec-chart). beta0 is the reference beta from p0_mc. With the per-particle
 theta_j = phi0 - ks*tau_j this reproduces Genesis's dtheta/ds = ks*(1 - 1/beta_z) + ku_like
 exactly, because -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
@@ -1389,7 +1389,7 @@ Output:
 ```
 Routine to compute the per-slice beam diagnostics, weighted. These are Genesis's
 DiagBeam::calc definitions with 1/N generalized to w_j/sum(w). The variances are
-two-pass (fel-physics.md sec-numerics). Uniform weights reproduce Genesis exactly up to
+two-pass (manual sec-numerics). Uniform weights reproduce Genesis exactly up to
 the regrouped arithmetic. Positions and sizes are of x and y directly. mean_px and
 mean_py are in Bmad's normalization P/p0. Multiply by fel_p0_mc for Genesis's
 gamma*beta. The routine also gives N_eff and the derived current.
@@ -1417,7 +1417,7 @@ Output:
 In-undulator collective effects for the FEL tracker: wakefields applied as a per-slice
 energy-loss rate, and longitudinal space charge entering the pendulum equation as a
 per-particle ez. Physics, Genesis provenance and validation are in
-docs/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
+the manual (sec-wakes, sec-spacecharge, sec-seamwake).
 
 Placement in the step: the wake's gamma decrement lands between the longitudinal
 advance and the second transverse half step. ez is computed per slice before the RK
@@ -1487,7 +1487,7 @@ everything off and leaves every existing check bit-identical.
 ```
 Routine to compute the single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV
 per meter per electron (negative = loss). It uses the numerical impedance of Bane &
-Stupakov SLAC-PUB-10707 (fel-physics.md sec-wakes), transcribed from
+Stupakov SLAC-PUB-10707 (manual sec-wakes), transcribed from
 Wake::singleWakeResistive with Genesis's exact numerics:
   k in [0, 100/s0] on 1000 intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3).
   Flat x-integral on [0,15] with 20000 points.
@@ -1518,7 +1518,7 @@ Output:
 ```
 Routine to build the single-particle kernels over the window at wavelength resolution
 (Wake::init): the material shortcuts, the three kernels, and the self-loading half
-weight on the s = 0 bin (fel-physics.md sec-wakes).
+weight on the s = 0 bin (manual sec-wakes).
 ```
 
 ```
@@ -1616,7 +1616,7 @@ Output:
 Routine to compute EFieldSolver::longRange on one node: the per-slice long-range
 space-charge field from the whole-window weighted current and rms-size profiles. The
 units are Genesis's longESC units (eV/m). The caller converts at use as Genesis does
-(fel-physics.md sec-spacecharge). The per-particle ODE ez is
+(manual sec-spacecharge). The per-particle ODE ez is
 fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 ```
 
@@ -2106,7 +2106,7 @@ Input:
 
 ```
 Routine to upload the source filter's sigmoid for one field member
-(fel-physics.md sec-source-filter). The table is real and the same for every member,
+(manual sec-source-filter). The table is real and the same for every member,
 since it is built on the grid's own normalized frequency axis and carries no
 wavelength. It uses the propagator's per-member layout so one device kernel serves
 both multiplies.
@@ -3448,7 +3448,7 @@ particle's four stages depend on that particle alone.
 *Module*
 
 ```
-Annotated HDF5 writes for the statistics file (fel-physics.md sec-stats).
+Annotated HDF5 writes for the statistics file (manual sec-stats).
 No array reaches the file without saying what it is. Every routine here writes a
 dataset and four string attributes with it:
 
@@ -3721,7 +3721,7 @@ The importdistribution equivalent. This module resamples a Bmad bunch_struct, wi
 arbitrary times and weights, into the evenly spaced, equal-population slices the FEL
 step needs. The method is Genesis 1.3 v4's own, transcribed from SDDSBeam.cpp. The
 class name is historical: it reads plain HDF5. Method, Genesis provenance and
-validation are in docs/fel-physics.md (sec-import). The only weighted
+validation are in the manual (sec-import). The only weighted
 generalization: the slice current is c*sum(w)/dslen where Genesis counts particles.
 The two are identical for uniform weights.
 
@@ -3826,7 +3826,7 @@ shot noise and stores the slice.
 ```
                            ex, ey, bx, by, ax, ay)
 
-Routine to compute Genesis's analyse moments (fel-physics.md sec-import): unweighted
+Routine to compute Genesis's analyse moments (manual sec-import): unweighted
 means, variances and Twiss over the particles with s0 < s < s1, on the slopes. The
 emittance is ex = sqrt(|var_x*var_px - cov^2|)*gavg, a normalized emittance through
 the mean energy. bx = var_x*gavg/ex and ax = -cov*gavg/ex. The moments are unweighted
@@ -3862,7 +3862,7 @@ Routine to write a bunch_struct as a Genesis 1.3 v4 distribution file. This is t
 &importdistribution input, and not a dump. The file has flat datasets t [s],
 p [gamma*beta], x, y [m], xp, yp [slopes], and the total charge. t = -tau/c with
 tau = -z/beta, so Genesis's s = -c*t reproduces this port's window position exactly.
-Both codes then bin the same particle set the same way (fel-physics.md sec-import).
+Both codes then bin the same particle set the same way (manual sec-import).
 Dead particles are skipped.
 ```
 
@@ -3896,7 +3896,7 @@ Errors return through err_flag, and nothing here stops.
 
 ```
 Routine to build the beam. It reads an openPMD particle dump of slices (beam.file), or
-loads a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
+loads a beam_init bunch by load_mode (manual sec-loading). In the sample mode a
 described bunch takes the analytic generator. A file, beam.position_file, takes
 the resampler of fel_import_mod. In the keep mode every particle of the bunch stays as
 a beamlet of copies. In the electrons mode every electron of a described bunch is one
@@ -3923,7 +3923,7 @@ Output:
 
 ```
 Routine to generate the beam from the beam_init description. This is the sample mode
-with no file (fel-physics.md sec-loading). The transverse planes are matched Gaussians
+with no file (manual sec-loading). The transverse planes are matched Gaussians
 on the lattice Twiss, and the per-slice current is derived. With the quiet start the
 particles are beamlets on a uniform ponderomotive phase grid. Without it they are
 independent particles. Shot noise is imposed where asked.
@@ -3935,7 +3935,7 @@ independent particles. Shot noise is imposed where asked.
 *Subroutine* `(cur, n_slice_e, p0_mc)`
 
 ```
-Routine for load_mode = "electrons" from a described bunch (fel-physics.md sec-loading).
+Routine for load_mode = "electrons" from a described bunch (manual sec-loading).
 Every electron of the bunch is one particle. The charge of the window is counted as the
 nearest whole number of electrons, as the weight load counts it (fel_weight_start), and
 each particle has the window's charge over that number, which is e to one part in twice
@@ -3994,7 +3994,7 @@ with no analytic counterpart. They are accepted at their defaults only.
 *Subroutine* `()`
 
 ```
-Routine for the sample mode from a bunch (fel-physics.md sec-import). The bunch_struct
+Routine for the sample mode from a bunch (manual sec-import). The bunch_struct
 is read from the openPMD-beamphysics file beam.position_file. On the check route
 beam.resample.use_beam_init it is generated from beam_init instead. It is resampled into FEL
 slices by the transcribed Genesis importdistribution method. fel_import_mod documents
@@ -6173,7 +6173,7 @@ Output:
 
 ```
 Routine to derive the slice spacing and the integration step from the gain where the
-input file states neither (fel-physics.md sec-window and sec-element).
+input file states neither (manual sec-window and sec-element).
 
 The spacing is the whole number of wavelengths in a quarter of the cooperation length
 lambda/(4 pi rho). That is four slices per cooperation length, the resolution at which
@@ -6227,7 +6227,7 @@ its rotations at each element's last step, and fel_init_beam, which gives a deri
 window this much headroom ahead of the bunch. So the window holds what the schedule
 slips, and the two cannot disagree.
 
-Three terms (fel-physics.md sec-slippage, sec-window, sec-phasing):
+Three terms (manual sec-slippage, sec-window, sec-phasing):
   Undulator steps. Each FEL element slips l (1 + aw^2) / (2 gamma0_ref^2 lambda), which
     the walk applies step by step as dz (1 + aw^2) / (2 gamma0_ref^2 lambda). At
     resonance that is one wavelength per period. Returned as slip_und, per element
@@ -6272,7 +6272,7 @@ Output:
 *Subroutine* `()`
 
 ```
-Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
+Routine to set up chicane breaks (manual sec-phasing). A break whose elements
 bend the reference (sbends, patches) detours the beam while the radiation goes
 straight. The light's path is the chord between the flanking undulator faces, from
 ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
@@ -6336,7 +6336,7 @@ refused when it matches nothing or more than one element.
 
 ```
 Routine to check the Bmad element wakes against the time window. Element sr wakes act
-across the whole window (fel-physics.md sec-seamwake). All slices concatenate into one
+across the whole window (manual sec-seamwake). All slices concatenate into one
 bunch in global window coordinates, and Bmad's wake machinery applies unmodified.
 The checks:
   lr (multi-bunch) wakes are not supported.
@@ -6353,7 +6353,7 @@ setup_fel_elements runs before it, since two_pol must precede the field.
 *Subroutine* `()`
 
 ```
-Routine to set up the diagnostics (fel-physics.md sec-stats). The dump-at lists are
+Routine to set up the diagnostics (manual sec-stats). The dump-at lists are
 resolved through Bmad's own lat_ele_locator, which gives class::name syntax. The exact
 record and element-end counts are precomputed by replaying the walk's skip rule, so the
 stats arrays are sized once and never grown. An entry matching nothing is refused.
@@ -6402,7 +6402,7 @@ exp(-i kappa delta), delta the step's slippage as a length, exact and continuous
 a step may slip a fraction of a slice and the field is never a fraction of a slice
 behind the beam. The push, the deposit and the averaged equations are untouched.
 
-The window coordinate. Window slice i (fel-physics.md sec-window) sits at
+The window coordinate. Window slice i (manual sec-window) sits at
 tau = (i - 1) * slice_spacing, so tau grows toward the head, the end light slips
 toward. The envelope rides the carrier exp(i (k0 z - omega0 t)), the convention the
 kernel's sign fixes, so a mode exp(i kappa tau) of the envelope has the carrier's
@@ -6883,7 +6883,7 @@ Routine to deposit one slice's source into its field record with no propagation.
 This is fel_field_step's deposit, the per-particle scatter with the source filter when
 it is on, kept apart from that routine so the slice propagator stays as it was. The
 source scale, the phase, the bilinear weights and the filter's transform pair are
-fel_field_step's (fel-physics.md sec-field, sec-source-filter), and so is the add of
+fel_field_step's (manual sec-field, sec-source-filter), and so is the add of
 2*crsource, through the element's polarization pair when both planes are live. The
 coherent source model is not carried here, and setup refuses it under the spectral
 propagator.
@@ -7009,7 +7009,7 @@ before a parallel loop executes them (wavefront_fft2_plan_threads).
 *Module*
 
 ```
-The tracker's production statistics file <out_root>.stats.h5 (fel-physics.md sec-stats).
+The tracker's production statistics file <out_root>.stats.h5 (manual sec-stats).
 
 The file describes itself. Every dataset goes through fel_h5_mod and carries @unit,
 @description and @axes, the last naming the coords/ datasets its dimensions run over.
@@ -7053,7 +7053,7 @@ bunch_params dict from any (record, slice) of the sufficient statistics. The val
 checks that at element ends it reproduces the stored twiss.
 
 Beam moments are computed in two passes: the mean first, then centered second moments
-(the variance rule of fel-physics.md sec-numerics). The one-pass form loses the entire
+(the variance rule of manual sec-numerics). The one-pass form loses the entire
 sigma to cancellation. Moments are weighted by macroparticle charge. They run parallel
 over slices with fixed-order results, since each slice's sums are its own.
 
@@ -7323,7 +7323,7 @@ Output:
 Routine to read the mode-against-artifact split out of the records the run already
 took. Nothing is computed here that the accumulator did not already hold. Every
 element end that takes the field angle moments takes one transform pair. It stores
-the power inside split_angle beside the total (fel-physics.md sec-source-filter).
+the power inside split_angle beside the total (manual sec-source-filter).
 
 The criterion of docs/startup-noise.md is stated at saturation, so it reads the
 peak-power record. The last record is where an exit power is quoted. Only records
@@ -8004,7 +8004,7 @@ Input:
 
 ```
 Routine to apply an element's Bmad sr wake once to the whole window, as a pure kick
-(fel-physics.md sec-seamwake).
+(manual sec-seamwake).
 The slices are concatenated into global window coordinates. Bmad's track1_sr_wake
 orders and kicks them (pseudomode accumulation head to tail, z_long binned FFT). The
 split back holds theta, Genesis's convention for wake energy loss and the same z
@@ -8053,7 +8053,7 @@ The phasor is conserved across migration. Moves shift phases by multiples of
 ```
 Routine to write one diag row per slice, slices in time-window order.
 Beam slice number is pairs with field slice fel_field_index(slip, is, nslice), the
-unrotation of fel-physics.md sec-slippage. The values are those the stats loop just
+unrotation of manual sec-slippage. The values are those the stats loop just
 evaluated, slice-parallel, with fel_field_diag and fel_slice_diag.
 
 Note: This routine only prints. take_stats_record must have run for this record first.
@@ -8068,7 +8068,7 @@ Note: This routine only prints. take_stats_record must have run for this record 
 Routine to write one energy-ledger row (unaveraged mode). The columns:
   E_beam      Beam energy relative to the reference, sum(w*(gamma-gamma0))*me
                 [C*eV = J]. Relative, so the per-record change is not differenced off a
-                large baseline at its summation-rounding floor (fel-physics.md
+                large baseline at its summation-rounding floor (manual
                 sec-numerics).
   U_field     Total window field energy, sum(P_is)*slice_spacing/c [J].
   dE_kick     Kick-side change dE_step returned by fel_unavg_step.
@@ -8307,7 +8307,7 @@ not change how the existing field diffracts (docs/startup-noise.md).
 One undulator segment, with constant parameters along it. That is one contiguous run
 of aw > 0 steps in Genesis's unrolled lattice. The segment has nstep equal steps of
 dz = l/nstep, with nstep = round(l/delz_target). kx, ky carry Genesis's unroll
-scaling by ku^2 (fel-physics.md sec-element).
+scaling by ku^2 (manual sec-element).
 ```
 
 (api-fel-coherent-struct)=
@@ -8316,7 +8316,7 @@ scaling by ku^2 (fel-physics.md sec-element).
 *Struct*
 
 ```
-One slice's coherent-source summary (fel-physics.md sec-coherent-source), computed
+One slice's coherent-source summary (manual sec-coherent-source), computed
 each step from the just-advanced particles. It holds:
   The source phasor S. This is exactly the sum the deposit would scatter, and
     SUM crsource = S is the normalization.
@@ -8428,7 +8428,7 @@ Output:
 Routine to map beam slice is (1-based) to its field slice in the rotated record:
   ifld = 1 + mod(is-1 + first, nslice)
 This is the Fortran form of Genesis's (is + field->first) % field.size()
-(fel-physics.md sec-slippage). The same mapping restores time order when reading the
+(manual sec-slippage). The same mapping restores time order when reading the
 record out. Field slice fel_field_index(slip, is, nslice) is the field at time window
 position is.
 ```
@@ -8515,7 +8515,7 @@ Output:
 ```
 Routine to account the slippage of one step and rotate the field record when it
 crosses a slice boundary.
-Transcribed from Control::applySlippage (fel-physics.md sec-slippage), reduced to one
+Transcribed from Control::applySlippage (manual sec-slippage), reduced to one
 shared-memory node. The MPI ring exchange between adjacent ranks is the identity when
 the ring has one member. This node is both rank 0 and rank size-1, so the
 non-periodic zero fill always applies to the transmitted slice. What remains is
@@ -8763,7 +8763,7 @@ Genesis does, in one integration step:
   1. Transverse half step.
   2. Longitudinal advance, with the path-length term sampled at mid element and
      Genesis's drift reference xku = ks*0.5/gamma0/gamma0. The division order is
-     kept for bit identity (fel-physics.md sec-interlude).
+     kept for bit identity (manual sec-interlude).
   3. The wake's gamma decrement.
   4. Transverse half step.
   5. Field diffraction with zero source.
@@ -8847,7 +8847,7 @@ The maps read the same with px in Bmad units:
           x'  = a1 x + a2 px/gz_hat
           px' = a3 x gz_hat + a1 px
 
-The effective strengths (fel-physics.md sec-natfocus), with Genesis's reference gamma:
+The effective strengths (manual sec-natfocus), with Genesis's reference gamma:
   qnat_{x,y} = k_{x,y}*aw^2/(gamma0*betpar0),  betpar0 = sqrt(1 - (1+aw^2)/gamma0^2)
 ```
 
@@ -8869,7 +8869,7 @@ Output:
 
 ```
 Routine to advance the transverse coordinates with the transverse maps of Bmad's own
-periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened (fel-physics.md
+periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened (manual
 sec-element). This is the default transport. Quadrupole bodies take the matrix of
 Bmad's quad_mat2_calc, transcribed into plane_mat2 below, with the per-particle
 1/rel_p^2 chromatic scaling and the half-octupole edge kicks. A plane with no
@@ -8995,7 +8995,7 @@ from BeamSolver::advance.
      space-charge ez are held fixed through the stages. The harmonic phases h*theta
      change per stage (fel_ode_multi).
 ez per particle is fel_shortrange_ez(ip) - long_esc(is)/m_electron. That is Genesis's
-ez = getEField(ip) + eloss (fel-physics.md sec-eom, sec-spacecharge).
+ez = getEField(ip) + eloss (manual sec-eom, sec-spacecharge).
 
 (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
 using phi0_new, the common phase at the end of this step. The module header says why
@@ -9025,7 +9025,7 @@ Output:
 
 ```
 Routine to take one RK4 step. The stage bookkeeping is BeamSolver::RungeKutta,
-verbatim (fel-physics.md sec-eom). ez is held fixed through the stages, as Genesis
+verbatim (manual sec-eom). ez is held fixed through the stages, as Genesis
 holds it.
 
 Note: The in-place stage algebra is kept exactly for bit identity. Do not rewrite it.
@@ -9054,7 +9054,7 @@ Output:
 
 ```
 Routine to evaluate the longitudinal equations of motion, fundamental only.
-Transcribed from BeamSolver::ODE (fel-physics.md sec-eom). ez is the per-particle
+Transcribed from BeamSolver::ODE (manual sec-eom). ez is the per-particle
 space-charge term in m_e c^2 per meter (short-range harmonics plus the long-range
 loss). ez is zero when space charge is off, and subtracting zero is exact.
 ```
@@ -9178,7 +9178,7 @@ Output:
 *Subroutine* `(und, beam, sl, xks1, coh)`
 
 ```
-Routine to compute one slice's coherent-source summary (fel-physics.md
+Routine to compute one slice's coherent-source summary (manual
 sec-coherent-source). Implemented from Tanaka, PRAB 27, 030703 (2024). Computed:
   The source phasor S, as the deposit would form it (same theta, same part factors,
     post-advance particles). The normalization is SUM crsource = S.
@@ -9216,7 +9216,7 @@ step. The source is built from the already pushed particles of beam slice sl. Th
 field is propagated by exp(K2 delz) in transverse Fourier space and the source is
 added. Transcribed from FieldSolverFFT::advance and FFT.
 
-The source scale, weighted, in V/m (fel-physics.md sec-field derives it from
+The source scale, weighted, in V/m (manual sec-field derives it from
 Genesis's internal-unit form):
 
   scl_w = fc * Z0 * sqrt(2) * c * delz / (4 * dgrid^2 * slice_spacing)
@@ -9252,7 +9252,7 @@ Output:
 *Subroutine* `()`
 
 ```
-Routine to deposit the coherent-Gaussian source (fel-physics.md sec-coherent-source).
+Routine to deposit the coherent-Gaussian source (manual sec-coherent-source).
 The slice's bunching phasor is deposited as a Gaussian of the charge second moments
 scaled by kappa. It is normalized so the deposited sum equals the particle deposit's.
 ```
@@ -9356,7 +9356,7 @@ Output:
 
 ```
 Routine to compute the two angles a source filter's edge can be set from
-(fel-physics.md sec-source-filter). Both come from the loaded beam and the undulator
+(manual sec-source-filter). Both come from the loaded beam and the undulator
 it enters, so an input file states neither.
 
 th_mode is four diffraction angles of the fundamental mode, 4 lambda / (2 pi sigma),
@@ -9390,7 +9390,7 @@ Output:
 
 ```
 Routine to return the factor that places a source filter's edge outside the angle it
-protects (fel-physics.md sec-source-filter). The edge is the protected angle over this
+protects (manual sec-source-filter). The edge is the protected angle over this
 margin, so a margin of one leaves the edge on that angle.
 
 The sigmoid of Eq. eq-sigmoid passes amplitude t at the protected angle when the edge
@@ -9450,7 +9450,7 @@ Output:
 ```
 Routine to diffract field slice ifld in free space over the step dz: FFT, multiply by
 the cached exp(K2 dz), inverse FFT, normalize. There is no source, coupling factor or
-undulator here. This is the field half that the unaveraged mode (fel-physics.md
+undulator here. This is the field half that the unaveraged mode (manual
 sec-unaveraged) shares with the averaged solver. The caller deposits its own source.
 
 Note: fel_field_kernel_init must have built the kernel serially for this grid,
@@ -9506,7 +9506,7 @@ definitions are Genesis's DiagField::calc in physical units:
 The accumulation order is y outer, x inner.
 
 ifld is the raw record index. For the field at time window position is, pass
-fel_field_index(slip, is, nslice), the unrotation of fel-physics.md sec-slippage.
+fel_field_index(slip, is, nslice), the unrotation of manual sec-slippage.
 ```
 
 ```
@@ -9549,7 +9549,7 @@ Output:
 *Module*
 
 ```
-The unaveraged mode (fel-physics.md sec-unaveraged). Particles are integrated through
+The unaveraged mode (manual sec-unaveraged). Particles are integrated through
 the undulator's real field, with the full Newton-Lorentz quiver and no period
 averaging, and the radiation field acts as a co-evolving kick. There is no resonance
 approximation. The mode reaches physics the averaged map cannot: the full quiver
@@ -9561,7 +9561,7 @@ the harmonic content and the entry/exit behavior of the averaged mode are output
 instead of assumed inputs. MINERVA (Freund and van der Slot) is the published existence
 proof for this physics, and only its published work was used here. This mode keeps the
 grid field and the Lorentz force where MINERVA evaluates modal fields. The cost per
-step is in fel-physics.md (sec-unaveraged) and examples/saturation_demo.
+step is in the manual (sec-unaveraged) and examples/saturation_demo.
 
 DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 path. They are outputs of this mode, and their appearance here would make the check
@@ -9688,7 +9688,7 @@ at s into the segment, from the analytic vector potential with the ramp envelope
 aw is rms. The peak is rms*sqrt(2) planar and rms helical. The curl retains the g' ramp
 terms. The transverse profiles are the near-axis models whose ponderomotive-average
 focusing reproduces the averaged mode's natural-focusing split exactly: planar kx = 0,
-ky = ku^2, and helical kx = ky = ku^2/2 (fel-physics.md sec-unaveraged).
+ky = ku^2, and helical kx = ky = ku^2/2 (manual sec-unaveraged).
 
 The four quantities that depend on s and not on the particle arrive as arguments: the
 envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK stage
@@ -10885,7 +10885,7 @@ Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
 The standard document is authoritative for this format. This module and the
 validation suite's h5py reader are each checked against its text.
 
-Layout (also see fel-physics.md sec-field-set):
+Layout (also see manual sec-field-set):
 
   /                        openPMD "2.0.0", openPMDextension "Wavefront",
                            basePath "/data/%T/", meshesPath "meshes/",

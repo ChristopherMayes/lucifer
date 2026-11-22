@@ -6,7 +6,7 @@
 ! The standard document is authoritative for this format. This module and the
 ! validation suite's h5py reader are each checked against its text.
 !
-! Layout (also see fel-physics.md sec-field-set):
+! Layout (also see manual sec-field-set):
 !
 !   /                        openPMD "2.0.0", openPMDextension "Wavefront",
 !                            basePath "/data/%T/", meshesPath "meshes/",

@@ -44,7 +44,7 @@ use fel_stats_mod
 implicit none
 
 ! The sin^2 ramp of an unaveraged element, in periods at each end, where the input file leaves
-! run.unaveraged_ramp_periods unset or sets it to 0 (fel-physics.md sec-unaveraged).
+! run.unaveraged_ramp_periods unset or sets it to 0 (manual sec-unaveraged).
 
 integer, parameter :: fel_ramp_periods_default$ = 2
 
@@ -97,26 +97,26 @@ type fel_global_struct
   ! by this program, and every other Bmad program then refused to parse the lattice. So
   ! they are run switches, the same for every element. Averaged and unaveraged elements
   ! still mix per element through Bmad's fel_method attribute.
-  ! Steps per undulator period. Below 10 the push does not converge (fel-physics.md
+  ! Steps per undulator period. Below 10 the push does not converge (manual
   ! sec-unaveraged). A smaller number is refused rather than rounded up.
   integer :: unaveraged_steps_per_period = 20
   ! Periods over which the field ramps at each end. 0 keeps the default of 2 and -1 asks
   ! for a hard edge. A hard edge reintroduces the handoff phase jump, so it is never the
   ! result of leaving the setting at 0.
   integer :: unaveraged_ramp_periods = fel_ramp_periods_default$
-  ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
+  ! The FEL source model (manual sec-coherent-source). 'deposit' is the standard
   ! per-particle scatter. 'coherent' is the SIMPLEX-hybrid coherent-Gaussian source
   ! (Tanaka, PRAB 27, 030703 (2024)). It drops the spatially incoherent artifact, keeps
   ! the physical shot noise in the slice bunch factor B(s), and makes the transverse shape
   ! a guarded Gaussian.
   character(16) :: source_model = 'deposit'
-  ! The angular filter on the source term (fel-physics.md sec-convergence), transcribed
+  ! The angular filter on the source term (manual sec-convergence), transcribed
   ! from Genesis4's source_filter, added in release 4.6.12 with its FFT solver. The
   ! transformed source is multiplied by a sigmoid in normalized transverse spatial
   ! frequency before it reaches the field. This suppresses the wide-angle emission of the
   ! point-like beamlets, and the field's own propagation is untouched. On by default
   ! because what it removes is emission no physical beam radiates (the four-machine
-  ! results are in fel-physics.md sec-source-filter). Turn it off to compare against a
+  ! results are in manual sec-source-filter). Turn it off to compare against a
   ! code that has no such filter.
   logical :: source_filter = .true.
   ! The sigmoid's edge as an angle [rad]. Unset, the run derives it from the beam and the
@@ -141,7 +141,7 @@ type fel_global_struct
   ! The sigmoid's width as a fraction of its edge, Genesis4's sigmoid. Small is a sharp
   ! edge. Genesis4's own default of 1 leaves the sigmoid at 0.73 on axis. That attenuates
   ! the coherent source as much as the wide angles and delays saturation
-  ! (fel-physics.md sec-source-filter).
+  ! (manual sec-source-filter).
   real(rp) :: source_filter_width = 0.05_rp
   ! Self-test of the filter check, as fp32_mutate is for the FP32 check: apply the
   ! sigmoid to the propagated field instead of to the source. Both suppress wide angles,
@@ -202,7 +202,7 @@ type fel_global_struct
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
   logical :: keep_escaped_field = .true.     ! Keep the escaped light, as the pulse.
   logical :: write_escaped = .false.         ! Also write the escaped file, each plane as it left.
-  logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
+  logical :: migrate = .false.               ! Slice migration (manual sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
   ! Provenance detail in the meta/ group of stats.h5. On, meta/ also records the login
@@ -278,7 +278,7 @@ end type
 ! (docs/startup-noise.md, Recommendations). Cells of a seventh of the rms beam size
 ! resolve the beam and the mode. Finer cells raise the wide-angle emission of the point
 ! beamlets without moving the mode power. A half width of nine beam sizes contains the
-! mode, and above that the half width does not enter. fel-physics.md sec-field gives
+! mode, and above that the half width does not enter. manual sec-field gives
 ! both constants on three machines a hundred times apart in wavelength.
 
 real(rp), parameter :: fel_cells_per_sigma$ = 7
@@ -336,7 +336,7 @@ type fel_beam_init_param_struct
   character(400) :: beam_file = ''        ! An FEL beam already in slices (with field.file(1)).
   character(400) :: write_genesis_dist = ''  ! Write the bunch as a Genesis4 distribution file.
   character(400) :: write_openpmd_file = ''  ! Write the bunch as openPMD-beamphysics.
-  ! How a bunch becomes slices (fel-physics.md sec-loading). The bunch is beam_init's,
+  ! How a bunch becomes slices (manual sec-loading). The bunch is beam_init's,
   ! generated or read through beam.position_file. It is binned by arrival time into
   ! the slices of slicing.
   ! "sample" draws beam.n_particle macroparticles in a slice from what fell into it (fewer
@@ -428,7 +428,7 @@ type fel_run_struct
   type (fel_und_struct), allocatable :: und_of(:)
   ! The angle at which the stats split the field power, whether or not the filter is on.
   ! It is the larger of four mode diffraction angles and the rho angle, derived from the
-  ! beam and the first FEL element (fel-physics.md sec-source-filter). Inside it lies what
+  ! beam and the first FEL element (manual sec-source-filter). Inside it lies what
   ! can couple to the mode. Outside it lies the wide-angle emission of the point beamlets.
   real(rp) :: split_angle = 0
   character(24) :: split_origin = ''       ! Where split_angle came from, for the report.

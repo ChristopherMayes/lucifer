@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks of the diagnostic output (fel-physics.md, sec-stats): the stats file, the dump_at
+Checks of the diagnostic output (manual sec-stats): the stats file, the dump_at
 elements and the escaped-field bank. Each is held by an identity between two routes
 rather than by a reference file.
 
@@ -218,7 +218,7 @@ def h5_identical(fa, fb):
     """Whether two HDF5 files hold the same data, with meta/, params/, setup/ and
     timing/ excluded. setup/ follows from params/ and timing/ is the wall clock.
 
-    meta/ holds provenance as datasets (fel-physics.md, sec-meta), since HDF5 caps an
+    meta/ holds provenance as datasets (manual sec-meta), since HDF5 caps an
     attribute at 64 kB. input_echo carries out_root and timestamp carries the clock, so
     any two runs differ in meta/. params/ records every key of the input file, the frame and
     dump switches among them, so two runs that differ only in what they write differ

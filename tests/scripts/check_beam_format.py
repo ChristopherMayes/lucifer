@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks of the particle dump format (fel-physics.md, sec-import).
+Checks of the particle dump format (manual sec-import).
 
 Most claims here are a round trip against the beam that was written. A round trip shows
 that this program agrees with itself. It does not show that the file says what it

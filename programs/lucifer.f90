@@ -354,7 +354,7 @@ if (run%rho_1d <= 0) run%rho_1d = fel_pierce_of_beam(run)
 call fel_write_header (run)
 
 ! Check instrument: write the transcribed single-particle wake kernels for comparison
-! with Genesis (fel-physics.md sec-wakes). fel_wake_init, called from
+! with Genesis (manual sec-wakes). fel_wake_init, called from
 ! fel_setup_schedule, builds the kernels.
 ! Note: The s = 0 entries carry the Bane self-slice half factor.
 
@@ -396,7 +396,7 @@ if (err) stop 1
 
 ! Final dumps. The field records are first unrotated to time order: position is of the
 ! time window holds record slice 1 + mod(is-1+first, nslice). Genesis's field writer
-! does the same on the fly (fel-physics.md sec-slippage).
+! does the same on the fly (manual sec-slippage).
 
 ! The final beam and field, timed, since on a short line they are a large part of
 ! what a run takes outside its walk.

@@ -74,7 +74,7 @@ off and on, it is held to be no wider than that of the slice's macroparticles pl
 random.
 
 The same statistic then runs on the loads that do not draw their own beamlets
-(fel-physics.md, sec-noise):
+(manual sec-noise):
 - load_mode = "keep" from a generated bunch, where the loader makes the beamlets.
 - A bunch of copies made outside the loader and loaded without the quiet start. The
   noise goes on the particles sharing their transverse coordinates.
@@ -1001,7 +1001,7 @@ def split_check(exe, lat, workdir):
 
     Every record that takes the field angle moments also reports the power within
     split_angle of the axis, from the transform those moments already compute
-    (fel-physics.md, sec-source-filter). A dump's own far field is an independent route
+    (manual sec-source-filter). A dump's own far field is an independent route
     to the same number, and Parseval makes the two equal. A difference is a bug in the
     masking or the normalization, and the 1e-6 check allows rounding only. One seeded
     steady-state segment is enough. The split depends on how the field is resolved and

@@ -180,7 +180,7 @@ if (err_flag) return
 call derive_slicing_and_step ()   ! Needs the FEL elements, and runs before the beam is sliced.
 if (err_flag) return
 
-! The field set (fel-physics.md sec-field-set). Validate the harmonics request. Then
+! The field set (manual sec-field-set). Validate the harmonics request. Then
 ! allocate the set and point the fundamental aliases at entry 1 before any field
 ! construction, since every construction path builds the fundamental through wf.
 
@@ -225,7 +225,7 @@ enddo
 h_max = maxval(harmonics)
 
 ! In the electrons mode every particle is one electron with its own coordinates
-! (fel-physics.md sec-loading). The load has no beamlets and no imposed noise, so the keys
+! (manual sec-loading). The load has no beamlets and no imposed noise, so the keys
 ! that describe them have nothing to set, and a value other than the default in one of
 ! them is refused. The defaults are not read. Neither is beam.shot_noise, whose two
 ! values give the same load. A default is accepted where the input states it, since
@@ -339,7 +339,7 @@ endif
 call fel_refuse_two_pol_combinations (run, err_flag)   ! Made again after a field import.
 if (err_flag) return
 
-! The source model (fel-physics.md sec-coherent-source), validated and then stamped onto
+! The source model (manual sec-coherent-source), validated and then stamped onto
 ! every FEL element. The coherent source carries the fundamental of one polarization. It
 ! is refused inside the unaveraged mode, which is its independent check (variance
 ! reduction inside the mode that resolves everything explicitly). Even harmonics are
@@ -361,7 +361,7 @@ case ('coherent')
   if (run%winit%seed_power <= 0 .and. run%field_file(1) == '') then
 
     ! The coherent source understates dark-start startup by about 175x on the reference
-    ! configuration (fel-physics.md sec-coherent-source). Spontaneous, spatially
+    ! configuration (manual sec-coherent-source). Spontaneous, spatially
     ! incoherent emission dominates SASE startup, and the coherent model drops exactly
     ! that. The physical noise of the slice bunch factor (Fawley, <|B|^2> N_lambda = 1)
     ! is present but is not the dominant seed. So a dark start is refused. Seeded runs
@@ -376,7 +376,7 @@ case ('coherent')
   where (is_fel) und_of%source_model = fel_source_coherent$
 end select
 
-! The source filter (fel-physics.md sec-source-filter), validated and stamped onto every
+! The source filter (manual sec-source-filter), validated and stamped onto every
 ! FEL element the same way. It multiplies the transformed source. The unaveraged mode
 ! builds no such source (it deposits from the resolved motion), and the coherent source
 ! has replaced it by an analytic Gaussian with no wide-angle content. Neither case is
@@ -432,7 +432,7 @@ if (run%global%source_filter) then
   ! Genesis4's own default of 1 puts that at 0.73. That attenuates the coherent source as
   ! much as the wide angles. It halves the physical in-cone startup power and delays
   ! saturation by five to nine metres, with nothing in the output saying so
-  ! (fel-physics.md sec-source-filter). A filter meant to remove wide angles keeps the
+  ! (manual sec-source-filter). A filter meant to remove wide angles keeps the
   ! axis. So a transmission under 0.99 is refused, with the width that would pass. The
   ! validation-only cuts lift the guard. Placing the edge where Genesis4 places it means
   ! taking its width too, and that comparison is the one use left for the soft sigmoid.
@@ -544,7 +544,7 @@ do je = 1, branch%n_ele_track
   ! aw (rms, Genesis's convention) from the peak field:
   ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy.
   ! Helical aw = K, planar aw = K/sqrt(2). The focusing split is Genesis's default by
-  ! helicity, scaled by ku^2 as Genesis's unroll does (fel-physics.md sec-element).
+  ! helicity, scaled by ku^2 as Genesis's unroll does (manual sec-element).
 
   kk = c_light * w%value(b_max$) / (kw * m_electron)
 
@@ -560,7 +560,7 @@ do je = 1, branch%n_ele_track
     und_of(je)%ky = kw**2
   endif
 
-  ! The element's offsets, roll-off wavenumber and kicks (fel-physics.md sec-element).
+  ! The element's offsets, roll-off wavenumber and kicks (manual sec-element).
   ! The offsets are the girder-composed totals, as offset_particle reads them. Bmad's
   ! planar kx gives the field cos(kx x) cosh(ky y) with ky^2 = kx^2 + ku^2, so the
   ! roll-off pair is -kx^2 and kx^2 + ku^2 in Genesis4's form. A helical kx is refused
@@ -822,7 +822,7 @@ end function described_pierce
 ! Subroutine derive_slicing_and_step ()
 !
 ! Routine to derive the slice spacing and the integration step from the gain where the
-! input file states neither (fel-physics.md sec-window and sec-element).
+! input file states neither (manual sec-window and sec-element).
 !
 ! The spacing is the whole number of wavelengths in a quarter of the cooperation length
 ! lambda/(4 pi rho). That is four slices per cooperation length, the resolution at which
@@ -1003,7 +1003,7 @@ end function fel_pierce_of_beam
 ! window this much headroom ahead of the bunch. So the window holds what the schedule
 ! slips, and the two cannot disagree.
 !
-! Three terms (fel-physics.md sec-slippage, sec-window, sec-phasing):
+! Three terms (manual sec-slippage, sec-window, sec-phasing):
 !   Undulator steps. Each FEL element slips l (1 + aw^2) / (2 gamma0_ref^2 lambda), which
 !     the walk applies step by step as dz (1 + aw^2) / (2 gamma0_ref^2 lambda). At
 !     resonance that is one wavelength per period. Returned as slip_und, per element
@@ -1100,7 +1100,7 @@ contains
 !+
 ! Subroutine setup_break_geometry ()
 !
-! Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
+! Routine to set up chicane breaks (manual sec-phasing). A break whose elements
 ! bend the reference (sbends, patches) detours the beam while the radiation goes
 ! straight. The light's path is the chord between the flanking undulator faces, from
 ! ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
@@ -1458,7 +1458,7 @@ if (wake_on) then
   endif
 endif
 
-! The source filter's edge (fel-physics.md sec-source-filter). The angle is the setting,
+! The source filter's edge (manual sec-source-filter). The angle is the setting,
 ! and the grid-relative cut is what the kernel builds from. So the conversion happens
 ! here, where the beam that sets the angle and the grid that receives it both exist.
 
@@ -1611,7 +1611,7 @@ call check_wake_window ()
 if (err_flag) return
 run%any_unavg = any(fel_mode == unaveraged$ .and. is_fel)
 
-! The collective terms are not wired into the unaveraged step (fel-physics.md
+! The collective terms are not wired into the unaveraged step (manual
 ! sec-unaveraged). A mixed line would apply them in some segments and silently drop
 ! them in others. So the combination is refused.
 
@@ -1726,7 +1726,7 @@ do ie = 1, branch%n_ele_track
   if (ele%value(l$) == 0) cycle
   if (is_fel(ie)) then
 
-    ! The off-phase knob (fel-physics.md sec-phasing): the wiggler's own z_offset, standard
+    ! The off-phase knob (manual sec-phasing): the wiggler's own z_offset, standard
     ! Bmad misalignment (girder-composed _tot form). It is anchored at the nominal
     ! position. The entry phase shifts by the displaced upstream break, and the exit
     ! unshifts for the displaced downstream one, so everything downstream stays anchored.
@@ -1978,7 +1978,7 @@ end subroutine resolve_window_ele
 ! Subroutine check_wake_window ()
 !
 ! Routine to check the Bmad element wakes against the time window. Element sr wakes act
-! across the whole window (fel-physics.md sec-seamwake). All slices concatenate into one
+! across the whole window (manual sec-seamwake). All slices concatenate into one
 ! bunch in global window coordinates, and Bmad's wake machinery applies unmodified.
 ! The checks:
 !   lr (multi-bunch) wakes are not supported.
@@ -2025,7 +2025,7 @@ end subroutine check_wake_window
 !+
 ! Subroutine setup_diagnostics ()
 !
-! Routine to set up the diagnostics (fel-physics.md sec-stats). The dump-at lists are
+! Routine to set up the diagnostics (manual sec-stats). The dump-at lists are
 ! resolved through Bmad's own lat_ele_locator, which gives class::name syntax. The exact
 ! record and element-end counts are precomputed by replaying the walk's skip rule, so the
 ! stats arrays are sized once and never grown. An entry matching nothing is refused.

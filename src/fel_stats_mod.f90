@@ -1,7 +1,7 @@
 !+
 ! Module fel_stats_mod
 !
-! The tracker's production statistics file <out_root>.stats.h5 (fel-physics.md sec-stats).
+! The tracker's production statistics file <out_root>.stats.h5 (manual sec-stats).
 !
 ! The file describes itself. Every dataset goes through fel_h5_mod and carries @unit,
 ! @description and @axes, the last naming the coords/ datasets its dimensions run over.
@@ -45,7 +45,7 @@
 ! checks that at element ends it reproduces the stored twiss.
 !
 ! Beam moments are computed in two passes: the mean first, then centered second moments
-! (the variance rule of fel-physics.md sec-numerics). The one-pass form loses the entire
+! (the variance rule of manual sec-numerics). The one-pass form loses the entire
 ! sigma to cancellation. Moments are weighted by macroparticle charge. They run parallel
 ! over slices with fixed-order results, since each slice's sums are its own.
 !
@@ -108,7 +108,7 @@ type fel_stats_struct
   real(rp), allocatable :: f_centroid(:,:,:)      ! (4, nslice, nrec)
   real(rp), allocatable :: f_sigma(:,:,:)         ! (16, nslice, nrec)
   real(rp), allocatable :: f_energy(:,:), f_power(:,:), f_on_axis(:,:)
-  ! The power inside split_angle, per slice per record (fel-physics.md sec-source-filter).
+  ! The power inside split_angle, per slice per record (manual sec-source-filter).
   ! NaN where the record did not take the angle moments. The rest of f_power is the
   ! wide-angle emission of the point beamlets. A SASE run separates that from the mode
   ! before quoting a power (docs/startup-noise.md).
@@ -515,7 +515,7 @@ do is = 1, nslice
   call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
   ! Two-pass weighted moments: mean first, then centered second moments
-  ! (fel-physics.md sec-numerics).
+  ! (manual sec-numerics).
 
   wsum = 0;  mean = 0
   do ip = 1, sl%n
@@ -1007,7 +1007,7 @@ end subroutine fel_stats_exit_light
 ! Routine to read the mode-against-artifact split out of the records the run already
 ! took. Nothing is computed here that the accumulator did not already hold. Every
 ! element end that takes the field angle moments takes one transform pair. It stores
-! the power inside split_angle beside the total (fel-physics.md sec-source-filter).
+! the power inside split_angle beside the total (manual sec-source-filter).
 !
 ! The criterion of docs/startup-noise.md is stated at saturation, so it reads the
 ! peak-power record. The last record is where an exit power is quoted. Only records

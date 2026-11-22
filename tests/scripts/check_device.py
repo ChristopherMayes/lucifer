@@ -1310,7 +1310,7 @@ def unavg_handedness(args, wd, exe):
 
 def source_filter(args, wd, exe):
     """
-    The source filter on the device (fel-physics.md sec-source-filter).
+    The source filter on the device (manual sec-source-filter).
 
     The CPU adds the filtered source inside the field's own transform pair. The device's
     fused solve adds the source in real space in its last pass, so the source is filtered
