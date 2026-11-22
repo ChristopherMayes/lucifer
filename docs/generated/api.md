@@ -1021,7 +1021,7 @@ Output:
 (api-fel-slice-to-bunch)=
 ### `fel_slice_to_bunch`
 
-*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)`
+*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos, reuse)`
 
 ```
 Routine to convert a packed slice to a Bmad bunch_struct. The copies are plain, since
@@ -1084,7 +1084,10 @@ Input:
                    then the frame's own, interpolated between the element's faces as
                    fel_frame_attributes interpolates the iteration's time. If omitted,
                    the coords sit at the upstream end, which tracking wants.
-
+  reuse       -- logical, optional: Keep the particle array bunch comes with where it
+                   is large enough? The particles past the slice's are then marked lost,
+                   which Bmad's tracking skips, and the caller must not write the bunch
+                   to a file. Default is False: the array has the slice's size exactly.
 
 Output:
   bunch       -- bunch_struct: The slice as a Bmad bunch.
@@ -1094,7 +1097,7 @@ Output:
 (api-fel-bunch-to-slice)=
 ### `fel_bunch_to_slice`
 
-*Subroutine* `(bunch, ele, sl, err_flag)`
+*Subroutine* `(bunch, ele, sl, err_flag, tracked)`
 
 ```
 Routine to copy a tracked Bmad bunch back into the packed slice. The copies are plain.
@@ -1107,6 +1110,10 @@ Input:
   bunch       -- bunch_struct: Tracked bunch. Every particle must be alive.
   ele         -- ele_struct: Element just tracked through (for the error message).
   sl          -- fel_slice_struct: Destination slice. The fill count n is unchanged.
+  tracked     -- logical, optional: Is the bunch this slice's own, converted by
+                   fel_slice_to_bunch and tracked? The slice's labels are then left as
+                   they are, since a label above the largest default integer does not
+                   fit a particle's ix_user. Default is False: the labels are the bunch's.
 
 Output:
   sl          -- fel_slice_struct: Slice with the tracked coordinates copied back.

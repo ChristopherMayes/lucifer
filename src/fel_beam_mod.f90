@@ -2615,7 +2615,7 @@ end function fel_m_ind
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)
+! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos, reuse)
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct. The copies are plain, since
 ! the stored coordinates are coord_struct's. The element's p0c must match the beam's
@@ -2675,14 +2675,17 @@ end function fel_m_ind
 !                    then the frame's own, interpolated between the element's faces as
 !                    fel_frame_attributes interpolates the iteration's time. If omitted,
 !                    the coords sit at the upstream end, which tracking wants.
-!
+!   reuse       -- logical, optional: Keep the particle array bunch comes with where it
+!                    is large enough? The particles past the slice's are then marked lost,
+!                    which Bmad's tracking skips, and the caller must not write the bunch
+!                    to a file. Default is False: the array has the slice's size exactly.
 !
 ! Output:
 !   bunch       -- bunch_struct: The slice as a Bmad bunch.
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)
+subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos, reuse)
 
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
@@ -2693,7 +2696,7 @@ real(rp), optional :: s_pos
 integer ip, loc
 integer, optional :: ix_slice
 logical err_flag
-logical, optional :: fold_phi0, kinetic_ok
+logical, optional :: fold_phi0, kinetic_ok, reuse
 character(*), parameter :: r_name = 'fel_slice_to_bunch'
 
 !
@@ -2720,8 +2723,17 @@ if (abs(ele%value(p0c$) - beam%p0c) > 1e-10_rp * beam%p0c) then
   return
 endif
 
+! A bunch that is kept from one slice to the next is allocated once at the largest
+! slice it has met. A slice's bunch is 224 bytes a particle, and allocating one for
+! every slice of every element was the part of an interlude that grew with the number
+! of threads.
+
 if (allocated(bunch%particle)) then
-  if (size(bunch%particle) /= sl%n) deallocate(bunch%particle)
+  if (logic_option(.false., reuse)) then
+    if (size(bunch%particle) < sl%n) deallocate(bunch%particle)
+  else
+    if (size(bunch%particle) /= sl%n) deallocate(bunch%particle)
+  endif
 endif
 if (.not. allocated(bunch%particle)) allocate(bunch%particle(sl%n))
 
@@ -2758,8 +2770,14 @@ do ip = 1, sl%n
   ! reference momentum changes, and must not touch vec(6) here.
   call init_coord (bunch%particle(ip), vec, ele, loc, electron$, shift_vec6 = .false., s_pos = s_pos)
   bunch%particle(ip)%charge = sl%weight(ip)
-  bunch%particle(ip)%ix_user = int(sl%id(ip))
+  bunch%particle(ip)%ix_user = int(min(sl%id(ip), int(huge(1), 8)))
   bunch%particle(ip)%t = bunch%particle(ip)%t + t_place
+enddo
+
+! The particles of an earlier, larger slice.
+
+do ip = sl%n + 1, size(bunch%particle)
+  bunch%particle(ip)%state = lost$
 enddo
 
 bunch%n_live = sl%n
@@ -2773,7 +2791,7 @@ end subroutine fel_slice_to_bunch
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_bunch_to_slice (bunch, ele, sl, err_flag)
+! Subroutine fel_bunch_to_slice (bunch, ele, sl, err_flag, tracked)
 !
 ! Routine to copy a tracked Bmad bunch back into the packed slice. The copies are plain.
 ! The phase bookkeeping is one phi0 update per element, done by the caller
@@ -2783,19 +2801,24 @@ end subroutine fel_slice_to_bunch
 !   bunch       -- bunch_struct: Tracked bunch. Every particle must be alive.
 !   ele         -- ele_struct: Element just tracked through (for the error message).
 !   sl          -- fel_slice_struct: Destination slice. The fill count n is unchanged.
+!   tracked     -- logical, optional: Is the bunch this slice's own, converted by
+!                    fel_slice_to_bunch and tracked? The slice's labels are then left as
+!                    they are, since a label above the largest default integer does not
+!                    fit a particle's ix_user. Default is False: the labels are the bunch's.
 !
 ! Output:
 !   sl          -- fel_slice_struct: Slice with the tracked coordinates copied back.
 !   err_flag    -- logical: Set True on error (a lost particle), False otherwise.
 !-
 
-subroutine fel_bunch_to_slice (bunch, ele, sl, err_flag)
+subroutine fel_bunch_to_slice (bunch, ele, sl, err_flag, tracked)
 
 type (bunch_struct) bunch
 type (ele_struct) ele
 type (fel_slice_struct) sl
 integer ip
 logical err_flag
+logical, optional :: tracked
 character(*), parameter :: r_name = 'fel_bunch_to_slice'
 
 !
@@ -2816,7 +2839,7 @@ do ip = 1, sl%n
   sl%z(ip)  = bunch%particle(ip)%vec(5)
   sl%pz(ip) = bunch%particle(ip)%vec(6)
   sl%weight(ip) = bunch%particle(ip)%charge
-  sl%id(ip) = bunch%particle(ip)%ix_user
+  if (.not. logic_option(.false., tracked)) sl%id(ip) = bunch%particle(ip)%ix_user
 enddo
 
 err_flag = .false.

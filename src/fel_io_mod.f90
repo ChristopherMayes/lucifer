@@ -1649,14 +1649,12 @@ do ip = 1, fel_t_n$
   call fel_record_int ('timing', trim(record_name(fel_phase_name(ip))) // '_regions', &
         'The times this phase was entered.', fel_timer_regions(ip))
 enddo
-call fel_record_real ('timing', 'interlude_bunch_memory', 's', 'Time of the seam interlude in allocating and ' // &
-      'freeing its Bmad bunches, summed over the threads.', run%t_interlude(1))
 call fel_record_real ('timing', 'interlude_to_bunch', 's', 'Time of the seam interlude in converting slices to ' // &
-      'Bmad bunches, summed over the threads.', run%t_interlude(2))
+      'Bmad bunches, summed over the threads.', run%t_interlude(1))
 call fel_record_real ('timing', 'interlude_track', 's', 'Time of the seam interlude in track1_bunch, summed ' // &
-      'over the threads.', run%t_interlude(3))
+      'over the threads.', run%t_interlude(2))
 call fel_record_real ('timing', 'interlude_to_slice', 's', 'Time of the seam interlude in converting Bmad ' // &
-      'bunches to slices, summed over the threads.', run%t_interlude(4))
+      'bunches to slices, summed over the threads.', run%t_interlude(3))
 call fel_record_real ('timing', 'walk', 's', 'Wall-clock time of the walk.', walk)
 call fel_record_real ('timing', 'run', 's', 'Wall-clock time of the run up to the closing printout.', &
       fel_timer_run_seconds())
