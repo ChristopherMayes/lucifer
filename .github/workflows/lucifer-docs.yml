@@ -118,6 +118,17 @@ jobs:
       - name: Glossary words are linked at first use
         run: python tests/scripts/check_glossary.py
 
+      # Every page of the site's contents declares its kind in its front matter: tutorial,
+      # how-to, reference, explanation or record.
+      - name: Pages declare their kind
+        run: python tests/scripts/check_page_kinds.py
+
+      # Every image a page shows is named in docs/figures/sources.tsv with the script that
+      # draws it, and an image drawn by a hand-run script carries the hash of that script
+      # and of the files it reads.
+      - name: Figures have their scripts
+        run: python tests/scripts/check_figure_sources.py
+
       # A key that takes one of a set of names: the code compares it against the names in
       # its set in the key table and no other, and every name is compared or is the default.
       - name: Allowed names agree with the code

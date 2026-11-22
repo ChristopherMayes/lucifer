@@ -1,0 +1,21 @@
+# The images the pages show, each with the script that draws it. tests/scripts/check_figure_sources.py
+# reads this file and states its form. The columns are separated by tabs: the image, the class, the
+# script, the files the script reads, and for the class hand the SHA-256 of the script and those files.
+# After an image of the class hand is redrawn: tests/scripts/check_figure_sources.py --update <image>
+docs/generated/validation/*.svg	keystone	tests/scripts/report_tier_figures.py	-	-
+docs/generated/undulator-spectrum/*.svg	keystone	tests/scripts/report_undulator_spectrum.py	-	-
+docs/generated/spectral/*.svg	keystone	tests/scripts/report_spectral.py	-	-
+docs/generated/shot-noise/*.svg	keystone	tests/scripts/shot_noise_figures.py	-	-
+docs/generated/examples/*.svg	examples	examples/run_examples.sh	-	-
+docs/generated/python/*.svg	examples	tests/scripts/python_page_figures.py	-	-
+docs/figures/window.svg	hand	docs/figures/window_figure.py	-	02a121bcf23bccc06ffba04043d97a4906d4848cc30c97282a3c280df57981a8
+docs/figures/electrons-memory.svg	hand	docs/figures/electrons_memory_figure.py	-	b064d58b7dd8c98561d7f2e59a0b6dc62031e32a61fb6276a5c0419e26510fed
+docs/generated/startup-noise/window-profile.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/power-outside-and-inside-the-mode.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/cell-size-cause.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/wide-angle-vs-cell-size-and-particle-count.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/beamlets-vs-particles.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/line-and-doubled.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/source-filter.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	1bd81680cd8a3ea74e54b7ecd47273461523656c689ee95a431a5feb17713527
+docs/generated/startup-noise/source-filter-flash.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise-flash.json	b4b44a699a301db97e38fff4931daa182ae3d54fb111778435a9eef7b2f764ec
+docs/generated/startup-noise/source-filter-flash1.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise-flash1.json	b3493792a982bddec203bfae9b6bdb6a931a94dfce004ab940be73213fc9ce0f

@@ -447,6 +447,19 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_glossary.py" --root "$LUCIFER
   exit 1
 fi
 
+# And every page of the site's contents declares its kind in its front matter.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_page_kinds.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a page of the site's contents does not declare its kind."
+  exit 1
+fi
+
+# And every image a page shows has its script, and an image a script drew by hand is not
+# older than the script and the files it was drawn from.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_figure_sources.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: an image has no script, or its script changed after it was drawn."
+  exit 1
+fi
+
 # And every key with a set of names in the key table is compared against those names and no
 # other, so the table and the code that acts on it cannot drift apart.
 if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_allowed_values.py" --root "$LUCIFER_DIR"; then
