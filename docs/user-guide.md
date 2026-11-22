@@ -6,6 +6,7 @@ tags: [how-to]
 
 This page holds everything needed to get from a checkout to a tracked FEL run. The parameter-by-parameter reference is [`input-reference.md`](input-reference.md). What the output files hold and how to read them is [`reading-output.md`](reading-output.md). The measured [levels](glossary.md#gl-level) and how to reproduce them are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.md`](fel-physics.md).
 
+(building)=
 ## Building
 
 Lucifer is a Bmad user program, built with its own CMake against an installed Bmad rather than as part of one. The one variable that names Bmad is `LUCIFER_BMAD_ROOT`: an installed Bmad such as conda-forge's `bmad` package, a prefix with the modules under `include/bmad/`, or a distribution build's `production/` or `debug/` root, which holds `lib/`, `modules/` and `include/`. The first route is the package. `environment.yml` at the repository root names it in its nompi variant with conda-forge's compilers and cmake, each a minimum, and the two cmake lines build against the environment:
