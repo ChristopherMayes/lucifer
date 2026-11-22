@@ -10,6 +10,23 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-22 Changed: every page of the manual declares its kind, and every figure is tied to the
+  script that draws it. A page is a tutorial, a how-to guide, a reference, an explanation or a record,
+  and an explanation or a guide may be followed by its record. The kind is the key `tags` in the
+  front matter of each of the 46 pages in the contents of `docs/myst.yml`, in the first Markdown cell
+  of the three notebooks, and it is written by `report_examples.py`, `report_api.py`,
+  `report_python_api.py` and `report_layouts.py` for the pages they generate.
+  `tests/scripts/check_page_kinds.py` fails on a page of the contents with no `tags`, with a value
+  outside the five, or with two kinds other than an explanation or a guide and its record.
+  `docs/figures/sources.tsv` names the 73 images the pages show in three classes: 40 that the
+  keystone redraws at every run, 22 that a full run of `examples/run_examples.sh` redraws, and 11
+  that a script draws when it is run by hand, each of those with the SHA-256 of its script and of the
+  files the script reads. `tests/scripts/check_figure_sources.py` fails on an image that the file does
+  not name and on a hash that no longer matches, and `--update` rewrites a hash after its image is
+  redrawn. Both checks run in the examples job of the keystone and in the docs job of CI. The record
+  of `docs/electrons-mode.md` begins at the heading `Measurements`, and the README offers the
+  quickstart notebook for a first run and the examples for a reader with a task. No page gained or
+  lost a sentence otherwise, and no image was redrawn.
 - 2026-11-22 Added: a page for the electrons mode, `docs/electrons-mode.md`. It has two parts. The first
   describes the mode and holds no result of a run: the load, the keys the mode uses and refuses, the
   number of particles and their memory as a table and a figure by charge, on the host in FP64 and on
