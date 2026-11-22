@@ -87,6 +87,8 @@ type (ele_struct), pointer :: ele_p             ! The element the piece's arithm
 integer i_piece, n_piece
 real(rp) t_part(3), t_0, t_1
 type (bunch_struct), allocatable :: bunch_keep(:)
+type (ele_struct), allocatable, target :: ele_t(:), lord_t(:)
+type (branch_struct), allocatable, target :: branch_t(:)
 integer it, n_thread
 real(rp) l_piece, f_piece, z_ele0
 character(*), parameter :: r_name = 'track_fel_line'
@@ -179,6 +181,7 @@ run%t_interlude = 0
 n_thread = 1
 !$ n_thread = omp_get_max_threads()
 allocate (bunch_keep(0:n_thread-1))
+allocate (ele_t(0:n_thread-1), lord_t(0:n_thread-1), branch_t(0:n_thread-1))
 charge_dropped_tot = 0
 b_dev_max = 0
 
@@ -535,6 +538,7 @@ do ie = run%i_start, run%i_end
         else
           err = .false.
           t_part = 0
+          call private_elements (ele_p)
           !$OMP parallel do firstprivate(err) private(t_0, t_1, it) reduction(.or.: err_flag) &
           !$OMP     reduction(+: t_part) schedule(static)
           do is = 1, nslice
@@ -559,7 +563,7 @@ do ie = run%i_start, run%i_end
                 call move_alloc (bunch_keep(it)%particle, bunch_l%particle)
                 call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch_l, err, reuse = .true.)
                 t_1 = fel_timer_run_seconds();  t_part(1) = t_part(1) + (t_1 - t_0);  t_0 = t_1
-                if (.not. err) call track1_bunch (bunch_l, ele_p, err)
+                if (.not. err) call track1_bunch (bunch_l, ele_t(it), err)
                 t_1 = fel_timer_run_seconds();  t_part(2) = t_part(2) + (t_1 - t_0);  t_0 = t_1
                 if (.not. err) call fel_bunch_to_slice (bunch_l, ele_p, fbeam%slice(is), err, tracked = .true.)
                 call move_alloc (bunch_l%particle, bunch_keep(it)%particle)
@@ -724,6 +728,59 @@ call fel_toc (fel_t_walk$)
 !------------------------------------------------------------------------------
 contains
 
+!------------------------------------------------------------------------------
+!+
+! Subroutine private_elements (ele_in)
+!
+! Routine to give each thread an element of its own to hand to track1_bunch, whose branch
+! is the thread's own as well.
+!
+! Bmad's check_aperture_limit sets param%unstable_factor to zero at each of its calls,
+! two for every particle, and param is the branch's, which track1_bunch_hom finds through
+! the element's branch pointer. With one branch for all the threads each of those writes
+! takes the cache line from another core. On the 128 cores of a node the time of an
+! interlude in track1_bunch was 22600 thread-seconds where 4400 were the tracking, and
+! it grew by 144 cycles a particle for each thread.
+!
+! A thread's branch has the lattice's parameters and points at the lattice's elements,
+! which are only read. The element is a copy, and so is its lord where it is a slice of
+! an element, since Bmad takes the branch of a slice from its lord.
+!
+! Input:
+!   ele_in -- ele_struct: The element or the piece of one the interlude tracks through.
+!-
+
+subroutine private_elements (ele_in)
+
+type (ele_struct), target :: ele_in
+type (branch_struct), pointer :: branch_in
+integer jt
+
+!
+
+branch_in => pointer_to_branch(ele_in)
+do jt = 0, n_thread - 1
+  branch_t(jt)%name        = branch_in%name
+  branch_t(jt)%ix_branch   = branch_in%ix_branch
+  branch_t(jt)%n_ele_track = branch_in%n_ele_track
+  branch_t(jt)%n_ele_max   = branch_in%n_ele_max
+  branch_t(jt)%lat         => branch_in%lat
+  branch_t(jt)%ele         => branch_in%ele
+  branch_t(jt)%param       = branch_in%param
+
+  ele_t(jt) = ele_in
+  if (ele_in%ix_ele == ix_slice_slave$) then
+    lord_t(jt) = ele_in%lord
+    lord_t(jt)%branch => branch_t(jt)
+    ele_t(jt)%lord => lord_t(jt)
+  else
+    ele_t(jt)%branch => branch_t(jt)
+  endif
+enddo
+
+end subroutine private_elements
+
+!------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
 ! Subroutine apply_bmad_wake_kick (wake_ele)
