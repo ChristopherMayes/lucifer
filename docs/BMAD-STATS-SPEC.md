@@ -1,3 +1,7 @@
+---
+tags: [reference]
+---
+
 # bmad-stats: a self-describing HDF5 layout for accelerator statistics
 
 This is version 1.0, in force for this writer, with open questions pending. This document is normative for any writer claiming `@file_format = 'bmad-stats'`. It is versioned by its own number, independently of any program. Lucifer is the reference writer, as `bmad-stats 1.0` plus the `fel` extension (BMAD-STATS-EXT-FEL.md).

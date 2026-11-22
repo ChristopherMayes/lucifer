@@ -1,6 +1,7 @@
 ---
 title: "Grid and particle-count dependence of SASE power"
 short_title: SASE convergence
+tags: [explanation, record]
 ---
 
 Self-amplified spontaneous emission (SASE) is simulated by starting the radiation field at zero and letting the [shot noise](glossary.md#gl-shot-noise) of the electron beam seed the instability. Such a simulation is commonly called unseeded. The field power an unseeded simulation reports depends on two numerical parameters that have no physical counterpart: the transverse cell size of the field grid and the number of [macroparticles](glossary.md#gl-macroparticle) per [slice](glossary.md#gl-slice). The dependence is large. For the beam and undulator line described below, with a 29 nm bunch and 1024 macroparticles per slice, the exit power is 0.25 GW with 6.35 µm cells and 37 GW with 0.78 µm cells. At either cell size, four times the macroparticles reduces the exit power by about a factor of six.

@@ -1,6 +1,7 @@
 ---
 title: "Lucifer: an FEL tracker inside Bmad"
 short_title: Introduction
+tags: [reference]
 ---
 
 Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its averaged FEL physics began as a transcription of Genesis 1.3 Version 4 (Genesis4) and is validated against Genesis4 from bitwise-identical starting states. The lattice, the beam and the transport outside the FEL step are Bmad's. The unaveraged method, the spectral field propagator, the [device](glossary.md#gl-device) step and the numerics derived from the beam are Lucifer's own.

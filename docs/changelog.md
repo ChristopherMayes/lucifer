@@ -1,6 +1,7 @@
 ---
 title: Lucifer changelog
 short_title: Changelog
+tags: [record]
 ---
 
 # Lucifer changelog

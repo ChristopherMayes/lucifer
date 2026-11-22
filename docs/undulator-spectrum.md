@@ -1,6 +1,7 @@
 ---
 title: "Undulator radiation: the spectrum of one undulator and its formulas"
 short_title: Undulator spectrum
+tags: [explanation, record]
 ---
 
 The radiation of an electron that crosses an undulator of $N$ periods has a spectrum that consists of a narrow peak at each harmonic of a fundamental frequency. The shape of each peak, the energy radiated at its maximum and the dependence of both on the angle of observation are known in closed form. A beam whose current is far below that required for gain radiates the incoherent sum of the radiation of its electrons. Lucifer computes the same radiation from the source and field equations of [](fel-physics.md), which were written for the amplified field and not for the spontaneous one. This page compares the two for the fundamental of two undulators: that of FLASH1, which is planar, and the Delta afterburner of the LCLS, which is helical. The reference in every comparison is a formula. No other code is involved. On this page the energy radiated per unit angular frequency and per unit solid angle, $d^2W/d\omega\,d\Omega$, is called the spectral intensity, and the peak of the spectrum at the fundamental frequency is called the fundamental peak.

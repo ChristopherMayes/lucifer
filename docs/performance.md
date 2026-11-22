@@ -1,6 +1,7 @@
 ---
 title: Performance
 short_title: Performance
+tags: [record]
 ---
 
 This page is the measured record of where a run spends its time. Every number here is machine-local and carries the machine and the build that produced it. That is why this page is hand written and stays out of `generated/`.

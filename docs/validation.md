@@ -1,3 +1,7 @@
+---
+tags: [record]
+---
+
 # Validation: what is checked, how, and at what measured level
 
 Lucifer's physics is transcribed from Genesis 1.3 Version 4 (Genesis4) and validated against it from bitwise-identical starting states. This page is the measured record: the rule every commit obeys, the [tier](glossary.md#gl-tier) table with its [recorded digits](glossary.md#gl-level), the [check sections](glossary.md#gl-validation-suite) that run on every validation pass, and what each measurement pins, subsystem by subsystem.

@@ -1,6 +1,7 @@
 ---
 title: Lucifer and Genesis 1.3 Version 4 (Genesis4)
 short_title: Genesis4
+tags: [reference]
 ---
 
 Lucifer's averaged physics was transcribed from Genesis4, and the Genesis4 [tiers](glossary.md#gl-tier) compare against it. This page is for a user who knows one code and wants the other. It says what physics the two share, what each has that the other does not, how a setting translates, and how a file moves between them.

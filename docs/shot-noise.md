@@ -1,6 +1,7 @@
 ---
 title: "The shot-noise load: the noise power of a beamlet"
 short_title: Shot-noise load
+tags: [explanation]
 ---
 
 Self-amplified spontaneous emission (SASE) starts from the [shot noise](glossary.md#gl-shot-noise) of the electron beam: $N$ electrons at independent random phases have a mean square bunching of $1/N$. Before tracking begins, Lucifer generates the [macroparticles](glossary.md#gl-macroparticle) of every [slice](glossary.md#gl-slice). This set of macroparticles is called the [load](glossary.md#gl-load), and the routines that generate it are called the loader.

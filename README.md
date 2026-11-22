@@ -71,7 +71,7 @@ lucifer lucifer.toml
 
 `lucifer.toml` is the name the examples use by convention. It is an argument rather than a default, and any name works.
 
-The examples are the fastest way in. Each is a directory of real inputs with its own README and the numbers measured on it:
+A first run is the subject of the quickstart notebook, [`docs/notebooks/quickstart.ipynb`](docs/notebooks/quickstart.ipynb), which loads an input file, runs it and shows its output step by step. The examples are for a reader who has a task. Each is a directory of real inputs with its own README, which states the task and the choices in its input file, and the numbers measured on it:
 
 ```
 cd examples/steady_state && ../../build-release/bin/lucifer lucifer.toml

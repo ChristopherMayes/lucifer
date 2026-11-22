@@ -1,3 +1,7 @@
+---
+tags: [how-to]
+---
+
 # User guide: building, describing a run, and running it
 
 This page holds everything needed to get from a checkout to a tracked FEL run. The parameter-by-parameter reference is [`input-reference.md`](input-reference.md). What the output files hold and how to read them is [`reading-output.md`](reading-output.md). The measured [levels](glossary.md#gl-level) and how to reproduce them are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.md`](fel-physics.md).
