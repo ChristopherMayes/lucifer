@@ -216,7 +216,7 @@ The field-free drift is parallel over slices for the same reason. A time-depende
 (perf-electrons)=
 ### Every electron of the LCLS window, on 12 and on 128 cores
 
-The run is the example `lcls_electrons` ([](generated/examples/lcls_electrons.md)): the 30.8 pC window of LCLS loaded with `beam.load_mode = "electrons"` ([](fel-physics.md#sec-electrons)), 192,386,391 particles in 300 slices on a 128-point grid, 1254 steps over 132 m with 96 field-free elements between the segments. The runs gave the same exit power, pulse energy and bunching to every digit the program prints.
+The run is the example `lcls_electrons` ([](generated/examples/lcls_electrons.md)): the 30.8 pC window of LCLS loaded with `beam.load_mode = "electrons"` ([](electrons-mode.md)), 192,386,391 particles in 300 slices on a 128-point grid, 1254 steps over 132 m with 96 field-free elements between the segments. The runs gave the same exit power, pulse energy and bunching to every digit the program prints.
 
 *Measured 2026-11-21. Apple M3 Max: 12 threads, gfortran 15.3.0, with another program on the same cores for the first hour of the run. NERSC Perlmutter CPU node: two AMD EPYC 7763, 128 cores, 512 GB, 128 threads bound to cores and spread, gfortran 15.3.0 and Bmad from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"` with the plan measured on the node.*
 
