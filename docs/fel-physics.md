@@ -1,6 +1,7 @@
 ---
 title: "Lucifer, the Bmad FEL Tracker: Physics Manual"
 short_title: Physics manual
+tags: [explanation]
 ---
 
 (sec-intro)=

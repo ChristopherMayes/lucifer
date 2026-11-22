@@ -1,6 +1,7 @@
 ---
 title: Glossary
 short_title: Glossary
+tags: [reference]
 ---
 
 The words this documentation uses for the pieces of a run and for the checks on it, each with the page that defines it. A page links a word here where it first uses it. Four words carry two meanings each, and both meanings are listed. A `record` is a row of the statistics file in one place and the field's stored array in another. A `plane` is a transverse field sample in one place and a position along the lattice in another. A `kick` is the phase kick of the shot-noise load in one place and the radiation's force on a particle in another. A `ramp` is an undulator's end field in one place and the spectral propagator's slippage phase in another.

@@ -1,3 +1,7 @@
+---
+tags: [how-to]
+---
+
 # Reading the output
 
 This page is for someone handed a Lucifer output file who never runs the program. Every output is self-describing, so the tooling here hard-codes almost nothing and neither should yours.

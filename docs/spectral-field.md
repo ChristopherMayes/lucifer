@@ -1,6 +1,7 @@
 ---
 title: The spectral field propagator
 short_title: Spectral propagator
+tags: [explanation, record]
 ---
 
 The spectral field propagator, `field.propagator = "spectral"`, transforms the whole [window](glossary.md#gl-window) in $(x, y, \tau)$. Each frequency of the field then diffracts at its own wavenumber, and the slippage is a continuous [phase ramp](glossary.md#gl-ramp-phase). The [slice propagator](glossary.md#gl-propagator).md#gl-slice) propagator stays the default, and every [tier](glossary.md#gl-tier) of the [keystone](glossary.md#gl-keystone) takes it. What the spectral propagator is for is a field sampled coarser than the beam's slices, `field.n_wavelength`, which only a continuous slippage can carry.

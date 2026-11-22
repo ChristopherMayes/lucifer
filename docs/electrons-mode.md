@@ -1,6 +1,7 @@
 ---
 title: "The electrons mode: one particle for every electron"
 short_title: Electrons mode
+tags: [explanation, record]
 ---
 
 The [load](glossary.md#gl-load) of a run ordinarily represents the electrons of a [slice](glossary.md#gl-slice) by a much smaller number of [macroparticles](glossary.md#gl-macroparticle), on which the [shot noise](glossary.md#gl-shot-noise) of the beam is imposed ([](shot-noise.md)). With `beam.load_mode = "electrons"` the load instead contains one particle for every electron of the bunch. Every particle has coordinates and a phase of its own, there are no [beamlets](glossary.md#gl-beamlet), and the shot noise is a property of the load.
@@ -95,7 +96,7 @@ With `bmad_com%radiation_fluctuations_on` the slices of an interlude are tracked
 The validation suite runs the mode on the CPU alone. No test covers it under `run.device = "metal"`.
 
 (el-measured)=
-## Measurements on the examples
+## Measurements
 
 The sections above describe the mode and hold for any run. This section records measurements. Every number in it was obtained on an example of the repository, on the machine and with the number of threads stated, and is revised when the example or the program changes.
 

@@ -1,3 +1,7 @@
+---
+tags: [reference]
+---
+
 # BMAD-STATS-EXT-FEL: the FEL extension
 
 This is version 1.1, in force for this writer, with open questions pending. It extends BMAD-STATS-SPEC.md for time-dependent FEL tracking output. It is declared by `'fel'` in the root `@extensions` and by `@fel_version` on the root. Everything here satisfies the core contract (spec R41): a generic core reader loads an FEL file without knowing this document exists. Rules are numbered F1, F2, ... and cite the core rules they instantiate.

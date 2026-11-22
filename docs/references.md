@@ -1,6 +1,7 @@
 ---
 title: References
 short_title: References
+tags: [reference]
 ---
 
 This page lists what this code implements, and where each thing came from. Every entry names the source and the routine that carries it, so a reader can go from a paper to the transcription and back. The physics manual repeats these citations in place, section by section, with the equations beside them.

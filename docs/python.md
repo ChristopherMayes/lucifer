@@ -1,3 +1,7 @@
+---
+tags: [how-to]
+---
+
 (python-package)=
 # Python
 
