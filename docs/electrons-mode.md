@@ -13,7 +13,7 @@ The page has two parts. The first describes the mode: the load ([](#el-load)), t
 
 The charge $Q$ of the [window](glossary.md#gl-window) is counted as the nearest whole number of electrons, $N = \mathrm{nint}(Q/e)$, and every particle has the weight $Q/N$, which differs from $e$ by at most one part in $2N$. The loaded charge is therefore $Q$ exactly.
 
-The numbers of electrons in the slices are one multinomial draw. The slices are taken in order, and slice $i$, whose charge $Q_i$ follows from the current profile of the bunch ([](fel-physics.md#sec-loading)), receives a binomial share of the electrons not yet assigned, with a probability equal to $Q_i$ divided by the charge not yet loaded. The numbers $N_i$ sum to $N$, and each fluctuates about its mean as the number of electrons in a slice of a real bunch does. Each electron is then assigned four transverse coordinates from the Gaussian distribution matched to the Twiss parameters of the lattice, an energy from the Gaussian distribution of width `sig_pz`, and a phase distributed uniformly over the $2\pi\,\texttt{n\_wavelength}$ of its slice. The current is taken as uniform within a slice, as it is in the other modes.
+The numbers of electrons in the slices are one multinomial draw. The slices are taken in order, and slice $i$, whose charge $Q_i$ follows from the current profile of the bunch ([](#sec-loading)), receives a binomial share of the electrons not yet assigned, with a probability equal to $Q_i$ divided by the charge not yet loaded. The numbers $N_i$ sum to $N$, and each fluctuates about its mean as the number of electrons in a slice of a real bunch does. Each electron is then assigned four transverse coordinates from the Gaussian distribution matched to the Twiss parameters of the lattice, an energy from the Gaussian distribution of width `sig_pz`, and a phase distributed uniformly over the $2\pi\,\texttt{n\_wavelength}$ of its slice. The current is taken as uniform within a slice, as it is in the other modes.
 
 No two particles share a coordinate. For $N_i$ independent phases
 
@@ -47,7 +47,7 @@ The transverse grid, the step and the window are derived as in the other modes (
 (el-migration)=
 ### Migration
 
-A particle of this load is one electron, so that a move to the neighboring slice separates no beamlet, and the radiation that [migration](glossary.md#gl-migration) adds to a load of beamlets ([](fel-physics.md#sec-migration)) does not arise. The pass runs in threads. It leaves in every slice the particles that a serial scan of the slices in order leaves there, in the same order, so that a result does not depend on the number of threads.
+A particle of this load is one electron, so that a move to the neighboring slice separates no beamlet, and the radiation that [migration](glossary.md#gl-migration) adds to a load of beamlets ([](#sec-migration)) does not arise. The pass runs in threads. It leaves in every slice the particles that a serial scan of the slices in order leaves there, in the same order, so that a result does not depend on the number of threads.
 
 (el-size)=
 ## The number of particles and their memory
@@ -75,7 +75,7 @@ The memory of the particles as a function of the charge in the window, at 68 byt
 
 Two further quantities of memory increase with the number of particles. In an [interlude](glossary.md#gl-interlude) each thread converts one slice at a time to a Bmad bunch of 224 bytes per particle, and retains the bunch of the largest slice that it has converted. The memory of the interludes is therefore at most 224 bytes times the number of threads times the number of particles of the largest slice. The beam file at the exit, where it is requested, is written through a Bmad bunch of 224 bytes per particle that contains the whole window.
 
-A Bmad bunch is indexed by a default integer. A beam file, and an element wake of Bmad, which requires the whole window as one bunch ([](fel-physics.md#sec-seamwake)), are therefore refused above $2^{31}-1$ particles, which is 344 pC. The tracking itself counts particles in 8-byte integers and has no such limit.
+A Bmad bunch is indexed by a default integer. A beam file, and an element wake of Bmad, which requires the whole window as one bunch ([](#sec-seamwake)), are therefore refused above $2^{31}-1$ particles, which is 344 pC. The tracking itself counts particles in 8-byte integers and has no such limit.
 
 The memory of the field, of the record of the run and of the [escaped field](glossary.md#gl-bank) is that of the other modes and does not depend on the number of particles.
 

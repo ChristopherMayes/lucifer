@@ -426,7 +426,7 @@ of that history. The entries before that date describe that branch.
   step's. A dump tracked on by another code had the gaps, and its bunching spectrum had lines at
   every multiple of the resonant wavenumber over `n_wavelength`, up to 1e4 times the shot noise.
   The macroparticles of a slice now stand on one even grid over the whole slice (`fel_slice_fill`,
-  [](fel-physics.md#sec-quiet)), with uniform weights, and a beamlet is the grid points whose phases
+  [](#sec-quiet)), with uniform weights, and a beamlet is the grid points whose phases
   within a period differ by a whole number of 2 pi over `beamlet_size`, so the quiet start holds at
   every harmonic. The keep mode stands a particle at its own phase in its slice. With no noise the
   bunching of a slice at those wavenumbers is 2e-16 where it was 0.83. A slice of one wavelength

@@ -14,7 +14,7 @@ This page lists what this code implements, and where each thing came from. Every
 **Bmad**, D. Sagan. The lattice, the tracking of every non-FEL element, the wake machinery, the beam I/O and the units and phase-space conventions are Bmad's. D. Sagan, *Bmad: A relativistic charged particle simulation library*, [Nucl. Instr. and Meth. A **558** (2006) 356](https://doi.org/10.1016/j.nima.2005.11.001).
 
 (ref-minerva)=
-**MINERVA**, H. P. Freund and P. J. M. van der Slot. H. P. Freund, P. J. M. van der Slot, D. L. A. G. Grimminck, I. D. Setija and P. Falgari, [New J. Phys. **19**, 023020 (2017)](https://doi.org/10.1088/1367-2630/aa59f1). The published existence proof that unaveraged FEL dynamics is practical for production. It is also the published source of the substeps-per-period envelope that this mode's own convergence measurement is read against. Lucifer differs by keeping the grid field and the Lorentz force where MINERVA evaluates modal fields. Only the published work informed this port. MINERVA's source was not read, and no run of it was compared against. See [](fel-physics.md#sec-unaveraged).
+**MINERVA**, H. P. Freund and P. J. M. van der Slot. H. P. Freund, P. J. M. van der Slot, D. L. A. G. Grimminck, I. D. Setija and P. Falgari, [New J. Phys. **19**, 023020 (2017)](https://doi.org/10.1088/1367-2630/aa59f1). The published existence proof that unaveraged FEL dynamics is practical for production. It is also the published source of the substeps-per-period envelope that this mode's own convergence measurement is read against. Lucifer differs by keeping the grid field and the Lorentz force where MINERVA evaluates modal fields. Only the published work informed this port. MINERVA's source was not read, and no run of it was compared against. See [](#sec-unaveraged).
 
 **SIMPLEX**, T. Tanaka. Its source is unlicensed and unread. The coherent source is implemented from the published paper alone.
 
@@ -23,13 +23,13 @@ This page lists what this code implements, and where each thing came from. Every
 ## Papers the code implements
 
 (ref-tanaka)=
-**Coherent source.** T. Tanaka, [Phys. Rev. Accel. Beams **27**, 030703 (2024)](https://doi.org/10.1103/PhysRevAccelBeams.27.030703), [arXiv:2310.20197](https://arxiv.org/abs/2310.20197). The [slice](glossary.md#gl-slice) bunch factor splits into coherent and spatially incoherent parts, and the incoherent part's radiation diffracts away. It is implemented from the paper in `fel_track_mod` (`run.source_model = 'coherent'`), which refuses the configurations the model does not cover. See [](fel-physics.md#sec-coherent-source).
+**Coherent source.** T. Tanaka, [Phys. Rev. Accel. Beams **27**, 030703 (2024)](https://doi.org/10.1103/PhysRevAccelBeams.27.030703), [arXiv:2310.20197](https://arxiv.org/abs/2310.20197). The [slice](glossary.md#gl-slice) bunch factor splits into coherent and spatially incoherent parts, and the incoherent part's radiation diffracts away. It is implemented from the paper in `fel_track_mod` (`run.source_model = 'coherent'`), which refuses the configurations the model does not cover. See [](#sec-coherent-source).
 
 (ref-bane-stupakov)=
-**Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, [SLAC-PUB-10707](https://www.slac.stanford.edu/pubs/slacpubs/10500/slac-pub-10707.pdf). The numerical impedance with AC (Drude) conductivity and Leontovich surface impedance, round and flat geometry. It is computed in `fel_collective_mod` (`fel_resistive_wall_wake`) on the integration grids Genesis4 uses. See [](fel-physics.md#sec-wakes).
+**Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, [SLAC-PUB-10707](https://www.slac.stanford.edu/pubs/slacpubs/10500/slac-pub-10707.pdf). The numerical impedance with AC (Drude) conductivity and Leontovich surface impedance, round and flat geometry. It is computed in `fel_collective_mod` (`fel_resistive_wall_wake`) on the integration grids Genesis4 uses. See [](#sec-wakes).
 
 (ref-fawley)=
-**Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in FEL simulation codes, [Phys. Rev. ST Accel. Beams **5**, 070701 (2002)](https://doi.org/10.1103/PhysRevSTAB.5.070701), in the one-substitution weighted generalization that makes it correct for per-particle weights. `fel_fawley_noise`, checked statistically against the closed form of its kick under uniform and nonuniform weights. See [](fel-physics.md#sec-noise) and [](shot-noise.md).
+**Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in FEL simulation codes, [Phys. Rev. ST Accel. Beams **5**, 070701 (2002)](https://doi.org/10.1103/PhysRevSTAB.5.070701), in the one-substitution weighted generalization that makes it correct for per-particle weights. `fel_fawley_noise`, checked statistically against the closed form of its kick under uniform and nonuniform weights. See [](#sec-noise) and [](shot-noise.md).
 
 (ref-mcneil)=
 **Shot noise through macroparticle charge.** B. W. J. McNeil, M. W. Poole and G. R. M. Robb, [Phys. Rev. ST Accel. Beams **6**, 070701 (2003)](https://doi.org/10.1103/PhysRevSTAB.6.070701), and their conference paper, [Proc. PAC 2003, p. 950](https://accelconf.web.cern.ch/p03/PAPERS/MPPB059.PDF). A [macroparticle](glossary.md#gl-macroparticle) stands for a Poisson number of electrons, so the statistics of the load are those of the electrons' arrival and not of an averaged bunching. `fel_weight_noise` was written from the conference paper and from the restatement below, with the bunch's charge held. See [](shot-noise.md#shot-weight).
@@ -43,13 +43,13 @@ This page lists what this code implements, and where each thing came from. Every
 (ref-watson)=
 **Weber's exponential integrals.** G. N. Watson, *A Treatise on the Theory of Bessel Functions*, 2nd edition (Cambridge University Press, 1944), sections 13.3 and 13.31. The two integrals of Bessel functions against a Gaussian that give the mean of the shot-noise kick in closed form. See [](shot-noise.md).
 
-**Incoherent (quantum) diffusion.** The standard undulator quantum-diffusion variance in the Saldin form, as fitted in Genesis4's [`Incoherent.cpp`](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/Core/Incoherent.cpp#L56), with one draw per [beamlet](glossary.md#gl-beamlet) so the [quiet start](glossary.md#gl-quiet-start)'s cancellation survives. Applied only when Bmad's own `radiation_fluctuations` switch is on. See [](fel-physics.md#sec-eom).
+**Incoherent (quantum) diffusion.** The standard undulator quantum-diffusion variance in the Saldin form, as fitted in Genesis4's [`Incoherent.cpp`](https://github.com/svenreiche/Genesis-1.3-Version4/blob/v4.6.16/src/Core/Incoherent.cpp#L56), with one draw per [beamlet](glossary.md#gl-beamlet) so the [quiet start](glossary.md#gl-quiet-start)'s cancellation survives. Applied only when Bmad's own `radiation_fluctuations` switch is on. See [](#sec-eom).
 
 (ref-sase-theory)=
 **SASE startup and gain estimates.** Ming Xie's fitting formula for the 3D power gain length, [Nucl. Instrum. Methods A **445**, 59 (2000)](<https://doi.org/10.1016/S0168-9002(00)00114-5>). E. L. Saldin, E. A. Schneidmiller and M. V. Yurkov's effective shot-noise power, saturation length and efficiency, and the incoherent undulator power of a beam in its central cone, [New J. Phys. **12**, 035010 (2010)](https://doi.org/10.1088/1367-2630/12/3/035010), [arXiv:0912.4161](https://arxiv.org/abs/0912.4161), eqs. 1, 5 and 18. They are computed from the input's parameters by the script of [](startup-noise.md) and placed beside the measurements there.
 
 (ref-wolski)=
-**Normal-mode emittances.** A. Wolski's approach to general coupled linear optics, [Phys. Rev. ST Accel. Beams **9**, 024001 (2006)](https://doi.org/10.1103/PhysRevSTAB.9.024001), supplies the eigen-emittances stored beside the projected Twiss planes. Bmad's `calc_bunch_params` evaluates them, and `tests/scripts/bunch_params_from_stats.py` re-derives them independently as a check. See [](fel-physics.md#sec-stats).
+**Normal-mode emittances.** A. Wolski's approach to general coupled linear optics, [Phys. Rev. ST Accel. Beams **9**, 024001 (2006)](https://doi.org/10.1103/PhysRevSTAB.9.024001), supplies the eigen-emittances stored beside the projected Twiss planes. Bmad's `calc_bunch_params` evaluates them, and `tests/scripts/bunch_params_from_stats.py` re-derives them independently as a check. See [](#sec-stats).
 
 ## Papers the SASE convergence page cites
 
@@ -97,7 +97,7 @@ These are the sources of [](undulator-spectrum.md).
 
 ## Standards
 
-**openPMD**, with the beamphysics extension for particle dumps and EXT_Wavefront for field dumps. The only dump format this code writes. Note: openPMD's `unitSI` is load-bearing, which is the opposite of the [statistics file](glossary.md#gl-statistics-file)'s convention, so the two never appear in one file. See [](fel-physics.md#sec-openpmd) and [](BMAD-STATS-SPEC.md).
+**openPMD**, with the beamphysics extension for particle dumps and EXT_Wavefront for field dumps. The only dump format this code writes. Note: openPMD's `unitSI` is load-bearing, which is the opposite of the [statistics file](glossary.md#gl-statistics-file)'s convention, so the two never appear in one file. See [](#sec-openpmd) and [](BMAD-STATS-SPEC.md).
 
 **bmad-stats**, defined by this project in [](BMAD-STATS-SPEC.md) with the FEL extension in [](BMAD-STATS-EXT-FEL.md). The statistics file is deliberately not FEL-specific.
 
