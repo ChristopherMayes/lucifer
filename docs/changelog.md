@@ -14,11 +14,14 @@ of that history. The entries before that date describe that branch.
   particle, and `param` belongs to the branch of the lattice, which all the threads of an
   interlude shared, so every one of those writes took the cache line from another core. On a
   node of 128 cores the interlude spent 22600 thread-seconds in `track1_bunch` over 18 elements
-  and 1.9e8 electrons, 6.5 µs for each particle, and the time for each particle grew by 144
-  cycles for every thread: at 64 and at 128 threads an interlude took the same 225 to 230 s.
-  Each thread now tracks through a copy of the element whose branch is its own
+  and 1.9e8 electrons, 6.5 µs for each particle, and took the same 225 to 230 s at 64 and at
+  128 threads. Each thread now tracks through a copy of the element whose branch is its own
   (`private_elements` of `src/fel_track_line_mod.f90`), with the lattice's parameters and the
-  lattice's elements. The tracking of every particle is unchanged, and no result changes.
+  lattice's elements. The same interlude then spends 1280 thread-seconds in `track1_bunch` and
+  takes 25.6 s at 128 threads, and 76 s where it took 458 s at 16 (`docs/performance.md`). The
+  example `examples/lcls_electrons` takes 1519 s on that node where it took 2623 s, its
+  interludes 133 s where they took 1235 s. The tracking of every particle is unchanged, and no
+  result changes.
 - 2026-11-21 Changed: the seam interlude keeps one Bmad bunch for each thread. An interlude takes
   each slice through Bmad's `track1_bunch`, and it allocated the slice's bunch, 224 bytes a
   particle, for every slice of every element and freed it again. On twelve threads that was 12
