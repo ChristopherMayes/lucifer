@@ -10,6 +10,26 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-22 Changed: a section of the physics manual is referred to by its label alone, and a check
+  holds every label reference of the manual. The 126 links of the form `fel-physics.md#label` in 13
+  pages are references by label, `#label`, which the site resolves wherever the section stands. The
+  816 cross-references of those pages have the same target and the same text in the built site as
+  before. The 138 citations of the form `fel-physics.md sec-x` in the comments of 17 files of `src/`
+  and `programs/` and of 19 scripts and lattices read `manual sec-x`, and
+  `docs/generated/api.md` quotes them so. The comment of one Genesis4 input file,
+  `tests/genesis4/time_dependent/Aramis-td-sase-filter.in`, keeps the old form: the key of the
+  cache of Genesis4 references covers the text of every input file, so an edit to that comment makes
+  the validation suite run the whole reference set again. The links of the READMEs keep the file name, since the
+  forge does not resolve a label. `tests/scripts/check_labels.py` reads the 1170 labels of the pages
+  in the contents and of the generated pages they include. It fails on a label defined twice, on a
+  reference `#label` that names no label, on a link `page.md#label` whose page does not define the
+  label, in a page or in a README, and on a section label cited in the source that the manual does not
+  define. It runs with the other page checks, in the examples job of the keystone and in the docs
+  job of CI. Before it, the link check read the file of a link and not its anchor, and the site
+  built with a warning on a reference that did not resolve. On `main` it found three references
+  that rested on a heading with no label: two to `Building` in `docs/user-guide.md` and one in
+  `docs/startup-noise.md`. Both headings have a label now. No section moved and no sentence of a
+  page changed.
 - 2026-11-22 Changed: every page of the manual declares its kind, and every figure is tied to the
   script that draws it. A page is a tutorial, a how-to guide, a reference, an explanation or a record,
   and an explanation or a guide may be followed by its record. The kind is the key `tags` in the

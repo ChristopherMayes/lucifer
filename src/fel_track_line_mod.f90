@@ -163,7 +163,7 @@ if (write_diag) then
         '               current               n_eff'
 endif
 
-! The unaveraged energy ledger (fel-physics.md sec-unaveraged). One row per record
+! The unaveraged energy ledger (manual sec-unaveraged). One row per record
 ! step inside FEL segments: total weighted beam energy, total window field energy,
 ! and the kick-side energy change of the step. The ledger check holds
 ! d(E_beam + U_field) to the floor in docs/validation.md.
@@ -272,7 +272,7 @@ do ie = run%i_start, run%i_end
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
-    ! The element's kicks (fel-physics.md sec-element). The averaged mode applies half
+    ! The element's kicks (manual sec-element). The averaged mode applies half
     ! of each at the entry face and half at the exit face, as offset_particle does for
     ! track_a_wiggler, on the host before the device takes the beam and after it gives
     ! it back. The unaveraged mode integrates them as a uniform field over the element,
@@ -297,7 +297,7 @@ do ie = run%i_start, run%i_end
       endif
     endif
 
-    ! The off-phase knob (fel-physics.md sec-phasing). A displaced element sees the extra
+    ! The off-phase knob (manual sec-phasing). A displaced element sees the extra
     ! upstream-break phase at entry. It gives the phase back at its last step, before the
     ! migration there, since the downstream break is shorter by the same delta. So the
     ! anchor stays nominal downstream. Sign: positive z_offset = a longer upstream break
@@ -393,7 +393,7 @@ do ie = run%i_start, run%i_end
 
       ! Element sr wake, once per passage as in Bmad. One kick at the step nearest
       ! mid-element, scaled to the full element length (scale_with_length uses ele's l),
-      ! across the whole window (fel-physics.md sec-seamwake). It is a direct kick with
+      ! across the whole window (manual sec-seamwake). It is a direct kick with
       ! no transport, since this walk owns transport inside wigglers.
 
       if (associated(wake_src) .and. istep == (und%nstep + 1)/2) then
@@ -492,7 +492,7 @@ do ie = run%i_start, run%i_end
 
         ! Wake-carrying interlude: all slices as one bunch in global window coordinates,
         ! through Bmad's track1_bunch. track1_bunch applies the sr wake at ds_wake with
-        ! the whole window visible head to tail (fel-physics.md sec-seamwake). Every
+        ! the whole window visible head to tail (manual sec-seamwake). Every
         ! other element takes the per-slice path below.
 
         call fel_concat_slices (fbeam, ele_p, run%wake_bunch, run%wake_beta0, err)
@@ -599,7 +599,7 @@ do ie = run%i_start, run%i_end
       endif
       call fel_toc (fel_t_drift$)
 
-      ! Absolute-time phasing (fel-physics.md sec-phasing), set by bmad_com's global switch
+      ! Absolute-time phasing (manual sec-phasing), set by bmad_com's global switch
       ! through Bmad's own resolver. Keep the real beam-vs-light carrier phase of this
       ! break: the drift slip plus any geometric (chicane) delay. The relative mode
       ! re-anchors instead. Whole turns wrap, so a phase needs no floor.
@@ -786,7 +786,7 @@ end subroutine private_elements
 ! Subroutine apply_bmad_wake_kick (wake_ele)
 !
 ! Routine to apply an element's Bmad sr wake once to the whole window, as a pure kick
-! (fel-physics.md sec-seamwake).
+! (manual sec-seamwake).
 ! The slices are concatenated into global window coordinates. Bmad's track1_sr_wake
 ! orders and kicks them (pseudomode accumulation head to tail, z_long binned FFT). The
 ! split back holds theta, Genesis's convention for wake energy loss and the same z
@@ -960,7 +960,7 @@ end subroutine whole_beam_phasor
 !
 ! Routine to write one diag row per slice, slices in time-window order.
 ! Beam slice number is pairs with field slice fel_field_index(slip, is, nslice), the
-! unrotation of fel-physics.md sec-slippage. The values are those the stats loop just
+! unrotation of manual sec-slippage. The values are those the stats loop just
 ! evaluated, slice-parallel, with fel_field_diag and fel_slice_diag.
 !
 ! Note: This routine only prints. take_stats_record must have run for this record first.
@@ -991,7 +991,7 @@ end subroutine write_diag_rows
 ! Routine to write one energy-ledger row (unaveraged mode). The columns:
 !   E_beam      Beam energy relative to the reference, sum(w*(gamma-gamma0))*me
 !                 [C*eV = J]. Relative, so the per-record change is not differenced off a
-!                 large baseline at its summation-rounding floor (fel-physics.md
+!                 large baseline at its summation-rounding floor (manual
 !                 sec-numerics).
 !   U_field     Total window field energy, sum(P_is)*slice_spacing/c [J].
 !   dE_kick     Kick-side change dE_step returned by fel_unavg_step.

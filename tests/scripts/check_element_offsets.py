@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 An FEL element's x_offset, y_offset, kx, hkick and vkick, against Bmad's own tracking
-(fel-physics.md sec-element, validation.md val-element-offsets). Bmad only.
+(manual sec-element, validation.md val-element-offsets). Bmad only.
 
 One short planar wiggler (offset_probe.bmad, 40 periods, Benchmark1-SASE energy and
 aw) carries, in turn, nothing, an offset, a kx, a kick, and all three. A beam of 256
@@ -179,7 +179,7 @@ def main():
     # The focusing attributes, offset and kx: the averaged mode against the map it was
     # flattened from, then both modes against Bmad's integrator. The unaveraged field's
     # sin^2 ramps hold the focusing integral at (1 - 5 l_ramp / 4 L) of the hard-edged
-    # one (fel-physics.md sec-unaveraged), and the comparison takes that factor; the raw
+    # one (manual sec-unaveraged), and the comparison takes that factor; the raw
     # ratio is printed beside it.
     f_ramp = 1 - 1.25 * L_RAMP / L_UND
     for case in ("offset", "kx"):

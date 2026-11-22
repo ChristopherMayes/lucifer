@@ -102,7 +102,7 @@ end type
 ! One undulator segment, with constant parameters along it. That is one contiguous run
 ! of aw > 0 steps in Genesis's unrolled lattice. The segment has nstep equal steps of
 ! dz = l/nstep, with nstep = round(l/delz_target). kx, ky carry Genesis's unroll
-! scaling by ku^2 (fel-physics.md sec-element).
+! scaling by ku^2 (manual sec-element).
 !-
 
 type fel_und_struct
@@ -124,7 +124,7 @@ type fel_und_struct
   real(rp) :: cos_t = 1, sin_t = 0   !   e = (cos_t, sin_t). Cached for the maps.
   complex(rp) :: pol(2) = [(1.0_rp, 0.0_rp), (0.0_rp, 0.0_rp)]
                               ! Polarization 2-vector on the (Ex, Ey) pair
-                              ! (fel-physics.md sec-field): planar (cos t, sin t),
+                              ! (manual sec-field): planar (cos t, sin t),
                               ! helical (1, -i)/sqrt(2). The averaged kick reads
                               ! E_eff = conj(pol).E and the deposit writes pol*src.
                               ! With one polarization this is the scalar path exactly.
@@ -144,7 +144,7 @@ end type
 !+
 ! Struct fel_coherent_struct
 !
-! One slice's coherent-source summary (fel-physics.md sec-coherent-source), computed
+! One slice's coherent-source summary (manual sec-coherent-source), computed
 ! each step from the just-advanced particles. It holds:
 !   The source phasor S. This is exactly the sum the deposit would scatter, and
 !     SUM crsource = S is the normalization.
@@ -194,7 +194,7 @@ type fel_kernel_struct
   real(rp) :: dgrid = 0, ks = 0, dz = 0
 end type
 
-! The source model (fel-physics.md sec-coherent-source): the standard per-particle
+! The source model (manual sec-coherent-source): the standard per-particle
 ! deposit, or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703
 ! (2024), arXiv:2310.20197). The coherent source drops the spatially incoherent
 ! artifact. The slice bunch factor keeps the physical shot noise. The transverse shape
@@ -413,7 +413,7 @@ end subroutine fel_mat6_as_wiggler
 ! Routine to map beam slice is (1-based) to its field slice in the rotated record:
 !   ifld = 1 + mod(is-1 + first, nslice)
 ! This is the Fortran form of Genesis's (is + field->first) % field.size()
-! (fel-physics.md sec-slippage). The same mapping restores time order when reading the
+! (manual sec-slippage). The same mapping restores time order when reading the
 ! record out. Field slice fel_field_index(slip, is, nslice) is the field at time window
 ! position is.
 !-
@@ -552,7 +552,7 @@ end subroutine fel_field_slice_plane
 !
 ! Routine to account the slippage of one step and rotate the field record when it
 ! crosses a slice boundary.
-! Transcribed from Control::applySlippage (fel-physics.md sec-slippage), reduced to one
+! Transcribed from Control::applySlippage (manual sec-slippage), reduced to one
 ! shared-memory node. The MPI ring exchange between adjacent ranks is the identity when
 ! the ring has one member. This node is both rank 0 and rank size-1, so the
 ! non-periodic zero fill always applies to the transmitted slice. What remains is
@@ -1188,7 +1188,7 @@ if (dev_twin) then
   if (err) return
 endif
 
-! The coherent source (fel-physics.md sec-coherent-source). First the per-slice
+! The coherent source (manual sec-coherent-source). First the per-slice
 ! phasor, moments and LG sums from the just-advanced particles, slice-parallel. Then
 ! the one global kappa (Tanaka Eq 26). Its integrals run over the whole window, so this
 ! is the cross-slice serial point. Then the guard. A slice whose transverse charge
@@ -1241,7 +1241,7 @@ if (und%source_model == fel_source_coherent$) then
   call fel_toc (fel_t_source$)
 endif
 
-! Field solve, harmonic loop outermost. Each pass is self-contained (fel-physics.md
+! Field solve, harmonic loop outermost. Each pass is self-contained (manual
 ! sec-field-set). The deposit reads the just-advanced particles, so every field sees
 ! the same beam state.
 
@@ -1516,7 +1516,7 @@ end subroutine fel_track_und_twin_close
 !   1. Transverse half step.
 !   2. Longitudinal advance, with the path-length term sampled at mid element and
 !      Genesis's drift reference xku = ks*0.5/gamma0/gamma0. The division order is
-!      kept for bit identity (fel-physics.md sec-interlude).
+!      kept for bit identity (manual sec-interlude).
 !   3. The wake's gamma decrement.
 !   4. Transverse half step.
 !   5. Field diffraction with zero source.
@@ -1577,7 +1577,7 @@ gamma0 = fel_gamma0(beam)                         ! Genesis's gammaref.
 p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
 xku = xks * 0.5_rp / gamma0 / gamma0
-qquad = qf * gamma0                               ! fel-physics.md sec-interlude.
+qquad = qf * gamma0                               ! manual sec-interlude.
 q_hat = qquad / p0_mc
 phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, p0_mc)
 nslice = size(wf%Ex, 3)
@@ -1766,7 +1766,7 @@ end subroutine fel_track_interlude_genesis
 !           x'  = a1 x + a2 px/gz_hat
 !           px' = a3 x gz_hat + a1 px
 !
-! The effective strengths (fel-physics.md sec-natfocus), with Genesis's reference gamma:
+! The effective strengths (manual sec-natfocus), with Genesis's reference gamma:
 !   qnat_{x,y} = k_{x,y}*aw^2/(gamma0*betpar0),  betpar0 = sqrt(1 - (1+aw^2)/gamma0^2)
 !
 ! Input:
@@ -1830,7 +1830,7 @@ end subroutine fel_transverse_track
 ! Subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
 !
 ! Routine to advance the transverse coordinates with the transverse maps of Bmad's own
-! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened (fel-physics.md
+! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened (manual
 ! sec-element). This is the default transport. Quadrupole bodies take the matrix of
 ! Bmad's quad_mat2_calc, transcribed into plane_mat2 below, with the per-particle
 ! 1/rel_p^2 chromatic scaling and the half-octupole edge kicks. A plane with no
@@ -2093,7 +2093,7 @@ end subroutine fel_apply_focus
 !      space-charge ez are held fixed through the stages. The harmonic phases h*theta
 !      change per stage (fel_ode_multi).
 ! ez per particle is fel_shortrange_ez(ip) - long_esc(is)/m_electron. That is Genesis's
-! ez = getEField(ip) + eloss (fel-physics.md sec-eom, sec-spacecharge).
+! ez = getEField(ip) + eloss (manual sec-eom, sec-spacecharge).
 !
 ! (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
 ! using phi0_new, the common phase at the end of this step. The module header says why
@@ -2250,7 +2250,7 @@ elseif (nf == 1) then
       cpart = cpart + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
 
       ! Two live polarizations: the element couples to E_eff = conj(pol).E
-      ! (fel-physics.md sec-field). With one polarization this branch does not run.
+      ! (manual sec-field). With one polarization this branch does not run.
 
       if (allocated(wf%Ey)) then
         cpart = conjg(und%pol(1)) * cpart
@@ -2334,7 +2334,7 @@ end subroutine fel_advance
 ! Subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, ez, gamma, theta)
 !
 ! Routine to take one RK4 step. The stage bookkeeping is BeamSolver::RungeKutta,
-! verbatim (fel-physics.md sec-eom). ez is held fixed through the stages, as Genesis
+! verbatim (manual sec-eom). ez is held fixed through the stages, as Genesis
 ! holds it.
 !
 ! Note: The in-place stage algebra is kept exactly for bit identity. Do not rewrite it.
@@ -2422,7 +2422,7 @@ end subroutine fel_runge_kutta
 ! Subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 !
 ! Routine to evaluate the longitudinal equations of motion, fundamental only.
-! Transcribed from BeamSolver::ODE (fel-physics.md sec-eom). ez is the per-particle
+! Transcribed from BeamSolver::ODE (manual sec-eom). ez is the per-particle
 ! space-charge term in m_e c^2 per meter (short-range harmonics plus the long-range
 ! loss). ez is zero when space charge is off, and subtracting zero is exact.
 !
@@ -2694,7 +2694,7 @@ end subroutine fel_grid_weights_pre
 !+
 ! Subroutine fel_coherent_prep (und, beam, sl, xks1, coh)
 !
-! Routine to compute one slice's coherent-source summary (fel-physics.md
+! Routine to compute one slice's coherent-source summary (manual
 ! sec-coherent-source). Implemented from Tanaka, PRAB 27, 030703 (2024). Computed:
 !   The source phasor S, as the deposit would form it (same theta, same part factors,
 !     post-advance particles). The normalization is SUM crsource = S.
@@ -2815,7 +2815,7 @@ end subroutine fel_coherent_prep
 ! field is propagated by exp(K2 delz) in transverse Fourier space and the source is
 ! added. Transcribed from FieldSolverFFT::advance and FFT.
 !
-! The source scale, weighted, in V/m (fel-physics.md sec-field derives it from
+! The source scale, weighted, in V/m (manual sec-field derives it from
 ! Genesis's internal-unit form):
 !
 !   scl_w = fc * Z0 * sqrt(2) * c * delz / (4 * dgrid^2 * slice_spacing)
@@ -2895,7 +2895,7 @@ scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
 
 if (scl_w /= 0 .and. und%source_model == fel_source_coherent$) then
 
-  ! The coherent-Gaussian source (fel-physics.md sec-coherent-source). The slice's
+  ! The coherent-Gaussian source (manual sec-coherent-source). The slice's
   ! whole phasor S is deposited as one analytic Gaussian at the charge centroid, with
   ! covariance kappa^2 * (second-moment matrix). S carries the physical shot noise
   ! through B(s), which the Fawley loading sets to <|B|^2> N_lambda = 1. The discrete
@@ -2932,7 +2932,7 @@ elseif (scl_w /= 0) then
   enddo
 endif
 
-! The source filter (fel-physics.md sec-source-filter). The source gets a forward
+! The source filter (manual sec-source-filter). The source gets a forward
 ! transform of its own and the sigmoid multiplies it there. It is added to the field in
 ! Fourier space before the one inverse transform. FieldSolverFFT::FFT carries both
 ! branches for the same reason. Without the filter the transform pair is linear, and
@@ -2976,7 +2976,7 @@ contains
 !+
 ! Subroutine coherent_gaussian_source ()
 !
-! Routine to deposit the coherent-Gaussian source (fel-physics.md sec-coherent-source).
+! Routine to deposit the coherent-Gaussian source (manual sec-coherent-source).
 ! The slice's bunching phasor is deposited as a Gaussian of the charge second moments
 ! scaled by kappa. It is normalized so the deposited sum equals the particle deposit's.
 !-
@@ -3318,7 +3318,7 @@ end subroutine fel_field_kernel_init
 ! Subroutine fel_filter_angles (beam, und, lambda, th_mode, th_rho)
 !
 ! Routine to compute the two angles a source filter's edge can be set from
-! (fel-physics.md sec-source-filter). Both come from the loaded beam and the undulator
+! (manual sec-source-filter). Both come from the loaded beam and the undulator
 ! it enters, so an input file states neither.
 !
 ! th_mode is four diffraction angles of the fundamental mode, 4 lambda / (2 pi sigma),
@@ -3404,7 +3404,7 @@ end subroutine fel_filter_angles
 ! Function fel_filter_margin (tolerance, width) result (margin)
 !
 ! Routine to return the factor that places a source filter's edge outside the angle it
-! protects (fel-physics.md sec-source-filter). The edge is the protected angle over this
+! protects (manual sec-source-filter). The edge is the protected angle over this
 ! margin, so a margin of one leaves the edge on that angle.
 !
 ! The sigmoid of Eq. eq-sigmoid passes amplitude t at the protected angle when the edge
@@ -3488,7 +3488,7 @@ end function fel_kernel_index
 !
 ! Routine to diffract field slice ifld in free space over the step dz: FFT, multiply by
 ! the cached exp(K2 dz), inverse FFT, normalize. There is no source, coupling factor or
-! undulator here. This is the field half that the unaveraged mode (fel-physics.md
+! undulator here. This is the field half that the unaveraged mode (manual
 ! sec-unaveraged) shares with the averaged solver. The caller deposits its own source.
 !
 ! Note: fel_field_kernel_init must have built the kernel serially for this grid,
@@ -3636,7 +3636,7 @@ end subroutine fel_field_diffract_by
 ! The accumulation order is y outer, x inner.
 !
 ! ifld is the raw record index. For the field at time window position is, pass
-! fel_field_index(slip, is, nslice), the unrotation of fel-physics.md sec-slippage.
+! fel_field_index(slip, is, nslice), the unrotation of manual sec-slippage.
 !
 ! Input:
 !   wf    -- wavefront_struct: The field.

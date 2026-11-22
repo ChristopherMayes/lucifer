@@ -25,7 +25,7 @@ contains
 ! Subroutine fel_init_beam (run, err_flag)
 !
 ! Routine to build the beam. It reads an openPMD particle dump of slices (beam.file), or
-! loads a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
+! loads a beam_init bunch by load_mode (manual sec-loading). In the sample mode a
 ! described bunch takes the analytic generator. A file, beam.position_file, takes
 ! the resampler of fel_import_mod. In the keep mode every particle of the bunch stays as
 ! a beamlet of copies. In the electrons mode every electron of a described bunch is one
@@ -260,7 +260,7 @@ contains
 ! Subroutine generate_initial_state ()
 !
 ! Routine to generate the beam from the beam_init description. This is the sample mode
-! with no file (fel-physics.md sec-loading). The transverse planes are matched Gaussians
+! with no file (manual sec-loading). The transverse planes are matched Gaussians
 ! on the lattice Twiss, and the per-slice current is derived. With the quiet start the
 ! particles are beamlets on a uniform ponderomotive phase grid. Without it they are
 ! independent particles. Shot noise is imposed where asked.
@@ -335,7 +335,7 @@ if (seed_power > 0 .and. seed_waist_size <= 0) then
 endif
 
 ! The window and the per-slice current derive from the beam_init description
-! (fel-physics.md sec-loading). One bulk bunch is evaluated analytically at the slice
+! (manual sec-loading). One bulk bunch is evaluated analytically at the slice
 ! centers. The default window holds every particle of the described bunch, and the
 ! line's slippage ahead of its head. So radiation that slips forward has somewhere to go
 ! before it leaves.
@@ -384,7 +384,7 @@ else
 endif
 
 ! A derived window holds the line's slippage ahead of the window head, which is its
-! high-index end (fel-physics.md sec-window), from the sum the walk's schedule takes
+! high-index end (manual sec-window), from the sum the walk's schedule takes
 ! (fel_setup_slippage), with the reference gamma the schedule uses. The record rotates
 ! one slice per n_wavelength wavelengths once 0.8 of a slice has accumulated, so
 ! nint(S / n_wavelength) slices never fall short of the rotations S wavelengths produce.
@@ -598,7 +598,7 @@ do is_g = 1, nslice_gen
     enddo
   endif
 
-  ! Noise bookkeeping per slice (fel-physics.md sec-noise): real electrons
+  ! Noise bookkeeping per slice (manual sec-noise): real electrons
   ! N_lambda = charge/e, and effective macroparticle number N_eff = (sum w)^2/sum w^2.
 
   wsum = sum(sl%weight(1:n_s))
@@ -682,7 +682,7 @@ end subroutine generate_initial_state
 !+
 ! Subroutine load_electrons (cur, n_slice_e, p0_mc)
 !
-! Routine for load_mode = "electrons" from a described bunch (fel-physics.md sec-loading).
+! Routine for load_mode = "electrons" from a described bunch (manual sec-loading).
 ! Every electron of the bunch is one particle. The charge of the window is counted as the
 ! nearest whole number of electrons, as the weight load counts it (fel_weight_start), and
 ! each particle has the window's charge over that number, which is e to one part in twice
@@ -906,7 +906,7 @@ end subroutine check_beam_init_contract
 !+
 ! Subroutine import_initial_state ()
 !
-! Routine for the sample mode from a bunch (fel-physics.md sec-import). The bunch_struct
+! Routine for the sample mode from a bunch (manual sec-import). The bunch_struct
 ! is read from the openPMD-beamphysics file beam.position_file. On the check route
 ! beam.resample.use_beam_init it is generated from beam_init instead. It is resampled into FEL
 ! slices by the transcribed Genesis importdistribution method. fel_import_mod documents

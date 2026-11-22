@@ -27,7 +27,7 @@ The experiments, each a set of runs and one figure:
                 shot-noise power and saturation estimates, from the input file's parameters.
   f. genesis    Genesis4 on the validation suite's SASE tier input file at three grids
                 with both of its field solvers, and Lucifer started from each of its dumps.
-  g. filter     The source filter (fel-physics.md, sec-source-filter) at the machine's
+  g. filter     The source filter (manual sec-source-filter) at the machine's
                 filter grid, 256 on the first machine, and two loads, with its sigmoid's
                 edge at the central cone and at the 3 urad cut, against the same runs with
                 the filter off. What the filter does to the power inside the mode is what
@@ -88,7 +88,7 @@ I_ALFVEN = 17045.0
 # scales, a hundred times the wavelength on a beam five times the size, whose z_R/L_g is
 # 2.6 times smaller. The filter's default is built from two angles whose ratio goes as
 # 1/sqrt(z_R/L_g), so a second machine is what says whether the default is general or a
-# property of the first (fel-physics.md sec-source-filter). The third and fourth are real
+# property of the first (manual sec-source-filter). The third and fourth are real
 # machines at their published parameters, FLASH1 at DESY at 13.7 nm (examples/flash1) and
 # LCLS at SLAC at 1.5 Angstrom (examples/lcls). Both are planar where the other two are
 # helical, so their coupling factor is not one.
@@ -275,7 +275,7 @@ fft_fieldsolver = {fft}
 """
 
 # The comparison against Genesis4 runs with the source filter off, since Genesis4's run
-# carries none and the filter is this program's default (fel-physics.md,
+# carries none and the filter is this program's default (manual
 # sec-source-filter). An input file that left it on would compare a filtered run with an
 # unfiltered one and read a difference of order one.
 LUCIFER_FROM_GENESIS = """[run]
@@ -309,7 +309,7 @@ def filter_xcut(ngrid, theta):
     """The source filter's xcut that puts its sigmoid's edge at the angle theta.
 
     Genesis normalizes the shifted grid index by ngrid, so xcut = 1 is the angle
-    lambda/dx, twice the Nyquist angle (fel-physics.md sec-source-filter)."""
+    lambda/dx, twice the Nyquist angle (manual sec-source-filter)."""
     return theta * cell_size(ngrid) / LAMBDA0
 
 
@@ -571,7 +571,7 @@ def exp_floor(rn, args, lat, results):
 
 def exp_filter(rn, args, lat, results):
     """
-    The source filter against the split this page defines (fel-physics.md,
+    The source filter against the split this page defines (manual
     sec-source-filter). The filter suppresses the source at wide transverse angles. This
     experiment measures what that does to the power inside the mode, the part that
     amplifies. The grid is the machine's filter_grid, 256 on the first machine, the cell
@@ -694,7 +694,7 @@ def accepted_power(wd, root, record):
 def exp_tolerance(rn, args, lat, results):
     """
     Where the source filter's edge sits relative to the angle it protects
-    (fel-physics.md sec-source-filter).
+    (manual sec-source-filter).
 
     An edge at the protected angle itself puts the sigmoid's half-amplitude point on it
     and takes three quarters of the source intensity there.

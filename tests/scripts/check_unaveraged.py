@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks of the unaveraged mode (fel-physics.md, sec-unaveraged, and validation.md,
+Checks of the unaveraged mode (manual sec-unaveraged, and validation.md,
 val-the-unaveraged-mode-fc). The checks are self-referenced where the point is
 self-consistency (the energy ledger, ballistic conservation) and closed-form where the
 point is measuring the inputs of the averaged mode (the coupling factor fc).

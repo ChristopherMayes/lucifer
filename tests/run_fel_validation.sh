@@ -938,7 +938,7 @@ sec_device () {
     || { echo "FAIL: device backend checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# The unaveraged-mode checks (fel-physics.md sec-unaveraged) hold the energy
+# The unaveraged-mode checks (manual sec-unaveraged) hold the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
 # comparison against the averaged mode. The fc/faw leak grep is part of the check: the

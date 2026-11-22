@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Two-polarization checks (fel-physics.md, sec-field, the vector convention). The
+Two-polarization checks (manual sec-field, the vector convention). The
 radiation carries (Ex, Ey) when any FEL element is tilted, and an x-planar set followed
 by a y-planar set must behave correctly. Symmetries and physics hold the checks, and no
 reference file is involved:

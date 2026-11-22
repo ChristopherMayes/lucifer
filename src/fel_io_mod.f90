@@ -939,7 +939,7 @@ call fel_box_rule (fel_rule_mid$, 'lattice', 'window', .false., .true.)
 call fel_box_columns (c_lat, c_win)
 
 ! An FEL segment with an offset, a roll-off wavenumber or a kick says so, since each is
-! read from the lattice and changes the tracking (fel-physics.md sec-element).
+! read from the lattice and changes the tracking (manual sec-element).
 
 any_segment = .false.
 do ie = 1, branch%n_ele_track

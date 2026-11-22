@@ -1,7 +1,7 @@
 !+
 ! Module fel_unaveraged_mod
 !
-! The unaveraged mode (fel-physics.md sec-unaveraged). Particles are integrated through
+! The unaveraged mode (manual sec-unaveraged). Particles are integrated through
 ! the undulator's real field, with the full Newton-Lorentz quiver and no period
 ! averaging, and the radiation field acts as a co-evolving kick. There is no resonance
 ! approximation. The mode reaches physics the averaged map cannot: the full quiver
@@ -13,7 +13,7 @@
 ! instead of assumed inputs. MINERVA (Freund and van der Slot) is the published existence
 ! proof for this physics, and only its published work was used here. This mode keeps the
 ! grid field and the Lorentz force where MINERVA evaluates modal fields. The cost per
-! step is in fel-physics.md (sec-unaveraged) and examples/saturation_demo.
+! step is in the manual (sec-unaveraged) and examples/saturation_demo.
 !
 ! DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 ! path. They are outputs of this mode, and their appearance here would make the check
@@ -200,7 +200,7 @@ end subroutine fel_unavg_setup
 ! aw is rms. The peak is rms*sqrt(2) planar and rms helical. The curl retains the g' ramp
 ! terms. The transverse profiles are the near-axis models whose ponderomotive-average
 ! focusing reproduces the averaged mode's natural-focusing split exactly: planar kx = 0,
-! ky = ku^2, and helical kx = ky = ku^2/2 (fel-physics.md sec-unaveraged).
+! ky = ku^2, and helical kx = ky = ku^2/2 (manual sec-unaveraged).
 !
 ! The four quantities that depend on s and not on the particle arrive as arguments: the
 ! envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK stage
@@ -481,7 +481,7 @@ endif
 phi0_rate_avg = fel_phi0_rate(ks, und%ku, p0_mc)
 
 ! The unaveraged source scale: the averaged scl_w with the coupling factor removed
-! and the 1/2 period-average projection undone (fel-physics.md sec-unaveraged).
+! and the 1/2 period-average projection undone (manual sec-unaveraged).
 
 scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_spacing)
 
@@ -706,7 +706,7 @@ do is = 1, nslice
     ! own 4|src|^2, so the ledger closes to rounding. Diffracting first and adding after,
     ! E' = D E + 2 src, charges the beam against E while the record gains the cross term
     ! against D E. The difference, 4 Re<(D - I) E, dE>, is first order in the substep's
-    ! diffraction phase (fel-physics.md sec-unaveraged gives its size). The stored record
+    ! diffraction phase (manual sec-unaveraged gives its size). The stored record
     ! is then the substep's midpoint field, the same Strang split read at the other half
     ! step. The device's solve does the same.
 

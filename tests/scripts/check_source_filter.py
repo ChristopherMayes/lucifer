@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Check the source-term filter against Genesis4's own (fel-physics.md, sec-source-filter).
+Check the source-term filter against Genesis4's own (manual sec-source-filter).
 
 The filter is a transcription, so the check is the one every transcribed path gets. Both
 codes run the same configuration from the same particles and the same field, and what is

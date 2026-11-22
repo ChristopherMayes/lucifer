@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks of the harmonic field set and the openPMD wavefront (fel-physics.md,
+Checks of the harmonic field set and the openPMD wavefront (manual
 sec-field-set):
 
   1. openPMD round trip. A run's field dump must carry every required attribute of

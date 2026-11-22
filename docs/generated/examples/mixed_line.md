@@ -143,7 +143,7 @@ seed_waist_size = 30e-6
 ```fortran
 ! The Benchmark1-SASE line with one segment tracked unaveraged and the other eleven averaged.
 ! The tracking method is an element attribute, so a mixed line is a line of elements
-! that differ, exactly as the tapered line is (fel-physics.md sec-element).
+! that differ, exactly as the tapered line is (manual sec-element).
 
 call, file = ../aramis.bmad
 

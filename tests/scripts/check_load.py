@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Check the load path (fel-physics.md sec-loading).
+Check the load path (manual sec-loading).
 
 Four things, each on the check built for it:
 

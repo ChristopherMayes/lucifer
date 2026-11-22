@@ -15,7 +15,7 @@
 ! a step may slip a fraction of a slice and the field is never a fraction of a slice
 ! behind the beam. The push, the deposit and the averaged equations are untouched.
 !
-! The window coordinate. Window slice i (fel-physics.md sec-window) sits at
+! The window coordinate. Window slice i (manual sec-window) sits at
 ! tau = (i - 1) * slice_spacing, so tau grows toward the head, the end light slips
 ! toward. The envelope rides the carrier exp(i (k0 z - omega0 t)), the convention the
 ! kernel's sign fixes, so a mode exp(i kappa tau) of the envelope has the carrier's
@@ -1282,7 +1282,7 @@ end subroutine bank_append
 ! This is fel_field_step's deposit, the per-particle scatter with the source filter when
 ! it is on, kept apart from that routine so the slice propagator stays as it was. The
 ! source scale, the phase, the bilinear weights and the filter's transform pair are
-! fel_field_step's (fel-physics.md sec-field, sec-source-filter), and so is the add of
+! fel_field_step's (manual sec-field, sec-source-filter), and so is the add of
 ! 2*crsource, through the element's polarization pair when both planes are live. The
 ! coherent source model is not carried here, and setup refuses it under the spectral
 ! propagator.
