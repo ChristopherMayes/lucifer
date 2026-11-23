@@ -16,6 +16,7 @@ project:
         - file: notebooks/input.ipynb
         - file: notebooks/output.ipynb
     - file: fel-physics.md
+    - file: particle-load.md
     - file: shot-noise.md
     - file: electrons-mode.md
     - file: undulator-spectrum.md
