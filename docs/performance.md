@@ -247,7 +247,20 @@ An interlude takes each slice through Bmad's `track1_bunch`, one slice in each t
 | 64 | 231 s | 27.0 s | 12720 s | 978 s | 411 s | 177 s |
 | 128 | 225 s | 25.6 s | 22640 s | 1277 s | 746 s | 422 s |
 
-The last two columns are with a branch for each thread. With one branch for all the threads the thread time in `track1_bunch` rose with the number of threads, and from 64 to 128 threads the interlude did not get shorter. Bmad's `check_aperture_limit` sets `param%unstable_factor` to zero at each call, twice for every particle, and `param` was the one `lat_param_struct` of the lattice's branch, so every thread wrote one memory location for every particle. At 128 threads the processors retired 0.19 instructions per cycle, with no time in the kernel and six cache misses per particle, and 89 percent of the cycles were on three stores to the stack that follow those two calls. Each thread now tracks through a copy of the element whose branch is its own, and the interlude takes 25.6 s where it took 225 s.
+The last two columns are with a branch for each thread. With one branch for all the threads the thread time in `track1_bunch` rose with the number of threads, and from 64 to 128 threads the interlude did not get shorter. Bmad's `check_aperture_limit` sets `param%unstable_factor` to zero at each call, twice for every particle, and `param` was the one `lat_param_struct` of the lattice's branch, so every thread wrote one memory location for every particle. At 128 threads the processors retired 0.19 instructions per cycle, with no time in the kernel and six cache misses per particle, and 89 percent of the cycles were on three stores to the stack that follow those two calls. For that measurement each thread tracked through a copy of the element whose branch was its own, and the interlude took 25.6 s where it had taken 225 s.
+
+From Bmad 20261122-0 the same is done inside Bmad. `track1_bunch_hom` tracks with a `lat_param_struct` of the call's own, and `check_aperture_limit` writes the factor only where its value changes. Lucifer builds against that release at the earliest and hands `track1_bunch` the lattice's own element from every thread, with no copy of its own. The interlude has not been measured on the node since that change, so the two columns of a branch for each thread are the measurement of Lucifer's copies and not of Bmad's.
+
+*Measured 2026-11-23: Apple M3 Max, 12 cores, production build against Bmad 20261122-0, GNU Fortran 15.3.0. `examples/lcls_electrons` at a hundredth of its charge, `beam.bunch_charge=3.082369e-13`, which is $1.9\times10^{6}$ electrons. The three parts are summed over the threads, and where two values stand they are two runs.*
+
+| threads | the element handed to `track1_bunch` | walk | `track1_bunch` | to bunches | to slices |
+|---|---|---|---|---|---|
+| 12 | a copy for each thread | 75.6 s, 69.1 s | 23.3 s, 20.3 s | 8.2 s, 7.9 s | 1.4 s, 1.2 s |
+| 12 | the lattice's own | 67.2 s, 66.2 s | 21.2 s, 21.4 s | 7.3 s, 8.4 s | 1.3 s, 1.3 s |
+| 1 | a copy for each thread | 726 s | 19.6 s | 7.7 s | 1.7 s |
+| 1 | the lattice's own | 685 s | 18.6 s | 6.3 s | 1.7 s |
+
+Every array of the statistics file is the same in the six runs. On this computer the thread time in `track1_bunch` at 12 threads is that of one thread with either element, so twelve cores do not show what 128 showed, and the table says only that removing the copies changed neither the result nor the time here.
 
 What remains at 128 threads is divided almost evenly between `track1_bunch` and the two conversions, whose thread time rises with the number of threads as that of `track1_bunch` no longer does. A particle of a Bmad bunch is 224 bytes, and the conversions write and read every one of them for every element.
 
