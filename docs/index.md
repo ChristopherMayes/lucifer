@@ -50,7 +50,8 @@ The averaged method's transverse maps have a third option behind them, the trans
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what [level](glossary.md#gl-level) | [](validation.md) |
 | know where a run spends its time | [](performance.md) |
-| know how a bunch becomes the particles of a run: the three load modes, the [quiet start](glossary.md#gl-quiet-start), the imposed noise, the [resampler](glossary.md#gl-resampler) and migration | [](particle-load.md) |
+| know how a bunch becomes the particles of a run: the three load modes, the [quiet start](glossary.md#gl-quiet-start), the imposed noise and the [resampler](glossary.md#gl-resampler) | [](particle-load.md) |
+| know what moving a particle between slices does to each load, and what was measured | [](migration.md) |
 | know what noise the load imposes when a [beamlet](glossary.md#gl-beamlet) holds few electrons | [](shot-noise.md) |
 | track every electron of a bunch as a particle of its own | [](electrons-mode.md) |
 | see the radiation of one undulator beside the formulas of undulator radiation | [](undulator-spectrum.md) |

@@ -58,7 +58,7 @@ The beam at the exit is not written: `run.write_final_beam` is off in this mode 
 
 ## Migration
 
-`run.migrate = true` moves an electron to the neighboring slice when its phase leaves its own. With one electron per particle a move separates nothing, so the radiation that migration adds to a beamlet load ([slice migration](../../particle-load.md#sec-migration)) does not arise. The pass runs in threads.
+`run.migrate = true` moves an electron to the neighboring slice when its phase leaves its own. With one electron per particle a move separates nothing, so the radiation that migration adds to a beamlet load ([slice migration](../../migration.md#sec-migration)) does not arise. The pass runs in threads.
 
 ## The input files
 
