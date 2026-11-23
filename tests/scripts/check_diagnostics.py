@@ -343,13 +343,12 @@ def interludes(exe, wd):
     pair, as the hand-split lattice does. On FEL beam sizes the fringe difference is below
     notice, and the comparison checks that.
 
-    The whole quadrupole is not the reference because Bmad's quadrupole map need not
-    compose. Through Bmad 20261120-0 it was the paraxial map, which composes exactly, and
-    the cut run reproduced the whole element to rounding. From 20261122-0 the map is one
-    step of a fourth-order split of the paraxial map and the kinematic remainder. The whole
-    quadrupole then carries the splitting error of one step and each piece a smaller one,
-    and on this line the power of the two runs differs by up to 7e-9 along the second
-    wiggler (docs/validation.md, the interlude's own steps).
+    The whole quadrupole is not the reference because Bmad's quadrupole map does not
+    compose. It is one step of a fourth-order split of the paraxial map and the kinematic
+    remainder, so the whole quadrupole carries the splitting error of one step and each
+    piece a smaller one. On this line the power of the two runs differs by up to 7e-9
+    along the second wiggler (docs/validation.md, the interlude's own steps). Before Bmad
+    20261122-0 the map was the paraxial one, which composes exactly.
     """
     print("--- the interlude's own steps:")
     (wd / "intlat.bmad").write_text(INT_LAT)

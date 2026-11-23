@@ -15,4 +15,4 @@ value	name	where
 1.0	BMAD-STATS-SPEC version	doc/BMAD-STATS-SPEC.md
 3.0	lucifer-frames format version	fel_beam_mod.f90
 4.6.15	Genesis4 reference release	tests
-20261018	Bmad release Lucifer builds against	lucifer/BMAD_RELEASE
+20261122	Bmad release Lucifer builds against	lucifer/BMAD_RELEASE
