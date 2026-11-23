@@ -10,6 +10,21 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-23 Fixed: the checks of `run.interlude_ds_step` hold under Bmad 20261122-0. Two rows of
+  `tests/scripts/check_diagnostics.py` compared a run whose interlude elements are cut into pieces
+  with the run that tracks them whole, at 1e-9 in the exit power, and failed at 1.014e-9 on a build
+  against that release, on Linux and on macOS. Its `bmad_standard` quadrupole map is one step of a
+  fourth-order split of the paraxial map and the kinematic remainder, where the earlier map was the
+  paraxial one, which composes exactly. A quadrupole whole and the same quadrupole in pieces
+  therefore differ by the splitting error of one step. The check now makes two comparisons that hold
+  under either map, each at 1e-9: the run with the pipe alone cut against the whole-element run, and
+  the run with every interlude element cut against a lattice split by hand into the same pieces. A
+  row holds that a step of 0.15 m cuts the pipe and not the quadrupole. The whole quadrupole against
+  its pieces has no tolerance: the coordinates converge as the fourth power of the length of a
+  piece, and the exit power differs by 1.0e-9 on the check's line and by up to 6.9e-9 along the
+  second wiggler, without order in the quadrupole strength. `docs/validation.md` records the
+  measurements, and `docs/input-reference.md` states that a quadrupole in pieces differs from the
+  quadrupole whole.
 - 2026-11-22 Changed: a section of the physics manual is referred to by its label alone, and a check
   holds every label reference of the manual. The 126 links of the form `fel-physics.md#label` in 13
   pages are references by label, `#label`, which the site resolves wherever the section stands. The
