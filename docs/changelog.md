@@ -32,13 +32,16 @@ of that history. The entries before that date describe that branch.
   results that they are not explained or not known: the lower fraction of beamlets of 8 in the
   example `sase`, the pulse energy of FLASH1 at the exit, which is lower with migration on, and the
   position of the upper end of each range. The page gives the radiation added to a load of beamlets
-  as the first reason for the default, and it states in words what follows for a run.
+  as the first reason for the default, and it states in words what follows for a run. That statement
+  says that the scan ends at 8192 macroparticles per slice with the whole range above one percent of
+  the SASE power, and that it does not hold for the keep mode under the quiet start.
   `docs/user-guide.md` holds the steps of a run with migration under the label `ug-migration`.
-  `docs/particle-load.md` states that the weight method in the keep mode gives the shot-noise level
-  exactly where every particle of the bunch represents at least one electron. `docs/glossary.md`
-  defines the two meanings of seed, the seed field and the random seed, and its entry for the load
-  names the three modes. The README of `examples/lcls_electrons` links to the new page, and
-  `docs/index.md` and `docs/myst.yml` list it.
+  `docs/index.md` lists migration of a beamlet as a whole among the features the program does not
+  have. `docs/particle-load.md` states that the weight method in the keep mode gives the shot-noise
+  level exactly where every particle of the bunch represents at least one electron.
+  `docs/glossary.md` defines the two meanings of seed, the seed field and the random seed, and its
+  entry for the load names the three modes. The README of `examples/lcls_electrons` links to the new
+  page, and `docs/index.md` and `docs/myst.yml` list it.
 - 2026-11-23 Fixed: the checks of `run.interlude_ds_step` hold under Bmad 20261122-0. Two rows of
   `tests/scripts/check_diagnostics.py` compared a run whose interlude elements are cut into pieces
   with the run that tracks them whole, at 1e-9 in the exit power, and failed at 1.014e-9 on a build
