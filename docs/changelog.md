@@ -17,9 +17,12 @@ of that history. The entries before that date describe that branch.
   its arrays `ele_t`, `lord_t` and `branch_t` did from Lucifer's side, so `track1_bunch` is handed
   the lattice's element again. On twelve cores, with `examples/lcls_electrons` at a hundredth of its
   charge, the thread time in `track1_bunch` is 21.2 s and 21.4 s where it was 23.3 s and 20.3 s, and
-  every array of the statistics file is unchanged. The interlude on the 128 cores of a node has not
-  been measured with Bmad's change in place of the copies. The release's `bmad_standard` quadrupole
-  map includes the exact kinematic terms, as one step of a split, and with it ten rows of
+  every array of the statistics file is unchanged. On the 128 cores of a Perlmutter node, on the
+  line of one LCLS undulator and 18 drifts and quadrupoles with 1.9e8 electrons, the thread time in
+  `track1_bunch` with Bmad's change is 866, 980, 1061 and 1340 s at 16, 32, 64 and 128 threads,
+  where it was 792, 901, 978 and 1277 s with the copies and 22640 s at 128 threads with neither. The
+  interlude takes 26.1 s at 128 threads where it took 25.6 s. The release's `bmad_standard`
+  quadrupole map includes the exact kinematic terms, as one step of a split, and with it ten rows of
   `docs/generated/validation-measured.md` move, each a residual at rounding or a difference far
   inside its tolerance, and no row against Genesis4 moves in its printed digits. Of the 1340 values
   of `examples/measured.tsv`, 86 move in seven examples: the 64 of `space_charge` that are at

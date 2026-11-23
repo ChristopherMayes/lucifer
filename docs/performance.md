@@ -249,7 +249,18 @@ An interlude takes each slice through Bmad's `track1_bunch`, one slice in each t
 
 The last two columns are with a branch for each thread. With one branch for all the threads the thread time in `track1_bunch` rose with the number of threads, and from 64 to 128 threads the interlude did not get shorter. Bmad's `check_aperture_limit` sets `param%unstable_factor` to zero at each call, twice for every particle, and `param` was the one `lat_param_struct` of the lattice's branch, so every thread wrote one memory location for every particle. At 128 threads the processors retired 0.19 instructions per cycle, with no time in the kernel and six cache misses per particle, and 89 percent of the cycles were on three stores to the stack that follow those two calls. For that measurement each thread tracked through a copy of the element whose branch was its own, and the interlude took 25.6 s where it had taken 225 s.
 
-From Bmad 20261122-0 the same is done inside Bmad. `track1_bunch_hom` tracks with a `lat_param_struct` of the call's own, and `check_aperture_limit` writes the factor only where its value changes. Lucifer builds against that release at the earliest and hands `track1_bunch` the lattice's own element from every thread, with no copy of its own. The interlude has not been measured on the node since that change, so the two columns of a branch for each thread are the measurement of Lucifer's copies and not of Bmad's.
+From Bmad 20261122-0 the same is done inside Bmad. `track1_bunch_hom` tracks with a `lat_param_struct` of the call's own, and `check_aperture_limit` writes the factor only where its value changes. Lucifer builds against that release at the earliest and hands `track1_bunch` the lattice's own element from every thread, with no copy of its own. The two columns of a branch for each thread above are the measurement of Lucifer's copies. The interlude was measured again on the node with Bmad's change in their place.
+
+*Measured 2026-11-23 on the Perlmutter CPU node above: Lucifer at commit af47c37, which hands `track1_bunch` the lattice's own element, built in the same conda environment with its `bmad` package at 20261122.0. The line, the electrons and the binding of the threads are those of the table above.*
+
+| threads | wall time | `track1_bunch` | to bunches | to slices |
+|---|---|---|---|---|
+| 16 | 81.7 s | 866 s | 360 s | 45 s |
+| 32 | 49.5 s | 980 s | 399 s | 78 s |
+| 64 | 28.4 s | 1061 s | 410 s | 182 s |
+| 128 | 26.1 s | 1340 s | 743 s | 419 s |
+
+The thread time in `track1_bunch` no longer rises as it did with one branch, where it was 22640 s at 128 threads. It is 5 to 9 percent above the time with Lucifer's copies at each number of threads, and the wall time of the interlude 2 to 7 percent above. The two conversions are the same to 3 percent. The release that carries Bmad's change also carries the quadrupole map with the exact kinematic terms, which adds work in every quadrupole of the line, so the 5 to 9 percent is not assigned to either change. The whole of `lcls_electrons` at 128 threads on that build took 136 s in its interludes, 1027 s in the particle push and 1578 s in its walk, where the run with the copies took 133 s, 974 s and 1519 s. The statistics, the field solve and the memory at the peak were not read from that run.
 
 *Measured 2026-11-23: Apple M3 Max, 12 cores, production build against Bmad 20261122-0, GNU Fortran 15.3.0. `examples/lcls_electrons` at a hundredth of its charge, `beam.bunch_charge=3.082369e-13`, which is $1.9\times10^{6}$ electrons. The three parts are summed over the threads, and where two values stand they are two runs.*
 
