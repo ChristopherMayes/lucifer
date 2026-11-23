@@ -329,7 +329,7 @@ where the two builds agree to every printed digit.
 | migration conservation: moves | 74184 | same | >= 10000 |
 | migration conservation: charge dropped | 2.6125e-14 | same | >= 0 |
 | migration conservation: worst violation | 1.7212e-14 | same | <= 1.0000e-10 |
-| migration phase continuity | 8.4646e-15 | 8.5144e-15 | <= 1.0000e-10 |
+| migration phase continuity | 8.1786e-15 | 8.2252e-15 | <= 1.0000e-10 |
 | migration window residency | 0 | same | <= 0 |
 | migration no-op: moves | 0 | same | <= 0 |
 | migration no-op: diag byte-equal |  | same | holds |
@@ -581,9 +581,9 @@ where the two builds agree to every printed digit.
 | crossed TD production Py vs CPU (slippage live) | 4.1009e-06 | same | <= 1.6000e-03 |
 | migration on the device bites | 74054 | same | >= 10000 |
 | migration conservation on the device, worst violation | 1.6292e-14 | same | <= 1.0000e-10 |
-| migration phase continuity on the device, worst deviation | 5.4840e-15 | 5.4735e-15 | <= 1.0000e-10 |
+| migration phase continuity on the device, worst deviation | 8.4108e-15 | 8.5280e-15 | <= 1.0000e-10 |
 | migration window residency on the device | 0 | same | <= 0 |
-| heavy-migration window power, device vs CPU | 1.3872e-04 | same | <= 3.0000e-03 |
+| heavy-migration window power, device vs CPU | 1.3877e-04 | same | <= 3.0000e-03 |
 | a migrated slice outgrew the rectangle and the seam grew it |  | same | holds |
 | migrating lockstep worst_x | 2.8844e-07 | same | <= 1.0000e-06 |
 | migrating lockstep worst_px | 2.6490e-07 | same | <= 1.0000e-06 |
@@ -774,7 +774,7 @@ where the two builds agree to every printed digit.
 | wake spectral production TD window power vs CPU | 9.0210e-08 | same | <= 1.6000e-03 |
 | migrating wake record: refreshes at the CPU's positions | 49 | same | >= 2 |
 | migrating wake record: refreshed loss rates vs CPU | 3.6770e-04 | same | <= 1.2000e-03 |
-| migrating wake window power, device vs CPU | 1.7742e-04 | same | <= 3.0000e-03 |
+| migrating wake window power, device vs CPU | 1.7713e-04 | same | <= 3.0000e-03 |
 | undulator spectrum, FLASH1, 55 periods, run.device = metal: planes that differ from the constant times conj(S), over the largest | 1.3046e-06 | same | <= 4.0000e-06 |
 | undulator spectrum, FLASH1, 55 periods, run.device = metal: frequency of the spectral maximum less the undulator's fundamental, in units of the peak's FWHM | 2.1042e-05 | same | <= 1.0000e-03 |
 | undulator spectrum, FLASH1, 55 periods, run.device = metal: FWHM of the fundamental peak over 0.8859/N | 1.0001e+00 | same | 9.9900e-01 to 1.0010e+00 |
@@ -1005,7 +1005,7 @@ where the two builds agree to every printed digit.
 | unitSI = 0.5 on doubled samples reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | gridUnitSI = 2 on a halved spacing reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal a y component shaped unlike x |  | same | holds |
-| the filter angle acts on an imported field with no grid in the input file (relative move) | 1.0414e-06 | 1.0404e-06 | <= 1.0000e+00 |
+| the filter angle acts on an imported field with no grid in the input file (relative move) | 1.0210e-06 | 1.0221e-06 | <= 1.0000e+00 |
 | and the input file with the grid keys filters as the input file without them | 0.0000e+00 | same | <= 1.0000e-09 |
 | restart, x | 0.0000e+00 | same | <= 1.0000e-16 |
 | restart, y | 0.0000e+00 | same | <= 1.0000e-16 |
@@ -1397,9 +1397,9 @@ where the two builds agree to every printed digit.
 | range: and its transverse origin is the whole window's [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refusal: a slice range outside the window refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: the knob at zero is the run that never named it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| interlude: the pipe alone cut, exit power against the whole element | 1.9477e-14 | 1.8385e-14 | <= 1.0000e-09 |
-| interlude: the pipe alone cut, exit sigma_x against the whole element | 1.4902e-16 | same | <= 1.0000e-09 |
-| interlude: cut into pieces, exit power against the hand-split lattice of the same pieces, so the fringe difference the iterator buys is below notice here | 2.5848e-14 | 3.4039e-14 | <= 1.0000e-09 |
+| interlude: the pipe alone cut, exit power against the whole element | 5.9159e-14 | 6.0797e-14 | <= 1.0000e-09 |
+| interlude: the pipe alone cut, exit sigma_x against the whole element | 0.0000e+00 | same | <= 1.0000e-09 |
+| interlude: cut into pieces, exit power against the hand-split lattice of the same pieces, so the fringe difference the iterator buys is below notice here | 1.4562e-15 | 4.0046e-15 | <= 1.0000e-09 |
 | interlude: cut into pieces, exit sigma_x against the hand-split lattice of the same pieces | 2.9803e-16 | same | <= 1.0000e-09 |
 | interlude: rows strictly inside the quadrupole, whole (0 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the quadrupole, cut (4 expected) | 0 | same | <= 5.0000e-01 |
@@ -1414,14 +1414,14 @@ where the two builds agree to every printed digit.
 | interlude: and none where nothing is cut | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: a wake-carrying element is not cut | 0 | same | <= 5.0000e-01 |
 | interlude: and the elements without a wake still are | 0 | same | <= 5.0000e-01 |
-| interlude: the zero wake left the physics alone, so only the rows differ | 6.1889e-15 | 2.0023e-15 | <= 1.0000e-09 |
+| interlude: the zero wake left the physics alone, so only the rows differ | 2.7177e-13 | 2.7213e-13 | <= 1.0000e-09 |
 | interlude: refused with the transcribed Genesis interlude (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: with sr_wakes_on off the wake element is cut like any other | 0 | same | <= 5.0000e-01 |
 | interlude: and its physics is the whole-element run's | 0.0000e+00 | same | <= 1.0000e-09 |
 | interlude: space charge on a seam interlude is refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: and Bmad's own centroid message never printed (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | thin kicker: a zero-length kicker kicks (1e-5 expected) | 8.0794e-05 | same | <= 1.0000e-03 |
-| thin kicker: the same kick through a finite length agrees | 1.9073e-10 | same | <= 1.0000e-03 |
+| thin kicker: the same kick through a finite length agrees | 1.9074e-10 | same | <= 1.0000e-03 |
 | thin kicker: it takes a record, and the zero-length pipe is still skipped | 0 | same | <= 5.0000e-01 |
 | frames: the particle sPosition is the frame's own [m] | 8.8818e-16 | 1.1102e-15 | <= 1.0000e-12 |
 | frames: the particle timeOffset is the iteration's time [s] | 2.4815e-24 | 4.1359e-24 | <= 1.0000e-18 |

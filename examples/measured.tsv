@@ -3,7 +3,7 @@ bmad_wake	lucifer.toml	beamlet_size	4
 bmad_wake	lucifer.toml	beamlet_size_derived	yes	
 bmad_wake	lucifer.toml	bunching_max	1.8033e-02	
 bmad_wake	lucifer.toml	bunching_max_s	5.6240e+01	m
-bmad_wake	lucifer.toml	bunching_peak	1.8004e-02	
+bmad_wake	lucifer.toml	bunching_peak	1.8039e-02	
 bmad_wake	lucifer.toml	energy_change	-1.1955e+06	eV
 bmad_wake	lucifer.toml	exit_bunching	1.7787e-02	
 bmad_wake	lucifer.toml	exit_bunching_max	5.6521e-02	
@@ -31,7 +31,7 @@ bmad_wake	lucifer.toml	initial_bunching	6.6356e-03
 bmad_wake	lucifer.toml	initial_energy	5.8038e+09	eV
 bmad_wake	lucifer.toml	initial_sigma_energy	5.1039e+05	eV
 bmad_wake	lucifer.toml	mode_peak_inside	1.6727e+08	W
-bmad_wake	lucifer.toml	mode_peak_s	5.6760e+01	m
+bmad_wake	lucifer.toml	mode_peak_s	5.6240e+01	m
 bmad_wake	lucifer.toml	n_particle	2048	
 bmad_wake	lucifer.toml	n_particle_derived	no	
 bmad_wake	lucifer.toml	n_record	1105	
@@ -49,7 +49,7 @@ bmad_wake	lucifer_transcribed.toml	beamlet_size	4
 bmad_wake	lucifer_transcribed.toml	beamlet_size_derived	yes	
 bmad_wake	lucifer_transcribed.toml	bunching_max	1.8140e-02	
 bmad_wake	lucifer_transcribed.toml	bunching_max_s	5.6240e+01	m
-bmad_wake	lucifer_transcribed.toml	bunching_peak	1.8118e-02	
+bmad_wake	lucifer_transcribed.toml	bunching_peak	1.8132e-02	
 bmad_wake	lucifer_transcribed.toml	energy_change	-1.1875e+06	eV
 bmad_wake	lucifer_transcribed.toml	exit_bunching	1.7912e-02	
 bmad_wake	lucifer_transcribed.toml	exit_bunching_max	5.7165e-02	
@@ -77,7 +77,7 @@ bmad_wake	lucifer_transcribed.toml	initial_bunching	6.6356e-03
 bmad_wake	lucifer_transcribed.toml	initial_energy	5.8038e+09	eV
 bmad_wake	lucifer_transcribed.toml	initial_sigma_energy	5.1039e+05	eV
 bmad_wake	lucifer_transcribed.toml	mode_peak_inside	1.7002e+08	W
-bmad_wake	lucifer_transcribed.toml	mode_peak_s	5.6760e+01	m
+bmad_wake	lucifer_transcribed.toml	mode_peak_s	5.6680e+01	m
 bmad_wake	lucifer_transcribed.toml	n_particle	2048	
 bmad_wake	lucifer_transcribed.toml	n_particle_derived	no	
 bmad_wake	lucifer_transcribed.toml	n_record	1105	
@@ -183,7 +183,7 @@ coherent_source	lucifer.toml	beamlet_size	8
 coherent_source	lucifer.toml	beamlet_size_derived	no	
 coherent_source	lucifer.toml	bunching_max	3.4271e-01	
 coherent_source	lucifer.toml	bunching_max_s	4.0780e+01	m
-coherent_source	lucifer.toml	bunching_peak	3.2798e-01	
+coherent_source	lucifer.toml	bunching_peak	3.2232e-01	
 coherent_source	lucifer.toml	energy_change	-2.1383e+05	eV
 coherent_source	lucifer.toml	exit_bunching	2.7442e-01	
 coherent_source	lucifer.toml	exit_bunching_max	2.7442e-01	
@@ -206,7 +206,7 @@ coherent_source	lucifer.toml	initial_bunching	3.8856e-17
 coherent_source	lucifer.toml	initial_energy	5.8038e+09	eV
 coherent_source	lucifer.toml	initial_sigma_energy	4.7654e+05	eV
 coherent_source	lucifer.toml	mode_peak_inside	1.2854e+09	W
-coherent_source	lucifer.toml	mode_peak_s	4.2750e+01	m
+coherent_source	lucifer.toml	mode_peak_s	4.2510e+01	m
 coherent_source	lucifer.toml	n_particle	512	
 coherent_source	lucifer.toml	n_particle_derived	no	
 coherent_source	lucifer.toml	n_record	1105	
@@ -224,7 +224,7 @@ coherent_source	lucifer_low_m.toml	beamlet_size	8
 coherent_source	lucifer_low_m.toml	beamlet_size_derived	no	
 coherent_source	lucifer_low_m.toml	bunching_max	2.3820e-01	
 coherent_source	lucifer_low_m.toml	bunching_max_s	3.7240e+01	m
-coherent_source	lucifer_low_m.toml	bunching_peak	2.3442e-01	
+coherent_source	lucifer_low_m.toml	bunching_peak	2.3782e-01	
 coherent_source	lucifer_low_m.toml	energy_change	-4.2874e+05	eV
 coherent_source	lucifer_low_m.toml	exit_bunching	1.7420e-01	
 coherent_source	lucifer_low_m.toml	exit_bunching_max	1.7420e-01	
@@ -251,7 +251,7 @@ coherent_source	lucifer_low_m.toml	initial_bunching	3.8856e-17
 coherent_source	lucifer_low_m.toml	initial_energy	5.8038e+09	eV
 coherent_source	lucifer_low_m.toml	initial_sigma_energy	4.7654e+05	eV
 coherent_source	lucifer_low_m.toml	mode_peak_inside	1.5881e+09	W
-coherent_source	lucifer_low_m.toml	mode_peak_s	3.8000e+01	m
+coherent_source	lucifer_low_m.toml	mode_peak_s	3.7680e+01	m
 coherent_source	lucifer_low_m.toml	n_particle	512	
 coherent_source	lucifer_low_m.toml	n_particle_derived	no	
 coherent_source	lucifer_low_m.toml	n_record	1105	
@@ -630,7 +630,7 @@ migration	lucifer.toml	beamlet_size	4
 migration	lucifer.toml	beamlet_size_derived	yes	
 migration	lucifer.toml	bunching_max	2.9299e-02	
 migration	lucifer.toml	bunching_max_s	4.7500e+01	m
-migration	lucifer.toml	bunching_peak	2.5070e-02	
+migration	lucifer.toml	bunching_peak	2.4971e-02	
 migration	lucifer.toml	energy_change	8.2653e+02	eV
 migration	lucifer.toml	exit_bunching	2.4873e-02	
 migration	lucifer.toml	exit_bunching_max	8.0967e-02	
@@ -658,7 +658,7 @@ migration	lucifer.toml	initial_bunching	6.0905e-03
 migration	lucifer.toml	initial_energy	5.8038e+09	eV
 migration	lucifer.toml	initial_sigma_energy	5.0897e+05	eV
 migration	lucifer.toml	mode_peak_inside	8.0473e+07	W
-migration	lucifer.toml	mode_peak_s	5.6680e+01	m
+migration	lucifer.toml	mode_peak_s	5.6760e+01	m
 migration	lucifer.toml	n_particle	1024	
 migration	lucifer.toml	n_particle_derived	no	
 migration	lucifer.toml	n_record	1105	
@@ -722,7 +722,7 @@ mixed_line	lucifer.toml	beamlet_size	4
 mixed_line	lucifer.toml	beamlet_size_derived	yes	
 mixed_line	lucifer.toml	bunching_max	2.6083e-01	
 mixed_line	lucifer.toml	bunching_max_s	3.7240e+01	m
-mixed_line	lucifer.toml	bunching_peak	2.5706e-01	
+mixed_line	lucifer.toml	bunching_peak	2.5561e-01	
 mixed_line	lucifer.toml	energy_change	-4.2596e+05	eV
 mixed_line	lucifer.toml	exit_bunching	1.9914e-01	
 mixed_line	lucifer.toml	exit_bunching_max	1.9914e-01	
@@ -745,7 +745,7 @@ mixed_line	lucifer.toml	initial_bunching	4.4450e-17
 mixed_line	lucifer.toml	initial_energy	5.8038e+09	eV
 mixed_line	lucifer.toml	initial_sigma_energy	5.0149e+05	eV
 mixed_line	lucifer.toml	mode_peak_inside	1.4559e+09	W
-mixed_line	lucifer.toml	mode_peak_s	3.7760e+01	m
+mixed_line	lucifer.toml	mode_peak_s	3.8000e+01	m
 mixed_line	lucifer.toml	n_particle	2048	
 mixed_line	lucifer.toml	n_particle_derived	no	
 mixed_line	lucifer.toml	n_record	1105	
@@ -763,7 +763,7 @@ mixed_line	lucifer_averaged.toml	beamlet_size	4
 mixed_line	lucifer_averaged.toml	beamlet_size_derived	yes	
 mixed_line	lucifer_averaged.toml	bunching_max	2.6029e-01	
 mixed_line	lucifer_averaged.toml	bunching_max_s	3.7240e+01	m
-mixed_line	lucifer_averaged.toml	bunching_peak	2.5530e-01	
+mixed_line	lucifer_averaged.toml	bunching_peak	2.5664e-01	
 mixed_line	lucifer_averaged.toml	energy_change	-4.2764e+05	eV
 mixed_line	lucifer_averaged.toml	exit_bunching	1.9550e-01	
 mixed_line	lucifer_averaged.toml	exit_bunching_max	1.9550e-01	
@@ -786,7 +786,7 @@ mixed_line	lucifer_averaged.toml	initial_bunching	4.4450e-17
 mixed_line	lucifer_averaged.toml	initial_energy	5.8038e+09	eV
 mixed_line	lucifer_averaged.toml	initial_sigma_energy	5.0149e+05	eV
 mixed_line	lucifer_averaged.toml	mode_peak_inside	1.4404e+09	W
-mixed_line	lucifer_averaged.toml	mode_peak_s	3.8000e+01	m
+mixed_line	lucifer_averaged.toml	mode_peak_s	3.7760e+01	m
 mixed_line	lucifer_averaged.toml	n_particle	2048	
 mixed_line	lucifer_averaged.toml	n_particle_derived	no	
 mixed_line	lucifer_averaged.toml	n_record	1105	
@@ -894,147 +894,147 @@ sase_wake	lucifer.toml	wide_angle_ratio	1.0564e-02
 sase_wake	lucifer.toml	wide_angle_ratio_exit	2.2149e-02	
 space_charge	lucifer.toml	beamlet_size	4	
 space_charge	lucifer.toml	beamlet_size_derived	yes	
-space_charge	lucifer.toml	bunching_max	3.0630e-13	
-space_charge	lucifer.toml	bunching_max_s	5.5702e+01	m
-space_charge	lucifer.toml	bunching_peak	3.0373e-13	
+space_charge	lucifer.toml	bunching_max	3.2784e-13	
+space_charge	lucifer.toml	bunching_max_s	5.7000e+01	m
+space_charge	lucifer.toml	bunching_peak	3.3429e-13	
 space_charge	lucifer.toml	energy_change	6.8505e+02	eV
-space_charge	lucifer.toml	exit_bunching	2.9938e-13	
-space_charge	lucifer.toml	exit_bunching_max	8.9438e-13	
+space_charge	lucifer.toml	exit_bunching	3.2784e-13	
+space_charge	lucifer.toml	exit_bunching_max	1.1790e-12	
 space_charge	lucifer.toml	exit_energy	5.8038e+09	eV
 space_charge	lucifer.toml	exit_energy_span	3.9466e+07	eV
-space_charge	lucifer.toml	exit_power	1.8084e-15	W
-space_charge	lucifer.toml	exit_power_inside	1.7807e-15	W
-space_charge	lucifer.toml	exit_power_outside	2.7682e-17	W
-space_charge	lucifer.toml	exit_power_per_slice	2.2605e-17	W
-space_charge	lucifer.toml	exit_power_slice_max	7.7592e-17	W
-space_charge	lucifer.toml	exit_power_slice_spread	1.2026e+00	
-space_charge	lucifer.toml	exit_pulse_energy	1.0856e-32	J
-space_charge	lucifer.toml	exit_sigma_energy	1.2445e-06	eV
-space_charge	lucifer.toml	exit_window_energy	1.8097e-33	J
+space_charge	lucifer.toml	exit_power	1.9361e-15	W
+space_charge	lucifer.toml	exit_power_inside	1.9014e-15	W
+space_charge	lucifer.toml	exit_power_outside	3.4620e-17	W
+space_charge	lucifer.toml	exit_power_per_slice	2.4201e-17	W
+space_charge	lucifer.toml	exit_power_slice_max	9.2441e-17	W
+space_charge	lucifer.toml	exit_power_slice_spread	1.2500e+00	
+space_charge	lucifer.toml	exit_pulse_energy	1.1815e-32	J
+space_charge	lucifer.toml	exit_sigma_energy	1.3140e-06	eV
+space_charge	lucifer.toml	exit_window_energy	1.9374e-33	J
 space_charge	lucifer.toml	fel_steps	1068	
 space_charge	lucifer.toml	filter_edge	3.0203e-06	rad
 space_charge	lucifer.toml	filter_mode_angle	3.0203e-06	rad
 space_charge	lucifer.toml	filter_ratio	1.1498e+00	
 space_charge	lucifer.toml	filter_rho_angle	2.6268e-06	rad
-space_charge	lucifer.toml	gain_length	1.9066e+00	m
+space_charge	lucifer.toml	gain_length	1.9987e+00	m
 space_charge	lucifer.toml	grid_cell	3.1496e-06	m
 space_charge	lucifer.toml	grid_derived	no	
 space_charge	lucifer.toml	grid_n_pts	128	
 space_charge	lucifer.toml	initial_bunching	5.1226e-17	
 space_charge	lucifer.toml	initial_energy	5.8038e+09	eV
 space_charge	lucifer.toml	initial_sigma_energy	0.0000e+00	eV
-space_charge	lucifer.toml	mode_peak_inside	2.3711e-15	W
+space_charge	lucifer.toml	mode_peak_inside	2.6328e-15	W
 space_charge	lucifer.toml	mode_peak_s	5.6760e+01	m
 space_charge	lucifer.toml	n_particle	512	
 space_charge	lucifer.toml	n_particle_derived	no	
 space_charge	lucifer.toml	n_record	1105	
 space_charge	lucifer.toml	n_slice	80	
-space_charge	lucifer.toml	peak_power	2.4046e-15	W
+space_charge	lucifer.toml	peak_power	2.6771e-15	W
 space_charge	lucifer.toml	peak_power_s	5.6760e+01	m
 space_charge	lucifer.toml	power_after_first_element	7.3143e-19	W
 space_charge	lucifer.toml	power_after_first_element_per_slice	9.1429e-21	W
-space_charge	lucifer.toml	slice_power_max_at_bunching_max	7.4349e-17	W
+space_charge	lucifer.toml	slice_power_max_at_bunching_max	9.2441e-17	W
 space_charge	lucifer.toml	slice_spacing	3.0000e-10	m
 space_charge	lucifer.toml	split_angle	3.0203e-06	rad
-space_charge	lucifer.toml	wide_angle_ratio	1.4110e-02	
-space_charge	lucifer.toml	wide_angle_ratio_exit	1.5546e-02	
+space_charge	lucifer.toml	wide_angle_ratio	1.6835e-02	
+space_charge	lucifer.toml	wide_angle_ratio_exit	1.8207e-02	
 space_charge	lucifer_gate_off.toml	beamlet_size	4	
 space_charge	lucifer_gate_off.toml	beamlet_size_derived	yes	
-space_charge	lucifer_gate_off.toml	bunching_max	2.4507e-13	
-space_charge	lucifer_gate_off.toml	bunching_max_s	5.6760e+01	m
-space_charge	lucifer_gate_off.toml	bunching_peak	2.2701e-13	
+space_charge	lucifer_gate_off.toml	bunching_max	2.3587e-13	
+space_charge	lucifer_gate_off.toml	bunching_max_s	5.2698e+01	m
+space_charge	lucifer_gate_off.toml	bunching_peak	2.3582e-13	
 space_charge	lucifer_gate_off.toml	energy_change	0.0000e+00	eV
-space_charge	lucifer_gate_off.toml	exit_bunching	2.4258e-13	
-space_charge	lucifer_gate_off.toml	exit_bunching_max	6.2396e-13	
+space_charge	lucifer_gate_off.toml	exit_bunching	2.3159e-13	
+space_charge	lucifer_gate_off.toml	exit_bunching_max	6.3345e-13	
 space_charge	lucifer_gate_off.toml	exit_energy	5.8038e+09	eV
 space_charge	lucifer_gate_off.toml	exit_energy_span	0.0000e+00	eV
-space_charge	lucifer_gate_off.toml	exit_power	9.4042e-16	W
-space_charge	lucifer_gate_off.toml	exit_power_inside	9.1151e-16	W
-space_charge	lucifer_gate_off.toml	exit_power_outside	2.8909e-17	W
-space_charge	lucifer_gate_off.toml	exit_power_per_slice	1.1755e-17	W
-space_charge	lucifer_gate_off.toml	exit_power_slice_max	3.2649e-17	W
-space_charge	lucifer_gate_off.toml	exit_power_slice_spread	1.0910e+00	
-space_charge	lucifer_gate_off.toml	exit_pulse_energy	1.2870e-32	J
+space_charge	lucifer_gate_off.toml	exit_power	9.7506e-16	W
+space_charge	lucifer_gate_off.toml	exit_power_inside	9.4544e-16	W
+space_charge	lucifer_gate_off.toml	exit_power_outside	2.9616e-17	W
+space_charge	lucifer_gate_off.toml	exit_power_per_slice	1.2188e-17	W
+space_charge	lucifer_gate_off.toml	exit_power_slice_max	3.3797e-17	W
+space_charge	lucifer_gate_off.toml	exit_power_slice_spread	1.1103e+00	
+space_charge	lucifer_gate_off.toml	exit_pulse_energy	1.3071e-32	J
 space_charge	lucifer_gate_off.toml	exit_sigma_energy	0.0000e+00	eV
-space_charge	lucifer_gate_off.toml	exit_window_energy	9.4107e-34	J
+space_charge	lucifer_gate_off.toml	exit_window_energy	9.7573e-34	J
 space_charge	lucifer_gate_off.toml	fel_steps	1068	
 space_charge	lucifer_gate_off.toml	filter_edge	3.0203e-06	rad
 space_charge	lucifer_gate_off.toml	filter_mode_angle	3.0203e-06	rad
 space_charge	lucifer_gate_off.toml	filter_ratio	1.1498e+00	
 space_charge	lucifer_gate_off.toml	filter_rho_angle	2.6268e-06	rad
-space_charge	lucifer_gate_off.toml	gain_length	2.5062e+00	m
+space_charge	lucifer_gate_off.toml	gain_length	2.6433e+00	m
 space_charge	lucifer_gate_off.toml	grid_cell	3.1496e-06	m
 space_charge	lucifer_gate_off.toml	grid_derived	no	
 space_charge	lucifer_gate_off.toml	grid_n_pts	128	
 space_charge	lucifer_gate_off.toml	initial_bunching	5.1226e-17	
 space_charge	lucifer_gate_off.toml	initial_energy	5.8038e+09	eV
 space_charge	lucifer_gate_off.toml	initial_sigma_energy	0.0000e+00	eV
-space_charge	lucifer_gate_off.toml	mode_peak_inside	1.2759e-15	W
-space_charge	lucifer_gate_off.toml	mode_peak_s	5.2010e+01	m
+space_charge	lucifer_gate_off.toml	mode_peak_inside	1.2655e-15	W
+space_charge	lucifer_gate_off.toml	mode_peak_s	5.6760e+01	m
 space_charge	lucifer_gate_off.toml	n_particle	512	
 space_charge	lucifer_gate_off.toml	n_particle_derived	no	
 space_charge	lucifer_gate_off.toml	n_record	1105	
 space_charge	lucifer_gate_off.toml	n_slice	80	
-space_charge	lucifer_gate_off.toml	peak_power	1.3624e-15	W
-space_charge	lucifer_gate_off.toml	peak_power_s	5.4447e+01	m
+space_charge	lucifer_gate_off.toml	peak_power	1.6765e-15	W
+space_charge	lucifer_gate_off.toml	peak_power_s	5.4402e+01	m
 space_charge	lucifer_gate_off.toml	power_after_first_element	2.3921e-18	W
 space_charge	lucifer_gate_off.toml	power_after_first_element_per_slice	2.9901e-20	W
-space_charge	lucifer_gate_off.toml	slice_power_max_at_bunching_max	3.2649e-17	W
+space_charge	lucifer_gate_off.toml	slice_power_max_at_bunching_max	3.0516e-17	W
 space_charge	lucifer_gate_off.toml	slice_spacing	3.0000e-10	m
 space_charge	lucifer_gate_off.toml	split_angle	3.0203e-06	rad
-space_charge	lucifer_gate_off.toml	wide_angle_ratio	2.4964e-02	
-space_charge	lucifer_gate_off.toml	wide_angle_ratio_exit	3.1715e-02	
+space_charge	lucifer_gate_off.toml	wide_angle_ratio	3.0119e-02	
+space_charge	lucifer_gate_off.toml	wide_angle_ratio_exit	3.1325e-02	
 space_charge	lucifer_off.toml	beamlet_size	4	
 space_charge	lucifer_off.toml	beamlet_size_derived	yes	
-space_charge	lucifer_off.toml	bunching_max	2.4507e-13	
-space_charge	lucifer_off.toml	bunching_max_s	5.6760e+01	m
-space_charge	lucifer_off.toml	bunching_peak	2.2701e-13	
+space_charge	lucifer_off.toml	bunching_max	2.3587e-13	
+space_charge	lucifer_off.toml	bunching_max_s	5.2698e+01	m
+space_charge	lucifer_off.toml	bunching_peak	2.3582e-13	
 space_charge	lucifer_off.toml	energy_change	0.0000e+00	eV
-space_charge	lucifer_off.toml	exit_bunching	2.4258e-13	
-space_charge	lucifer_off.toml	exit_bunching_max	6.2396e-13	
+space_charge	lucifer_off.toml	exit_bunching	2.3159e-13	
+space_charge	lucifer_off.toml	exit_bunching_max	6.3345e-13	
 space_charge	lucifer_off.toml	exit_energy	5.8038e+09	eV
 space_charge	lucifer_off.toml	exit_energy_span	0.0000e+00	eV
-space_charge	lucifer_off.toml	exit_power	9.4042e-16	W
-space_charge	lucifer_off.toml	exit_power_inside	9.1151e-16	W
-space_charge	lucifer_off.toml	exit_power_outside	2.8909e-17	W
-space_charge	lucifer_off.toml	exit_power_per_slice	1.1755e-17	W
-space_charge	lucifer_off.toml	exit_power_slice_max	3.2649e-17	W
-space_charge	lucifer_off.toml	exit_power_slice_spread	1.0910e+00	
-space_charge	lucifer_off.toml	exit_pulse_energy	1.2870e-32	J
+space_charge	lucifer_off.toml	exit_power	9.7506e-16	W
+space_charge	lucifer_off.toml	exit_power_inside	9.4544e-16	W
+space_charge	lucifer_off.toml	exit_power_outside	2.9616e-17	W
+space_charge	lucifer_off.toml	exit_power_per_slice	1.2188e-17	W
+space_charge	lucifer_off.toml	exit_power_slice_max	3.3797e-17	W
+space_charge	lucifer_off.toml	exit_power_slice_spread	1.1103e+00	
+space_charge	lucifer_off.toml	exit_pulse_energy	1.3071e-32	J
 space_charge	lucifer_off.toml	exit_sigma_energy	0.0000e+00	eV
-space_charge	lucifer_off.toml	exit_window_energy	9.4107e-34	J
+space_charge	lucifer_off.toml	exit_window_energy	9.7573e-34	J
 space_charge	lucifer_off.toml	fel_steps	1068	
 space_charge	lucifer_off.toml	filter_edge	3.0203e-06	rad
 space_charge	lucifer_off.toml	filter_mode_angle	3.0203e-06	rad
 space_charge	lucifer_off.toml	filter_ratio	1.1498e+00	
 space_charge	lucifer_off.toml	filter_rho_angle	2.6268e-06	rad
-space_charge	lucifer_off.toml	gain_length	2.5062e+00	m
+space_charge	lucifer_off.toml	gain_length	2.6433e+00	m
 space_charge	lucifer_off.toml	grid_cell	3.1496e-06	m
 space_charge	lucifer_off.toml	grid_derived	no	
 space_charge	lucifer_off.toml	grid_n_pts	128	
 space_charge	lucifer_off.toml	initial_bunching	5.1226e-17	
 space_charge	lucifer_off.toml	initial_energy	5.8038e+09	eV
 space_charge	lucifer_off.toml	initial_sigma_energy	0.0000e+00	eV
-space_charge	lucifer_off.toml	mode_peak_inside	1.2759e-15	W
-space_charge	lucifer_off.toml	mode_peak_s	5.2010e+01	m
+space_charge	lucifer_off.toml	mode_peak_inside	1.2655e-15	W
+space_charge	lucifer_off.toml	mode_peak_s	5.6760e+01	m
 space_charge	lucifer_off.toml	n_particle	512	
 space_charge	lucifer_off.toml	n_particle_derived	no	
 space_charge	lucifer_off.toml	n_record	1105	
 space_charge	lucifer_off.toml	n_slice	80	
-space_charge	lucifer_off.toml	peak_power	1.3624e-15	W
-space_charge	lucifer_off.toml	peak_power_s	5.4447e+01	m
+space_charge	lucifer_off.toml	peak_power	1.6765e-15	W
+space_charge	lucifer_off.toml	peak_power_s	5.4402e+01	m
 space_charge	lucifer_off.toml	power_after_first_element	2.3921e-18	W
 space_charge	lucifer_off.toml	power_after_first_element_per_slice	2.9901e-20	W
-space_charge	lucifer_off.toml	slice_power_max_at_bunching_max	3.2649e-17	W
+space_charge	lucifer_off.toml	slice_power_max_at_bunching_max	3.0516e-17	W
 space_charge	lucifer_off.toml	slice_spacing	3.0000e-10	m
 space_charge	lucifer_off.toml	split_angle	3.0203e-06	rad
-space_charge	lucifer_off.toml	wide_angle_ratio	2.4964e-02	
-space_charge	lucifer_off.toml	wide_angle_ratio_exit	3.1715e-02	
+space_charge	lucifer_off.toml	wide_angle_ratio	3.0119e-02	
+space_charge	lucifer_off.toml	wide_angle_ratio_exit	3.1325e-02	
 space_charge	lucifer_short_range.toml	beamlet_size	4	
 space_charge	lucifer_short_range.toml	beamlet_size_derived	yes	
 space_charge	lucifer_short_range.toml	bunching_max	3.0435e-01	
 space_charge	lucifer_short_range.toml	bunching_max_s	3.9031e+01	m
-space_charge	lucifer_short_range.toml	bunching_peak	2.9702e-01	
+space_charge	lucifer_short_range.toml	bunching_peak	2.9611e-01	
 space_charge	lucifer_short_range.toml	energy_change	-2.8422e+05	eV
 space_charge	lucifer_short_range.toml	exit_bunching	2.4499e-01	
 space_charge	lucifer_short_range.toml	exit_bunching_max	2.4499e-01	
@@ -1061,7 +1061,7 @@ space_charge	lucifer_short_range.toml	initial_bunching	3.9308e-17
 space_charge	lucifer_short_range.toml	initial_energy	5.8038e+09	eV
 space_charge	lucifer_short_range.toml	initial_sigma_energy	5.0137e+05	eV
 space_charge	lucifer_short_range.toml	mode_peak_inside	1.4415e+09	W
-space_charge	lucifer_short_range.toml	mode_peak_s	3.8000e+01	m
+space_charge	lucifer_short_range.toml	mode_peak_s	3.7760e+01	m
 space_charge	lucifer_short_range.toml	n_particle	8192	
 space_charge	lucifer_short_range.toml	n_particle_derived	no	
 space_charge	lucifer_short_range.toml	n_record	1105	
@@ -1079,7 +1079,7 @@ spontaneous	lucifer.toml	beamlet_size	4
 spontaneous	lucifer.toml	beamlet_size_derived	yes	
 spontaneous	lucifer.toml	bunching_max	2.9086e-01	
 spontaneous	lucifer.toml	bunching_max_s	3.9390e+01	m
-spontaneous	lucifer.toml	bunching_peak	2.8065e-01	
+spontaneous	lucifer.toml	bunching_peak	2.8180e-01	
 spontaneous	lucifer.toml	energy_change	-9.2710e+05	eV
 spontaneous	lucifer.toml	exit_bunching	2.2935e-01	
 spontaneous	lucifer.toml	exit_bunching_max	2.2935e-01	
@@ -1106,7 +1106,7 @@ spontaneous	lucifer.toml	initial_bunching	3.9308e-17
 spontaneous	lucifer.toml	initial_energy	5.8038e+09	eV
 spontaneous	lucifer.toml	initial_sigma_energy	5.0137e+05	eV
 spontaneous	lucifer.toml	mode_peak_inside	1.0822e+09	W
-spontaneous	lucifer.toml	mode_peak_s	3.7680e+01	m
+spontaneous	lucifer.toml	mode_peak_s	3.8000e+01	m
 spontaneous	lucifer.toml	n_particle	8192	
 spontaneous	lucifer.toml	n_particle_derived	no	
 spontaneous	lucifer.toml	n_record	1105	
@@ -1124,7 +1124,7 @@ spontaneous	lucifer_damping_only.toml	beamlet_size	4
 spontaneous	lucifer_damping_only.toml	beamlet_size_derived	yes	
 spontaneous	lucifer_damping_only.toml	bunching_max	2.9229e-01	
 spontaneous	lucifer_damping_only.toml	bunching_max_s	3.9300e+01	m
-spontaneous	lucifer_damping_only.toml	bunching_peak	2.8340e-01	
+spontaneous	lucifer_damping_only.toml	bunching_peak	2.8268e-01	
 spontaneous	lucifer_damping_only.toml	energy_change	-9.1501e+05	eV
 spontaneous	lucifer_damping_only.toml	exit_bunching	2.0584e-01	
 spontaneous	lucifer_damping_only.toml	exit_bunching_max	2.0584e-01	
@@ -1151,13 +1151,13 @@ spontaneous	lucifer_damping_only.toml	initial_bunching	3.9308e-17
 spontaneous	lucifer_damping_only.toml	initial_energy	5.8038e+09	eV
 spontaneous	lucifer_damping_only.toml	initial_sigma_energy	5.0137e+05	eV
 spontaneous	lucifer_damping_only.toml	mode_peak_inside	1.0984e+09	W
-spontaneous	lucifer_damping_only.toml	mode_peak_s	3.7240e+01	m
+spontaneous	lucifer_damping_only.toml	mode_peak_s	3.7760e+01	m
 spontaneous	lucifer_damping_only.toml	n_particle	8192	
 spontaneous	lucifer_damping_only.toml	n_particle_derived	no	
 spontaneous	lucifer_damping_only.toml	n_record	1105	
 spontaneous	lucifer_damping_only.toml	n_slice	1	
 spontaneous	lucifer_damping_only.toml	peak_power	1.0996e+09	W
-spontaneous	lucifer_damping_only.toml	peak_power_s	3.7680e+01	m
+spontaneous	lucifer_damping_only.toml	peak_power_s	3.8000e+01	m
 spontaneous	lucifer_damping_only.toml	power_after_first_element	4.0291e+03	W
 spontaneous	lucifer_damping_only.toml	power_after_first_element_per_slice	4.0291e+03	W
 spontaneous	lucifer_damping_only.toml	slice_power_max_at_bunching_max	1.0154e+09	W
@@ -1214,7 +1214,7 @@ taper	lucifer.toml	beamlet_size	4
 taper	lucifer.toml	beamlet_size_derived	yes	
 taper	lucifer.toml	bunching_max	3.0436e-01	
 taper	lucifer.toml	bunching_max_s	3.8807e+01	m
-taper	lucifer.toml	bunching_peak	6.7283e-02	
+taper	lucifer.toml	bunching_peak	7.2283e-02	
 taper	lucifer.toml	energy_change	-2.9327e+06	eV
 taper	lucifer.toml	exit_bunching	6.7283e-02	
 taper	lucifer.toml	exit_bunching_max	6.7283e-02	
@@ -1241,13 +1241,13 @@ taper	lucifer.toml	initial_bunching	3.9308e-17
 taper	lucifer.toml	initial_energy	5.8038e+09	eV
 taper	lucifer.toml	initial_sigma_energy	5.0137e+05	eV
 taper	lucifer.toml	mode_peak_inside	8.7874e+09	W
-taper	lucifer.toml	mode_peak_s	5.7000e+01	m
+taper	lucifer.toml	mode_peak_s	5.6760e+01	m
 taper	lucifer.toml	n_particle	8192	
 taper	lucifer.toml	n_particle_derived	no	
 taper	lucifer.toml	n_record	1105	
 taper	lucifer.toml	n_slice	1	
 taper	lucifer.toml	peak_power	8.7996e+09	W
-taper	lucifer.toml	peak_power_s	5.6760e+01	m
+taper	lucifer.toml	peak_power_s	5.6240e+01	m
 taper	lucifer.toml	power_after_first_element	4.0672e+03	W
 taper	lucifer.toml	power_after_first_element_per_slice	4.0672e+03	W
 taper	lucifer.toml	slice_power_max_at_bunching_max	1.8906e+09	W

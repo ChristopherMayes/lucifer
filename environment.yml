@@ -15,7 +15,7 @@ name: lucifer-build
 channels:
   - conda-forge
 dependencies:
-  - bmad >=20261023.0 nompi_*
+  - bmad >=20261122.0 nompi_*
   - toml-f >=0.5
   - compilers >=2.0
   - cmake >=3.20
