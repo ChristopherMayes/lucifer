@@ -71,6 +71,17 @@ The key `beam.load_mode` selects how the bunch is represented by the particles o
 
 In the electrons mode the keys of the beamlets and of the imposed noise are not used, and a value other than the default in any of them is refused. The memory of the particles is 68 bytes per electron, 13 GB for a window of 30.8 pC, and the run time of the particle push is proportional to the number of electrons. The example [`lcls_electrons`](generated/examples/lcls_electrons.md) tracks the $1.9\times10^{8}$ electrons of such a window and compares the result with that of the sample mode, and [](performance.md#perf-electrons) gives its run time on twelve cores and on 128.
 
+(ug-migration)=
+### A run with slice migration
+
+The key `run.migrate = true` moves a particle to the slice into which its phase has drifted. It is off by default, and what it does to each load is described in [](migration.md).
+
+1. Select `beam.load_mode = "electrons"` where the electrons of the window can be held in memory ([](#el-size)). Its particles are independent, and migration adds no radiation to them.
+2. With a load of beamlets, which is the sample mode or the keep mode under `quiet_start = true`, run the same input file a second time with `beam.shot_noise = false` and without a seed field. The power of the second run is the radiation that migration adds, and it is compared with the power of the first.
+3. Raise `beam.n_particle` until that radiation is small beside the power of the first run at the positions of interest. It is inversely proportional to the number of macroparticles per slice ([](#mig-beamlets)).
+4. With `beam.load_mode = "keep"` and `quiet_start = true`, expect the radiation of the second run from the first element onward, whatever the number of particles ([](#mig-keep)).
+5. Set `run.migrate_check = true` to have the threaded pass compared with the serial one at every pass, and read the moved particles and the dropped charge in `<out_root>.migration.txt`.
+
 ## Running
 
 A run is one input file, a TOML file that names the lattice:
