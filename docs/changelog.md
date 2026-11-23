@@ -25,6 +25,27 @@ of that history. The entries before that date describe that branch.
   second wiggler, without order in the quadrupole strength. `docs/validation.md` records the
   measurements, and `docs/input-reference.md` states that a quadrupole in pieces differs from the
   quadrupole whole.
+- 2026-11-22 Changed: the particle load has a page of its own, `docs/particle-load.md`, divided from
+  `docs/fel-physics.md`. It is an explanation followed by its record. The explanation holds the
+  three values of `beam.load_mode` and the two switches in two tables, the sequence that generates a
+  load, the sample, keep and electrons modes, the quiet start, the two methods of the imposed shot
+  noise with the groups and the quiet floor, the resampler and slice migration, each under the label
+  it had (`sec-loading`, `sec-electrons`, `sec-quiet`, `sec-noise`, `sec-import`, `sec-migration`)
+  and with its Genesis4 source block. Its sentences are rewritten as full declarative ones, and no
+  statement is removed. The record, under the heading `Measurements`, holds the measured numbers
+  that stood in the paragraph on migration: the radiation that migration adds to a load of beamlets
+  in `sase`, LCLS and FLASH1, recorded on 2026-11-12, and the pulse energy with migration on over that
+  with migration off for the electrons mode and for the weight load, recorded on 2026-11-21. The
+  explanation states their conclusion in words and links to them. Each of the 113 numerals removed
+  from `docs/fel-physics.md` stands in the new page. `docs/fel-physics.md` keeps the heading of each
+  section with a sentence and a link, and its section on particle dumps, `sec-pardump`, is a section
+  of its own. Three statements are corrected to the program as it is. The first-order kick is the
+  one method other than the weight method, where the text spoke of two. The rule of fewer beamlets
+  in a slice of little charge acts under the first-order kick and the quiet start, where the text
+  said under `shot_noise`, and the weight method does not use `beam.beamlet_min_electrons`. The
+  default window of a Gaussian bunch is $2\sigma_z\sqrt{2\ln N_0}$ long for $N_0$ electrons in the
+  central slice, and $8\sigma_z$ where $N_0$ is less than one. The README of
+  `examples/lcls_electrons` links to the new page, and `docs/index.md` and `docs/myst.yml` list it.
 - 2026-11-22 Changed: a section of the physics manual is referred to by its label alone, and a check
   holds every label reference of the manual. The 126 links of the form `fel-physics.md#label` in 13
   pages are references by label, `#label`, which the site resolves wherever the section stands. The

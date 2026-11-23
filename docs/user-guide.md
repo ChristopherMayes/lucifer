@@ -61,7 +61,7 @@ A lattice writes them as it writes any attribute, `fel_method = unaveraged`, and
 (ug-loads)=
 ## The three loads
 
-The key `beam.load_mode` selects how the bunch is represented by the particles of the [slices](glossary.md#gl-slice). The three modes are described in [](#sec-loading), and the key in [](input-reference.md#param-beam-load-mode).
+The key `beam.load_mode` selects how the bunch is represented by the particles of the [slices](glossary.md#gl-slice). The three modes are described in [](particle-load.md), and the key in [](input-reference.md#param-beam-load-mode).
 
 | `load_mode` | the particles of a slice | what determines their number |
 |---|---|---|
