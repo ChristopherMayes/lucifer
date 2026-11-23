@@ -44,8 +44,18 @@ of that history. The entries before that date describe that branch.
   in a slice of little charge acts under the first-order kick and the quiet start, where the text
   said under `shot_noise`, and the weight method does not use `beam.beamlet_min_electrons`. The
   default window of a Gaussian bunch is $2\sigma_z\sqrt{2\ln N_0}$ long for $N_0$ electrons in the
-  central slice, and $8\sigma_z$ where $N_0$ is less than one. The README of
-  `examples/lcls_electrons` links to the new page, and `docs/index.md` and `docs/myst.yml` list it.
+  central slice, and $8\sigma_z$ where $N_0$ is less than one. Five further statements are held to
+  the source. In the keep mode the phase of a particle is taken modulo the length of its slice,
+  $2\pi$ times `window.n_wavelength`, where the text gave $2\pi$, and the copies occupy the one
+  wavelength that begins at that phase. The first-order kick is applied at $\lfloor (b-1)/2 \rfloor$
+  harmonics for a beamlet of $b$. The sample mode loads fewer than `beam.n_particle` macroparticles
+  in a slice of few electrons under either method, since the weight method omits a beamlet that is
+  assigned no electron. The weight method refuses a load with `quiet_start = false`, and in the keep
+  mode it counts the electrons of each particle of the bunch. The keep mode rounds its number of
+  slices up, and the resampler rounds to the nearest integer. The record of 2026-11-12 states the
+  commit `31be058`, the beamlet size, the seeds and the positions that were recorded with it. The
+  README of `examples/lcls_electrons` links to the new page, and `docs/index.md` and `docs/myst.yml`
+  list it.
 - 2026-11-22 Changed: a section of the physics manual is referred to by its label alone, and a check
   holds every label reference of the manual. The 126 links of the form `fel-physics.md#label` in 13
   pages are references by label, `#label`, which the site resolves wherever the section stands. The

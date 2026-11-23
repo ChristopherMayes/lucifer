@@ -294,7 +294,7 @@ $$
   \qquad a_k = \frac{z_k}{k}, \qquad z_k = 2\sqrt{\frac{x_k}{N}} ,
 $$ (eq-shot-kick)
 
-where the number of harmonics is $H = (M-1)/2$ in integer division, which is 3 for a beamlet of 8. The sines are evaluated at the unperturbed phases. Two random numbers are drawn for each harmonic of each beamlet. The phase $\phi_k$ is uniformly distributed over $2\pi$, and $x_k = -\ln u_k$, with $u_k$ uniformly distributed on $(0,1)$, is exponentially distributed with unit mean. The kick is intended to give the beamlet a bunching of $\sqrt{x_k/N}$ at harmonic $k$, the square of which has the mean $1/N$ and the exponential distribution of real shot noise. The quantity $z_k$ is the amplitude of the kick in the phase of harmonic $k$. Equation [](#eq-shot-kick) is Eq. [](#eq-fawley) of [](particle-load.md) written for one beamlet.
+where the number of harmonics is $H = (M-1)/2$ in integer division, which is 3 for a beamlet of 8. The sines are evaluated at the unperturbed phases. Two random numbers are drawn for each harmonic of each beamlet. The phase $\phi_k$ is uniformly distributed over $2\pi$, and $x_k = -\ln u_k$, with $u_k$ uniformly distributed on $(0,1)$, is exponentially distributed with unit mean. The kick is intended to give the beamlet a bunching of $\sqrt{x_k/N}$ at harmonic $k$, the square of which has the mean $1/N$ and the exponential distribution of real shot noise. The quantity $z_k$ is the amplitude of the kick in the phase of harmonic $k$. Equation [](#eq-shot-kick) is Eq. [](#eq-fawley) of [](#sec-noise) written for one beamlet.
 
 :::{figure} generated/shot-noise/beamlet.svg
 :name: fig-shot-beamlet
