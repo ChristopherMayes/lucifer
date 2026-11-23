@@ -1397,12 +1397,14 @@ where the two builds agree to every printed digit.
 | range: and its transverse origin is the whole window's [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refusal: a slice range outside the window refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: the knob at zero is the run that never named it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| interlude: cut into pieces, exit power against the whole element | 1.2378e-13 | 1.1886e-13 | <= 1.0000e-09 |
-| interlude: cut into pieces, exit sigma_x against the whole element | 5.9606e-16 | same | <= 1.0000e-09 |
-| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.5928e-14 | 8.3368e-14 | <= 1.0000e-09 |
+| interlude: the pipe alone cut, exit power against the whole element | 1.9477e-14 | 1.8385e-14 | <= 1.0000e-09 |
+| interlude: the pipe alone cut, exit sigma_x against the whole element | 1.4902e-16 | same | <= 1.0000e-09 |
+| interlude: cut into pieces, exit power against the hand-split lattice of the same pieces, so the fringe difference the iterator buys is below notice here | 2.5848e-14 | 3.4039e-14 | <= 1.0000e-09 |
+| interlude: cut into pieces, exit sigma_x against the hand-split lattice of the same pieces | 2.9803e-16 | same | <= 1.0000e-09 |
 | interlude: rows strictly inside the quadrupole, whole (0 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the quadrupole, cut (4 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the pipe, cut (9 expected) | 0 | same | <= 5.0000e-01 |
+| interlude: at a step of 0.15 m the pipe alone is cut (1 row inside it, none inside the quadrupole) | 0 | same | <= 5.0000e-01 |
 | interlude: the stats file holds exactly the rows the diag carries | 0 | same | <= 5.0000e-01 |
 | interlude: the stats file records the step it ran at | 0.0000e+00 | same | <= 1.0000e-12 |
 | interlude: one frame per stats row with the pieces on | 0 | same | <= 5.0000e-01 |

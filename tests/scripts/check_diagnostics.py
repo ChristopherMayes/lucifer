@@ -332,17 +332,32 @@ def interludes(exe, wd):
 
     The knob is off by default, and off must be the path of an input file that never names it.
     The first check is byte identity against such an input file. The second is that cutting an
-    element reproduces tracking it whole. The pieces come from Bmad's
-    element_slice_iterator, which keeps an element's fringes at its own ends rather than
-    giving every piece a pair. On FEL beam sizes the fringe difference is below notice.
-    The hand-split lattice, whose every piece carries a fringe pair, checks that here
-    at 1e-9.
+    element does not change the answer, which is two comparisons, each at 1e-9.
+
+    A pipe is a drift, whose map composes exactly, so the run with the pipe alone cut
+    reproduces the run that tracks every element whole.
+
+    A quadrupole in pieces is compared with a lattice split by hand into the same pieces,
+    and not with the quadrupole whole. The pieces come from Bmad's element_slice_iterator,
+    which keeps an element's fringes at its own ends rather than giving every piece a
+    pair, as the hand-split lattice does. On FEL beam sizes the fringe difference is below
+    notice, and the comparison checks that.
+
+    The whole quadrupole is not the reference because Bmad's quadrupole map need not
+    compose. Through Bmad 20261120-0 it was the paraxial map, which composes exactly, and
+    the cut run reproduced the whole element to rounding. From 20261122-0 the map is one
+    step of a fourth-order split of the paraxial map and the kinematic remainder. The whole
+    quadrupole then carries the splitting error of one step and each piece a smaller one,
+    and on this line the power of the two runs differs by up to 7e-9 along the second
+    wiggler (docs/validation.md, the interlude's own steps).
     """
     print("--- the interlude's own steps:")
     (wd / "intlat.bmad").write_text(INT_LAT)
+    # The hand-split pieces are the iterator's at interlude_ds_step = 0.04: five of the
+    # quadrupole and ten of the pipe.
     hand = INT_LAT.replace("QF: quadrupole, l = 0.20, k1 = 8.0, fringe_type = full",
-                           "QFS: quadrupole, l = 0.02, k1 = 8.0, fringe_type = full\n"
-                           "QF: line = (10*QFS)")
+                           "QFS: quadrupole, l = 0.04, k1 = 8.0, fringe_type = full\n"
+                           "QF: line = (5*QFS)")
     hand = hand.replace("P1: pipe, l = 0.40", "P1S: pipe, l = 0.04\nP1: line = (10*P1S)")
     (wd / "intlath.bmad").write_text(hand)
 
@@ -356,19 +371,27 @@ def interludes(exe, wd):
     run(exe, wd, "int_p", INT_NML.format(lat="intlat.bmad", root="int_p",
         extra="  run.interlude_ds_step = 0.04\n"))
     run(exe, wd, "int_h", INT_NML.format(lat="intlath.bmad", root="int_h", extra=""))
+    # At a step of 0.15 m the iterator cuts the pipe of 0.40 m in two and leaves the
+    # quadrupole of 0.20 m whole: max(1, int(1.01 L / ds)) pieces.
+    run(exe, wd, "int_d", INT_NML.format(lat="intlat.bmad", root="int_d",
+        extra="  run.interlude_ds_step = 0.15\n"))
     w = np.loadtxt(wd / "int_w.diag.txt")
     p = np.loadtxt(wd / "int_p.diag.txt")
     h = np.loadtxt(wd / "int_h.diag.txt")
+    d = np.loadtxt(wd / "int_d.diag.txt")
 
-    # The pieces are tracked, so they must not change the answer. The element's exit is
-    # the same however many pieces cross it.
-    check("interlude: cut into pieces, exit power against the whole element",
-          abs(p[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
-    check("interlude: cut into pieces, exit sigma_x against the whole element",
-          abs(p[-1, 8] - w[-1, 8]) / w[-1, 8], 1e-9)
-    check("interlude: the hand-split lattice agrees too, so the fringe difference the "
-          "iterator buys is below notice here",
-          abs(h[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
+    # The pieces are tracked, so they must not change the answer. Where the map of the
+    # element composes exactly, its exit is the same however many pieces cross it.
+    check("interlude: the pipe alone cut, exit power against the whole element",
+          abs(d[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
+    check("interlude: the pipe alone cut, exit sigma_x against the whole element",
+          abs(d[-1, 8] - w[-1, 8]) / w[-1, 8], 1e-9)
+    check("interlude: cut into pieces, exit power against the hand-split lattice of the "
+          "same pieces, so the fringe difference the iterator buys is below notice here",
+          abs(p[-1, 2] - h[-1, 2]) / h[-1, 2], 1e-9)
+    check("interlude: cut into pieces, exit sigma_x against the hand-split lattice of the "
+          "same pieces",
+          abs(p[-1, 8] - h[-1, 8]) / h[-1, 8], 1e-9)
 
     # With the pieces on, rows land inside the quadrupole and inside the pipe. Tracked
     # whole, neither has a row inside. The element spans are 0.3 to 0.5 m and 0.5 to
@@ -382,6 +405,10 @@ def interludes(exe, wd):
           abs(inside(p, 0.3, 0.5) - 4), 0.5, note=f"[{inside(p, 0.3, 0.5)}]")
     check("interlude: rows strictly inside the pipe, cut (9 expected)",
           abs(inside(p, 0.5, 0.9) - 9), 0.5, note=f"[{inside(p, 0.5, 0.9)}]")
+    check("interlude: at a step of 0.15 m the pipe alone is cut (1 row inside it, none "
+          "inside the quadrupole)",
+          abs(inside(d, 0.5, 0.9) - 1) + inside(d, 0.3, 0.5), 0.5,
+          note=f"[{inside(d, 0.5, 0.9)} and {inside(d, 0.3, 0.5)}]")
 
     # The record-count precompute replays the walk, so the stats file is exact-sized. A
     # mismatch would mean the two disagree about where a row falls.
