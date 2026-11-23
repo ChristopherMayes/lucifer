@@ -50,7 +50,7 @@ PLAIN = {
     "dump", "frame", "slice range", "continuation", "header", "footer",
     "load", "shot noise", "kick", "push", "deposit", "source", "field solve", "kernel",
     "ramp", "sponge", "host", "FP64", "freerun", "check section", "level",
-    "recorded digit", "estimate",
+    "recorded digit", "estimate", "seed",
 }
 NO_PLURAL = {"bank", "walk", "seam", "pad", "twin", "window", "slice", "comb", "slab"}
 
