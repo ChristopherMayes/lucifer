@@ -197,9 +197,10 @@ def main():
     # The kicks, against the attribute itself: px by hkick and x by L hkick / 2, and the
     # same in y, in both FEL modes. The y plane carries the natural focusing, so its two
     # move by a part in 1e4 from the drift values. Bmad's own two trackers are printed
-    # for the record and not held: at release 20261023-0 bmad_standard applies a
-    # wiggler's kick twice, once through offset_particle and once through the kick
-    # folded into its multipoles, and runge_kutta's planar field carries no kick.
+    # for the record and not held. At release 20261122-0 both give the kick, 1.0000 in
+    # each ratio. At 20261023-0 bmad_standard applied a wiggler's kick twice, once
+    # through offset_particle and once through the kick folded into its multipoles, and
+    # runge_kutta's planar field carried no kick.
     for tr in ("avg", "uv"):
         dk = d[(tr, "kick")]
         check(f"kick: {tr} |d_px / hkick - 1|", abs(dk[2].mean() / HKICK - 1), BOUNDS["kick"][tr][0])

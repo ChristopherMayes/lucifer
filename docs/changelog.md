@@ -10,6 +10,27 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-23 Changed: the minimum Bmad release is 20261122-0, in `BMAD_RELEASE` and in
+  `environment.yml`, and `track_fel_line` no longer keeps a copy of the element for each thread of
+  an interlude. That release tracks a bunch with a `lat_param_struct` of the call's own and writes
+  `param%unstable_factor` only where it changes, which is what the routine `private_elements` and
+  its arrays `ele_t`, `lord_t` and `branch_t` did from Lucifer's side, so `track1_bunch` is handed
+  the lattice's element again. On twelve cores, with `examples/lcls_electrons` at a hundredth of its
+  charge, the thread time in `track1_bunch` is 21.2 s and 21.4 s where it was 23.3 s and 20.3 s, and
+  every array of the statistics file is unchanged. The interlude on the 128 cores of a node has not
+  been measured with Bmad's change in place of the copies. The release's `bmad_standard` quadrupole
+  map includes the exact kinematic terms, as one step of a split, and with it ten rows of
+  `docs/generated/validation-measured.md` move, each a residual at rounding or a difference far
+  inside its tolerance, and no row against Genesis4 moves in its printed digits. Of the 1340 values
+  of `examples/measured.tsv`, 86 move in seven examples: the 64 of `space_charge` that are at
+  rounding, and 22 that are the position of a maximum over records of equal power, `mode_peak_s` and
+  `peak_power_s`, with the bunching read at it, `bunching_peak`. Between Bmad 20261023-0 and
+  20261120-0 the power and the bunching of eight examples are the same to the last bit, and between
+  20261120-0 and 20261122-0 they differ by 7e-12 to 7e-7. The two trackers of Bmad that
+  `check_element_offsets.py` prints for the record both move a kicked wiggler by its kick at this
+  release, where `bmad_standard` moved it by twice the kick and `runge_kutta` not at all.
+  `docs/user-guide.md`, `docs/validation.md`, `docs/input-reference.md` and `docs/performance.md`
+  state the release and what depends on it.
 - 2026-11-23 Changed: slice migration has a page of its own, `docs/migration.md`, an explanation
   followed by its record. It holds the section `sec-migration` and its Genesis4 source block, the
   effect of migration on a load of beamlets under the label `mig-beamlets`, and under the heading
