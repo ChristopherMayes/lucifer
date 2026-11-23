@@ -44,7 +44,7 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 ## The load
 
 (gl-load)=
-**load, loader.** Loading makes the macroparticles of every slice from the bunch, before the walk. The load is what results: each slice's macroparticles with their weights. The loader is the part of Lucifer that does it, `fel_import_bunch` in `src/fel_import_mod.f90` with the noise routines of `src/fel_beam_mod.f90`. It bins the bunch by arrival time into the slices. `beam.load_mode = "sample"` then draws `beam.n_particle` macroparticles in every slice, and `"keep"` keeps the bunch's own particles ([](#sec-loading)).
+**load, loader.** Loading makes the macroparticles of every slice from the bunch, before the walk. The load is what results: each slice's macroparticles with their weights. The loader is the part of Lucifer that does it, `fel_import_bunch` in `src/fel_import_mod.f90` with the noise routines of `src/fel_beam_mod.f90`. It bins the bunch by arrival time into the slices. `beam.load_mode = "sample"` then draws `beam.n_particle` macroparticles in a slice, or fewer in a slice of few electrons, `"keep"` keeps the bunch's own particles, and `"electrons"` loads one particle for every electron ([](#sec-loading)).
 
 (gl-resampler)=
 **resampler.** The sample mode's loader for a bunch read from a file. It draws each slice's macroparticles from the bunch's particles near that slice, at one count a slice, with weights that follow the current. Its keys are the table `[beam.resample]` ([](#sec-import)).
@@ -62,7 +62,13 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 **quiet floor.** The largest bunching a load has before the noise is imposed, $\max_h |b(h)|^2 N_\lambda$ over the harmonics below the beamlet size. The loader measures it and refuses `shot_noise` on a load above 0.01, since that load already carries noise ([](#sec-noise)).
 
 (gl-migration)=
-**slice migration.** Moving a particle to the slice its phase has drifted into, `run.migrate`, in `fel_migrate_slices`. It is off by default ([](#sec-migration)).
+**slice migration.** Moving a particle to the slice its phase has drifted into, `run.migrate`, in `fel_migrate_slices`. It is off by default. It separates the members of a beamlet, which then radiate ([](migration.md)).
+
+(gl-seed-field)=
+**seed, first meaning.** A radiation field given at the entrance of the line, which the beam amplifies: `field.seed_power`, or the field of `field.file`. A run with a seed field is a seeded run. A SASE run has none and starts from the shot noise.
+
+(gl-seed-random)=
+**seed, second meaning.** The integer `run.ran_seed`, from which the random numbers of the load are generated. It is written random seed where the first meaning is near. A result over a number of random seeds is taken over that number of runs, which differ in this integer alone.
 
 ## The field
 

@@ -17,9 +17,20 @@ of that history. The entries before that date describe that branch.
   `pl-migration-electrons`, each with the label it had. The text is moved from
   `docs/particle-load.md` and no number changes. `docs/particle-load.md` is an explanation alone:
   the record of that page supported its section on migration and none of the others. It ends with a
-  table, `pl-evidence`, of the pages on which the measurements of the load are recorded. The README
-  of `examples/lcls_electrons` links to the new page, and `docs/index.md` and `docs/myst.yml` list
-  it.
+  table, `pl-evidence`, of the pages on which the measurements of the load are recorded. The new
+  page states what the first migration pass does to the copies of the keep mode, under the label
+  `mig-keep`. Under the quiet start `keep_initial_state` places the copies of a particle over one
+  wavelength from its phase, so that a copy can lie beyond the end of its slice, and
+  `fel_migrate_slices` transfers such a copy at the first pass. The fraction $(1 - 1/b)/n$ of the
+  beamlets is then separated with no drift, for a beamlet of $b$ and a slice of $n$ wavelengths. The
+  record of 2026-11-12 holds the six numbers of macroparticles per slice that were measured on the
+  example `sase`, 256 to 8192, where the manual held two, and the row of FLASH1 at 12 m, and it
+  states which of its fields were added after the day of the measurement. `docs/particle-load.md`
+  states that the weight method in the keep mode gives the shot-noise level exactly where every
+  particle of the bunch represents at least one electron. `docs/glossary.md` defines the two
+  meanings of seed, the seed field and the random seed, and its entry for the load names the three
+  modes. The README of `examples/lcls_electrons` links to the new page, and `docs/index.md` and
+  `docs/myst.yml` list it.
 - 2026-11-23 Fixed: the checks of `run.interlude_ds_step` hold under Bmad 20261122-0. Two rows of
   `tests/scripts/check_diagnostics.py` compared a run whose interlude elements are cut into pieces
   with the run that tracks them whole, at 1e-9 in the exit power, and failed at 1.014e-9 on a build
@@ -43,28 +54,29 @@ of that history. The entries before that date describe that branch.
   `sec-quiet`, `sec-noise`, `sec-import`) and with its Genesis4 source block. Its sentences are
   rewritten as full declarative ones, and no statement is removed. The measured numbers that stood
   in the paragraph on migration are a record under the heading `Measurements` of
-  `docs/migration.md`: the radiation that migration adds to a load of beamlets in `sase`, LCLS and FLASH1,
-  recorded on 2026-11-12, and the pulse energy with migration on over that with migration off for
-  the electrons mode and for the weight load, recorded on 2026-11-21. The explanation states their
-  conclusion in words and links to them. Each of the 113 numerals removed from `docs/fel-physics.md`
-  stands in the two new pages. `docs/fel-physics.md` keeps the heading of each section with a
-  sentence and a link, and its section on particle dumps, `sec-pardump`, is a section of its own.
-  Three statements are corrected to the program as it is. The first-order kick is the one method
-  other than the weight method, where the text spoke of two. The rule of fewer beamlets in a slice
-  of little charge acts under the first-order kick and the quiet start, where the text said under
-  `shot_noise`, and the weight method does not use `beam.beamlet_min_electrons`. The default window
-  of a Gaussian bunch is $2\sigma_z\sqrt{2\ln N_0}$ long for $N_0$ electrons in the central slice,
-  and $8\sigma_z$ where $N_0$ is less than one. Five further statements are held to the source. In
-  the keep mode the phase of a particle is taken modulo the length of its slice, $2\pi$ times
-  `window.n_wavelength`, where the text gave $2\pi$, and the copies occupy the one wavelength that
-  begins at that phase. The first-order kick is applied at $\lfloor (b-1)/2 \rfloor$ harmonics for a
-  beamlet of $b$. The sample mode loads fewer than `beam.n_particle` macroparticles in a slice of
-  few electrons under either method, since the weight method omits a beamlet that is assigned no
-  electron. The weight method refuses a load with `quiet_start = false`, and in the keep mode it
-  counts the electrons of each particle of the bunch. The keep mode rounds its number of slices up,
-  and the resampler rounds to the nearest integer. The record of 2026-11-12 states the commit
-  `31be058`, the beamlet size, the seeds and the positions that were recorded with it. The README of
-  `examples/lcls_electrons` links to the new page, and `docs/index.md` and `docs/myst.yml` list it.
+  `docs/migration.md`: the radiation that migration adds to a load of beamlets in `sase`, LCLS and
+  FLASH1, recorded on 2026-11-12, and the pulse energy with migration on over that with migration
+  off for the electrons mode and for the weight load, recorded on 2026-11-21. The explanation states
+  their conclusion in words and links to them. Each of the 113 numerals removed from
+  `docs/fel-physics.md` stands in the two new pages. `docs/fel-physics.md` keeps the heading of each
+  section with a sentence and a link, and its section on particle dumps, `sec-pardump`, is a section
+  of its own. Three statements are corrected to the program as it is. The first-order kick is the
+  one method other than the weight method, where the text spoke of two. The rule of fewer beamlets
+  in a slice of little charge acts under the first-order kick and the quiet start, where the text
+  said under `shot_noise`, and the weight method does not use `beam.beamlet_min_electrons`. The
+  default window of a Gaussian bunch is $2\sigma_z\sqrt{2\ln N_0}$ long for $N_0$ electrons in the
+  central slice, and $8\sigma_z$ where $N_0$ is less than one. Five further statements are held to
+  the source. In the keep mode the phase of a particle is taken modulo the length of its slice,
+  $2\pi$ times `window.n_wavelength`, where the text gave $2\pi$, and the copies occupy the one
+  wavelength that begins at that phase. The first-order kick is applied at $\lfloor (b-1)/2 \rfloor$
+  harmonics for a beamlet of $b$. The sample mode loads fewer than `beam.n_particle` macroparticles
+  in a slice of few electrons under either method, since the weight method omits a beamlet that is
+  assigned no electron. The weight method refuses a load with `quiet_start = false`, and in the keep
+  mode it counts the electrons of each particle of the bunch. The keep mode rounds its number of
+  slices up, and the resampler rounds to the nearest integer. The record of 2026-11-12 states the
+  commit `31be058`, the beamlet size, the seeds and the positions that were recorded with it. The
+  README of `examples/lcls_electrons` links to the new page, and `docs/index.md` and `docs/myst.yml`
+  list it.
 - 2026-11-22 Changed: a section of the physics manual is referred to by its label alone, and a check
   holds every label reference of the manual. The 126 links of the form `fel-physics.md#label` in 13
   pages are references by label, `#label`, which the site resolves wherever the section stands. The

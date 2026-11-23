@@ -41,7 +41,7 @@ $$
   \qquad k_s = 2\pi/\lambda_s .
 $$ (eq-theta)
 
-This reference-offset split is the FP32-safe formulation and removes the wrap hazard. $z$ does not wrap, so [slice migration](glossary.md#gl-migration)y.md#gl-slice) migration ([](#sec-migration)) needs no $\theta$-wrap protocol. The common advance rate over an element with reference wavenumber $k_u^{\mathrm{like}}$ is computed without cancellation (`fel_phi0_rate`):
+This reference-offset split is the FP32-safe formulation and removes the wrap hazard. $z$ does not wrap, so [slice migration](glossary.md#gl-migration) ([](#sec-migration)) needs no $\theta$-wrap protocol. The common advance rate over an element with reference wavenumber $k_u^{\mathrm{like}}$ is computed without cancellation (`fel_phi0_rate`):
 
 $$
   \begin{aligned}
