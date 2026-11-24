@@ -30,6 +30,10 @@ rather than by a reference file.
      thin-slice list on an input file loaded under the measured floor, load_only stopping
      after the header, and the refusal of a harmonic at which the load carries no shot
      noise.
+  7a. The mode peak. On a segment followed by a drift, a quadrupole and a drift the power
+     inside the split angle is the same to rounding at the element ends from the
+     undulator's on. run/z_mode_peak must be the first of them, the first record within
+     1e-12 of the largest, and not the one the last bit favors.
   8. The frame series (run.dump_at_comb). One frame per stats record, a frame at an
      element end identical to that element's own dump, labels unique in every frame and
      following migration, the frame's attributes against the lattice, frames landing
@@ -177,6 +181,23 @@ PRE_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to
   ran_seed = 999
 {extra}&end
 """
+
+# The pre-run's segment followed by a drift, a quadrupole and a drift, for the mode peak.
+# Those change the field by rounding alone, so the mode power is the same at the element
+# ends from the undulator's on, and the peak record must be the first of them. The run
+# starts from noise, since the mode power of the seeded pre-run is largest at the entrance.
+
+PEAK_TAIL = """call, file = aramis_1seg.bmad
+D1: drift, l = 0.44
+QF: quadrupole, l = 0.08, k1 = 2.0
+D2: drift, l = 0.24
+SEGT: line = (UND, D1, QF, D2)
+use, SEGT
+"""
+
+# The relative distance within which a record counts as the peak, peak_rel_tol of
+# fel_stats_convergence in src/fel_stats_mod.f90.
+PEAK_REL_TOL = 1e-12
 
 # Zero-length wake elements of both polarities, for check 5a. A zero-length element
 # carrying an sr wake is a standard Bmad idiom: a wake assigned over an element range or
@@ -1345,6 +1366,28 @@ def main():
     check("pre-run: the run counts its thin slices", 0.0 if thin > 0 else 1.0, 0.5, note=f"[{thin}]")
     check("pre-run: the run records the walk's clock beside the estimate", 0.0 if walk > 0 else 1.0, 0.5,
           note=f"[{walk:.3g} s]")
+
+    # 7a. The mode peak on a plateau. The record is recomputed here from the power inside
+    # the split angle at every record: the first within PEAK_REL_TOL of the largest. The
+    # strict maximum among records that agree to rounding is chosen by the last bit.
+
+    (wd / "peak_tail.bmad").write_text(PEAK_TAIL)
+    run(exe, wd, "peak", PRE_NML.format(root="peak", extra="").replace('"aramis_1seg.bmad"', '"peak_tail.bmad"')
+        .replace("seed_power = 1e4", "seed_power = 0"), threads="4")
+    with h5py.File(wd / "peak.stats.h5", "r") as f:
+        s_rec = f["coords/s"][()]
+        inside = f["field/total/power_inside_angle"][()]
+        z_peak = float(f["run/z_mode_peak"][()])
+    have = np.isfinite(inside)
+    took = np.nonzero(have.any(axis=1))[0]
+    mode = np.array([np.sum(inside[i][have[i]]) for i in took])
+    plateau = took[mode >= mode.max() * (1 - PEAK_REL_TOL)]
+    check("mode peak: the power inside the split angle is the same to 1e-12 at the element ends "
+          "from the undulator's on (records short of 3)", max(0, 3 - len(plateau)), 0.5,
+          note=f"[{len(plateau)} records, s = {s_rec[plateau[0]]:.2f} to {s_rec[plateau[-1]]:.2f} m, "
+               f"spread {1 - mode[mode >= mode.max() * (1 - PEAK_REL_TOL)].min() / mode.max():.1e}]")
+    check("mode peak: run/z_mode_peak is the first of those records, the undulator's end (m)",
+          abs(z_peak - s_rec[plateau[0]]), 1e-9, note=f"[z_mode_peak {z_peak:.2f} m]")
 
     # load_only records the same setup and stops: the pre-run is the setup without the
     # tracking, so the two setup/ groups have to agree value for value, and the estimate

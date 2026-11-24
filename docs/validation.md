@@ -1002,6 +1002,19 @@ The rows and frames were counted on the checks' own line, a quadrupole of 0.2 m 
 
 There is one thing Tao does not do and this program does. Tao's comb gives statistics along an element but its beam dumps stay at element ends, `ix_slice == -1` guarding both the internal save and the dump file. `dump_at_comb` writes a frame at every comb row, so with the pieces on a frame lands wherever a row does, which is what a movie through a break wants.
 
+(val-mode-peak)=
+## The mode peak on a plateau
+
+The run reports the split between the mode and the wide-angle emission at the record where the power inside the split angle is largest, `run/z_mode_peak` of the statistics file, and the bunching at that record, `run/bunching_peak` ([](user-guide.md)). After the last undulator of a line that power does not change. A drift and a quadrupole alter the field by rounding alone, so that the records at the ends of those elements hold the same power to a few parts in $10^{16}$. `fel_stats_convergence` takes the first record whose power is within $10^{-12}$ of the largest, which on such a plateau is the end of the undulator. It took the strict maximum before, which among those records is decided by the last bit of the field, and the bunching differs from one of them to the next, since the beam drifts. `example_record.py` takes the peak of the window power, `peak_power_s` of `examples/measured.tsv`, by the same rule.
+
+`check_diagnostics.py` holds the rule on one Aramis segment followed by a drift, a quadrupole and a drift, in a run from noise. The power inside the split angle must agree to $10^{-12}$ at the three records from the end of the undulator, and `run/z_mode_peak` must be the first of them, at 3.99 m. The levels are in [](#val-levels-diagnostics).
+
+*Measured 2026-11-24: Lucifer at commit 03919e7 and the same source with the rule, release builds against Bmad 20261122-0, gfortran 15.3.0.* On the line of the check the three records differ by at most $3\times10^{-16}$ of the power. With the strict maximum `run/z_mode_peak` was 4.51 m at the values 999, 1001 and 1004 of `run.ran_seed` and 4.43 m at 1000, 1002 and 1003. With the rule it is 3.99 m at all six.
+
+Of the 30 runs of `examples/run_examples.sh`, 22 have two or more records within $10^{-12}$ of the largest mode power, three to five records each, with a spread of at most $9\times10^{-16}$. The strict maximum had chosen a record other than the first in 20 of them. The nearest record below a plateau is $3\times10^{-11}$ under it, in `flash1`, and $4\times10^{-3}$ or more in every other run, so that the distance $10^{-12}$ lies a factor of a thousand above the one and a factor of thirty below the other. The window power has such a plateau in ten runs, and its strict maximum was a record other than the first in nine. With the rule 49 values of `examples/measured.tsv` moved: `mode_peak_s` and `bunching_peak` in the 20 runs and `peak_power_s` in the nine. The bunching at the peak changed by between 0.03% and 7.8%, the largest in `taper`, where the peak moved from 56.76 m to 56.24 m. No other value moved.
+
+The examples were also run with the rule against the conda-forge packages of Bmad 20261023.0, 20261120.0 and 20261122.0. The first two give the same table to every digit. Between the second and the third, `mode_peak_s` and `peak_power_s` agree in 28 of the 30 runs, where the strict maximum had moved `mode_peak_s` in ten runs and `peak_power_s` in two. The two runs that differ are `lucifer_off.toml` and `lucifer_gate_off.toml` of `space_charge`, a quiet load without shot noise whose power, $10^{-15}$ W, is amplified rounding. Their mode power itself differs between the two releases, by 0.8% at its peak, and its largest record is at the end of a different undulator.
+
 (val-the-saturation-demo)=
 ## The saturation demo
 

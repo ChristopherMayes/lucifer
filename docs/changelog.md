@@ -10,6 +10,24 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-24 Fixed: the record that a run reports as the mode peak was chosen by the last bit of the
+  field where several records hold the same power. After the last undulator of a line the power
+  inside the split angle is the same at the end of every element to a few parts in 1e16, and
+  `fel_stats_convergence` took the strict maximum among them. `run/z_mode_peak` then moved by an
+  element, and `run/bunching_peak` by percent, with a change of compiler, of Bmad release or of the
+  order of a sum: between Bmad 20261120-0 and 20261122-0 it moved in ten examples. The peak is now
+  the first record whose power is within 1e-12 of the largest, which on such a plateau is the end of
+  the undulator. `tests/scripts/example_record.py` takes `peak_power_s` by the same rule. 49 values
+  of `examples/measured.tsv` move: `mode_peak_s` and `bunching_peak` in 20 runs and `peak_power_s`
+  in nine, each from a later record of a plateau to its first. The bunching at the peak changes by
+  0.03% to 7.8%, the largest in `taper`, 0.0723 to 0.0779, where the peak goes from 56.76 m to 56.24
+  m. No other value of that file moves, and no row of `docs/generated/validation-measured.md`.
+  `check_diagnostics.py` holds the rule on a segment followed by a drift, a quadrupole and a drift,
+  where the strict maximum gave 4.43 m or 4.51 m according to the seed and the rule gives 3.99 m.
+  Against the conda-forge packages of Bmad 20261023.0, 20261120.0 and 20261122.0 the peak records
+  now agree in 28 of 30 example runs. The two that differ are quiet runs of `space_charge` whose
+  power is amplified rounding, 1e-15 W, and differs itself between the releases.
+  `docs/validation.md` records the measurements under `val-mode-peak`.
 - 2026-11-24 Fixed: the keep mode under the quiet start stored copies of a particle beyond the end
   of its slice. `keep_initial_state` placed copy j of a particle of phase theta0 at theta0 + 2 pi j
   / beamlet_size, so that a copy of a particle in the last wavelength of a slice lay past the end of

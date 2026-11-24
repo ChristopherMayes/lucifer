@@ -7338,6 +7338,15 @@ the power inside split_angle beside the total (manual sec-source-filter).
 The criterion of docs/startup-noise.md is stated at saturation, so it reads the
 peak-power record. The last record is where an exit power is quoted. Only records
 that took the angle moments are considered.
+
+The peak record is the first whose mode power is within peak_rel_tol of the largest.
+Note: After the last undulator the power is the same at the end of every element, to a
+few parts in 1e16, since a drift and a quadrupole change the field by rounding alone.
+The record of the strict maximum among them was once taken, and a change in the last
+bit of the field moved the peak by an element and the bunching read there by percent.
+The first record of such a plateau is the end of the undulator. peak_rel_tol is 1e-12,
+a thousand times the spread seen on a plateau. The nearest record below a plateau in the
+examples is 3e-11 under it.
 ```
 
 ```

@@ -1013,6 +1013,15 @@ end subroutine fel_stats_exit_light
 ! peak-power record. The last record is where an exit power is quoted. Only records
 ! that took the angle moments are considered.
 !
+! The peak record is the first whose mode power is within peak_rel_tol of the largest.
+! Note: After the last undulator the power is the same at the end of every element, to a
+! few parts in 1e16, since a drift and a quadrupole change the field by rounding alone.
+! The record of the strict maximum among them was once taken, and a change in the last
+! bit of the field moved the peak by an element and the bunching read there by percent.
+! The first record of such a plateau is the end of the undulator. peak_rel_tol is 1e-12,
+! a thousand times the spread seen on a plateau. The nearest record below a plateau in the
+! examples is 3e-11 under it.
+!
 ! Input:
 !   stats -- fel_stats_struct: The filled accumulator.
 !
@@ -1025,7 +1034,8 @@ subroutine fel_stats_convergence (stats, cvg)
 
 type (fel_stats_struct) stats
 type (fel_convergence_struct) cvg
-real(rp) pow, p_in, q
+real(rp), parameter :: peak_rel_tol = 1.0e-12_rp
+real(rp) pow, p_in, p_max, q
 integer ir, ir_peak, ir_last, k
 
 !
@@ -1033,14 +1043,23 @@ integer ir, ir_peak, ir_last, k
 cvg = fel_convergence_struct()
 if (stats%irec < 1 .or. .not. allocated(stats%f_p_in)) return
 
-ir_peak = 0;  ir_last = 0
+ir_last = 0;  p_max = 0
 do ir = 1, stats%irec
   if (all(stats%f_angles_valid(:, ir) == 0)) cycle
   ir_last = ir
-  if (ir_peak == 0) ir_peak = ir
-  if (mode_power(ir) > mode_power(ir_peak)) ir_peak = ir
+  p_max = max(p_max, mode_power(ir))
 enddo
 if (ir_last == 0) return
+
+! The first record of the plateau at the maximum.
+
+ir_peak = ir_last
+do ir = 1, ir_last
+  if (all(stats%f_angles_valid(:, ir) == 0)) cycle
+  if (mode_power(ir) < p_max * (1 - peak_rel_tol)) cycle
+  ir_peak = ir
+  exit
+enddo
 
 cvg%ok = .true.
 cvg%angle = stats%split_angle
@@ -1378,7 +1397,9 @@ call fel_stats_convergence (stats, cvg)
 if (cvg%ok) then
   call fel_h5_real (g_id, 'z_mode_peak', 'm', 'z of the mode peak', &
         'Position of the record where the power inside split_angle peaked, which is ' // &
-        'where the mode saturates, among the records that took the field angle moments.', &
+        'where the mode saturates, among the records that took the field angle moments. ' // &
+        'It is the first record whose power is within 1e-12 of the largest, which after ' // &
+        'the last undulator is the end of that undulator.', &
         'none', cvg%z(1), err)
   call fel_h5_real (g_id, 'power_inside_angle_peak', 'W', 'mode power', &
         'Power within field/total/split_angle of the axis, summed over the window and ' // &
