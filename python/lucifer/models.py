@@ -55,6 +55,8 @@ class Run:
     """Minimum z advance between per-record stats rows. 0 is every record, negative is none. [m]"""
     interlude_ds_step: float = 0.0
     """The length an interlude element is cut into, for stats rows and frames along it. 0 tracks it whole. [m]"""
+    step_slip_max: float = 1.05
+    """The most slices that the slippage of one integration step may cross, in a run of more than one slice whose beam carries noise. A step beyond it is refused. 0 accepts any step. Bounds: from 0.0."""
     dump_beam_at: list[str] = _field(default_factory=lambda: [])
     """Element locators for mid-run beam dumps."""
     dump_field_at: list[str] = _field(default_factory=lambda: [])

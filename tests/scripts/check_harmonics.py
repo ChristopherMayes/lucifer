@@ -167,6 +167,11 @@ NML_IMPORT = """! flat keys; routed into the input file's tables by lucifer.flat
 # read 1.4e-3 against its 1e-6 level, where 255 read 5.3e-8. Against 4.6.16 at 256 it
 # reads 1.2e-7 and P3 2.2e-4. docs/validation.md (val-the-transverse-grid) has the account.
 
+# The windows below are slices of one wavelength on a segment whose step is three periods,
+# so a step slips the field by three slices. run.step_slip_max refuses that for a beam that
+# carries noise, since the start-up power is then three times too large. The rows here hold
+# identities and not a level, so the key is at 0 and each run is the run that was recorded.
+
 NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
@@ -193,6 +198,7 @@ NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_
   ran_seed = 777
   harmonics = 1, 3
   write_diag = T
+  step_slip_max = 0
 {extra}&end
 """
 

@@ -600,8 +600,8 @@ where the two builds agree to every printed digit.
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
 | migration no-op on the device: migrate T vs F final beam z |  | same | holds |
-| two runs bit for bit, the filter on: 182 arrays compared | 0 | same | <= 0 |
-| two runs bit for bit, the filter off: 178 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter on: 184 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter off: 180 arrays compared | 0 | same | <= 0 |
 | deposit accuracy, cancelling phases | 1.4673e-05 | same | <= 1.5372e-05 |
 | deposit quantum below the FP32 spacing of its bound, cancelling phases | 37 | same | >= 24 |
 | deposit accuracy, unequal weights | 1.4681e-05 | same | <= 1.5383e-05 |
@@ -772,7 +772,7 @@ where the two builds agree to every printed digit.
 | wake production TD window power vs CPU | 1.7755e-06 | same | <= 1.6000e-03 |
 | energy the wake removes, device vs CPU, fraction of itself | 2.8039e-05 | same | <= 9.0000e-05 |
 | the enlarged decrement moves the energy removed | 6.2520e-02 | same | >= 3.1250e-02 |
-| two wake runs bit for bit: 178 arrays compared | 0 | same | <= 0 |
+| two wake runs bit for bit: 180 arrays compared | 0 | same | <= 0 |
 | wake spectral production TD window power vs CPU | 9.0210e-08 | same | <= 1.6000e-03 |
 | migrating wake record: refreshes at the CPU's positions | 49 | same | >= 2 |
 | migrating wake record: refreshed loss rates vs CPU | 3.6770e-04 | same | <= 1.2000e-03 |
@@ -1373,6 +1373,11 @@ where the two builds agree to every printed digit.
 | pre-run: the run records the walk's clock beside the estimate | 0.0000e+00 | same | <= 5.0000e-01 |
 | mode peak: the power inside the split angle is the same to 1e-12 at the element ends from the undulator's on (records short of 3) | 0 | same | <= 5.0000e-01 |
 | mode peak: run/z_mode_peak is the first of those records, the undulator's end (m) | 0.0000e+00 | same | <= 1.0000e-09 |
+| step: a step of three slices from noise is refused, with the slippage in the message (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| step: the same input at a step of one period is accepted, its slippage in planes | 1.0000e+00 | same | <= 1.0500e+00 |
+| step: a step that the lattice does not state is derived within the bound, its slippage in planes | 1.0000e+00 | same | <= 1.0500e+00 |
+| step: the stats file says the slice set that step (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| step: a quiet load at three slices a step is accepted, with the warning (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: load_only records the same setup and estimate as the run does | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: load_only tracks nothing (records) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it | 0.0000e+00 | same | <= 5.0000e-01 |

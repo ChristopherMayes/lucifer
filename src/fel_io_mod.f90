@@ -1055,6 +1055,7 @@ if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0 .
   call fel_column_add (c_right, 'electrons / beamlet', number_text(e_beamlet))
 endif
 if (l_1d > 0 .and. ds_first > 0) call fel_column_add (c_right, 'gain length / step', number_text(l_1d / ds_first))
+if (run%step_slip > 0) call fel_column_add (c_right, 'step slippage / plane', number_text(run%step_slip))
 
 call fel_box_rule (fel_rule_mid$, 'derived', '', .true., .true.)
 call fel_box_columns (c_left, c_right)
@@ -1101,6 +1102,11 @@ call fel_record_int8 ('setup', 'n_macroparticle', 'The macroparticles of the who
 call fel_record_int ('setup', 'beamlets_per_slice', 'The beamlets in the slice with the most charge.', nbeamlet)
 call fel_record_int ('setup', 'beamlet_size', 'The macroparticles of one beamlet.', run%bparam%beamlet_size)
 call fel_record_real ('setup', 'step', 'm', 'The integration step of the first FEL element.', ds_first)
+call fel_record_str ('setup', 'step_from', 'What set the integration step of the first FEL element: lattice ' // &
+      'where the lattice states it, and for a derived step gain, a twentieth of the gain length, or slice, ' // &
+      'the step whose slippage is run.step_slip_max slices.', trim(run%step_from))
+call fel_record_real ('setup', 'step_slip', '1', 'The slippage of one integration step in planes of the ' // &
+      'field, the largest over the FEL elements. 0 in a run of one slice.', run%step_slip)
 
 ! What the run will write and hold, stated before it tracks: the pulse, the frames, the
 ! field's reductions and the device's resident bytes.
@@ -1478,6 +1484,10 @@ if (run%sigma_beam > 0) then
 endif
 if (l_1d > 0 .and. ds_first > 0) then
   if (l_1d / ds_first < 5) call warn ('gain length / step = ' // number_text(l_1d / ds_first) // ', under 5')
+endif
+if (run%global%step_slip_max > 0 .and. run%step_slip > run%global%step_slip_max) then
+  call warn ('step slippage / plane = ' // number_text(run%step_slip) // ', above ' // &
+             number_text(run%global%step_slip_max))
 endif
 if (run%bparam%quiet_start .and. run%bparam%beam_file == '' .and. nbeamlet > 0 .and. &
     run%bparam%load_mode /= 'electrons') then

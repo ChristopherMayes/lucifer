@@ -10,6 +10,29 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-24 Fixed: a time-dependent run whose integration step slipped the field by more than one
+  slice started from noise that was too strong by that number, and nothing said so. `track_fel_line`
+  couples a plane of the field to the slices beneath it for a step and then moves the field by the
+  step's slippage. At r planes a step a plane meets the beam of one plane in r, and the window is r
+  sets of planes that exchange no light, each with the shot noise of 1/r of the electrons of its
+  spacing. On `examples/sase` at one wavelength per slice the pulse energy at the end of the first
+  undulator was 2.01 +- 0.15 and 2.99 +- 0.21 times that of a step of one period, at steps of two
+  and three periods, over eight seeds, and 2.86 +- 0.03 with unaveraged undulators. A quiet load
+  with a seed field is unchanged to 1%, and so is the spectral propagator at its derived plane of 15
+  wavelengths. The new key `run.step_slip_max`, 1.05 by default, is the largest slippage of a step
+  in planes of the field. A step that the lattice leaves to the program is derived within it: with
+  `window.n_wavelength = 1` on the Aramis line the step from the gain alone was four periods, 4.01
+  +- 0.24 times too strong, and is now one. A step that the lattice states beyond it is refused
+  where the beam carries noise, with `THE INTEGRATION STEP OF <element> SLIPS THE FIELD BY <r>
+  PLANES`, the largest `ds_step` and the smallest `window.n_wavelength` that are accepted. A quiet
+  load is accepted with the line `! step slippage / plane = <r>, above 1.05`. The header prints
+  `step slippage / plane` and the statistics file records `setup/step_slip` and `setup/step_from`.
+  No example and no tier exceeds 0.9963 planes a step in a run of more than one slice, and no
+  recorded digit moves. 24 runs of five check scripts, in windows of one wavelength at a step of
+  three periods, hold identities and set the key to 0. Three rows of `docs/generated/validation-
+  measured.md` change in their names, which count the arrays of a statistics file, by the two new
+  records. `check_diagnostics.py` holds the refusal, the derived step and the two accepted cases,
+  and `docs/validation.md` records the measurements under `val-step-slip`.
 - 2026-11-24 Fixed: the record that a run reports as the mode peak was chosen by the last bit of the
   field where several records hold the same power. After the last undulator of a line the power
   inside the split angle is the same at the end of every element to a few parts in 1e16, and

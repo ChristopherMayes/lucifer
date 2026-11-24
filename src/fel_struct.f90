@@ -180,6 +180,13 @@ type fel_global_struct
   !   >  0: Pieces of about this length [m]. Stats rows and frames then land inside a
   !         drift as they already land inside a wiggler.
   real(rp) :: interlude_ds_step = 0
+  ! The most slices that the slippage of one integration step may cross in a run of more
+  ! than one slice whose beam carries noise. A field slice is coupled to one beam slice
+  ! for a step and is then moved by the step's slippage. At r slices a step it meets one
+  ! beam slice in r, and the start-up energy is r times too large. The default leaves room
+  ! for an undulator detuned by five percent.
+  !   <= 0: Any step is accepted.
+  real(rp) :: step_slip_max = 1.05_rp
   character(60) :: dump_beam_at(40) = ''     ! Element locators for mid-run beam dumps.
   character(60) :: dump_field_at(40) = ''    ! Element locators for mid-run field dumps.
   ! Write the beam and the field at every comb position as a frame series. This gives a
@@ -413,6 +420,11 @@ type fel_run_struct
   ! What the setup estimated from the described beam, 0 where a dump is loaded and
   ! nothing describes it: the one-dimensional Pierce parameter and the rms beam size.
   real(rp) :: rho_1d = 0, sigma_beam = 0
+  ! The slippage of one integration step in planes of the field, the largest over the FEL
+  ! elements, 0 in a run of one slice (check_step_slip of fel_setup). And what set the
+  ! step of the first FEL element: 'lattice', or for a derived step 'gain' or 'slice'.
+  real(rp) :: step_slip = 0
+  character(8) :: step_from = 'lattice'
   real(rp) :: filter_edge = 0              ! The source filter's edge as an angle [rad], 0 with no filter.
   ! The assembled state.
   type (lat_struct) :: lat

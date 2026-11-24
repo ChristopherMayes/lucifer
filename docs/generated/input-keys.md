@@ -34,6 +34,7 @@
 | `continuation` | true/false | false |  |  | beam.file and field.file are a checkpoint pair the run continues from, not an initialization. |
 | `comb_ds_save` | real | `0` | m |  | Minimum z advance between per-record stats rows. 0 is every record, negative is none. |
 | `interlude_ds_step` | real | `0` | m |  | The length an interlude element is cut into, for stats rows and frames along it. 0 tracks it whole. |
+| `step_slip_max` | real | `1.05` |  | from 0 | The most slices that the slippage of one integration step may cross, in a run of more than one slice whose beam carries noise. A step beyond it is refused. 0 accepts any step. |
 | `dump_beam_at` | list of strings | `[]` |  |  | Element locators for mid-run beam dumps. |
 | `dump_field_at` | list of strings | `[]` |  |  | Element locators for mid-run field dumps. |
 | `dump_at_comb` | true/false | false |  |  | Write the beam and the field at every comb position as a frame series. |

@@ -90,6 +90,11 @@ import validate_bmad_stats  # noqa: E402  The standard's own conformance checker
 
 FAILED = False
 
+# The windows below are slices of one wavelength on a segment whose step is three periods,
+# so a step slips the field by three slices. run.step_slip_max refuses that for a beam that
+# carries noise, since the start-up power is then three times too large. The rows here hold
+# identities and not a level, so the key is at 0 and each run is the run that was recorded.
+
 NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
@@ -117,6 +122,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   write_escaped = T
   dump_beam_at = "UND"
   dump_field_at = "UND"
+  step_slip_max = 0
 {extra}&end
 """
 
@@ -149,6 +155,7 @@ FRAME_NML = """! flat keys; routed into the input file's tables by lucifer.flat.
   shot_noise = T
   shot_noise_method = "first_order"
   ran_seed = 999
+  step_slip_max = 0
 {extra}&end
 """
 
@@ -179,6 +186,7 @@ PRE_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to
   shot_noise = T
   shot_noise_method = "first_order"
   ran_seed = 999
+  step_slip_max = 0
 {extra}&end
 """
 
@@ -1388,6 +1396,48 @@ def main():
                f"spread {1 - mode[mode >= mode.max() * (1 - PEAK_REL_TOL)].min() / mode.max():.1e}]")
     check("mode peak: run/z_mode_peak is the first of those records, the undulator's end (m)",
           abs(z_peak - s_rec[plateau[0]]), 1e-9, note=f"[z_mode_peak {z_peak:.2f} m]")
+
+    # 7b. The step against the slice (run.step_slip_max). The pre-run's window is slices of
+    # one wavelength and the segment's step is three periods, so a step slips the field by
+    # three slices and a start from noise is three times too strong. That is refused. The
+    # same input at a step of one period is accepted, a step that the lattice does not state
+    # is derived within the bound, and a quiet load is accepted with a line of the header's
+    # warnings. The last three stop after the header, which is where the setup is recorded.
+
+    def step_run(root, lat, quiet=False):
+        text = PRE_NML.format(root=root, extra="  load_only = T\n").replace("  step_slip_max = 0\n", "")
+        if quiet:
+            text = text.replace("  shot_noise = T\n", "  shot_noise = F\n")
+        (wd / f"{root}.toml").write_text(to_groups(text.replace('"aramis_1seg.bmad"', f'"{lat}"')))
+        r = subprocess.run([str(exe), f"{root}.toml"], cwd=wd, capture_output=True, text=True,
+                           env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+        return r.returncode, r.stdout + r.stderr
+
+    seg = (latdir / "aramis_1seg.bmad").read_text()
+    (wd / "step_one.bmad").write_text(seg.replace("ds_step = 0.045", "ds_step = 0.015"))
+    (wd / "step_unset.bmad").write_text(seg.replace(", ds_step = 0.045", ""))
+
+    rc, out = step_run("step3", "aramis_1seg.bmad")
+    m = re.search(r"SLIPS THE FIELD BY\s+([0-9.]+)\s+PLANES", out)
+    refused = rc != 0 and m is not None and abs(float(m.group(1)) - 2.99) < 0.006 and "ds_step AT OR BELOW" in out
+    check("step: a step of three slices from noise is refused, with the slippage in the message (0 = yes)",
+          0.0 if refused else 1.0, 0.5, note=f"[{m.group(1) if m else 'no message'} planes]")
+
+    rc, out = step_run("step1", "step_one.bmad")
+    slip1 = setup_values(wd / "step1.stats.h5").get("step_slip", 99.0) if rc == 0 else 99.0
+    check("step: the same input at a step of one period is accepted, its slippage in planes", slip1, 1.05)
+
+    rc, out = step_run("stepd", "step_unset.bmad")
+    sd = setup_values(wd / "stepd.stats.h5") if rc == 0 else {}
+    check("step: a step that the lattice does not state is derived within the bound, its slippage in planes",
+          sd.get("step_slip", 99.0), 1.05, note=f"[step {sd.get('step', 0.0):.3f} m]")
+    check("step: the stats file says the slice set that step (0 = yes)",
+          0.0 if sd.get("step_from") == "slice" else 1.0, 0.5, note=f"[{sd.get('step_from', 'no record')}]")
+
+    rc, out = step_run("stepq", "aramis_1seg.bmad", quiet=True)
+    warned = rc == 0 and re.search(r"! step slippage / plane = 2\.99, above 1\.05", out) is not None
+    check("step: a quiet load at three slices a step is accepted, with the warning (0 = yes)",
+          0.0 if warned else 1.0, 0.5)
 
     # load_only records the same setup and stops: the pre-run is the setup without the
     # tracking, so the two setup/ groups have to agree value for value, and the estimate

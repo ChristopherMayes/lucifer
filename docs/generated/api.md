@@ -6198,6 +6198,14 @@ and fills num_steps from it. That resolves the wiggle the averaged model has alr
 averaged over. The derived step replaces it. The unset state is that exact quotient,
 since the bookkeeper leaves nothing else to read. So an element whose step is
 l_period/20 by the input file's own choice is derived over. Any other stated step is kept.
+
+In a time-dependent description the derived step is also at most the step whose slippage
+is run.step_slip_max slices, in whole periods and at least one. A field slice is coupled
+to one beam slice for a step and then moved by the step's slippage. A step that slips it
+r slices lets it meet one beam slice in r, and a start from noise is r times too strong
+(check_step_slip of fel_setup). The gain alone knows nothing of a spacing that the input file
+states: one wavelength per slice on a line whose gain length is 1.3 m gave a step of four
+periods. run%step_from says which bound set the step of the first FEL element.
 ```
 
 (api-fel-pierce-of-beam)=
@@ -6327,6 +6335,28 @@ Output:
                  (%ele_slip, %fel_zoff, %light_corr, %phase_rate, %gamma0_ref), tracking window
                  (%i_start, %i_end) and diagnostics (%stats, dump locators, record counts) set.
   err_flag  -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-check-step-slip)=
+### `check_step_slip`
+
+*Subroutine* `()`
+
+```
+Routine to hold the slippage of one integration step to run.step_slip_max planes of the
+field, in a run of more than one slice whose beam carries noise.
+
+The walk couples a field plane to the beam slices under it for one step and then moves
+the field by the step's slippage, dz (1 + aw^2) / (2 gamma0^2 lambda) wavelengths. Where
+that is r planes, a plane meets the beam of one plane in r and passes the rest. The
+window is then r sets of planes that exchange no light. Each set is a valid run at r
+times the spacing, but its slices carry the shot noise of 1/r of the electrons that the
+spacing holds, so the start-up power is r times too large. Measured on examples/sase at
+r of 2 and 3: 2.01 and 2.99 times the pulse energy at the end of the first undulator
+(docs/validation.md, val-step-slip). A quiet load with no shot noise has no noise to
+count too often and is accepted, with a line of the header's warnings.
+
+run%step_slip is set to the largest r of the FEL elements, 0 in a run of one slice.
 ```
 
 (api-resolve-window-ele)=

@@ -163,6 +163,11 @@ GAIN = """! flat keys; routed into the input file's tables by lucifer.flat.to_to
 &end
 """
 
+# The windows below are slices of one wavelength on a segment whose step is three periods,
+# so a step slips the field by three slices. run.step_slip_max refuses that for a beam that
+# carries noise, since the start-up power is then three times too large. The rows here hold
+# identities and not a level, so the key is at 0 and each run is the run that was recorded.
+
 TDID = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
@@ -187,6 +192,7 @@ TDID = """! flat keys; routed into the input file's tables by lucifer.flat.to_to
   shot_noise_method = "first_order"
   ran_seed = 999
   write_diag = T
+  step_slip_max = 0
 &end
 """
 
