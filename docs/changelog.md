@@ -10,6 +10,31 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-24 Fixed: the keep mode under the quiet start stored copies of a particle beyond the end
+  of its slice. `keep_initial_state` placed copy j of a particle of phase theta0 at theta0 + 2 pi j
+  / beamlet_size, so that a copy of a particle in the last wavelength of a slice lay past the end of
+  the slice: 47022 of 320000 copies in slices of three wavelengths and 139855 in slices of one, in
+  the load of `check_load.py`. The averaged step is periodic in the phase and did not distinguish
+  such a copy. With `run.migrate = true` the first call of `fel_migrate_slices` moved it to the next
+  slice, and its beamlet was then quiet in neither slice. Copy j now stands at 2 pi floor(theta0 / 2
+  pi) + mod(theta0 + 2 pi j / beamlet_size, 2 pi), in the wavelength that holds its particle. A run
+  with `run.migrate = false` is unchanged: the SASE pulse energy of `examples/import` agrees along
+  the line to 6e-11, and no recorded digit of a check or of an example moves.
+  `docs/generated/layouts.md` changes in the largest and the smallest time of its keep-mode dump,
+  since a dump holds each returned copy one wavelength from where it was. On `examples/import` with
+  no shot noise and migration on, over eight seeds, the pass at the end of the first undulator moved
+  45356 to 46382 of the 400000 macroparticles where a later undulator moved 33636 to 34909, and it
+  now moves 33645 to 34504. The pulse energy that migration adds to this load is lower by 27% at the
+  end of the second undulator and by 12% at the end of the third. It is unchanged at the exit, 9% of
+  the SASE pulse energy, since the drift within one undulator separates the beamlets of the
+  wavelength at one end of every slice as well. `docs/migration.md` states this under `mig-keep` and
+  records the measurement under `mig-keep-measured`, whose rows are in
+  `docs/figures/migration-keep.tsv`.
+  `check_load.py` holds every phase of the keep load's dump to its slice, at three wavelengths per
+  slice and at one. In slices of one wavelength at the example's step of three periods the SASE
+  pulse energy was three times that at a step of one period, 42.6 pJ against 14.9 pJ, so the runs of
+  that slice length were made at one period. The program gives no warning of a step that advances
+  the field more than one slice.
 - 2026-11-23 Changed: the minimum Bmad release is 20261122-0, in `BMAD_RELEASE` and in
   `environment.yml`, and `track_fel_line` no longer keeps a copy of the element for each thread of
   an interlude. That release tracks a bunch with a `lat_param_struct` of the call's own and writes
