@@ -389,7 +389,10 @@ def bank(exe, wd, threads):
     n_slip = int(np.floor(length / (2 * gamma**2 * WAVELENGTH))) + 1
     write_pulse(wd, "spec_bank", NZ - 100, e_tot, length)
     ok = True
-    for key, more in (("slices", []), ("spectral", ["field.propagator=spectral"])):
+    # A step of this run slips the field by 1.9 slices, which run.step_slip_max refuses for a
+    # loaded beam. The rows hold the bank's bookkeeping and not a level, so the key is at 0.
+    for key, more in (("slices", ["run.step_slip_max=0"]),
+                      ("spectral", ["field.propagator=spectral", "run.step_slip_max=0"])):
         root = f"spec_bank_{key}"
         text = run(exe, wd, "spec_bank.toml", root, more, threads)
         if text is None:

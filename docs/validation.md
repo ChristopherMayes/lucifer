@@ -1015,6 +1015,39 @@ Of the 30 runs of `examples/run_examples.sh`, 22 have two or more records within
 
 The examples were also run with the rule against the conda-forge packages of Bmad 20261023.0, 20261120.0 and 20261122.0. The first two give the same table to every digit. Between the second and the third, `mode_peak_s` and `peak_power_s` agree in 28 of the 30 runs, where the strict maximum had moved `mode_peak_s` in ten runs and `peak_power_s` in two. The two runs that differ are `lucifer_off.toml` and `lucifer_gate_off.toml` of `space_charge`, a quiet load without shot noise whose power, $10^{-15}$ W, is amplified rounding. Their mode power itself differs between the two releases, by 0.8% at its peak, and its largest record is at the end of a different undulator.
 
+(val-step-slip)=
+## The step against the spacing of the slices
+
+A plane of the field is coupled to the slices beneath it for one integration step and is then moved by the slippage of that step. Where the slippage is $r$ planes the start-up power is $r$ times too large ([](#sec-element)). `run.step_slip_max`, 1.05 by default, bounds a derived step and refuses a stated one beyond it where the beam carries noise ([](input-reference.md#param-global-step-slip-max)).
+
+`check_diagnostics.py` holds five rows on one Aramis segment in a window of eight slices of one wavelength, at the levels in [](#val-levels-diagnostics). At the segment's step of three periods a start from noise must be refused, with the slippage of 2.99 planes and the largest accepted `ds_step` in the message. The same input at a step of one period must be accepted. With no step stated in the lattice, the derived step must slip at most 1.05 planes, and `setup/step_from` of the statistics file must be `slice`. A quiet load with a seed field at three periods must be accepted with the line `! step slippage / plane = 2.99, above 1.05`. Before the bound the first was accepted, the derived step was 0.0596 m, four periods, and the last gave no line.
+
+When the bound was introduced, 24 of the 500 runs of more than one slice in the validation suite slipped the field by more than 1.05 planes a step with a beam that carries noise: thirteen of `check_diagnostics.py`, five of `check_device.py`, and two each of `check_harmonics.py`, `check_spectral.py` and `check_unaveraged.py`. They run windows of one wavelength per slice at a step of three periods, or a loaded pulse at 1.9 slices a step, and their rows hold identities and not a level. Each sets `run.step_slip_max = 0` and is the run that was recorded. No example slips more than 0.9963 planes a step in a run of more than one slice.
+
+*Measured 2026-11-24: Lucifer at commit 03919e7, release build against Bmad 20261122-0, gfortran 15.3.0, four threads.* The example `sase`, with `run.track_end=UND##4` and the values 101 to 108 of `run.ran_seed`, at `window.n_wavelength` of 1, 2, 3 and 6 and with `ds_step` of `UND` in `examples/aramis.bmad` at 0.045, 0.03 and 0.015 m, which are steps of 2.989, 2 and 1 periods. The numbers are the pulse energy at the ends of the four undulators divided by that of a reference run, as the ratio of the means of the eight random seeds with its standard error.
+
+| wavelengths per slice | step, periods | planes a step | reference | 3.99 m | 8.74 m | 13.49 m | 18.24 m |
+|---|---|---|---|---|---|---|---|
+| 1 | 2 | 2.00 | 1 wavelength, 1 period | $2.01 \pm 0.15$ | $2.01 \pm 0.18$ | $2.01 \pm 0.20$ | $1.92 \pm 0.26$ |
+| 1 | 2.989 | 2.99 | 1 wavelength, 1 period | $2.99 \pm 0.21$ | $2.89 \pm 0.19$ | $2.61 \pm 0.21$ | $2.28 \pm 0.28$ |
+| 3 | 2.989 | 1.00 | 1 wavelength, 1 period | $1.14 \pm 0.08$ | $1.14 \pm 0.09$ | $1.13 \pm 0.12$ | $1.15 \pm 0.20$ |
+| 6 | 2.989 | 0.50 | 3 wavelengths, 2.989 periods | $0.95 \pm 0.07$ | $0.93 \pm 0.07$ | $0.99 \pm 0.10$ | $0.96 \pm 0.16$ |
+| 2 | 2.989 | 1.49 | 3 wavelengths, 2.989 periods | $1.31 \pm 0.07$ | $1.26 \pm 0.08$ | $1.12 \pm 0.12$ | $0.92 \pm 0.15$ |
+| 1 | 2.989 | 2.99 | 3 wavelengths, 2.989 periods | $2.63 \pm 0.16$ | $2.53 \pm 0.14$ | $2.30 \pm 0.19$ | $1.98 \pm 0.28$ |
+
+At the end of the first undulator the energy is proportional to the number of planes a step from one plane upward, and it does not depend on that number below one. The factor decreases along the line, which was not examined.
+
+Four further cases, each as the run at one wavelength per slice and 2.989 periods a step divided by the run at one period a step, at the ends of the undulators tracked:
+
+| case | 3.99 m | 8.74 m | 13.49 m | 18.24 m |
+|---|---|---|---|---|
+| quiet load, `beam.shot_noise=false field.seed_power=1e5 field.seed_waist_size=30e-6`, one run each | 1.00 | 1.01 | 1.01 | 1.01 |
+| `field.propagator=spectral`, four random seeds | $1.00 \pm 0.10$ | $0.99 \pm 0.13$ | $0.99 \pm 0.12$ | $0.99 \pm 0.14$ |
+| unaveraged undulators, a window of 96 wavelengths, `run.track_end=UND##2`, four random seeds | $2.86 \pm 0.03$ | $2.86 \pm 0.02$ | | |
+| no `ds_step` in the lattice, eight random seeds | $4.01 \pm 0.24$ | $3.76 \pm 0.25$ | $3.22 \pm 0.26$ | $2.62 \pm 0.33$ |
+
+The quiet load with a seed field is not affected, so that it is accepted. Under the spectral propagator the plane of the field is 15 wavelengths in these runs, the step slips it by 0.2 of a plane, and the energy is not affected. The case of a plane of one wavelength under that propagator was not run. The unaveraged mode is affected as the averaged mode is. In the last row the step derived from the gain alone was 0.0596 m, 3.97 periods, which the bound now reduces to one period. The unaveraged runs set `window.window_length=9.6e-9`, `beam.z_min=-4.8e-9`, `beam.z_max=4.8e-9` and `beam.bunch_charge=9.606645941707e-14`.
+
 (val-the-saturation-demo)=
 ## The saturation demo
 

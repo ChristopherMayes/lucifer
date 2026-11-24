@@ -837,13 +837,21 @@ end function described_pierce
 ! averaged over. The derived step replaces it. The unset state is that exact quotient,
 ! since the bookkeeper leaves nothing else to read. So an element whose step is
 ! l_period/20 by the input file's own choice is derived over. Any other stated step is kept.
+!
+! In a time-dependent description the derived step is also at most the step whose slippage
+! is run.step_slip_max slices, in whole periods and at least one. A field slice is coupled
+! to one beam slice for a step and then moved by the step's slippage. A step that slips it
+! r slices lets it meet one beam slice in r, and a start from noise is r times too strong
+! (check_step_slip of fel_setup). The gain alone knows nothing of a spacing that the input file
+! states: one wavelength per slice on a line whose gain length is 1.3 m gave a step of four
+! periods. run%step_from says which bound set the step of the first FEL element.
 !-
 
 subroutine derive_slicing_and_step ()
 
 type (ele_struct), pointer :: ele
-real(rp) rho, l_coop, l_1d, step, l_per
-integer je, n_wl, n_step, n_done
+real(rp) rho, l_coop, l_1d, step, l_per, slip_per
+integer je, n_wl, n_step, n_done, n_per, n_per_slip, n_bounded
 logical td
 
 !
@@ -886,7 +894,7 @@ if (rho <= 0) return
 ! The step, per element, where the input file states none.
 
 l_1d = 0
-n_done = 0
+n_done = 0;  n_bounded = 0
 do je = 1, branch%n_ele_track
   if (.not. is_fel(je)) cycle
   ele => branch%ele(je)
@@ -895,17 +903,38 @@ do je = 1, branch%n_ele_track
   if (ele%value(ds_step$) /= l_per / 20) cycle
 
   l_1d = twopi / (run%und_of(je)%ku * 4 * pi * sqrt(3.0_rp) * rho)
-  step = max(1.0_rp, real(int(l_1d / 20 / l_per), rp)) * l_per
+  n_per = max(1, int(l_1d / 20 / l_per))
+
+  ! The periods whose slippage is step_slip_max slices. slip_per is the slippage of one
+  ! period in wavelengths, which is 1 at resonance.
+
+  if (td .and. run%global%step_slip_max > 0 .and. run%gamma0 > 0) then
+    slip_per = l_per * (1 + run%und_of(je)%aw**2) / (2 * run%gamma0**2 * run%winit%lambda0)
+    n_per_slip = max(1, int(run%global%step_slip_max * run%slicing%n_wavelength / slip_per))
+    if (n_per_slip < n_per) then
+      n_per = n_per_slip
+      n_bounded = n_bounded + 1
+      if (n_done == 0) run%step_from = 'slice'
+    endif
+  endif
+  if (n_done == 0 .and. run%step_from /= 'slice') run%step_from = 'gain'
+
+  step = n_per * l_per
   n_step = max(1, nint(ele%value(l$) / step))
   ele%value(num_steps$) = n_step
   ele%value(ds_step$) = ele%value(l$) / n_step
   n_done = n_done + 1
 enddo
 
-if (n_done > 0) then
+if (n_done > 0 .and. n_bounded == 0) then
   call out_io (s_info$, r_name, 'Integration step \es10.3\ m on \i0\ element(s), derived: a ' // &
                'twentieth of the gain length \es10.3\ m, in whole periods.', &
                i_array = [n_done], r_array = [step, l_1d])
+elseif (n_done > 0) then
+  call out_io (s_info$, r_name, 'Integration step \es10.3\ m on \i0\ element(s), derived. On \i0\ of ' // &
+               'them the slippage of \f0.2\ slice(s) is the bound, in whole periods, and on the rest', &
+               'a twentieth of the gain length \es10.3\ m.', &
+               i_array = [n_done, n_bounded], r_array = [step, run%global%step_slip_max, l_1d])
 endif
 
 end subroutine derive_slicing_and_step
@@ -1698,6 +1727,11 @@ call fel_setup_slippage (run, gamma0_ref, wf%wavelength, ele_slip, light_corr, &
                          run%slip_und, run%slip_int, run%slip_chic, err_flag, run%und_slip)
 if (err_flag) return
 
+! The slippage of one step against the spacing of the field's planes.
+
+call check_step_slip ()
+if (err_flag) return
+
 ! The spectral propagator's pad beyond the window's head, sized for the window and
 ! allocated dark on every member (fel_spectral_size, fel_spectral_mod).
 
@@ -1938,6 +1972,75 @@ endif
 
 !------------------------------------------------------------------------------
 contains
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine check_step_slip ()
+!
+! Routine to hold the slippage of one integration step to run.step_slip_max planes of the
+! field, in a run of more than one slice whose beam carries noise.
+!
+! The walk couples a field plane to the beam slices under it for one step and then moves
+! the field by the step's slippage, dz (1 + aw^2) / (2 gamma0^2 lambda) wavelengths. Where
+! that is r planes, a plane meets the beam of one plane in r and passes the rest. The
+! window is then r sets of planes that exchange no light. Each set is a valid run at r
+! times the spacing, but its slices carry the shot noise of 1/r of the electrons that the
+! spacing holds, so the start-up power is r times too large. Measured on examples/sase at
+! r of 2 and 3: 2.01 and 2.99 times the pulse energy at the end of the first undulator
+! (docs/validation.md, val-step-slip). A quiet load with no shot noise has no noise to
+! count too often and is accepted, with a line of the header's warnings.
+!
+! run%step_slip is set to the largest r of the FEL elements, 0 in a run of one slice.
+!-
+
+subroutine check_step_slip ()
+
+type (ele_struct), pointer :: ele_c
+real(rp) slip_m, r, r_max, plane
+integer ie_c, ie_max, n_step_min
+logical noisy
+
+!
+
+run%step_slip = 0
+if (nslice < 2) return
+
+plane = real(max(1, ffield(1)%n_per), rp) * nint(fbeam%slice_spacing / fbeam%wavelength)
+r_max = 0;  ie_max = 0
+do ie_c = 1, branch%n_ele_track
+  if (.not. is_fel(ie_c)) cycle
+  ele_c => branch%ele(ie_c)
+  slip_m = (1 + run%und_of(ie_c)%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
+  r = slip_m * ele_c%value(l$) / max(1, nint(ele_c%value(num_steps$))) / plane
+  if (r > r_max) then
+    r_max = r;  ie_max = ie_c
+  endif
+enddo
+run%step_slip = r_max
+
+if (ie_max == 0 .or. run%global%step_slip_max <= 0) return
+if (r_max <= run%global%step_slip_max) return
+
+noisy = run%bparam%shot_noise .or. .not. run%bparam%quiet_start .or. run%bparam%beam_file /= '' .or. &
+        run%bparam%load_mode == 'electrons'
+if (.not. noisy) return
+
+! The fewest whole steps of the element that the bound accepts, and their length.
+
+ele_c => branch%ele(ie_max)
+slip_m = (1 + run%und_of(ie_max)%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
+n_step_min = ceiling(slip_m * ele_c%value(l$) / (run%global%step_slip_max * plane))
+call out_io (s_error$, r_name, 'THE INTEGRATION STEP OF ' // trim(ele_c%name) // &
+             ' SLIPS THE FIELD BY \f0.2\ PLANES, ABOVE run.step_slip_max = \f0.2\ .', &
+             'A PLANE OF THE FIELD THEN MEETS THE BEAM OF ONE PLANE IN THAT MANY, AND A START FROM', &
+             'NOISE IS TOO STRONG BY THE SAME FACTOR.', &
+             'POSSIBLE SOLUTION: ds_step AT OR BELOW \es11.4\ m ON THE ELEMENT, OR window.n_wavelength', &
+             'AT OR ABOVE \i0\ . run.step_slip_max = 0 ACCEPTS THE STEP AS IT IS.', &
+             r_array = [r_max, run%global%step_slip_max, ele_c%value(l$) / n_step_min], &
+             i_array = [ceiling(r_max * nint(fbeam%slice_spacing / fbeam%wavelength) / run%global%step_slip_max)])
+err_flag = .true.
+
+end subroutine check_step_slip
 
 !------------------------------------------------------------------------------
 !+

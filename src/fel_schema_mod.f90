@@ -143,6 +143,9 @@ call add ('run', 'comb_ds_save', key_real$, 'm', 'comb', &
       'Minimum z advance between per-record stats rows. 0 is every record, negative is none.')
 call add ('run', 'interlude_ds_step', key_real$, 'm', 'interlude step', &
       'The length an interlude element is cut into, for stats rows and frames along it. 0 tracks it whole.')
+call add ('run', 'step_slip_max', key_real$, '', 'step slip max', &
+      'The most slices that the slippage of one integration step may cross, in a run of more ' // &
+      'than one slice whose beam carries noise. A step beyond it is refused. 0 accepts any step.', lo = 0.0_rp)
 call add ('run', 'dump_beam_at', key_string_list$, '', 'beam dumps', &
       'Element locators for mid-run beam dumps.')
 call add ('run', 'dump_field_at', key_string_list$, '', 'field dumps', &
@@ -566,6 +569,7 @@ case ('run.track_end');                    call put (run%global%track_end)
 case ('run.continuation');                 run%global%continuation = lv
 case ('run.comb_ds_save');                 run%global%comb_ds_save = rv
 case ('run.interlude_ds_step');            run%global%interlude_ds_step = rv
+case ('run.step_slip_max');                run%global%step_slip_max = rv
 case ('run.dump_beam_at');                 call put_list (run%global%dump_beam_at)
 case ('run.dump_field_at');                call put_list (run%global%dump_field_at)
 case ('run.dump_at_comb');                 run%global%dump_at_comb = lv
@@ -1013,6 +1017,7 @@ case ('run.track_end');                    sv = run%global%track_end
 case ('run.continuation');                 lv = run%global%continuation
 case ('run.comb_ds_save');                 rv = run%global%comb_ds_save
 case ('run.interlude_ds_step');            rv = run%global%interlude_ds_step
+case ('run.step_slip_max');                rv = run%global%step_slip_max
 case ('run.dump_beam_at');                 slist = run%global%dump_beam_at
 case ('run.dump_field_at');                slist = run%global%dump_field_at
 case ('run.dump_at_comb');                 lv = run%global%dump_at_comb

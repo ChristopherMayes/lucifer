@@ -1932,7 +1932,11 @@ def genesis_harmonics(args, wd, exe):
     for src, dst in (("DEVG-initial.par.h5", "DEVG-initial.beam.h5"),
                      ("DEVG-initial.fld.h5", "DEVG-initial.wf.h5")):
         convert_genesis.to_openpmd(wd / src, wd / dst)
-    imp = ch.NML_IMPORT.replace('transport_model = "genesis"', 'transport_model = "bmad"')
+    # Genesis4's own run slips the field three slices a step here, and the comparison is of
+    # the two codes on that input. run.step_slip_max refuses it for a loaded beam, so the
+    # key is at 0.
+    imp = ch.NML_IMPORT.replace('transport_model = "genesis"', 'transport_model = "bmad"').replace(
+        "{extra}&end", "  step_slip_max = 0\n{extra}&end")
     curves = {}
     for tag, extra in (("cpu", ""), ("dev", DEV)):
         name = f"devg_{tag}"
