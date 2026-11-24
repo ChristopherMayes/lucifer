@@ -1371,6 +1371,8 @@ where the two builds agree to every printed digit.
 | pre-run: 64 beamlets in a slice, under the 128 the printout warns below | 0 | same | <= 5.0000e-01 |
 | pre-run: the run counts its thin slices | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: the run records the walk's clock beside the estimate | 0.0000e+00 | same | <= 5.0000e-01 |
+| mode peak: the power inside the split angle is the same to 1e-12 at the element ends from the undulator's on (records short of 3) | 0 | same | <= 5.0000e-01 |
+| mode peak: run/z_mode_peak is the first of those records, the undulator's end (m) | 0.0000e+00 | same | <= 1.0000e-09 |
 | pre-run: load_only records the same setup and estimate as the run does | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: load_only tracks nothing (records) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it | 0.0000e+00 | same | <= 5.0000e-01 |

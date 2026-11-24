@@ -22,14 +22,16 @@ by column and a number a README once typed from a run comes from the run itself:
                                          total and the x plane, such as y or h3
   exit_power_per_slice, exit_power_slice_spread  the exit power over the slices, and the
                                          rms over the mean of the per-slice powers
-  peak_power, peak_power_s               the window power's maximum along the line
+  peak_power, peak_power_s               the window power's maximum along the line, at the
+                                         first record within 1e-12 of it
   exit_power_inside, exit_power_outside  the window power inside and outside the split
                                          angle at the last record that has the split, and
                                          exit_power_inside_s names that record's s when
                                          it is not the last
   wide_angle_ratio, wide_angle_ratio_exit  outside over inside, the run's maximum and its
                                          value at the exit, as the program reports them
-  mode_peak_inside, mode_peak_s          the inside power's maximum and where it sits
+  mode_peak_inside, mode_peak_s          the inside power's maximum and where it sits, as
+                                         the program reports them
   split_angle                            the angle the split is taken at
   initial_bunching, exit_bunching, exit_bunching_max
                                          the mean of |b| over slices at the start and the
@@ -86,6 +88,10 @@ import sys
 
 import h5py
 import numpy as np
+
+# The relative distance within which a record counts as the peak, peak_rel_tol of
+# fel_stats_convergence in src/fel_stats_mod.f90.
+PEAK_REL_TOL = 1e-12
 
 # What opens a rule of a box of the printout, in Unicode and in ASCII, and the tag line
 # beside the logo, at whose column the logo's other lines carry the version, the date
@@ -200,7 +206,10 @@ def rows_for(input_file: pathlib.Path, log: pathlib.Path):
         rows.append(("exit_power_per_slice", win[-1] / n_slice, "W"))
         if n_slice > 1 and win[-1] > 0:
             rows.append(("exit_power_slice_spread", float(np.std(power[-1]) / np.mean(power[-1])), ""))
-        k = int(np.argmax(win))
+        # The first record within PEAK_REL_TOL of the largest, as the program takes its mode
+        # peak. After the last undulator the window power is the same at the end of every
+        # element to rounding, and the strict maximum among those is chosen by the last bit.
+        k = int(np.nonzero(win >= win.max() * (1 - PEAK_REL_TOL))[0][0])
         rows += [("peak_power", win[k], "W"), ("peak_power_s", s[k], "m")]
         last_in = np.nonzero(np.isfinite(win_in))[0]
         if last_in.size:
