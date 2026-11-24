@@ -79,7 +79,7 @@ The key `run.migrate = true` moves a particle to the slice into which its phase 
 1. Select `beam.load_mode = "electrons"` where the electrons of the window can be held in memory ([](#el-size)). Its particles are independent, and migration adds no radiation to them.
 2. With a load of beamlets, which is the sample mode or the keep mode under `quiet_start = true`, run the same input file a second time with `beam.shot_noise = false` and without a seed field. The power of the second run is the radiation that migration adds, and it is compared with the power of the first.
 3. Raise `beam.n_particle` until that radiation is small beside the power of the first run at the positions of interest. It is inversely proportional to the number of macroparticles per slice ([](#mig-beamlets)).
-4. With `beam.load_mode = "keep"` and `quiet_start = true`, expect the radiation of the second run from the first element onward, whatever the number of particles ([](#mig-keep)).
+4. With `beam.load_mode = "keep"` and `quiet_start = true`, the number of macroparticles per slice is that of the particles of the bunch multiplied by `beam.beamlet_size`, and `beam.n_particle` does not change it. The radiation of the second run is then lowered by a bunch of more particles ([](#mig-keep)).
 5. Set `run.migrate_check = true` to have the threaded pass compared with the serial one at every pass, and read the moved particles and the dropped charge in `<out_root>.migration.txt`.
 
 ## Running

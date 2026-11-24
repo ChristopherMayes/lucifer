@@ -70,7 +70,7 @@ Lucifer does not have:
 - Simultaneous harmonic fields in the unaveraged mode.
 - Elliptical polarization beyond the tilt-honored planar and helical limits.
 - One-to-one particle tracking, and the particle sorting it implies.
-- Migration of a beamlet as a whole. `run.migrate` moves each [macroparticle](glossary.md#gl-macroparticle) singly, which separates the members of a beamlet ([](#mig-beamlets)). In the keep mode under the quiet start it separates a fraction of the beamlets at its first pass, before any particle has drifted ([](#mig-keep)).
+- Migration of a beamlet as a whole. `run.migrate` moves each [macroparticle](glossary.md#gl-macroparticle) singly, which separates the members of a beamlet ([](#mig-beamlets)).
 - Undulator field errors.
 - On the GPU: space charge, spontaneous radiation, the coherent source and Bmad element wakes on an FEL element, each refused. A CUDA backend, which the device interface is shaped for.
 - MPI. The shared-memory design is a design decision rather than a gap, and a case for adding MPI would rest on a measurement.
