@@ -1282,8 +1282,8 @@ The `keep` run writes it: final dump of several patches, two of them empty. Its 
               @value            float64 little-endian (1,)  [0]
           time                  dataset                     (512,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [-7.00498e-21]
-            @minValue           float64 little-endian (1,)  [-9.33338e-19]
+            @maxValue           float64 little-endian (1,)  [1.10603e-21]
+            @minValue           float64 little-endian (1,)  [-6.63801e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"

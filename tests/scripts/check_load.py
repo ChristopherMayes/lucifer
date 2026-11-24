@@ -8,7 +8,11 @@ Four things, each on the check built for it:
                    beamlet of copies. The per-slice currents and charge-weighted moments
                    the loader records are recomputed here from the bunch file with the same
                    binning, and must agree to roundoff. The dump the load writes must carry
-                   the bunch's charge.
+                   the bunch's charge. No copy may be stored outside its slice: every
+                   phase of the dump lies in [0, 2 pi n_wavelength), at three wavelengths
+                   per slice and at one. A copy beyond the end of its slice is moved by
+                   the first migration pass, and its beamlet is then quiet in neither
+                   slice.
   split weights    the same load with every particle split into coincident copies at a
                    third and two thirds of its charge must record the same currents and
                    moments to roundoff.
@@ -55,6 +59,7 @@ LAMBDA0 = 1e-10
 SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
 E_CHARGE = 1.602176634e-19
+PHASE_MARGIN = 1e-9
 
 INPUT = """[run]
   lattice = "{lat}"
@@ -161,6 +166,25 @@ def keep_exactness(exe, wd):
           f"{n_dump} macroparticles for {len(b['x'])} particles  {'ok' if good else 'FAIL'}")
     record("the dump carries the bunch's charge", dq, 1e-12, "max", good)
     ok = ok and good
+
+    # The copies stand within the slice of their particle. The count is of the phases
+    # outside [0, 2 pi n_wavelength) by more than PHASE_MARGIN, which is above the rounding
+    # of the dump's time and far below the spacing of the copies, 2 pi / 8.
+    rc, out = run(exe, wd, "ldkeep1", bextra.replace('  write_openpmd_file = "load_bunch.h5"\n', ''),
+                  pextra="  run.load_only = T\n", sample=1)
+    if rc != 0:
+        print(f"FAIL: the keep load at one wavelength per slice exited {rc}:\n{out[-1500:]}")
+        return False
+    for root, sample in (("ldkeep", SAMPLE), ("ldkeep1", 1)):
+        theta = np.concatenate([sl["theta"] for sl in beamio.read_slices(wd / f"{root}-initial.beam.h5",
+                                                                         LAMBDA0, sample * LAMBDA0)])
+        n_out = int(np.sum((theta < -PHASE_MARGIN) | (theta > 2 * np.pi * sample + PHASE_MARGIN)))
+        good = n_out == 0 and theta.size > 0
+        name = f"keep mode, quiet start, copies stored outside their slice, {sample} wavelength" \
+               + ("s" if sample > 1 else "") + " per slice"
+        print(f"  {name}: {n_out} of {theta.size} (check == 0)  {'ok' if good else 'FAIL'}")
+        record(name, n_out, 0, "equal", good)
+        ok = ok and good
 
     # Split weights: a third and two thirds, coincident, must record the same load.
     rc, out = run(exe, wd, "ldsplit", bextra.replace('  write_openpmd_file = "load_bunch.h5"\n', '')

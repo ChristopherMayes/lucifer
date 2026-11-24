@@ -1095,11 +1095,21 @@ end subroutine fel_bunch_from_beam_init
 ! arrival time into the slices. A slice's charge is what fell into it.
 !
 ! With the quiet start each particle becomes a beamlet of beamlet_size copies at
-! weight/beamlet_size. The copies share its five other coordinates, with phases spread
-! over 2 pi about its own. So the load is quiet at every harmonic below beamlet_size,
-! and the bunch's moments are the particles'. Without the quiet start each particle
-! keeps its phase and its weight. No random number is drawn before the shot noise, so
-! the same bunch loads the same way every time.
+! weight/beamlet_size. The copies share its five other coordinates. Copy j of a particle
+! of phase theta0 stands at
+!   2 pi floor(theta0 / 2 pi) + mod(theta0 + 2 pi j / beamlet_size, 2 pi).
+! The copies are evenly spaced over the wavelength that holds the particle. So the load
+! is quiet at every harmonic below beamlet_size, and the bunch's moments are the
+! particles'. Without the quiet start each particle keeps its phase and its weight. No
+! random number is drawn before the shot noise, so the same bunch loads the same way
+! every time.
+!
+! Note: The copies were once placed at theta0 + 2 pi j / beamlet_size with no wrap. A copy
+! of a particle in the last wavelength of its slice was then stored beyond the end of the
+! slice. The averaged step is periodic in the phase and did not distinguish it. With
+! run.migrate on, the first call of fel_migrate_slices moved such a copy to the next
+! slice, and a beamlet in two slices is quiet in neither. No copy is now stored outside
+! its slice, and migration separates a beamlet by drift alone, as in the sample mode.
 !
 ! The window follows the bunch: ceiling(extent / spacing) slices from the earliest
 ! particle. Where the input file states window.n_slice or window.window_length, that is the
@@ -1113,7 +1123,7 @@ type (bunch_struct), pointer :: bp
 type (coord_struct), pointer :: cp
 type (fel_slice_struct), pointer :: sl
 real(rp), allocatable :: s_k(:)
-real(rp) p0_mc, p_mc, gam, beta_p, ks_l, spacing_k, smin, ttotal, offset, theta0, w_copy
+real(rp) p0_mc, p_mc, gam, beta_p, ks_l, spacing_k, smin, ttotal, offset, theta0, theta, theta_end, w_copy
 real(rp) floor_max, wsum, q_sum, q_lo, q_hi
 integer, allocatable :: isl(:), nfill(:), group_w(:)
 type (fel_noise_tally_struct) tally
@@ -1263,7 +1273,8 @@ do is_g = 1, nslice_k
 enddo
 
 ! Fill. theta0 is the particle's own phase inside its slice. The copies stand at
-! theta0 + 2 pi m / beamlet_size, so z = beta theta / ks is the stored chart.
+! theta0 + 2 pi m / beamlet_size, less 2 pi where that is past the end of the wavelength
+! that holds theta0. z = beta theta / ks is the stored chart.
 ! The transverse momenta are exact: Px / (m c) over p0_mc, where Bmad's vec(2) is Px / P0.
 ! The resampler carries Genesis's gamma x' instead, for transcription fidelity.
 
@@ -1278,14 +1289,17 @@ do ip = 1, size(bp%particle)
   ! The particle's own phase in its slice, which is window_sample periods long.
 
   theta0 = modulo(ks_l * (s_k(ip) - smin + offset - (isl(ip) - 1) * spacing_k), twopi * window_sample)
+  theta_end = twopi * min(floor(theta0 / twopi) + 1, window_sample)
   w_copy = cp%charge / ncopy
   do im = 0, ncopy - 1
+    theta = theta0 + im * twopi / ncopy
+    if (theta >= theta_end) theta = theta - twopi
     i = sl%n + 1
     sl%n = i
     sl%x(i) = cp%vec(1);  sl%px(i) = cp%vec(2) * cp%p0c / (m_electron * p0_mc)
     sl%y(i) = cp%vec(3);  sl%py(i) = cp%vec(4) * cp%p0c / (m_electron * p0_mc)
     sl%pz(i) = (p_mc - p0_mc) / p0_mc
-    sl%z(i) = beta_p * (theta0 + im * twopi / ncopy) / ks_l
+    sl%z(i) = beta_p * theta / ks_l
     sl%weight(i) = w_copy
   enddo
 enddo

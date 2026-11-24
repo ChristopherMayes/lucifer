@@ -238,6 +238,8 @@ where the two builds agree to every printed digit.
 |---|---|---|---|
 | keep mode against the bunch, currents, counts and moments | 1.5202e-11 | 1.0440e-11 | <= 1.0000e-10 |
 | the dump carries the bunch's charge | 2.1036e-16 | same | <= 1.0000e-12 |
+| keep mode, quiet start, copies stored outside their slice, 3 wavelengths per slice | 0 | same | = 0 |
+| keep mode, quiet start, copies stored outside their slice, 1 wavelength per slice | 0 | same | = 0 |
 | split weights against the unsplit load | 3.4719e-12 | same | <= 1.0000e-11 |
 | refused, noise on the unquiet generator |  | same | holds |
 | copies made outside the loader take the noise on the copies |  | same | holds |

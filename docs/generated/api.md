@@ -4024,11 +4024,21 @@ Routine for load_mode = "keep". Every live particle of the bunch stays, binned b
 arrival time into the slices. A slice's charge is what fell into it.
 
 With the quiet start each particle becomes a beamlet of beamlet_size copies at
-weight/beamlet_size. The copies share its five other coordinates, with phases spread
-over 2 pi about its own. So the load is quiet at every harmonic below beamlet_size,
-and the bunch's moments are the particles'. Without the quiet start each particle
-keeps its phase and its weight. No random number is drawn before the shot noise, so
-the same bunch loads the same way every time.
+weight/beamlet_size. The copies share its five other coordinates. Copy j of a particle
+of phase theta0 stands at
+  2 pi floor(theta0 / 2 pi) + mod(theta0 + 2 pi j / beamlet_size, 2 pi).
+The copies are evenly spaced over the wavelength that holds the particle. So the load
+is quiet at every harmonic below beamlet_size, and the bunch's moments are the
+particles'. Without the quiet start each particle keeps its phase and its weight. No
+random number is drawn before the shot noise, so the same bunch loads the same way
+every time.
+
+Note: The copies were once placed at theta0 + 2 pi j / beamlet_size with no wrap. A copy
+of a particle in the last wavelength of its slice was then stored beyond the end of the
+slice. The averaged step is periodic in the phase and did not distinguish it. With
+run.migrate on, the first call of fel_migrate_slices moved such a copy to the next
+slice, and a beamlet in two slices is quiet in neither. No copy is now stored outside
+its slice, and migration separates a beamlet by drift alone, as in the sample mode.
 
 The window follows the bunch: ceiling(extent / spacing) slices from the earliest
 particle. Where the input file states window.n_slice or window.window_length, that is the
