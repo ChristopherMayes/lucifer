@@ -1,0 +1,28 @@
+# The radiation that slice migration adds to a load of beamlets, the record pl-migration-radiation
+# of docs/migration.md. Measured on 2026-11-12 with Lucifer at commit 31be058. Each row is the power
+# of a run with run.migrate = true whose load has neither shot noise nor a seed field, as a fraction
+# of the SASE power of the same configuration, which is the mean of 8 random seeds with migration
+# off. The rows of sase are of the example examples/sase, which runs the Aramis line of
+# examples/aramis.bmad, the Bmad translation of the lattice of Genesis4's Benchmark1-SASE. The rows
+# LCLS and FLASH1 were recorded under the names of the two FEL lines, whose configurations in the
+# program are the examples lcls and flash1, and the input files of those runs were not recorded. The
+# columns line and wavelength_nm name the FEL line of a row and its radiation wavelength, as the
+# figure and the table print them. The lattice and the beam of each line are in the table
+# tab-mig-cases of the page. A row holds the lower and the upper end of the fraction over the
+# positions from s_from_m to s_to_m, and one value in both columns where one value was recorded.
+# Every value is as it was recorded on that day, with the digits it was recorded with.
+# docs/figures/migration_radiation_figure.py reads this file. The columns are separated by tabs.
+configuration	line	wavelength_nm	beamlet_size	n_per_slice	s_from_m	s_to_m	fraction_low	fraction_high
+sase	Aramis	0.1	4	256	5	40	0.38	0.85
+sase	Aramis	0.1	4	512	5	40	0.19	0.40
+sase	Aramis	0.1	4	1024	5	40	0.09	0.21
+sase	Aramis	0.1	4	2048	5	40	0.05	0.10
+sase	Aramis	0.1	4	4096	5	40	0.02	0.05
+sase	Aramis	0.1	4	8192	5	40	0.011	0.027
+sase	Aramis	0.1	8	2048	5	40	0.03	0.045
+sase	Aramis	0.1	8	8192	5	40	0.005	0.012
+LCLS	LCLS	0.151	4	4096	10	20	0.06	0.06
+LCLS	LCLS	0.151	4	4096	40	40	0.01	0.01
+FLASH1	FLASH1	13.7	4	4096	8	8	0.38	0.38
+FLASH1	FLASH1	13.7	4	4096	12	12	0.11	0.11
+FLASH1	FLASH1	13.7	4	4096	14	14	0.05	0.05

@@ -10,6 +10,7 @@ docs/generated/examples/*.svg	examples	examples/run_examples.sh	-	-
 docs/generated/python/*.svg	examples	tests/scripts/python_page_figures.py	-	-
 docs/figures/window.svg	hand	docs/figures/window_figure.py	-	02a121bcf23bccc06ffba04043d97a4906d4848cc30c97282a3c280df57981a8
 docs/figures/electrons-memory.svg	hand	docs/figures/electrons_memory_figure.py	-	b064d58b7dd8c98561d7f2e59a0b6dc62031e32a61fb6276a5c0419e26510fed
+docs/figures/migration-radiation.svg	hand	docs/figures/migration_radiation_figure.py	docs/figures/migration-radiation.tsv,python/lucifer/plot.py	c7e987c2d6c3da6629805623d4945324712e8790a69c2d89326b3678e0f5e22f
 docs/generated/startup-noise/window-profile.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	25ba45cd3ec8bf7f94d88642526432b6b9a45b482ab0fb4b425efb73106d7c87
 docs/generated/startup-noise/power-outside-and-inside-the-mode.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	25ba45cd3ec8bf7f94d88642526432b6b9a45b482ab0fb4b425efb73106d7c87
 docs/generated/startup-noise/cell-size-cause.png	hand	tests/scripts/startup_noise.py	docs/generated/startup-noise/startup-noise.json	25ba45cd3ec8bf7f94d88642526432b6b9a45b482ab0fb4b425efb73106d7c87
