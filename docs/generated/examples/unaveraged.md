@@ -10,6 +10,28 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/unaveraged/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of each of its runs. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-unaveraged
+
+| quantity | `lucifer.toml` | `lucifer_averaged.toml` |
+|---|---|---|
+| lattice file | `examples/unaveraged/seg1.bmad` | `examples/unaveraged/seg1_averaged.bmad` |
+| radiation wavelength | 0.100 nm | 0.100 nm |
+| beam energy | 5.80 GeV | 5.80 GeV |
+| current | 3.00 kA, steady state | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.381 and 0.405 µm | 0.381 and 0.405 µm |
+| rms relative momentum spread of a slice | $8.6\times10^{-5}$ | $8.6\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 16.9 and 24.8 µm | 16.9 and 24.8 µm |
+| beta function at the entrance, x and y | 8.51 and 17.2 m | 8.51 and 17.2 m |
+| alpha function at the entrance, x and y | $-0.69$ and $1.36$ | $-0.69$ and $1.36$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | one of 3.99 m | one of 3.99 m |
+| length of the line | 3.99 m | 3.99 m |
+| window | one slice of one wavelength | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m | 1.34 m |
+:::
+
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
@@ -17,6 +39,8 @@ The example runs in two commands, with Bmad only:
     python -m lucifer.plot unaveraged.stats.h5
 
 This is one seeded steady-state segment tracked with no period averaging and no resonance approximation (the manual's [unaveraged-mode section](../../fel-physics.md)). The particles ride the real helical field, quiver and all, at 20 integration substeps per period with sin^2 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
+
+The line is one undulator segment of the Aramis line ([`../aramis.bmad`](examples.md#ex-the-aramis-line)): a helical undulator of 3.99 m with a period of 15 mm and an rms undulator parameter of 0.849, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and each run is steady state: one slice with a current of 3.0 kA.
 
 The mode is `seg1.bmad`'s own `fel_method`, `unaveraged`. The substep count and the ramp length are global switches, `run.unaveraged_steps_per_period` and `run.unaveraged_ramp_periods`, at their defaults here. `lucifer_averaged.toml` runs the identical configuration through the averaged default, with a lattice that calls the same file and overrides that one attribute.
 

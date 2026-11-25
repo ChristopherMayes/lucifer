@@ -87,7 +87,7 @@ It takes the compile command from the production build's own makefile, so the re
 (perf-the-phase-profile)=
 ## The phase profile
 
-The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 256, 12 threads and the [source filter](glossary.md#gl-source-filter) at its default. Each column is one run. The `2026-10-24` columns are the same configuration under FFTW's estimated plan, the record this one replaces.
+The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO [Benchmark1-SASE line](glossary.md#gl-aramis), 2048 particles per slice, `ngrid` 256, 12 threads and the [source filter](glossary.md#gl-source-filter) at its default. Each column is one run. The `2026-10-24` columns are the same configuration under FFTW's estimated plan, the record this one replaces.
 
 *Measured 2026-11-15: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, fftw 3.3.11 under `run.fft_plan = "wisdom"`.*
 

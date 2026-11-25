@@ -10,6 +10,29 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/spontaneous/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of each of its runs. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load. The input files of the example do not differ in these quantities.
+:label: tab-case-spontaneous
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/aramis.bmad` |
+| radiation wavelength | 0.100 nm |
+| beam energy | 5.80 GeV |
+| current | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.392 and 0.390 µm |
+| rms relative momentum spread of a slice | $8.6\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.3 and 24.7 µm |
+| beta function at the entrance, x and y | 8.68 and 17.8 m |
+| alpha function at the entrance, x and y | $-0.73$ and $1.44$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m |
+| window | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m |
+:::
+
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
@@ -17,6 +40,8 @@ The example runs in two commands, with Bmad only:
     python -m lucifer.plot spontaneous.stats.h5
 
 This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad.radiation_damping_on` subtracts the classical rate from every particle. `bmad.radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../input-reference.md)).
+
+The line is the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and each run is steady state: one slice with a current of 3.0 kA.
 
 Both input files are the `../steady_state` input file plus the switches, so that run is the control and the difference is the radiation.
 

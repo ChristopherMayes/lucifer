@@ -10,6 +10,30 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/bmad_wake/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of each of its runs. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-bmad-wake
+
+| quantity | `lucifer.toml` | `lucifer_transcribed.toml` |
+|---|---|---|
+| lattice file | `examples/bmad_wake/wake_lattice.bmad` | `examples/aramis.bmad` |
+| radiation wavelength | 0.100 nm | 0.100 nm |
+| beam energy | 5.80 GeV | 5.80 GeV |
+| current | 3.00 kA, uniform along the window | 3.00 kA, uniform along the window |
+| charge in the window | 288 fC | 288 fC |
+| normalized emittance, x and y | 0.398 and 0.399 µm | 0.398 and 0.399 µm |
+| rms relative momentum spread of a slice | $8.8\times10^{-5}$ | $8.8\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.3 and 24.7 µm | 17.3 and 24.7 µm |
+| beta function at the entrance, x and y | 8.51 and 17.4 m | 8.51 and 17.4 m |
+| alpha function at the entrance, x and y | $-0.69$ and $1.41$ | $-0.69$ and $1.41$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 12 of 3.99 m | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m | 57.0 m |
+| window | 96 slices of 3 wavelengths | 96 slices of 3 wavelengths |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m | 1.34 m |
+:::
+
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
@@ -17,6 +41,8 @@ The example runs in two commands, with Bmad only:
     python -m lucifer.plot bmad_wake.stats.h5
 
 This is the resistive-wall wake of `../sase_wake`, delivered through Bmad's own wake machinery instead of the transcribed Genesis 1.3 Version 4 (Genesis4) model. `ztable.wake` is the Bane and Stupakov resistive-wall kernel for a 0.5 mm copper chamber, attached as an `sr_wake` `z_long` table to every element of `wake_lattice.bmad`. The undulators apply it once per element at mid-element across the whole window. The quadrupoles and pipes apply it through Bmad's own `track1_bunch`. The drift slots are pipes here, because a Bmad drift cannot carry a wake.
+
+The line is the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line), which `wake_lattice.bmad` calls, the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, with a uniform current of 3.0 kA over a window of 96 slices of 3 wavelengths.
 
 The table was exported by `wake.write_kernels` and then converted to Bmad's conventions. The sign is flipped to Bmad's positive-decelerating sense, the self-slice term is unhalved, the causal side is at z < 0, and the table is padded past the window. The conversion is described in the header of `wake_lattice.bmad`, and any `wake.on` run regenerates the exported kernel (the manual's [Bmad element wakes section](../../fel-physics.md)).
 

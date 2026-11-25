@@ -8,6 +8,8 @@ The example runs in two commands, with Bmad only:
 
 The bunch is described by Bmad's `beam_init_struct`, the native equivalent of what Genesis 1.3 Version 4 (Genesis4)'s `&beam` describes. It is loaded into FEL slices by each of the two `load_mode` settings and tracked dark through the full line: SASE from a real bunch (the manual's [loading section](../../docs/fel-physics.md)).
 
+The line is the Aramis line of [`../aramis.bmad`](../README.md#the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5. The bunch is Gaussian with an rms length of 1.2 nm and a charge of 30.1 fC, which is 3.0 kA at its peak, in a window of 34 slices of 3 wavelengths.
+
 The lattice is the whole optics specification. The reference energy comes from its `e_tot`, and the bunch is generated matched to the Twiss in its `beginning` statement, which is the FODO line's periodic solution. There is no `gamma0` knob and no `match` transform, because both would be a second way of saying what the lattice already says.
 
 The bunch is a Gaussian test bunch sized to what the FEL window can afford: `sig_z = 1.2 nm` with 30 fC gives the Benchmark1-SASE 3 kA peak in a window a few hundred wavelengths long. A physical accelerator bunch is micrometers long and carries hundreds of pC. It needs thousands of slices and belongs to a production run rather than to an example.

@@ -8,6 +8,8 @@ The example runs in two commands, with Bmad only:
 
 The FEL method is an element attribute, so a line whose segments are tracked differently is a line of elements that differ. `mixed.bmad` calls `../aramis.bmad` for its parameters, defines `UNDU` as the same undulator carrying `fel_method = unaveraged`, and puts one `UNDU` in the third FODO cell. Eleven segments run the averaged default and the fifth runs unaveraged, integrating the real helical field with no period averaging (the manual's [unaveraged-mode section](../../docs/fel-physics.md)).
 
+The line is the Aramis line of [`../aramis.bmad`](../README.md#the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and each run is steady state: one slice with a current of 3.0 kA.
+
 `lucifer_averaged.toml` is the all-averaged twin, which overrides that one element back to the default. The two runs differ in one segment's method and in nothing else.
 
 On this input, a seeded steady state, the two runs are bit-identical up to the first record inside `UNDU`, at z = 19.045 m, and differ from there. The measured quantities are in the table below, the exit power of each run and the step count that the one unaveraged segment adds among them.

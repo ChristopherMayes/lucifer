@@ -10,12 +10,36 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/chicane/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of each of its runs. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-chicane
+
+| quantity | `lucifer.toml` | `lucifer_detuned.toml` |
+|---|---|---|
+| lattice file | `examples/chicane/chicane.bmad` | `examples/chicane/detuned.bmad` |
+| radiation wavelength | 0.100 nm | 0.100 nm |
+| beam energy | 5.80 GeV | 5.80 GeV |
+| current | 3.00 kA, steady state | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.392 and 0.390 µm | 0.392 and 0.390 µm |
+| rms relative momentum spread of a slice | $8.6\times10^{-5}$ | $8.6\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 22.9 and 22.9 µm | 22.9 and 22.9 µm |
+| beta function at the entrance, x and y | 15.3 and 15.3 m | 15.3 and 15.3 m |
+| alpha function at the entrance, x and y | $-0.01$ and $0.01$ | $-0.01$ and $0.01$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 2 of 0.990 m | 2 of 0.990 m |
+| length of the line | 2.31 m | 2.31 m |
+| window | one slice of one wavelength | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $4.9\times10^{-4}$ | $4.9\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.41 m | 1.41 m |
+:::
+
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_detuned.toml
 
 The line is two undulator segments with a four-bend closed-bump chicane in the break, in absolute time tracking mode (`bmad_com[absolute_time_tracking] = T` in the lattice). The inter-segment phase then follows the real geometry. The beam detours the bump while the radiation drifts the chord between the undulator faces, which is computed from `ele%floor` and never entered by hand. The arc-minus-chord delay (583 wavelengths at the reference angle) re-injects the light onto the bunched beam at whatever carrier phase the bend angle dictates.
+
+The two segments are helical undulators of 0.99 m with the period of 15 mm and the rms undulator parameter of 0.849 of the Aramis line ([`../aramis.bmad`](examples.md#ex-the-aramis-line)), resonant at 0.1 nm, and the line has no quadrupole. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and each run is steady state: one slice with a current of 3.0 kA.
 
 The two lattices differ by 0.43 microradians of bend angle: half a wavelength of delay. With a 200 MW seed and two 0.99 m helical segments, the two lattices leave the first segment with the same power and part in the second. `chicane.bmad`, in phase, amplifies in the second segment. `detuned.bmad`, with half a wavelength more delay, absorbs there, and its exit power ends below the seed. The power after the first segment and the exit power of each input file are in the table below on the example's page.
 

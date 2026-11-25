@@ -10,13 +10,38 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/frames/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-frames
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/aramis.bmad` |
+| radiation wavelength | 0.100 nm |
+| beam energy | 5.80 GeV |
+| current | 3.00 kA, uniform along the window |
+| charge in the window | 23.7 fC |
+| normalized emittance, x and y | 0.403 and 0.398 µm |
+| rms relative momentum spread of a slice | $8.7\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.4 and 24.4 µm |
+| beta function at the entrance, x and y | 8.53 and 17.0 m |
+| alpha function at the entrance, x and y | $-0.69$ and $1.38$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m |
+| length tracked, from the entrance | 8.74 m |
+| window | 8 slices of 3 wavelengths |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m |
+:::
+
 The example runs in one command:
 
     ../../build-release/bin/lucifer lucifer.toml
 
 A run writes its beam and its field at element ends. A visualization wants them along z inside the undulators, and it wants to follow a particle from one to the next. This input file turns on the frame series and the field's reductions, and cuts both to four slices of the window ([reading the output](../../reading-output.md)).
 
-The input file runs two segments of the Aramis line with a 1 m comb and a window of 24 wavelengths at 3 wavelengths per slice, which is 8 slices. Each frame carries four of them, indices 3 to 6. A frame of each kind is written at every record, and the record count is in the table below with the run's other measured quantities. A beam frame is a fraction of a megabyte, a field frame about a megabyte, and the statistics file with the reductions a couple of megabytes, so everything the run wrote comes to some tens of megabytes.
+The input file runs two segments of the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line), helical undulators of 3.99 m resonant at 0.1 nm, with a beam of 5.80 GeV and a uniform current of 3.0 kA. It has a 1 m comb and a window of 24 wavelengths at 3 wavelengths per slice, which is 8 slices. Each frame carries four of them, indices 3 to 6. A frame of each kind is written at every record, and the record count is in the table below with the run's other measured quantities. A beam frame is a fraction of a megabyte, a field frame about a megabyte, and the statistics file with the reductions a couple of megabytes, so everything the run wrote comes to some tens of megabytes.
 
 The frame index is the statistics record index, so `frames-000006.beam.h5`, `frames-000006.wf.h5` and row 6 of `frames.stats.h5` are one position on the line. Frames land inside the undulators and not only at their ends, which is what riding the comb is for. At a 1 m comb on 8.74 m of line, six of the twelve fall strictly inside an undulator, two on an undulator's end, three in the break between the two, and one at the entry face.
 

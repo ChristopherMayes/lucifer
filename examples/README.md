@@ -16,36 +16,65 @@ An input file carries no comment beyond the one line that says why a setting dep
 
 ## Shared pieces
 
-`aramis.bmad` is the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom. Most examples call it, and the ones that need a different line carry their own lattice.
+`aramis.bmad` is the Aramis line, which most examples call and which the next section states. The examples that need a different line carry their own lattice.
 
 `python -m lucifer.plot` draws the summary figure of any stats file, ten panels against s with the lattice layout under them, an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields. Each panel is one call of `lucifer.plot.plot`, which [the Python page](../docs/python.md) describes, and what the panels mean is [reading an output file](../docs/reading-output.md).
+
+## The Aramis line
+
+`aramis.bmad` is the Bmad translation of `Aramis.lat`, the lattice of the Benchmark1-SASE case that is distributed with Genesis 1.3 Version 4 (Genesis4). The manual calls it the Aramis line, after that file. Its parameters are those of the Benchmark1-SASE case and are not taken from a publication of a facility.
+
+| the line | |
+|---|---|
+| undulator | helical, period 15 mm, rms undulator parameter 0.84853 |
+| undulator segment | 3.99 m, 266 periods |
+| segments | 12, two in each of 6 FODO cells of 9.5 m |
+| after each segment | a drift of 0.44 m, a quadrupole of 0.08 m with k1 = 2 or -2 m^-2, a drift of 0.24 m |
+| length | 57 m |
+| reference energy | 11357.82 electron rest energies, 5.80 GeV |
+| matched Twiss functions at the entrance | beta 8.54 m and alpha -0.703 in x, beta 17.4 m and alpha 1.40 in y |
+| resonant wavelength | 0.1 nm |
+
+The examples send one beam through this line, and the page of an example states where its beam differs.
+
+| the beam | |
+|---|---|
+| energy | 5.80 GeV |
+| current | 3.0 kA |
+| normalized emittance | 0.4 µm in both planes |
+| rms relative energy spread | 8.8e-5, which is one unit of the Lorentz factor |
+| rms size at the entrance | 17 µm in x and 25 µm in y, matched to the cell |
+| FEL parameter of the one-dimensional theory | 5.1e-4 |
+| gain length of the one-dimensional theory | 1.34 m |
+
+A time-dependent example states its window and its current profile, and a steady-state example tracks one slice of this current. The page of each example that `run_examples.sh` runs opens with a table of its case, the lattice and the beam, which is written from the statistics file of the run.
 
 ## The examples
 
 Times are wall clock for a production build on twelve cores. A debug build is several times slower.
 
-| Example | What it is | Time |
-|---|---|---|
-| [`steady_state/`](steady_state/) | Seeded single-slice gain curve, and mid-run openPMD dumps | about five seconds |
-| [`frames/`](frames/) | A frame series along z over a slice range, with the field's reductions | under a second |
-| [`taper/`](taper/) | The same line with a two-stage undulator taper, past saturation | about five seconds |
-| [`sase/`](sase/) | Pure SASE: a time window of slices, dark start, physical shot noise, slippage | about half a minute |
-| [`flash1/`](flash1/) | FLASH1 at DESY at 13.7 nm from its published parameters, against its measured gain length and pulse energy | about twenty seconds |
-| [`lcls/`](lcls/) | LCLS at SLAC at 1.5 Angstrom from its published parameters, against its measured gain length and saturated power | about a minute and a half |
-| [`sase_wake/`](sase_wake/) | The SASE run through a narrow chamber: resistive-wall, gap and roughness wakes | about half a minute |
-| [`bmad_wake/`](bmad_wake/) | The same resistive-wall kernel through Bmad's own `z_long` machinery, against the transcribed model | about half a minute each |
-| [`space_charge/`](space_charge/) | Long-range space charge on an attosecond bunch, and the short-range harmonics on a bunched beam | a few seconds each |
-| [`migration/`](migration/) | Slice migration: 149k moves, the charge accounted, and what leaving it off costs | about fifteen seconds each |
-| [`spontaneous/`](spontaneous/) | Undulator radiation under Bmad's own damping and fluctuation switches | about five seconds each |
-| [`unaveraged/`](unaveraged/) | One segment with no period averaging, beside its averaged twin | about five seconds |
-| [`mixed_line/`](mixed_line/) | One unaveraged segment among eleven averaged ones, in one line | a few seconds |
-| [`import/`](import/) | A `beam_init` bunch loaded in the keep mode and in the sample mode, tracked dark, and the openPMD round trip | under a minute and under ten seconds |
-| [`crossed_undulator/`](crossed_undulator/) | Two polarizations: an x-planar set bunches, its quarter-turn twin radiates orthogonally | about a second |
-| [`harmonics/`](harmonics/) | Harmonic lasing: a dark third harmonic grows from the fundamental's bunching | about a second |
-| [`chicane/`](chicane/) | A four-bend chicane between segments in absolute time: half a wavelength of geometry flips gain to absorption | about a second each |
-| [`coherent_source/`](coherent_source/) | Tanaka's coherent-source retrieval against the per-particle deposit | a couple of seconds each |
-| [`saturation_demo/`](saturation_demo/) | The full 57 m case to saturation, three trackers from identical dumps, one clock. Needs genesis4 | about twenty-five minutes |
-| [`lcls_electrons/`](lcls_electrons/) | The LCLS window of [`lcls/`](lcls/) with one particle for every electron, $1.9\times10^{8}$ of them. Needs 17 GB | over an hour on twelve cores |
+| Example | What it is | Line and beam | Time |
+|---|---|---|---|
+| [`steady_state/`](steady_state/) | Seeded single-slice gain curve, and mid-run openPMD dumps | Aramis at 0.1 nm, 5.80 GeV, 3.0 kA, steady state | about five seconds |
+| [`frames/`](frames/) | A frame series along z over a slice range, with the field's reductions | two segments of Aramis, 3.0 kA uniform, 8 slices | under a second |
+| [`taper/`](taper/) | The same line with a two-stage undulator taper, past saturation | Aramis with its last four segments tapered, 3.0 kA, steady state | about five seconds |
+| [`sase/`](sase/) | Pure SASE: a time window of slices, dark start, physical shot noise, slippage | Aramis, 3.0 kA uniform, 96 slices | about half a minute |
+| [`flash1/`](flash1/) | FLASH1 at DESY at 13.7 nm from its published parameters, against its measured gain length and pulse energy | FLASH1 at 13.7 nm, 668 MeV, 2.5 kA at the peak of a Gaussian bunch | about twenty seconds |
+| [`lcls/`](lcls/) | LCLS at SLAC at 1.5 Angstrom from its published parameters, against its measured gain length and saturated power | LCLS at 0.151 nm, 13.6 GeV, 3.0 kA uniform | about a minute and a half |
+| [`sase_wake/`](sase_wake/) | The SASE run through a narrow chamber: resistive-wall, gap and roughness wakes | Aramis, the beam and the window of `sase` | about half a minute |
+| [`bmad_wake/`](bmad_wake/) | The same resistive-wall kernel through Bmad's own `z_long` machinery, against the transcribed model | Aramis, the beam and the window of `sase` | about half a minute each |
+| [`space_charge/`](space_charge/) | Long-range space charge on an attosecond bunch, and the short-range harmonics on a bunched beam | Aramis, a Gaussian bunch of 4 nm rms with 3.0 kA at its peak, and one steady-state run | a few seconds each |
+| [`migration/`](migration/) | Slice migration: 149k moves, the charge accounted, and what leaving it off costs | Aramis, the beam and the window of `sase` | about fifteen seconds each |
+| [`spontaneous/`](spontaneous/) | Undulator radiation under Bmad's own damping and fluctuation switches | Aramis, 3.0 kA, steady state | about five seconds each |
+| [`unaveraged/`](unaveraged/) | One segment with no period averaging, beside its averaged twin | one segment of Aramis, 3.0 kA, steady state | about five seconds |
+| [`mixed_line/`](mixed_line/) | One unaveraged segment among eleven averaged ones, in one line | Aramis, 3.0 kA, steady state | a few seconds |
+| [`import/`](import/) | A `beam_init` bunch loaded in the keep mode and in the sample mode, tracked dark, and the openPMD round trip | Aramis, a Gaussian bunch of 1.2 nm rms with 3.0 kA at its peak | under a minute and under ten seconds |
+| [`crossed_undulator/`](crossed_undulator/) | Two polarizations: an x-planar set bunches, its quarter-turn twin radiates orthogonally | two planar undulators of 0.6 m with the period and the rms parameter of Aramis, 5.80 GeV, 3.0 kA, steady state | about a second |
+| [`harmonics/`](harmonics/) | Harmonic lasing: a dark third harmonic grows from the fundamental's bunching | one planar segment of 3.96 m with the period and the rms parameter of Aramis, 5.80 GeV, 3.0 kA, steady state | about a second |
+| [`chicane/`](chicane/) | A four-bend chicane between segments in absolute time: half a wavelength of geometry flips gain to absorption | two helical segments of 0.99 m with the undulator of Aramis and a chicane between them, 5.80 GeV, 3.0 kA, steady state | about a second each |
+| [`coherent_source/`](coherent_source/) | Tanaka's coherent-source retrieval against the per-particle deposit | Aramis, 3.0 kA, steady state | a couple of seconds each |
+| [`saturation_demo/`](saturation_demo/) | The full 57 m case to saturation, three trackers from identical dumps, one clock. Needs genesis4 | Aramis, 3.0 kA uniform, 96 slices | about twenty-five minutes |
+| [`lcls_electrons/`](lcls_electrons/) | The LCLS window of [`lcls/`](lcls/) with one particle for every electron, $1.9\times10^{8}$ of them. Needs 17 GB | LCLS, the beam and the window of `lcls` | over an hour on twelve cores |
 
 ## What each feature is exemplified by
 

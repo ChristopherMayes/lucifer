@@ -8,6 +8,8 @@ The example runs in two commands, with Bmad only:
 
 This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad.radiation_damping_on` subtracts the classical rate from every particle. `bmad.radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../docs/input-reference.md)).
 
+The line is the Aramis line of [`../aramis.bmad`](../README.md#the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and each run is steady state: one slice with a current of 3.0 kA.
+
 Both input files are the `../steady_state` input file plus the switches, so that run is the control and the difference is the radiation.
 
 The plot shows it in the beam-energy panel, where the mean falls in a straight line from the first meter. Over the first 20 m the FEL has amplified the seed to only a few MW and has extracted nothing measurable, so that slope is the radiation and nothing else. Fitting it there is the measurement:

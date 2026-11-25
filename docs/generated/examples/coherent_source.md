@@ -10,6 +10,29 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/coherent_source/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of each of its runs. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-coherent-source
+
+| quantity | `lucifer.toml` | `lucifer_low_m.toml` | `lucifer_reference.toml` |
+|---|---|---|---|
+| lattice file | `examples/aramis.bmad` | `examples/aramis.bmad` | `examples/aramis.bmad` |
+| radiation wavelength | 0.100 nm | 0.100 nm | 0.100 nm |
+| beam energy | 5.80 GeV | 5.80 GeV | 5.80 GeV |
+| current | 3.00 kA, steady state | 3.00 kA, steady state | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.346 and 0.449 µm | 0.346 and 0.449 µm | 0.390 and 0.402 µm |
+| rms relative momentum spread of a slice | $8.2\times10^{-5}$ | $8.2\times10^{-5}$ | $8.8\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.2 and 27.3 µm | 17.2 and 27.3 µm | 17.4 and 24.9 µm |
+| beta function at the entrance, x and y | 9.71 and 18.8 m | 9.71 and 18.8 m | 8.79 and 17.5 m |
+| alpha function at the entrance, x and y | $-1.00$ and $1.68$ | $-1.00$ and $1.68$ | $-0.75$ and $1.40$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 12 of 3.99 m | 12 of 3.99 m | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m | 57.0 m | 57.0 m |
+| window | one slice of one wavelength | one slice of one wavelength | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m | 1.34 m | 1.34 m |
+:::
+
 The example runs in three commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
@@ -18,6 +41,8 @@ The example runs in three commands, with Bmad only:
     python -m lucifer.plot coherent.stats.h5
 
 A run whose beam is transversely Gaussian (an idealized machine, a parameter scan, a seeded amplifier study) can trade the per-particle source deposit for Tanaka's coherent retrieval, `run.source_model = "coherent"` (PRAB 27, 030703 (2024), the manual's coherent-source section). It then converges at one to two orders of magnitude fewer macroparticles. With few particles the per-cell source is spiky, and that sampling noise always overestimates the gain. The coherent source carries the slice's exact bunching phasor on a fitted Gaussian instead, so the artifact never enters.
+
+The line is the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and each run is steady state: one slice with a current of 3.0 kA.
 
 Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration) are compared. `lucifer_reference.toml` deposits 8192 particles per slice. `lucifer_low_m.toml` deposits 512. `lucifer.toml` runs the coherent source on the same 512. The measured quantities are in the table below. The low-M deposit comes out high against the reference, and the coherent source at the same count lands close to it. Each run takes a few seconds.
 

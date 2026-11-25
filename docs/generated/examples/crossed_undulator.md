@@ -10,7 +10,31 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/crossed_undulator/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-crossed-undulator
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/crossed_undulator/run_lattice.bmad` |
+| radiation wavelength | 0.100 nm |
+| beam energy | 5.80 GeV |
+| current | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.371 and 0.355 µm |
+| rms relative momentum spread of a slice | $9.1\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 19.7 and 19.3 µm |
+| beta function at the entrance, x and y | 11.9 and 11.9 m |
+| alpha function at the entrance, x and y | $-0.03$ and $0.02$ |
+| undulator | planar, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 2 of 0.600 m |
+| length of the line | 1.40 m |
+| window | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $4.9\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.42 m |
+:::
+
 An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulator rotated a quarter turn, `UNDY: UNDX, tilt = pi/2`, follows after a short gap. The tilt is standard Bmad, and it is what states the polarization. Microbunching is longitudinal and blind to polarization, so the y set radiates orthogonally polarized light seeded by the bunching the x set built. The x field passes through the y set gaining nothing, and the validation suite holds that isolation at the level in [](../../validation.md#val-levels-two-polarization) (the manual's field-solver vector convention).
+
+Both undulators are planar, 0.6 m long, with the period of 15 mm and the rms undulator parameter of 0.849 of the Aramis line ([`../aramis.bmad`](examples.md#ex-the-aramis-line)), resonant at 0.1 nm, and the line has no quadrupole. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and the run is steady state: one slice with a current of 3.0 kA.
 
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot crossed.stats.h5

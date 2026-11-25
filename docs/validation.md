@@ -363,7 +363,7 @@ A beam with an energy spread of 60 $m_ec^2$ is then tracked through one undulato
 
 The pulse energy after one undulator is compared with that of the weight load, as means over 8 seeds of a window of 256 slices. Twelve seeds of windows of 512 and of 1024 slices gave ratios of 0.956 and 0.997 with standard errors of 0.031 and 0.025. At 256 slices and 8 seeds the standard error is 0.05 to 0.06, and the ratio is held within 0.3 of 1, five standard errors, which a noise level wrong by a factor of two would not pass. The comparison over the whole line and 48 seeds is in [](electrons-mode.md#el-compare).
 
-The migration pass was timed on $9.6\times10^{6}$ electrons, $10^5$ per slice in 96 slices, over two cells of the Benchmark1-SASE line on twelve threads of an Apple M3 Max on 2026-11-21. Its 8 passes moved $1.9\times10^{6}$ particles. They took 0.32 s with the serial routine, 0.75% of the [walk](glossary.md#gl-walk) of 43 s, and 0.054 s in threads, 0.13%.
+The migration pass was timed on $9.6\times10^{6}$ electrons, $10^5$ per slice in 96 slices, over two cells of the [Benchmark1-SASE line](glossary.md#gl-aramis) on twelve threads of an Apple M3 Max on 2026-11-21. Its 8 passes moved $1.9\times10^{6}$ particles. They took 0.32 s with the serial routine, 0.75% of the [walk](glossary.md#gl-walk) of 43 s, and 0.054 s in threads, 0.13%.
 
 (val-distribution-import-a-bunchstruct)=
 ## The resampler: a bunch_struct, resampled into slices

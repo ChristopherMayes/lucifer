@@ -65,6 +65,40 @@ by column and a number a README once typed from a run comes from the run itself:
                                          the source filter's two angles, their ratio and
                                          the edge, as setup printed them
 
+The case of the run, its lattice and its beam, from the same file:
+
+  wavelength                             the radiation wavelength, params/field/lambda0
+  current, current_uniform               the current of the window at the first record.
+                                         Where the slice currents differ by no more than
+                                         a tenth of their mean the current is uniform and
+                                         is that mean. Otherwise it is the largest slice
+                                         current.
+  bunch_charge, bunch_length_rms         the charge of the window, in a run of more than
+                                         one slice, and the rms length of the current
+                                         profile where the current is not uniform
+  norm_emit_x, norm_emit_y, initial_sigma_x, initial_sigma_y, initial_beta_x,
+  initial_beta_y, initial_alpha_x, initial_alpha_y, initial_sigma_pz
+                                         from the second moments of the slices at the
+                                         first record, about each slice's centroid and
+                                         averaged over the slices by their current: the
+                                         normalized emittance, the rms size, the Twiss
+                                         parameters and the rms relative momentum spread
+                                         at the entrance of the line
+  n_undulator, n_undulator_helical       the FEL elements of the line, and how many of
+                                         them are helical
+  undulator_period, undulator_aw, undulator_length
+                                         the period, the rms undulator parameter and the
+                                         length of an FEL element, the largest of each,
+                                         and under the same name with _min the smallest
+                                         where the elements differ
+  n_quadrupole, quadrupole_k1_min, quadrupole_k1_max
+                                         the quadrupoles of the line and the range of k1
+  line_length, tracked_length            the s of the end of the line and of the last
+                                         record, which differ where the run stops before
+                                         the end of the line
+  rho_1d, gain_length_1d                 the FEL parameter and the gain length of the
+                                         one-dimensional theory, as setup derived them
+
 A float prints with five significant digits, which is what a run reproduces, and a
 count as itself. A quantity the run does not give, such as a gain length on a line with
 no exponential regime, is left out rather than written as zero.
@@ -92,6 +126,8 @@ import numpy as np
 # The relative distance within which a record counts as the peak, peak_rel_tol of
 # fel_stats_convergence in src/fel_stats_mod.f90.
 PEAK_REL_TOL = 1e-12
+# The electron rest energy in eV, Bmad's m_electron.
+M_ELECTRON = 0.51099895069e6
 
 # What opens a rule of a box of the printout, in Unicode and in ASCII, and the tag line
 # beside the logo, at whose column the logo's other lines carry the version, the date
@@ -161,6 +197,59 @@ def from_setup(h5):
         mode, rho = float(setup["filter_mode_angle"][()]), float(setup["filter_rho_angle"][()])
         out += [("filter_mode_angle", mode, "rad"), ("filter_rho_angle", rho, "rad"),
                 ("filter_ratio", mode / rho if rho > 0 else 0.0, ""), ("filter_edge", float(setup["filter_edge"][()]), "rad")]
+    return out
+
+
+def case_rows(h5):
+    """The case of the run as (name, value, unit): its wavelength, its beam at the
+    entrance of the line and its lattice, from the stats file alone."""
+    out = [("wavelength", float(h5["params/field/lambda0"][()]), "m")]
+
+    cur = h5["beam/slice/current"][0].astype(float)
+    uniform = cur.size == 1 or float(cur.max() - cur.min()) <= 0.1 * float(cur.mean())
+    out += [("current", float(cur.mean() if uniform else cur.max()), "A"), ("current_uniform", bool(uniform), "")]
+    if cur.size > 1:
+        out.append(("bunch_charge", float(h5["beam/bunch/charge_live"][0]), "C"))
+    if not uniform:
+        z = h5["coords/z_slice"][()]
+        zbar = float(np.sum(cur * z) / np.sum(cur))
+        out.append(("bunch_length_rms", float(np.sqrt(np.sum(cur * (z - zbar) ** 2) / np.sum(cur))), "m"))
+
+    # The second moments of the slices at the entrance, in Bmad's (x, px, y, py, z, pz),
+    # about each slice's centroid and averaged over the slices by their current. px is the
+    # momentum over the reference momentum, so the normalized emittance is the geometric
+    # one times p0c over the rest energy.
+    sig = h5["beam/slice/sigma"][0]
+    live = cur > 0
+    m = np.tensordot(cur[live], sig[live], axes=(0, 0)) / np.sum(cur[live])
+    beta_gamma = float(h5["run/p0c"][()]) / M_ELECTRON
+    for k, plane in ((0, "x"), (2, "y")):
+        emit2 = m[k, k] * m[k + 1, k + 1] - m[k, k + 1] ** 2
+        if not emit2 > 0:
+            continue
+        emit = float(np.sqrt(emit2))
+        out += [(f"norm_emit_{plane}", beta_gamma * emit, "m"), (f"initial_sigma_{plane}", float(np.sqrt(m[k, k])), "m"),
+                (f"initial_beta_{plane}", float(m[k, k] / emit), "m"), (f"initial_alpha_{plane}", float(-m[k, k + 1] / emit), "")]
+    out.append(("initial_sigma_pz", float(np.sqrt(max(m[5, 5], 0.0))), ""))
+
+    lat = h5["lattice"]
+    fel = lat["is_fel"][()] == 1
+    if fel.any():
+        out += [("n_undulator", int(fel.sum()), ""), ("n_undulator_helical", int((lat["helical"][()][fel] == 1).sum()), "")]
+        for name, key, unit in (("undulator_period", "l_period", "m"), ("undulator_aw", "aw", ""), ("undulator_length", "l", "m")):
+            v = lat[key][()][fel]
+            out.append((name, float(v.max()), unit))
+            if float(v.max() - v.min()) > 1e-9 * abs(float(v.max())):
+                out.append((name + "_min", float(v.min()), unit))
+    k1 = lat["k1"][()]
+    quad = np.array([key.decode().strip() == "Quadrupole" for key in lat["key"][()]]) & (k1 != 0)
+    if quad.any():
+        out += [("n_quadrupole", int(quad.sum()), ""), ("quadrupole_k1_min", float(k1[quad].min()), "1/m^2"),
+                ("quadrupole_k1_max", float(k1[quad].max()), "1/m^2")]
+    out += [("line_length", float(lat["s_end"][()].max()), "m"), ("tracked_length", float(h5["coords/s"][-1]), "m")]
+    setup = h5["setup"]
+    if "rho_1d" in setup and float(setup["rho_1d"][()]) > 0:
+        out += [("rho_1d", float(setup["rho_1d"][()]), ""), ("gain_length_1d", float(setup["gain_length_1d"][()]), "m")]
     return out
 
 
@@ -266,6 +355,7 @@ def rows_for(input_file: pathlib.Path, log: pathlib.Path):
         if "params/field/grid_n_pts" in h5:
             rows.append(("grid_n_pts", int(h5["params/field/grid_n_pts"][()]), ""))
         rows += from_setup(h5)
+        rows += case_rows(h5)
     return rows
 
 

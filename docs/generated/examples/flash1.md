@@ -10,6 +10,31 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/flash1/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-flash1
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/flash1/flash1.bmad` |
+| radiation wavelength | 13.7 nm |
+| beam energy | 668 MeV |
+| current | 2.50 kA, at the peak of the bunch |
+| charge in the window | 79.8 pC |
+| rms length of the current profile | 3.82 µm |
+| normalized emittance, x and y | 1.49 and 1.51 µm |
+| rms relative momentum spread of a slice | $6.0\times10^{-4}$ |
+| rms beam size at the entrance, x and y | 108 and 106 µm |
+| beta function at the entrance, x and y | 10.1 and 9.82 m |
+| alpha function at the entrance, x and y | $0.19$ and $-0.24$ |
+| undulator | planar, period 27.3 mm, rms parameter $a_w$ = 0.8472 |
+| undulator segments | 6 of 4.50 m |
+| quadrupoles | 12, $k_1$ from $-0.8$ to $1.3$ m$^{-2}$ |
+| length of the line | 31.8 m |
+| window | 351 slices of 12 wavelengths |
+| FEL parameter $\rho$ of the one-dimensional theory | $2.0\times10^{-3}$ |
+| gain length of the one-dimensional theory | 0.638 m |
+:::
+
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
