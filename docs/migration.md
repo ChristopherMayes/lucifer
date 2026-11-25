@@ -53,29 +53,57 @@ The sections above describe the method and hold for any run. This section record
 (pl-migration-radiation)=
 ### The radiation that migration adds to a load of beamlets
 
-Recorded on 2026-11-12, with the program at commit `31be058`. The radiation was measured with a load of beamlets of 4 macroparticles that has neither shot noise nor a [seed field](glossary.md#gl-seed-field), which radiates $10^{-18}$ to $10^{-15}$ W with migration off. With migration on, its power was compared with the SASE power of the same configuration, which is the mean of 8 random seeds with migration off.
+Recorded on 2026-11-12, with the program at commit `31be058`. The radiation was measured with a load of beamlets of 4 macroparticles, and in two rows of 8, that has neither shot noise nor a [seed field](glossary.md#gl-seed-field), which radiates $10^{-18}$ to $10^{-15}$ W with migration off. With migration on, its power was compared with the SASE power of the same configuration, which is the mean of 8 random seeds with migration off.
 
-The first six rows are of the example `sase`. The rows LCLS and FLASH1 were recorded under the names of the two FEL lines, whose configurations in the program are the examples `lcls` and `flash1`. The input files of those runs were not recorded.
+The first eight rows are of the Aramis line at 0.1 nm, which the example `sase` runs: twelve helical undulator segments in a FODO channel, the lattice of the Benchmark1-SASE case of Genesis4, with a beam of 5.80 GeV and 3.0 kA. Six of them are with beamlets of 4 and two with beamlets of 8. The rows LCLS and FLASH1 were recorded under the names of the two FEL lines, whose configurations in the program are the examples `lcls` and `flash1`. The input files of those runs were not recorded. [](#tab-mig-cases) states the lattice and the beam of the three examples. Between the commit of the measurement and commit `c6e9ded` the input files and the lattice files of the three examples differ in one line: the example `lcls` stated `beam.n_particle = 4096` on that day and leaves the number to be derived now.
 
-The manual first held the rows of 1024 and of 8192 macroparticles per slice of the example `sase`, the rows of LCLS and the rows of FLASH1 at 8 m and at 14 m, with no commit and no position for the example `sase`. The commit, the beamlet size, the numbers of random seeds, the positions, the four other rows of the example `sase` and the row of FLASH1 at 12 m were added on 2026-11-22 and 2026-11-23 from the notes made on the day of the measurement. Every fraction is as it was recorded on that day.
+:::{table} The lattice and the beam of the three configurations of the record, from the input file and the lattice file of each example. Every beam is matched to the focusing of its line. The current of the first two is uniform along the [window](glossary.md#gl-window), and the bunch of FLASH1 is Gaussian with $\sigma_z = 3.82$ µm. The last two rows are `setup/rho_1d` and `setup/gain_length_1d` of the statistics file of each example, which the program derives from the rows above them. [](startup-noise.md#tab-sn-beam) and [](startup-noise.md#tab-sn-lattice) state the Aramis line in full.
+:label: tab-mig-cases
+
+| | Aramis | LCLS | FLASH1 |
+|---|---|---|---|
+| example | `sase` | `lcls` | `flash1` |
+| lattice file | `examples/aramis.bmad` | `examples/lcls/lcls.bmad` | `examples/flash1/flash1.bmad` |
+| radiation wavelength | 0.100 nm | 0.151 nm | 13.7 nm |
+| beam energy | 5.80 GeV | 13.6 GeV | 0.668 GeV |
+| peak current | 3.0 kA | 3.0 kA | 2.5 kA |
+| normalized emittance, both planes | 0.40 µm | 0.40 µm | 1.5 µm |
+| rms relative energy spread | $8.8\times10^{-5}$ | $1.3\times10^{-4}$ | $6.0\times10^{-4}$ |
+| undulator type | helical | planar | planar |
+| undulator period | 15.0 mm | 30.0 mm | 27.3 mm |
+| rms undulator parameter $a_w$ | 0.849 | 2.476 | 0.847 |
+| undulator segments | 12 of 3.99 m | 33 of 3.42 m | 6 of 4.50 m |
+| periods per segment | 266 | 114 | 165 |
+| quadrupoles between the segments | one of 0.08 m, $k_1 = \pm 2.0$ m$^{-2}$ | one of 0.20 m, $k_1 = 0.318$ and $-0.311$ m$^{-2}$ | two of 0.10 m, $k_1 = 1.3$ and $-0.8$ m$^{-2}$ |
+| length of the line | 57.0 m | 132.2 m | 31.8 m |
+| window | 96 slices of 3 wavelengths | 300 slices of 68 wavelengths | 351 slices of 12 wavelengths |
+| $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ | $5.8\times10^{-4}$ | $2.0\times10^{-3}$ |
+| gain length of the one-dimensional theory | 1.34 m | 2.36 m | 0.64 m |
+:::
+
+The manual first held the rows of 1024 and of 8192 macroparticles per slice of the example `sase`, the rows of LCLS and the rows of FLASH1 at 8 m and at 14 m, with no commit and no position for the example `sase`. The commit, the beamlet size, the numbers of random seeds, the positions, the four other rows of the example `sase` and the row of FLASH1 at 12 m were added on 2026-11-22 and 2026-11-23 from the notes made on the day of the measurement. Every fraction is as it was recorded on that day. The two rows with beamlets of 8 stood in the text below the table before the table was written from `docs/figures/migration-radiation.tsv`, which holds every row of this record.
 
 Each range of the example `sase` is over the positions from 5 to 40 m. The position at which a range has its upper end was not recorded, so that the dependence on position within a range is not known.
 
-| configuration | macroparticles per slice | position | power with migration on, as a fraction of the SASE power |
-|---|---|---|---|
-| the example `sase` | 256 | 5 to 40 m | 0.38 to 0.85 |
-| the example `sase` | 512 | 5 to 40 m | 0.19 to 0.40 |
-| the example `sase` | 1024 | 5 to 40 m | 0.09 to 0.21 |
-| the example `sase` | 2048 | 5 to 40 m | 0.05 to 0.10 |
-| the example `sase` | 4096 | 5 to 40 m | 0.02 to 0.05 |
-| the example `sase` | 8192 | 5 to 40 m | 0.011 to 0.027 |
-| LCLS | 4096 | 10 to 20 m | 0.06 |
-| LCLS | 4096 | 40 m | 0.01 |
-| FLASH1 | 4096 | 8 m | 0.38 |
-| FLASH1 | 4096 | 12 m | 0.11 |
-| FLASH1 | 4096 | 14 m | 0.05 |
+:::{figure} figures/migration-radiation.svg
+:label: fig-mig-radiation
+:width: 85%
+:alt: The fraction of the SASE power on a logarithmic axis, against the number of macroparticles per slice from 256 to 8192 on a logarithmic axis. Six bars of the Aramis line at 0.1 nm with beamlets of 4 extend from one of two parallel descending straight lines to the other. Two bars with beamlets of 8, at 2048 and at 8192, lie lower than the bars with beamlets of 4 at those numbers. At 4096 three points of FLASH1 at 13.7 nm, marked 8 m, 12 m and 14 m, and two points of LCLS at 0.151 nm, marked 10 to 20 m and 40 m, are each lower than the point before it along the line.
 
-In the six rows of the example `sase` the lower end of the range multiplied by the number of macroparticles per slice lies between 82 and 102, and the upper end between 205 and 221. The rows are therefore consistent with a power that is inversely proportional to the number of macroparticles, as [](#mig-beamlets) derives. At 512 macroparticles per slice beamlets of 2 gave the fraction of beamlets of 4. Beamlets of 8 gave less in this example, 0.03 to 0.045 at 2048 macroparticles per slice and 0.005 to 0.012 at 8192, and the same fractions as beamlets of 4 for LCLS and for FLASH1. The argument of [](#mig-beamlets) gives the dependence on the number of macroparticles at a fixed size of a beamlet and does not determine the dependence on that size. The lower fraction of beamlets of 8 in the example `sase`, which LCLS and FLASH1 do not show, is not explained. In the rows of LCLS and of FLASH1 the fraction falls along the line, as the amplified radiation exceeds the radiation that migration adds.
+The radiation that migration adds to a load of beamlets, as a fraction of the SASE power, is inversely proportional to the number $N$ of macroparticles per slice over the range measured with beamlets of 4, and at one number it decreases along the line. The vertical axis is the power $P_\mathrm{m}$ of a run with migration on whose load has no noise, divided by the SASE power $P_\mathrm{SASE}$. A bar is the range of that fraction over the positions from 5 to 40 m of the Aramis line at 0.1 nm, with a beam of 5.80 GeV and 3.0 kA, which is the example `sase`. The six bars with `beam.beamlet_size = 4` lie between the two lines $C/N$. A point is one value at $N = 4096$, marked with its position, of LCLS at 0.151 nm, with 13.6 GeV and 3.0 kA, or of FLASH1 at 13.7 nm, with 0.668 GeV and 2.5 kA. [](#tab-mig-cases) states the lattice and the beam of each. The bars with `beam.beamlet_size = 8` and the points are drawn beside the bar of their $N$ and not on it, so that the marks do not cover each other. `docs/figures/migration_radiation_figure.py` draws the figure and writes the table from `docs/figures/migration-radiation.tsv`.
+:::
+
+```{include} generated/migration-radiation.md
+:start-after: <!-- begin tab-mig-radiation -->
+:end-before: <!-- end tab-mig-radiation -->
+```
+
+```{include} generated/migration-radiation.md
+:start-after: <!-- begin fit-mig-radiation -->
+:end-before: <!-- end fit-mig-radiation -->
+```
+
+The six rows with beamlets of 4 are therefore consistent with a power that is inversely proportional to the number of macroparticles, as [](#mig-beamlets) derives. At 512 macroparticles per slice beamlets of 2 gave the fraction of beamlets of 4. Beamlets of 8 gave less in this example, at 2048 macroparticles per slice and at 8192, and the same fractions as beamlets of 4 for LCLS and for FLASH1. The argument of [](#mig-beamlets) gives the dependence on the number of macroparticles at a fixed size of a beamlet and does not determine the dependence on that size. The lower fraction of beamlets of 8 in the example `sase`, which LCLS and FLASH1 do not show, is not explained. In the rows of LCLS and of FLASH1 the fraction falls along the line, as the amplified radiation exceeds the radiation that migration adds.
 
 With migration on, the SASE power of FLASH1 over the same 8 random seeds is 1.30 of its value with migration off at 8 m, 1.07 at 12 m and 1.01 at 18 m, and the pulse energy at the exit is $0.966 \pm 0.015$ of its value with migration off. The pulse energy at the exit is thus lower with migration on by more than twice its uncertainty, on the same random seeds, whereas the radiation that migration adds would raise it. The charge that was dropped beyond the window was not recorded, and the difference is not explained. The power of a FLASH1 run with a seed field and with migration on, over 4 random seeds, differs from that with migration off by 1.5% at 6 m and by less than 0.7% from 10 to 18 m. The commit of the program was not recorded for the runs with a seed field.
 

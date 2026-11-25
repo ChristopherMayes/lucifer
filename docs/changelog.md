@@ -10,6 +10,27 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-25 Changed: the record of the radiation that slice migration adds to a load of beamlets,
+  `pl-migration-radiation` of `docs/migration.md`, has a figure, and its table is generated. The
+  thirteen rows of the record are held in `docs/figures/migration-radiation.tsv`: the six of the
+  example `sase` with beamlets of 4, the two with beamlets of 8, which stood in the text below the
+  table, the two of LCLS and the three of FLASH1. `docs/figures/migration_radiation_figure.py` reads
+  that file. It draws `docs/figures/migration-radiation.svg`, the power with migration on as a
+  fraction of the SASE power against the number N of macroparticles per slice on logarithmic axes,
+  with two lines C/N. It writes the table and the sentence on the two coefficients to
+  `docs/generated/migration-radiation.md`, which the page includes. The coefficients are 93 and 211,
+  the geometric means over the six rows with beamlets of 4 of the lower and of the upper end of the
+  range multiplied by N, where the page gave the ranges of those products, 82 to 102 and 205 to 221,
+  which it still gives. The regeneration of `tests/test_keystone.py` runs the script as a twelfth
+  generator, for the page alone, so that a row of the file that changes fails the keystone.
+  `docs/figures/sources.tsv` holds, for the image, the hash of the script, of the file and of
+  `python/lucifer/plot.py`, from which the script takes its style. The record names the eight rows
+  of the example `sase` by their line, the Aramis line at 0.1 nm, in the figure, in the table and in
+  the text, and a second table, `tab-mig-cases`, states the lattice and the beam of the three
+  configurations: the wavelength, the beam energy, the peak current, the emittance, the energy
+  spread, the undulator, the segments, the quadrupoles and the window of the examples `sase`, `lcls`
+  and `flash1`. The file holds the line and the wavelength of each row. No value of the record
+  changes and no run was made. The table gains a column for the beamlet size.
 - 2026-11-24 Fixed: a time-dependent run whose integration step slipped the field by more than one
   slice started from noise that was too strong by that number, and nothing said so. `track_fel_line`
   couples a plane of the field to the slices beneath it for a step and then moves the field by the
