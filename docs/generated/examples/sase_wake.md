@@ -10,12 +10,38 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/sase_wake/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-sase-wake
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/aramis.bmad` |
+| radiation wavelength | 0.100 nm |
+| beam energy | 5.80 GeV |
+| current | 3.00 kA, uniform along the window |
+| charge in the window | 288 fC |
+| normalized emittance, x and y | 0.398 and 0.399 µm |
+| rms relative momentum spread of a slice | $8.8\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.3 and 24.7 µm |
+| beta function at the entrance, x and y | 8.51 and 17.4 m |
+| alpha function at the entrance, x and y | $-0.69$ and $1.41$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m |
+| window | 96 slices of 3 wavelengths |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m |
+:::
+
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot sase_wake.stats.h5
 
 This is the `../sase` run through a deliberately narrow copper chamber of 0.5 mm radius, with the undulator gap wake and a 100 nm rough surface added. All three wake families are transcribed from Genesis 1.3 Version 4 (Genesis4) and act as a per-slice energy-loss rate. The resistive wall acts through the numerical impedance of Bane and Stupakov, the gap wake is convolved with dI/ds, and roughness acts through the complex-q contour (the manual's [wakes section](../../fel-physics.md)).
+
+The line is the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, with a uniform current of 3.0 kA over a window of 96 slices of 3 wavelengths.
 
 The chamber is a demonstration case. At 5.8 GeV and 1 Angstrom a normal chamber's wake is small, and this radius makes the physics visible in one run.
 

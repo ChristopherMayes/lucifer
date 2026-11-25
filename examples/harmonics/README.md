@@ -7,6 +7,8 @@ The example runs in one command, with Bmad only:
 
 This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (`field.harmonics = [1, 3]`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
 
+The segment is a planar undulator of 3.96 m with the period of 15 mm and the rms undulator parameter of 0.849 of the Aramis line ([`../aramis.bmad`](../README.md#the-aramis-line)), and the line has no quadrupole. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and the run is steady state: one slice with a current of 3.0 kA.
+
 The seed is 200 MW on 3.96 m of planar undulator at rms aw = 0.84853. Over the segment the fundamental gives up a small fraction of its seed power to the beam, and the third harmonic climbs from nothing through several decades. The measured quantities are in the table below. The exit power there is the fundamental's, and the harmonic's power along z is in the plot.
 
 The summary figure's harmonic panel shows both curves on one log scale, and that figure is this example's page in the documentation. The harmonic's full wavefront_params live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name, `harmonics-final-h3.wf.h5`, an openPMD EXT_Wavefront file with the photon energy identifying the harmonic.

@@ -10,6 +10,31 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/space_charge/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of each of its runs. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-space-charge
+
+| quantity | `lucifer.toml` | `lucifer_gate_off.toml` | `lucifer_off.toml` | `lucifer_short_range.toml` |
+|---|---|---|---|---|
+| lattice file | `examples/space_charge/sc_line.bmad` | `examples/space_charge/sc_line.bmad` | `examples/aramis.bmad` | `examples/space_charge/sc_line.bmad` |
+| radiation wavelength | 0.100 nm | 0.100 nm | 0.100 nm | 0.100 nm |
+| beam energy | 5.80 GeV | 5.80 GeV | 5.80 GeV | 5.80 GeV |
+| current | 3.00 kA, at the peak of the bunch | 3.00 kA, at the peak of the bunch | 3.00 kA, at the peak of the bunch | 3.00 kA, steady state |
+| charge in the window | 100 fC | 100 fC | 100 fC |  |
+| rms length of the current profile | 3.95 nm | 3.95 nm | 3.95 nm |  |
+| normalized emittance, x and y | 0.393 and 0.393 µm | 0.393 and 0.393 µm | 0.393 and 0.393 µm | 0.392 and 0.390 µm |
+| rms relative momentum spread of a slice | 0 | 0 | 0 | $8.6\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.2 and 24.2 µm | 17.2 and 24.2 µm | 17.2 and 24.2 µm | 17.3 and 24.7 µm |
+| beta function at the entrance, x and y | 8.58 and 16.9 m | 8.58 and 16.9 m | 8.58 and 16.9 m | 8.68 and 17.8 m |
+| alpha function at the entrance, x and y | $-0.72$ and $1.38$ | $-0.72$ and $1.38$ | $-0.72$ and $1.38$ | $-0.73$ and $1.44$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 | helical, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | 12 of 3.99 m | 12 of 3.99 m | 12 of 3.99 m | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m | 57.0 m | 57.0 m | 57.0 m |
+| window | 80 slices of 3 wavelengths | 80 slices of 3 wavelengths | 80 slices of 3 wavelengths | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m | 1.34 m | 1.34 m | 1.34 m |
+:::
+
 The example runs in four commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
@@ -19,6 +44,8 @@ The example runs in four commands, with Bmad only:
     python -m lucifer.plot space_charge.stats.h5
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../fel-physics.md)). The two terms answer different questions, so this example measures them separately.
+
+The line is the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV and normalized emittances of 0.4 µm. In the three time-dependent runs the bunch is Gaussian with an rms length of 4 nm and a charge of 100 fC, which is 3.0 kA at its peak, with no energy spread, in a window of 80 slices of 3 wavelengths. The fourth run is steady state, one slice with a current of 3.0 kA and an rms relative energy spread of 8.8e-5.
 
 The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the input files turn on Bmad's master switch, `bmad.csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so Bmad's `space_charge_com` `n_bin`, set in the lattice file plays no part in it. `space_charge.` in the input file holds the solver's numbers and nothing about whether it runs.
 

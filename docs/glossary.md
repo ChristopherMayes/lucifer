@@ -137,6 +137,9 @@ The window, in window order. Slice 1 is the tail and the highest index the head,
 (gl-line)=
 **line, element.** Bmad's lattice and the elements that make it up. Every element is Bmad's own, and the FEL ones are wigglers with an attribute.
 
+(gl-aramis)=
+**Aramis line, Benchmark1-SASE line.** The undulator line of `examples/aramis.bmad`, which most examples and most checks of the validation suite run. It is the Bmad translation of `Aramis.lat`, the lattice of the Benchmark1-SASE case that is distributed with Genesis4, and it is named after that file. The line consists of twelve helical undulator segments of 266 periods of 15 mm, two in each of six FODO cells, 57 m in all, and it is resonant at 0.1 nm for a beam of 5.80 GeV. Its parameters are those of the Benchmark1-SASE case and are not taken from a publication of a facility. [](startup-noise.md#tab-sn-beam) and [](startup-noise.md#tab-sn-lattice) state its beam and its lattice.
+
 (gl-fel-segment)=
 **FEL segment, undulator.** A Bmad `wiggler` or `undulator` element whose `fel_method` is `averaged` or `unaveraged`. The FEL parameters derive from its lattice attributes ([](#sec-element)).
 

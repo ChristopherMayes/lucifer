@@ -5,7 +5,7 @@ The example runs in one command, with Bmad only:
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot taper.stats.h5
 
-This is the `steady_state` run over `taper.bmad`. That lattice is `../aramis.bmad` for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
+This is the `steady_state` run over `taper.bmad`: one slice of a 5.80 GeV beam with a current of 3.0 kA, at 0.1 nm. That lattice is the Aramis line of [`../aramis.bmad`](../README.md#the-aramis-line) for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
 
 The FEL parameters are lattice attributes, so a heterogeneous line is a line of elements that differ. Each element carries its own `b_max`, `l_period` and `field_calc`, and the tracker derives each segment's `aw` from the element it is standing in. There is no per-segment namelist input and nothing to keep in step with the lattice.
 

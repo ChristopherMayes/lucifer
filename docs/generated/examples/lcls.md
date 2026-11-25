@@ -10,6 +10,30 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/lcls/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-lcls
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/lcls/lcls.bmad` |
+| radiation wavelength | 0.151 nm |
+| beam energy | 13.6 GeV |
+| current | 3.00 kA, uniform along the window |
+| charge in the window | 30.8 pC |
+| normalized emittance, x and y | 0.399 and 0.402 µm |
+| rms relative momentum spread of a slice | $1.3\times10^{-4}$ |
+| rms beam size at the entrance, x and y | 20.1 and 22.4 µm |
+| beta function at the entrance, x and y | 26.9 and 33.2 m |
+| alpha function at the entrance, x and y | $-0.84$ and $1.03$ |
+| undulator | planar, period 30.0 mm, rms parameter $a_w$ = 2.4759 |
+| undulator segments | 33 of 3.42 m |
+| quadrupoles | 32, $k_1$ from $-0.311$ to $0.318$ m$^{-2}$ |
+| length of the line | 132 m |
+| window | 300 slices of 68 wavelengths |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.8\times10^{-4}$ |
+| gain length of the one-dimensional theory | 2.36 m |
+:::
+
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml

@@ -8,6 +8,8 @@ The example runs in two commands, with Bmad only:
 
 The figure is the run with migration on drawn over the run with it off, with the difference beneath each curve: the pulse energy, the bunching, the mean energy change and the power across the window at the exit. `figure.args` holds that command's arguments for `run_examples.sh`. `python -m lucifer.plot migration.stats.h5` draws the summary figure of one run, with a thin gray line per slice.
 
+The line is the Aramis line of [`../aramis.bmad`](../README.md#the-aramis-line), the lattice of the Benchmark1-SASE case of Genesis4: twelve helical undulator segments of 3.99 m with a period of 15 mm in a FODO channel of 57 m, resonant at 0.1 nm. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, with a uniform current of 3.0 kA over a window of 96 slices of 3 wavelengths.
+
 A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `run.migrate = true` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.toml` is the same run with it off.
 
 No artificial driver is needed to make this happen. The phase advance a particle accumulates depends on its energy and on its betatron angles, both of which vary across the beam, so a real beam in a real line migrates on its own. Adding `../sase_wake`'s chamber block to this input file raises both the moves and the dropped charge. A wake that costs the tail slices 121 keV/m and the head slices 1.9 keV/m (`../sase_wake`) is a systematic phase walk on top of the beam's own spread.

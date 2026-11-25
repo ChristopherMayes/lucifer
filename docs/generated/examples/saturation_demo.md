@@ -8,7 +8,7 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/saturation_demo/`.
 
-This is the Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), run to saturation: the full 57 m 6-FODO Aramis line, a dark start, growth from shot noise alone, 96 slices x 2048 particles. It is tracked three ways from identical initial dumps, each on the machine's full performance-core count. Every input is a file in this directory:
+This is the Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), run to saturation: the full 57 m 6-FODO Aramis line at 0.1 nm, a beam of 5.80 GeV with a uniform current of 3.0 kA, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, a dark start, growth from shot noise alone, 96 slices x 2048 particles. It is tracked three ways from identical initial dumps, each on the machine's full performance-core count. Every input is a file in this directory:
 
 | file | what it is |
 |---|---|

@@ -10,12 +10,35 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/taper/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-taper
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/taper/taper.bmad` |
+| radiation wavelength | 0.100 nm |
+| beam energy | 5.80 GeV |
+| current | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.392 and 0.390 µm |
+| rms relative momentum spread of a slice | $8.6\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 17.3 and 24.7 µm |
+| beta function at the entrance, x and y | 8.68 and 17.8 m |
+| alpha function at the entrance, x and y | $-0.73$ and $1.44$ |
+| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.8451 to 0.8485 |
+| undulator segments | 12 of 3.99 m |
+| quadrupoles | 12, $k_1$ from $-2$ to $2$ m$^{-2}$ |
+| length of the line | 57.0 m |
+| window | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $5.1\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.34 m |
+:::
+
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot taper.stats.h5
 
-This is the `steady_state` run over `taper.bmad`. That lattice is `../aramis.bmad` for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
+This is the `steady_state` run over `taper.bmad`: one slice of a 5.80 GeV beam with a current of 3.0 kA, at 0.1 nm. That lattice is the Aramis line of [`../aramis.bmad`](examples.md#ex-the-aramis-line) for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
 
 The FEL parameters are lattice attributes, so a heterogeneous line is a line of elements that differ. Each element carries its own `b_max`, `l_period` and `field_calc`, and the tracker derives each segment's `aw` from the element it is standing in. There is no per-segment namelist input and nothing to keep in step with the lattice.
 

@@ -10,12 +10,36 @@ tags: [how-to, record]
 
 Everything on this page lives in and runs from `examples/harmonics/`.
 
+:::{table} The case of this example: its lattice and its beam, from the statistics file of its run. The emittance, the beam size and the Twiss functions are those of the slices at the first record, averaged over the slices by their current. They are moments of the macroparticles that were loaded, and so differ from the values of the input file by the statistics of the load.
+:label: tab-case-harmonics
+
+| quantity | value |
+|---|---|
+| lattice file | `examples/harmonics/harmonics.bmad` |
+| radiation wavelength | 0.100 nm |
+| beam energy | 5.80 GeV |
+| current | 3.00 kA, steady state |
+| normalized emittance, x and y | 0.390 and 0.402 µm |
+| rms relative momentum spread of a slice | $8.8\times10^{-5}$ |
+| rms beam size at the entrance, x and y | 23.0 and 23.1 µm |
+| beta function at the entrance, x and y | 15.4 and 15.1 m |
+| alpha function at the entrance, x and y | $-0.03$ and $-0.01$ |
+| undulator | planar, period 15.0 mm, rms parameter $a_w$ = 0.8485 |
+| undulator segments | one of 3.96 m |
+| length of the line | 3.96 m |
+| window | one slice of one wavelength |
+| FEL parameter $\rho$ of the one-dimensional theory | $4.5\times10^{-4}$ |
+| gain length of the one-dimensional theory | 1.53 m |
+:::
+
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot harmonics.stats.h5
 
 This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (`field.harmonics = [1, 3]`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
+
+The segment is a planar undulator of 3.96 m with the period of 15 mm and the rms undulator parameter of 0.849 of the Aramis line ([`../aramis.bmad`](examples.md#ex-the-aramis-line)), and the line has no quadrupole. The beam has an energy of 5.80 GeV, normalized emittances of 0.4 µm and an rms relative energy spread of 8.8e-5, and the run is steady state: one slice with a current of 3.0 kA.
 
 The seed is 200 MW on 3.96 m of planar undulator at rms aw = 0.84853. Over the segment the fundamental gives up a small fraction of its seed power to the beam, and the third harmonic climbs from nothing through several decades. The measured quantities are in the table below. The exit power there is the fundamental's, and the harmonic's power along z is in the plot.
 

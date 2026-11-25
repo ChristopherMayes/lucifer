@@ -11,7 +11,7 @@ Every number on this page comes from one record, `docs/generated/spectral/measur
 (spectral-when)=
 ## When to select it
 
-Select the spectral propagator for a long window. Under it the field is sampled at a tenth of the cooperation length instead of at every beam [slice](glossary.md#gl-slice). The transforms along the window then run over the field's planes alone. On the SASE tier's beam over 1280 slices through the Aramis line that sampling holds the pulse energy to 1.3 percent of the run at one plane a slice. The [walk](glossary.md#gl-walk) at 12 threads falls from 690 s to 198 s ([](#spectral-sweep)). The derived sampling needs no key.
+Select the spectral propagator for a long window. Under it the field is sampled at a tenth of the cooperation length instead of at every beam [slice](glossary.md#gl-slice). The transforms along the window then run over the field's planes alone. On the SASE tier's beam over 1280 slices through the [Aramis line](glossary.md#gl-aramis) that sampling holds the pulse energy to 1.3 percent of the run at one plane a slice. The [walk](glossary.md#gl-walk) at 12 threads falls from 690 s to 198 s ([](#spectral-sweep)). The derived sampling needs no key.
 
 Select it also for a seeded pulse whose bandwidth matters. The slice propagator diffracts every frequency at one wavenumber, which is wrong at first order in the relative bandwidth ([](#spectral-vacuum)). Through an FEL's gain that error does not reach the output of a chirped Aramis run at any bandwidth measured ([](#spectral-seeded)), so this reason is the smaller one.
 

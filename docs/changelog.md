@@ -10,6 +10,27 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-11-25 Changed: every example page states the case that the example runs, its lattice and its
+  beam. The page of the example `sase` named its line by the file `aramis.bmad` alone and stated no
+  beam energy, no current and no wavelength outside its input file.
+  `tests/scripts/example_record.py` now records the case of each run from its statistics file, in
+  `case_rows`: the radiation wavelength, the current and whether it is uniform, the charge of the
+  window, the rms length of a bunch, the normalized emittances, the rms sizes, the Twiss functions
+  and the momentum spread at the entrance, from the second moments of the slices at the first
+  record, the undulators with their period, rms parameter and length, the quadrupoles, the length of
+  the line and the length tracked, and rho and the gain length of the one-dimensional theory.
+  `tests/scripts/report_examples.py` writes them as a table before the text of each page, in nm,
+  GeV, kA and µm, with one column where the input files of an example do not differ. For `sase` the
+  table gives 0.100 nm, 5.80 GeV, 3.00 kA uniform along the window, emittances of 0.398 and 0.399
+  µm, beta functions of 8.51 and 17.4 m at the entrance, twelve helical segments of 3.99 m and a
+  window of 96 slices of 3 wavelengths. `examples/measured.tsv` gains 723 rows in its 30 runs, and
+  no value that it held changes. `examples/README.md` states the Aramis line and its beam in a
+  section of its own and gives a line and a beam for each example in its table, the README of each
+  example on that line names the line and the beam after its opening paragraph, and the glossary
+  defines the Aramis line, `gl-aramis`, as the Bmad translation of the lattice of Genesis4's
+  Benchmark1-SASE case. Eight pages link the entry at their first use of the name. A README links a
+  section of the index of the examples as `../README.md#<section>`, which `report_examples.py`
+  retargets to a label that it writes before each section of `docs/generated/examples/examples.md`.
 - 2026-11-25 Changed: the record of the radiation that slice migration adds to a load of beamlets,
   `pl-migration-radiation` of `docs/migration.md`, has a figure, and its table is generated. The
   thirteen rows of the record are held in `docs/figures/migration-radiation.tsv`: the six of the
